@@ -41,6 +41,8 @@ export class ReactiveEngine {
   private running: Promise<void> = Promise.resolve()
   /** Last input hash seen per node with a reaction. */
   private reactionKeys = new Map<NodeId, string>()
+  /** Last known parent of each node. A deleted node can no longer tell us. */
+  private parentOf = new Map<NodeId, NodeId>()
 
   constructor(
     private doc: CanvasDoc,
@@ -112,7 +114,15 @@ export class ReactiveEngine {
 
   private markDirty(ids: NodeId[], tr: Y.Transaction | undefined): void {
     if (!ids.length) return
-    for (const id of ids) this.dirty.add(id)
+    for (const id of ids) {
+      this.dirty.add(id)
+      // A change to a child also changes its group.
+      const parent = this.reader.node(id)?.parentId ?? this.parentOf.get(id)
+      if (parent) {
+        this.parentOf.set(id, parent)
+        this.dirty.add(parent)
+      }
+    }
     const local = tr ? this.isLocalOrigin(tr.origin) : false
     const invocationId = (tr?.origin as { invocationId?: string } | undefined)?.invocationId
     // A local cause wins over a remote one in the same batch.

@@ -1,0 +1,11 @@
+{
+  "name": "@geo-canvas/plugin-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@geo-canvas/core": "*",
+    "zod": "^4.1.0"
+  }
+}

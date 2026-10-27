@@ -1,0 +1,19 @@
+{
+  "name": "@geo-canvas/plugin-disasters",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@geo-canvas/core": "*",
+    "@geo-canvas/plugin-core": "*",
+    "@turf/area": "^7.4.0",
+    "@turf/distance": "^7.4.0",
+    "@turf/helpers": "^7.4.0",
+    "@turf/intersect": "^7.4.0",
+    "zod": "^4.1.0",
+    "ulid": "^3.0.0"
+  }
+}

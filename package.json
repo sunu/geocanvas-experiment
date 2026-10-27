@@ -2,7 +2,10 @@
   "name": "geo-canvas",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
@@ -11,6 +14,7 @@
   },
   "devDependencies": {
     "typescript": "^5.9.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "@types/geojson": "^7946.0.16"
   }
 }
