@@ -36,14 +36,25 @@ function memoryStorage() {
   return { db, storage }
 }
 
-const bytes = (n: number, seed: number) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) % 251)
+/** n bytes in a pattern set by seed. A plain loop: building megabytes through a callback is slow on CI. */
+function bytes(n: number, seed: number) {
+  const out = new Uint8Array(n)
+  for (let i = 0; i < n; i++) out[i] = (i * 31 + seed) % 251
+  return out
+}
+
+/** Same updates, compared as bytes (toEqual walks megabyte arrays element by element). */
+function expectUpdates(actual: Uint8Array[], expected: Uint8Array[]) {
+  expect(actual.map((u) => u.length)).toEqual(expected.map((u) => u.length))
+  actual.forEach((u, i) => expect(Buffer.compare(u, expected[i]!)).toBe(0))
+}
 
 describe('UpdateLog', () => {
   it('keeps small updates whole and in order', () => {
     const log = new UpdateLog(memoryStorage().storage)
     log.append(bytes(10, 1))
     log.append(bytes(20, 2))
-    expect(log.readAll()).toEqual([bytes(10, 1), bytes(20, 2)])
+    expectUpdates(log.readAll(), [bytes(10, 1), bytes(20, 2)])
   })
 
   it('splits an update over the row limit across rows and reads it back whole, between small ones', () => {
@@ -57,7 +68,7 @@ describe('UpdateLog', () => {
     const rows = db.prepare('SELECT length(data) AS n, more FROM updates ORDER BY id').all() as { n: number; more: number }[]
     expect(rows.map((r) => r.more)).toEqual([0, 1, 1, 0, 0])
     expect(Math.max(...rows.map((r) => r.n))).toBe(CHUNK_BYTES)
-    expect(log.readAll()).toEqual([bytes(5, 4), big, bytes(6, 5)])
+    expectUpdates(log.readAll(), [bytes(5, 4), big, bytes(6, 5)])
   })
 
   it('replaces everything with one compacted update, even one over the row limit', () => {
@@ -65,7 +76,7 @@ describe('UpdateLog', () => {
     for (let i = 0; i < 3; i++) log.append(bytes(100, i))
     const state = bytes(3_200_000, 9)
     log.replaceAll(state)
-    expect(log.readAll()).toEqual([state])
+    expectUpdates(log.readAll(), [state])
   })
 
   it('reads rooms saved before updates could span rows', () => {
@@ -76,7 +87,7 @@ describe('UpdateLog', () => {
 
     const log = new UpdateLog(storage)
     log.append(bytes(9, 8))
-    expect(log.readAll()).toEqual([bytes(7, 6), bytes(8, 7), bytes(9, 8)])
+    expectUpdates(log.readAll(), [bytes(7, 6), bytes(8, 7), bytes(9, 8)])
   })
 
   it('restores a board whose saved state is over the row limit', () => {
