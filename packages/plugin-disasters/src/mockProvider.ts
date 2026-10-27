@@ -46,10 +46,10 @@ const RADIUS_KM: Record<DisasterType, [number, number]> = {
 
 /** People affected per km² of footprint, and USD per person affected. Rough mock factors. */
 const IMPACT: Record<DisasterType, { rate: number; usdPerPerson: number }> = {
-  cyclone: { rate: 0.45, usdPerPerson: 420 },
-  flood: { rate: 0.55, usdPerPerson: 260 },
-  earthquake: { rate: 0.6, usdPerPerson: 1300 },
-  drought: { rate: 0.25, usdPerPerson: 90 },
+  cyclone: { rate: 0.04, usdPerPerson: 420 },
+  flood: { rate: 0.06, usdPerPerson: 260 },
+  earthquake: { rate: 0.08, usdPerPerson: 1300 },
+  drought: { rate: 0.02, usdPerPerson: 90 },
 }
 
 function mulberry32(seed: number) {

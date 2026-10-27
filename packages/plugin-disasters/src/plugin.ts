@@ -8,6 +8,9 @@ import type { DisasterEvent, DisasterProvider, DisasterType } from './types.js'
 export const PROVIDER = 'disasters'
 const TYPES = ['cyclone', 'flood', 'earthquake', 'drought'] as const
 
+/** Map hint for generic feature layers: properties.color. */
+export const SEVERITY_RGB = { green: [47, 158, 68], orange: [240, 140, 0], red: [224, 49, 49] } as const
+
 const only = (t: TargetRef) => (t.kind === 'nodes' ? t.ids[0]! : '')
 const eventIdArg = z.string().meta({ widget: 'disasters.event' }).describe('Id of a disaster event')
 
@@ -72,7 +75,7 @@ export const relatedEventsNode: NodeTypeDef = {
         .map((e) => ({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: e.center },
-          properties: { id: e.id, name: e.name, year: e.year, type: e.type, severity: e.severity },
+          properties: { id: e.id, name: e.name, year: e.year, type: e.type, severity: e.severity, color: SEVERITY_RGB[e.severity] },
         })),
     }
     return { outputs: { features }, data: { count: features.features.length } }
@@ -247,7 +250,7 @@ export function createDisastersPlugin(provider: DisasterProvider = new MockDisas
             {
               key: 'summary',
               type: 'core.text',
-              layout: { x: 0, y: 180, w: 380, h: 280 },
+              layout: { x: 1510, y: 0, w: 380, h: 300 },
               props: {
                 title: 'Summary',
                 ports: ['event', 'people', 'damage'],
