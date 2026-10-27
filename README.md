@@ -1,2 +1,2 @@
 # humanitarian-ttx
-Humanitarian Table Top Exercise for Data Exploration and Response
+**Agentic** Humanitarian Table Top Exercise for Data Exploration and Response
