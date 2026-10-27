@@ -11,6 +11,7 @@ import { Palette } from './palette/Palette'
 import { palette } from './palette/store'
 import { SidePanel, TopBar, EmptyState } from './ui/Chrome'
 import { AddBar, DoubleClickToAdd } from './ui/AddBar'
+import { sidebar } from './ui/sidebar'
 import './nodes/core'
 import './nodes/disasters'
 
@@ -79,6 +80,11 @@ function useGlobalKeys(session: Session) {
         e.preventDefault()
         if (palette.get().open) palette.close()
         else palette.open()
+        return
+      }
+      if (mod && e.key === '\\') {
+        e.preventDefault()
+        sidebar.toggle()
         return
       }
       if (typing || palette.get().open) return

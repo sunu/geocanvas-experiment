@@ -190,3 +190,4 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .gc-advanced[open] summary { margin-bottom: 8px; }
 
 .gc-text--edit { width: 100%; border: none; outline: none; resize: none; background: transparent; font-family: ui-monospace, monospace; font-size: 12px; }
+.gc-btn--on { background: var(--gc-node-head); }

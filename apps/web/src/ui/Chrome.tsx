@@ -4,6 +4,7 @@ import { catalog } from '../plugins'
 import { useNodes, useOplog, usePeers, useProposals, useRegistry, useSession } from './context'
 import { palette } from '../palette/store'
 import { usePendingLink } from '../canvas/ports'
+import { sidebar, useSidebarOpen } from './sidebar'
 
 export function TopBar() {
   const { runtime, room, user } = useSession()
@@ -11,6 +12,8 @@ export function TopBar() {
   const pending = usePendingLink()
   const registry = useRegistry()
   const enabled = new Set(registry.plugins.map((p) => p.id))
+  const sideOpen = useSidebarOpen()
+  const proposals = useProposals()
   return (
     <header className="gc-top">
       <strong>Geo Canvas</strong>
@@ -44,6 +47,13 @@ export function TopBar() {
           </span>
         ))}
       </span>
+      <button
+        className={`gc-btn ${sideOpen ? 'gc-btn--on' : ''}`}
+        onClick={() => sidebar.toggle()}
+        title={`${sideOpen ? 'Hide' : 'Show'} op log and proposals (⌘\\)`}
+      >
+        ☰ Log{!sideOpen && proposals.length ? ` · ${proposals.length} proposal${proposals.length > 1 ? 's' : ''}` : ''}
+      </button>
     </header>
   )
 }
@@ -79,6 +89,8 @@ export function EmptyState() {
 export function SidePanel() {
   const [tab, setTab] = useState<'log' | 'proposals'>('log')
   const proposals = useProposals()
+  const open = useSidebarOpen()
+  if (!open) return null
   return (
     <aside className="gc-side">
       <div className="gc-tabs">
