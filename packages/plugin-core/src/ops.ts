@@ -161,7 +161,13 @@ export const moveAnchorOp = defineOp({
   hidden: true,
   when: (ctx) => !!ctx.reader.node(only(ctx.target))?.anchor,
   // Keep the reference zoom: moving a pin does not change its scale.
-  apply: (tx, plan, target) => tx.setAnchor(only(target), { ...tx.reader.node(only(target))!.anchor!, lngLat: plan.lngLat }),
+  // A pin without one (made before pins scaled) gets the map's zoom now.
+  apply(tx, plan, target) {
+    const node = tx.reader.node(only(target))!
+    const mapZoom = (tx.reader.node(node.parentId ?? '')?.props.view as { zoom?: number } | undefined)?.zoom
+    const zoom = node.anchor?.zoom ?? mapZoom
+    tx.setAnchor(node.id, { kind: 'geo', lngLat: plan.lngLat, ...(zoom !== undefined ? { zoom } : {}) })
+  },
 })
 
 export const unpinOp = defineOp({

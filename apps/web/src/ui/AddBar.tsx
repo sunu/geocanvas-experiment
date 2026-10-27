@@ -28,7 +28,11 @@ export function AddBar() {
     const map = f ? runtime.reader.node(f.nodeId) : undefined
     const pin =
       map && isMapNode(map) && t.type !== 'core.map' && !t.group
-        ? { pinTo: { parentId: map.id, lngLat: currentView(runtime, map).center } }
+        ? (() => {
+            // Reference zoom = the map zoom now, so the card scales with the map from here.
+            const v = currentView(runtime, map)
+            return { pinTo: { parentId: map.id, lngLat: v.center, zoom: v.zoom } }
+          })()
         : undefined
     if (askFields(t).length) {
       palette.open({ opId, target: { kind: 'canvas' }, args: pin })

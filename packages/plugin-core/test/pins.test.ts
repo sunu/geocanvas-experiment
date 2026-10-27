@@ -47,6 +47,20 @@ describe('pins', () => {
     expect(pins.map((p) => p.id)).toEqual([r.created![0]])
   })
 
+  it('keeps the reference zoom on move, and fills it in for old pins', async () => {
+    const { rt, map, sticky } = await setup()
+    await rt.dispatch('core.node.pinToMap', nodes([sticky]), {})
+    expect(rt.reader.node(sticky)!.anchor!.zoom).toBe(6)
+    await rt.dispatch('core.map.setView', nodes([map]), { center: [34.8, -19.8], zoom: 8 })
+    await rt.dispatch('core.node.moveAnchor', nodes([sticky]), { lngLat: [35, -20] })
+    expect(rt.reader.node(sticky)!.anchor!.zoom).toBe(6)
+    // An old pin with no reference zoom gets the map's zoom on its next move.
+    const old = (await rt.dispatch('core.text.add', canvas, { pinTo: { parentId: map, lngLat: [34, -19] } })).created![0]!
+    expect(rt.reader.node(old)!.anchor!.zoom).toBeUndefined()
+    await rt.dispatch('core.node.moveAnchor', nodes([old]), { lngLat: [34.1, -19] })
+    expect(rt.reader.node(old)!.anchor!.zoom).toBe(8)
+  })
+
   it('refuses to pin a map, and deleting the map deletes its pins', async () => {
     const { rt, map, sticky } = await setup()
     const other = (await rt.dispatch('core.map.add', canvas, {})).created![0]!
