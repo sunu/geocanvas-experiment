@@ -64,6 +64,39 @@ describe('undo', () => {
     expect(rt.oplog().filter((e) => e.kind !== 'invocation').map((e) => e.kind)).toEqual(['undo', 'undo', 'redo'])
   })
 
+  it('merges quick repeats of an op with a mergeKey into one undo step', async () => {
+    const rt = runtime(new Y.Doc())
+    await rt.dispatch('core.node.create', canvas, { type: 'test.note', props: { text: 'start' } })
+    const id = rt.reader.nodes()[0]!.id
+    const t = { kind: 'nodes' as const, ids: [id] }
+    for (const text of ['a', 'ab', 'abc', 'abcd', 'abcde']) await rt.dispatch('test.note.setText', t, { text })
+    await rt.dispatch('core.node.move', t, { dx: 5 })
+    rt.undo() // the move
+    expect(rt.reader.node(id)!.props.text).toBe('abcde')
+    rt.undo() // all five text changes at once
+    expect(rt.reader.node(id)!.props.text).toBe('start')
+    rt.undo() // the create
+    expect(rt.reader.nodes()).toHaveLength(0)
+  })
+
+  it('does not merge after the merge window', async () => {
+    const rt = runtime(new Y.Doc())
+    await rt.dispatch('core.node.create', canvas, { type: 'test.note', props: { text: 'start' } })
+    const t = { kind: 'nodes' as const, ids: [rt.reader.nodes()[0]!.id] }
+    const realNow = Date.now
+    try {
+      let now = realNow()
+      Date.now = () => now
+      await rt.dispatch('test.note.setText', t, { text: 'one' })
+      now += 3000
+      await rt.dispatch('test.note.setText', t, { text: 'two' })
+    } finally {
+      Date.now = realNow
+    }
+    rt.undo()
+    expect(rt.reader.node(t.ids[0]!)!.props.text).toBe('one')
+  })
+
   it('undoes only my own ops', async () => {
     const [a, b] = linkedDocs()
     const ra = runtime(a, alice)

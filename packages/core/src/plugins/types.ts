@@ -46,6 +46,11 @@ export interface InputReaction {
   args?(node: NodeRecord, inputs: Record<string, unknown>): unknown
   /** Prop that turns the reaction on or off. Defaults to always on. */
   enabledProp?: string
+  /**
+   * What to watch. The reaction runs when this key changes. Default: all inputs.
+   * Example: a map watches its effective AOI (a user override or the input).
+   */
+  key?(node: NodeRecord, inputs: Record<string, unknown>): unknown
 }
 
 export interface NodeTypeDef {

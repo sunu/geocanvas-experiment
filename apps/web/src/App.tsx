@@ -4,14 +4,15 @@ import { createSession, roomFromUrl, type Session } from './session'
 import { SessionContext } from './ui/context'
 import { NodeShapeUtil } from './canvas/NodeShapeUtil'
 import { bindEditor, viewController } from './canvas/bridge'
-import { setEditor, selectionTarget } from './canvas/editorRef'
+import { getEditor, setEditor, selectionTarget } from './canvas/editorRef'
 import { InFront, OnCanvas } from './canvas/Overlays'
 import { linking } from './canvas/ports'
 import { Palette } from './palette/Palette'
 import { palette } from './palette/store'
 import { SidePanel, TopBar, EmptyState } from './ui/Chrome'
-import { AddBar, DoubleClickToAdd } from './ui/AddBar'
+import { AddBar, DoubleClickToAdd, DoubleClickToFocus } from './ui/AddBar'
 import { sidebar } from './ui/sidebar'
+import { focus } from './canvas/focus'
 import './nodes/core'
 import './nodes/disasters'
 
@@ -21,6 +22,7 @@ function InFrontAll() {
     <>
       <InFront />
       <DoubleClickToAdd />
+      <DoubleClickToFocus />
     </>
   )
 }
@@ -52,7 +54,9 @@ export function App() {
                 session.runtime.view = viewController(editor)
                 editor.user.updateUserPreferences({ colorScheme: 'system' })
                 const unbind = bindEditor(editor, session.runtime)
+                const unwatch = focus.watch(editor)
                 return () => {
+                  unwatch()
                   unbind()
                   setEditor(null)
                 }
@@ -87,6 +91,10 @@ function useGlobalKeys(session: Session) {
         sidebar.toggle()
         return
       }
+      if (e.key === 'Escape' && focus.get() && !palette.get().open) {
+        void session.runtime.dispatch('core.view.exitFocus', { kind: 'canvas' }, {})
+        return
+      }
       if (typing || palette.get().open) return
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
@@ -100,6 +108,12 @@ function useGlobalKeys(session: Session) {
         if (t.kind === 'nodes') void session.runtime.dispatch('core.node.delete', t, {})
       } else if (e.key === 'Escape') {
         linking.set(null)
+        const editor = getEditor()
+        if (editor?.getEditingShapeId() && !focus.get()) editor.setEditingShape(null)
+        if (focus.get()) void session.runtime.dispatch('core.view.exitFocus', { kind: 'canvas' }, {})
+      } else if (e.key === 'f' && !mod) {
+        const t = selectionTarget()
+        if (t.kind === 'nodes' && t.ids.length === 1) void session.runtime.dispatch('core.view.enterFocus', t, {})
       }
     }
     window.addEventListener('keydown', onKey)

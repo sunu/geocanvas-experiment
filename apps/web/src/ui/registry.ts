@@ -19,6 +19,8 @@ export interface NodeUI {
   icon?: string
   /** Go to edit mode right after the user adds one (sticky, text). */
   editOnCreate?: boolean
+  /** Double-click enters focus mode (e.g. maps), not only edit mode. */
+  focusOnDoubleClick?: boolean
 }
 
 export interface WidgetProps {

@@ -1,6 +1,7 @@
 import { getIndices, type Editor, type TLShapeId } from 'tldraw'
 import type { CanvasRuntime, Layout, NodeRecord, ViewController } from '@geo-canvas/core'
 import { NODE_SHAPE, nodeIdOf, shapeIdOf, type NodeShape } from './NodeShapeUtil'
+import { focus } from './focus'
 
 /**
  * Connects the tldraw editor to the canvas runtime.
@@ -148,6 +149,12 @@ export function viewController(editor: Editor): ViewController {
     },
     fitAll() {
       editor.zoomToFit({ animation: { duration: 300 } })
+    },
+    enterFocus(id) {
+      focus.enter(editor, id)
+    },
+    exitFocus() {
+      focus.exit(editor)
     },
   }
 }

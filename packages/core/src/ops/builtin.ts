@@ -234,6 +234,28 @@ export const zoomToOp = defineOp({
   applyView: (view, plan) => view.zoomTo(plan.zoom),
 })
 
+export const enterFocusOp = defineOp({
+  id: 'core.view.enterFocus',
+  title: 'Focus mode',
+  description: 'Make this node fill the screen and work inside it (pan a map, edit text). Esc goes back.',
+  scope: 'view',
+  target: { kind: 'node', min: 1, max: 1 },
+  args: z.object({}),
+  nl: { examples: ['focus on the map', 'open this full screen', 'let me work in the map'] },
+  applyView: (view, _plan, target) => view.enterFocus(nodeIdsOf(target)[0]!),
+})
+
+export const exitFocusOp = defineOp({
+  id: 'core.view.exitFocus',
+  title: 'Leave focus mode',
+  description: 'Go back to the canvas view from before focus mode.',
+  scope: 'view',
+  target: { kind: 'canvas' },
+  args: z.object({}),
+  hidden: true,
+  applyView: (view) => view.exitFocus(),
+})
+
 export const builtinOps: OpDef<any, any>[] = [
   createNodeOp,
   deleteNodesOp,
@@ -250,4 +272,6 @@ export const builtinOps: OpDef<any, any>[] = [
   focusOp,
   fitAllOp,
   zoomToOp,
+  enterFocusOp,
+  exitFocusOp,
 ]

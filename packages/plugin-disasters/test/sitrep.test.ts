@@ -109,6 +109,13 @@ describe('situation report', () => {
     const after = rt.engine.get(people.id)?.result?.outputs?.total as number
     expect(after).toBeLessThan(before)
     expect(after).toBeGreaterThan(0)
+
+    // The shared map view follows the AOI: fit at creation, refit after the change, as cascades.
+    const fits = rt.oplog().filter((e) => e.kind === 'invocation' && e.opId === 'core.map.fitToAoi')
+    expect(fits).toHaveLength(2)
+    expect(fits.every((e) => e.kind === 'invocation' && e.actor.kind === 'system')).toBe(true)
+    const view = rt.reader.node(map.id)!.props.view as { zoom: number }
+    expect(view.zoom).toBeGreaterThan(5)
   })
 
   it('regenerates related disasters with a wider year range from the palette op', async () => {

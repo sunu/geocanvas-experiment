@@ -2,6 +2,19 @@ import { z } from 'zod'
 import type { NodeTypeDef, PortMap } from '@geo-canvas/core'
 import type { Aoi, Table } from './ports.js'
 
+export const mapViewSchema = z.object({
+  center: z.tuple([z.number(), z.number()]).describe('[longitude, latitude]'),
+  zoom: z.number().min(0).max(22),
+  bearing: z.number().optional(),
+})
+
+/** Height of the node header above the map. The map viewport is the node minus this. */
+export const MAP_HEADER_H = 34
+
+export function mapViewport(layout: { w: number; h: number }) {
+  return { w: layout.w, h: Math.max(1, layout.h - MAP_HEADER_H) }
+}
+
 const geojson = z.custom<GeoJSON.GeoJSON>((v) => !!v && typeof v === 'object' && 'type' in (v as object))
 
 export const stickyNode: NodeTypeDef = {
@@ -53,12 +66,23 @@ export const mapNode: NodeTypeDef = {
     basemap: z.enum(['streets', 'light', 'dark', 'satellite']).default('light'),
     /** AOI that a user drew. It replaces the AOI from the input. */
     aoiOverride: geojson.meta({ advanced: true, widget: 'aoi' }).optional(),
+    /** Shared camera of the map. Set by core.map.setView and core.map.fitToAoi. */
+    view: mapViewSchema.meta({ advanced: true }).optional(),
+    /** Fit the view when the AOI changes. */
+    autoFit: z.boolean().meta({ advanced: true }).default(true),
   }),
   inputs: {
     aoi: { type: 'geo.aoi', label: 'AOI' },
     features: { type: 'geo.features', label: 'Features' },
   },
   outputs: { aoi: { type: 'geo.aoi', label: 'AOI' } },
+  // Fit the shared view when the effective AOI changes (the originator runs it, once).
+  onInputsChanged: {
+    op: 'core.map.fitToAoi',
+    enabledProp: 'autoFit',
+    key: (node, inputs) => node.props.aoiOverride ?? inputs.aoi ?? null,
+    args: (node, inputs) => (node.props.aoiOverride ?? inputs.aoi ? {} : undefined),
+  },
   compute: ({ node, inputs }) => {
     const aoi = (node.props.aoiOverride as Aoi | undefined) ?? (inputs.aoi as Aoi | undefined)
     return {

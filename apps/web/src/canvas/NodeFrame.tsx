@@ -3,6 +3,7 @@ import { useDerived, useNode, useRegistry, useSession } from '../ui/context'
 import { nodeUIs } from '../ui/registry'
 import { palette } from '../palette/store'
 import { HEADER_H, linking, portOffset, usePendingLink } from './ports'
+import { useFocus } from './focus'
 
 const stop = (e: React.PointerEvent | React.MouseEvent) => e.stopPropagation()
 
@@ -10,7 +11,11 @@ export function NodeFrame({ nodeId, width, height, editing }: { nodeId: string; 
   const node = useNode(nodeId)
   const derived = useDerived(nodeId)
   const registry = useRegistry()
+  const { runtime } = useSession()
+  const focused = useFocus()
   if (!node) return null
+  const isFocused = focused?.nodeId === node.id
+  const dimmed = !!focused && !isFocused && node.parentId !== focused.nodeId
   const def = registry.nodeType(node.type)
   const ui = nodeUIs.get(node.type)
   const inputs = def ? registry.inputsOf(node) : {}
@@ -28,7 +33,7 @@ export function NodeFrame({ nodeId, width, height, editing }: { nodeId: string; 
 
   const body = <ui.View node={node} derived={derived} editing={editing} width={width} height={ui.bare ? height : height - HEADER_H} />
   return (
-    <div className={`gc-node ${def.group ? 'gc-node--group' : ''} ${editing ? 'gc-node--editing' : ''}`}>
+    <div className={`gc-node ${def.group ? 'gc-node--group' : ''} ${editing ? 'gc-node--editing' : ''} ${dimmed ? 'gc-node--dimmed' : ''}`}>
       {!ui.bare && (
         <div className="gc-node__header">
           <span className="gc-node__icon">{ui.icon ?? '◻︎'}</span>
@@ -37,6 +42,19 @@ export function NodeFrame({ nodeId, width, height, editing }: { nodeId: string; 
           {status === 'error' && <span className="gc-node__error" title={derived?.error}>!</span>}
           <span className="gc-node__actions" onPointerDown={stop}>
             {ui.Actions && <ui.Actions node={node} />}
+            <button
+              className="gc-btn gc-btn--ghost"
+              title={isFocused ? 'Leave focus mode (Esc)' : 'Focus mode (F)'}
+              onClick={() =>
+                void runtime.dispatch(
+                  isFocused ? 'core.view.exitFocus' : 'core.view.enterFocus',
+                  isFocused ? { kind: 'canvas' } : { kind: 'nodes', ids: [node.id] },
+                  {},
+                )
+              }
+            >
+              {isFocused ? '⤡' : '⤢'}
+            </button>
             <button
               className="gc-btn gc-btn--ghost"
               title="Commands for this node (⌘K)"

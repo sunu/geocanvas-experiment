@@ -81,7 +81,7 @@ function TextView({ node, derived, editing }: NodeViewProps) {
 
 registerNodeUI('core.sticky', { View: StickyView, bare: true, icon: '🟨', editOnCreate: true })
 registerNodeUI('core.text', { View: TextView, icon: '¶', editOnCreate: true })
-registerNodeUI('core.map', { View: MapView, Actions: MapActions, icon: '🗺' })
+registerNodeUI('core.map', { View: MapView, Actions: MapActions, icon: '🗺', focusOnDoubleClick: true })
 registerNodeUI('core.chart', { View: ChartView, icon: '📊' })
 
 registerWidget('textarea', ({ value, onChange }) => (

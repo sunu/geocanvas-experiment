@@ -5,6 +5,7 @@ import { useRegistry, useSession } from './context'
 import { nodeUIs } from './registry'
 import { palette } from '../palette/store'
 import { placeNew, revealCreated } from '../canvas/editorRef'
+import { focus } from '../canvas/focus'
 
 /**
  * Quick add. Each button runs the node type's '<type>.add' op, the same op as in the palette.
@@ -52,13 +53,41 @@ export function AddBar() {
   )
 }
 
+/** Double-click on a node whose UI has `focusOnDoubleClick` (maps): enter focus mode, through the op. */
+export function DoubleClickToFocus() {
+  const editor = useEditor()
+  const { runtime } = useSession()
+  useEffect(() => {
+    const onEvent = (e: { name: string; phase?: string }) => {
+      if (e.name !== 'double_click' || e.phase !== 'settle-up' || focus.get()) return
+      // tldraw reports target 'canvas' for nodes with HTML content, so hit-test for the node.
+      const shape = editor.getShapeAtPoint(editor.inputs.getCurrentPagePoint(), { hitInside: true })
+      const nodeType = (shape?.props as { nodeType?: string } | undefined)?.nodeType
+      if (!shape || !nodeType || !nodeUIs.get(nodeType)?.focusOnDoubleClick) return
+      void runtime.dispatch('core.view.enterFocus', { kind: 'nodes', ids: [shape.id.replace(/^shape:/, '')] }, {})
+    }
+    editor.on('event', onEvent)
+    return () => {
+      editor.off('event', onEvent)
+    }
+  }, [editor, runtime])
+  return null
+}
+
 /** Double-click on empty canvas: open the palette on the add ops, placed at that point. */
 export function DoubleClickToAdd() {
   const editor = useEditor()
   useEffect(() => {
-    const onEvent = (e: { name: string; target?: string }) => {
+    const onEvent = (e: { name: string; target?: string; phase?: string }) => {
       if (e.name !== 'double_click' || e.target !== 'canvas') return
+      // tldraw sends one double_click per phase (down, up, settle-up). Act once, after the gesture
+      // is over, so the rest of the click does not close the palette again.
+      if (e.phase && e.phase !== 'settle-up') return
+      // Only on empty canvas: not in focus mode, and not when a node is under the pointer
+      // (tldraw can report 'canvas' for double-clicks inside a node's HTML content, e.g. a map).
+      if (focus.get()) return
       const p = editor.inputs.getCurrentPagePoint()
+      if (editor.getShapeAtPoint(p, { hitInside: true, margin: 8 })) return
       palette.open({ target: { kind: 'canvas' }, query: 'Add ', at: { x: p.x, y: p.y } })
     }
     editor.on('event', onEvent)

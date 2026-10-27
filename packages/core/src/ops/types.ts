@@ -35,6 +35,9 @@ export interface ViewController {
   zoomTo(zoom: number): void
   focusNodes(ids: NodeId[]): void
   fitAll(): void
+  /** Focus mode: the node fills the viewport and the user works inside it. */
+  enterFocus(id: NodeId): void
+  exitFocus(): void
 }
 
 export interface OpDef<Args = any, Plan = Args> {
@@ -59,6 +62,11 @@ export interface OpDef<Args = any, Plan = Args> {
   risk?: 'low' | 'high'
   /** Hide from the palette and from tool export (internal ops). */
   hidden?: boolean
+  /**
+   * Invocations with the same key, from the same user, less than MERGE_WINDOW_MS apart,
+   * become one undo step. Example: many small map pans.
+   */
+  mergeKey?(target: TargetRef, args: Args): string | undefined
   /** Hints for NL mode (plans/plan-003.md). */
   nl?: { examples?: string[]; aliases?: string[] }
 }

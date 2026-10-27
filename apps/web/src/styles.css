@@ -202,3 +202,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .gc-trace td { padding: 1px 8px 1px 0; }
 .gc-alts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; margin-top: 4px; }
 .gc-spinner--inline { display: inline-block; vertical-align: -2px; width: 10px; height: 10px; }
+.gc-map { overflow: hidden; }
+.gc-map__scaled { transform-origin: 0 0; }
+.gc-node--dimmed { opacity: 0.22; transition: opacity 0.2s; }

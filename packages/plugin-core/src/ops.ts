@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { defineOp, type TargetRef } from '@geo-canvas/core'
+import { bboxOf, fitBounds, round } from './geo/project.js'
+import { mapViewSchema, mapViewport } from './nodes.js'
 
 const only = (t: TargetRef) => (t.kind === 'nodes' ? t.ids[0]! : '')
 
@@ -71,6 +73,37 @@ export const scaleAoiOp = defineOp({
   apply: (tx, plan, target) => tx.updateProps(only(target), { aoiOverride: plan.aoi }),
 })
 
+export const setViewOp = defineOp({
+  id: 'core.map.setView',
+  title: 'Set map view',
+  description: 'Set the center and zoom of a map. All users see the same view.',
+  target: { kind: 'node', types: ['core.map'], min: 1, max: 1 },
+  args: mapViewSchema,
+  hidden: true,
+  // A pan is many small moves: merge them into one undo step.
+  mergeKey: (t) => `core.map.setView:${only(t)}`,
+  prepare: (_ctx, v) => ({ center: [round(v.center[0]), round(v.center[1])] as [number, number], zoom: round(v.zoom, 3), ...(v.bearing ? { bearing: round(v.bearing, 2) } : {}) }),
+  apply: (tx, view, target) => tx.updateProps(only(target), { view }),
+})
+
+export const fitToAoiOp = defineOp({
+  id: 'core.map.fitToAoi',
+  title: 'Zoom map to AOI',
+  description: 'Set the map view so that the whole area of interest is visible.',
+  target: { kind: 'node', types: ['core.map'], min: 1, max: 1 },
+  args: z.object({ padding: z.number().min(0).max(200).default(30).meta({ advanced: true }) }),
+  nl: { examples: ['zoom the map to the affected area', 'show the whole AOI'] },
+  when: (ctx) => !!ctx.derived(only(ctx.target))?.result?.outputs?.aoi,
+  prepare(ctx, args) {
+    const id = only(ctx.target)
+    const aoi = ctx.derived(id)?.result?.outputs?.aoi as GeoJSON.Feature | undefined
+    if (!aoi) throw new Error('This map has no AOI')
+    const node = ctx.reader.node(id)!
+    return fitBounds(bboxOf(aoi), mapViewport(node.layout), args.padding)
+  },
+  apply: (tx, view, target) => tx.updateProps(only(target), { view }),
+})
+
 export const setBasemapOp = defineOp({
   id: 'core.map.setBasemap',
   title: 'Set basemap',
@@ -117,6 +150,8 @@ export const coreNodeOps = [
   clearAoiOp,
   scaleAoiOp,
   setBasemapOp,
+  setViewOp,
+  fitToAoiOp,
   setChartSourceOp,
   setChartMarkOp,
 ]

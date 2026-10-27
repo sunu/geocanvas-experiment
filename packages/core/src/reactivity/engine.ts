@@ -226,7 +226,7 @@ export class ReactiveEngine {
   private maybeReact(node: NodeRecord, inputs: Record<string, unknown>, cause: ReactionCause): void {
     const reaction = this.getRegistry().nodeType(node.type)?.onInputsChanged
     if (!reaction) return
-    const key = stableHash(inputs)
+    const key = stableHash(reaction.key ? reaction.key(node, inputs) : inputs)
     const prev = this.reactionKeys.get(node.id)
     this.reactionKeys.set(node.id, key)
     if (prev === key) return

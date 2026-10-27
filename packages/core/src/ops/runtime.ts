@@ -58,6 +58,9 @@ export interface RuntimeOptions {
 
 const SYSTEM_ACTOR: Actor = { kind: 'system', id: 'system' }
 
+/** Window for merging invocations with the same mergeKey into one undo step. */
+export const MERGE_WINDOW_MS = 2000
+
 /**
  * One runtime per client (browser tab or agent process).
  * It owns the registry, the undo manager, and the reactivity engine for one doc.
@@ -77,6 +80,7 @@ export class CanvasRuntime {
   private readonly Origin = class extends InvocationOrigin {}
   private readonly Cascade = class extends SystemOrigin {}
   private onMeta: (e: Y.YMapEvent<unknown>) => void
+  private lastMerge: { key: string; at: number } | undefined
 
   constructor(opts: RuntimeOptions) {
     this.doc = getCanvasDoc(opts.ydoc)
@@ -88,7 +92,8 @@ export class CanvasRuntime {
 
     this.undoManager = new Y.UndoManager([this.doc.meta, this.doc.nodes, this.doc.links], {
       trackedOrigins: new Set([this.Origin]),
-      captureTimeout: 0,
+      // Merging is explicit: each dispatch calls stopCapturing() unless the op asks to merge.
+      captureTimeout: MERGE_WINDOW_MS,
     })
     this.undoManager.on('stack-item-added', (e: any) => {
       if (e.origin instanceof InvocationOrigin) {
@@ -268,7 +273,10 @@ export class CanvasRuntime {
         actor.kind === 'system'
           ? new this.Cascade(record.id, opts.parentId)
           : new this.Origin(actor, record.id)
-      this.undoManager.stopCapturing()
+      const mergeKey = actor.kind === 'system' ? undefined : op.mergeKey?.(target, parsed)
+      const merge = !!mergeKey && this.lastMerge?.key === mergeKey && Date.now() - this.lastMerge.at < MERGE_WINDOW_MS
+      if (!merge && actor.kind !== 'system') this.undoManager.stopCapturing()
+      if (actor.kind !== 'system') this.lastMerge = mergeKey ? { key: mergeKey, at: Date.now() } : undefined
       this.doc.ydoc.transact(() => {
         const tx = this.newTx()
         op.apply!(tx, plan, target)

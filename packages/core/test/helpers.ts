@@ -79,7 +79,19 @@ export const corePlugin = definePlugin({
       defaultSize: { w: 300, h: 300 },
     },
   ],
-  ops: [...builtinOps, regenerateOp],
+  ops: [
+    ...builtinOps,
+    regenerateOp,
+    defineOp({
+      id: 'test.note.setText',
+      title: 'Set text (merging)',
+      description: 'Set note text; quick repeats merge into one undo step.',
+      target: { kind: 'node', types: ['test.note'], min: 1, max: 1 },
+      args: z.object({ text: z.string() }),
+      mergeKey: (t) => (t.kind === 'nodes' ? `setText:${t.ids[0]}` : undefined),
+      apply: (tx, plan, t) => tx.updateProps((t as { ids: string[] }).ids[0]!, { text: plan.text }),
+    }),
+  ],
   templates: [
     {
       id: 'test.pipeline',

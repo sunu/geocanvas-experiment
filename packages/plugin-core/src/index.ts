@@ -6,6 +6,7 @@ import { corePortTypes } from './ports.js'
 export * from './ports.js'
 export * from './nodes.js'
 export * from './ops.js'
+export * from './geo/project.js'
 
 /** The core plugin. It is always on. It uses the same plugin API as every other plugin. */
 export const corePlugin = definePlugin({

@@ -9,6 +9,7 @@ import type { NodeViewProps } from '../ui/registry'
 import { getEditor } from '../canvas/editorRef'
 import { shapeIdOf } from '../canvas/NodeShapeUtil'
 import { layerFactories } from './mapLayers'
+import { liveViews, useRenderScale, viewOf } from './mapCamera'
 
 /** Basemaps that need no API key. */
 const VECTOR_STYLES: Record<string, string> = {
@@ -63,26 +64,107 @@ function DeckOverlay(props: MapboxOverlayProps) {
 
 export function MapView({ node, derived, editing, width, height }: NodeViewProps) {
   const registry = useRegistry()
+  const { runtime } = useSession()
   const mapRef = useRef<MapRef>(null)
   const draft = useDrawing(node.id)
   const [hover, setHover] = useState<string>()
   const data = derived?.result?.data as { aoi?: GeoJSON.Feature; features?: GeoJSON.FeatureCollection } | undefined
   const dark = node.props.basemap === 'dark' || node.props.basemap === 'satellite'
 
-  // Fit to the AOI when it changes.
-  const aoiKey = useMemo(() => (data?.aoi ? JSON.stringify(bboxOf(data.aoi)) : ''), [data?.aoi])
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !data?.aoi) return
-    const [minX, minY, maxX, maxY] = bboxOf(data.aoi)
-    map.fitBounds([[minX, minY], [maxX, maxY]], { padding: 30, duration: 600 })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aoiKey])
+  // The view to show (doc units) and the render scale (see mapCamera.ts).
+  const view = viewOf(node, data?.aoi)
+  const scale = useRenderScale(width, height)
+  const dz = Math.log2(scale)
+  const interacting = useRef(false)
+  const viewKey = JSON.stringify(view)
 
-  // Resize the GL canvas with the shape.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as { __maps?: Record<string, unknown> }
+    w.__maps ??= {}
+    const t = setInterval(() => {
+      const m = mapRef.current?.getMap()
+      if (m) {
+        w.__maps![node.id] = m
+        clearInterval(t)
+      }
+    }, 100)
+    return () => clearInterval(t)
+  }, [node.id])
+
+  // Doc view or render scale changed: move the camera, unless the local user is moving it.
+  useEffect(() => {
+    const map = mapRef.current?.getMap()
+    if (!map || interacting.current) return
+    const target = { center: view.center as [number, number], zoom: view.zoom + dz, bearing: view.bearing ?? 0 }
+    const c = map.getCenter()
+    const same = Math.abs(c.lng - target.center[0]) < 1e-6 && Math.abs(c.lat - target.center[1]) < 1e-6 && Math.abs(map.getZoom() - target.zoom) < 1e-3
+    if (same) return
+    map.easeTo({ ...target, duration: 350 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewKey, dz])
+
+  // Size of the GL canvas follows the shape and the render scale.
   useEffect(() => {
     mapRef.current?.resize()
-  }, [width, height])
+    const map = mapRef.current?.getMap()
+    if (map) map.jumpTo({ center: view.center, zoom: view.zoom + dz, bearing: view.bearing ?? 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height, scale])
+
+  // A user pan or zoom ends: commit the view as one op (quick repeats merge into one undo step).
+  const commitTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const toDoc = () => {
+    const map = mapRef.current!.getMap()
+    const c = map.getCenter()
+    return { center: [c.lng, c.lat] as [number, number], zoom: map.getZoom() - dz, bearing: map.getBearing() || undefined }
+  }
+  const onMoveStart = (e: { originalEvent?: unknown }) => {
+    if (!editing || !isUser(e)) return
+    interacting.current = true
+    clearTimeout(commitTimer.current)
+  }
+  const onMove = (e: { originalEvent?: unknown }) => {
+    if (interacting.current) liveViews.set(node.id, toDoc())
+    void e
+  }
+  const onMoveEnd = (e: { originalEvent?: unknown }) => {
+    if (!interacting.current) return
+    clearTimeout(commitTimer.current)
+    commitTimer.current = setTimeout(() => {
+      interacting.current = false
+      const v = toDoc()
+      liveViews.set(node.id, undefined)
+      void runtime.dispatch('core.map.setView', { kind: 'nodes', ids: [node.id] }, { ...v, bearing: v.bearing ?? undefined })
+    }, 300)
+    void e
+  }
+
+  // While editing, wheel and pinch belong to the map, not to the canvas camera.
+  // tldraw listens natively above us, so stop the native event here (React's handler runs too late).
+  const wrapRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el || !editing) return
+    const stop = (e: WheelEvent) => e.stopPropagation()
+    el.addEventListener('wheel', stop, { passive: true })
+    return () => el.removeEventListener('wheel', stop)
+  }, [editing])
+
+  // Time of the last user input on the map. MapLibre does not always set originalEvent
+  // (e.g. scroll zoom), so this tells user moves from programmatic ones.
+  const lastInput = useRef(0)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const mark = () => (lastInput.current = performance.now())
+    const opts = { capture: true, passive: true }
+    for (const t of ['wheel', 'pointerdown', 'pointermove', 'touchstart', 'keydown'] as const) el.addEventListener(t, mark, opts)
+    return () => {
+      for (const t of ['wheel', 'pointerdown', 'pointermove', 'touchstart', 'keydown'] as const) el.removeEventListener(t, mark, opts)
+    }
+  }, [])
+  const isUser = (e: { originalEvent?: unknown }) => !!e.originalEvent || performance.now() - lastInput.current < 400
 
   const layers = useMemo(() => {
     const out: Layer[] = []
@@ -109,24 +191,31 @@ export function MapView({ node, derived, editing, width, height }: NodeViewProps
   }
 
   return (
-    <div className="gc-map" onPointerDown={(e) => editing && e.stopPropagation()}>
-      <Map
-        ref={mapRef}
-        initialViewState={{ longitude: 40, latitude: 10, zoom: 1.5 }}
-        mapStyle={basemapStyle(String(node.props.basemap))}
-        attributionControl={{ compact: true }}
-        interactive={editing}
-        doubleClickZoom={!draft}
-        style={{ width: '100%', height: '100%' }}
+    <div ref={wrapRef} className="gc-map" onPointerDown={(e) => editing && e.stopPropagation()}>
+      <div
+        className="gc-map__scaled"
+        style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, transform: `scale(${1 / scale})` }}
       >
-        <DeckOverlay
-          layers={layers}
-          onClick={onClick}
-          onHover={(info: PickingInfo) => setHover((info.object as GeoJSON.Feature | undefined)?.properties?.name as string | undefined)}
-        />
-      </Map>
+        <Map
+          ref={mapRef}
+          initialViewState={{ longitude: view.center[0], latitude: view.center[1], zoom: view.zoom + dz, bearing: view.bearing ?? 0 }}
+          mapStyle={basemapStyle(String(node.props.basemap))}
+          attributionControl={{ compact: true }}
+          doubleClickZoom={!draft}
+          onMoveStart={onMoveStart}
+          onMove={onMove}
+          onMoveEnd={onMoveEnd}
+          style={{ width: '100%', height: '100%' }}
+        >
+          <DeckOverlay
+            layers={layers}
+            onClick={onClick}
+            onHover={(info: PickingInfo) => setHover((info.object as GeoJSON.Feature | undefined)?.properties?.name as string | undefined)}
+          />
+        </Map>
+      </div>
       {hover && <div className="gc-map__hover">{hover}</div>}
-      {!editing && <div className="gc-map__hint">Double-click to pan and zoom</div>}
+      {!editing && <div className="gc-map__hint">Double-click or press F to work in the map</div>}
       {data?.aoi && (derived?.result?.data as { overridden?: boolean })?.overridden && <div className="gc-map__badge">AOI set by user</div>}
       {draft && <div className="gc-map__draw">Click to add points ({draft.length}). Then press Finish in the header.</div>}
     </div>
@@ -170,16 +259,4 @@ export function MapActions({ node }: { node: NodeRecord }) {
       ✎ AOI
     </button>
   )
-}
-
-function bboxOf(f: GeoJSON.Feature): [number, number, number, number] {
-  let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity]
-  const visit = (c: unknown): void => {
-    if (Array.isArray(c) && typeof c[0] === 'number') {
-      minX = Math.min(minX, c[0]); minY = Math.min(minY, c[1] as number)
-      maxX = Math.max(maxX, c[0]); maxY = Math.max(maxY, c[1] as number)
-    } else if (Array.isArray(c)) c.forEach(visit)
-  }
-  visit((f.geometry as GeoJSON.Polygon).coordinates)
-  return [minX, minY, maxX, maxY]
 }
