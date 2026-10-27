@@ -136,9 +136,13 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
 
     if (id) {
       if (e.shiftKey) {
-        const next = new Set(selected)
-        if (!next.delete(id)) next.add(id)
-        setSelection(next)
+        // Shift: a click toggles this object; a drag draws a selection box from here, so a large
+        // map or box underneath does not get in the way of selecting what is on it.
+        boxSelect(e, selected, () => {
+          const next = new Set(selected)
+          if (!next.delete(id)) next.add(id)
+          setSelection(next)
+        })
         return
       }
       const moving = selected.has(id) ? selected : new Set([id])
@@ -152,8 +156,12 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
     }
 
     // Empty canvas: drag a selection box (shift adds to the selection).
-    const base = e.shiftKey ? selected : new Set<string>()
     if (!e.shiftKey) setSelection(new Set())
+    boxSelect(e, e.shiftKey ? selected : new Set())
+  }
+
+  /** Drag a selection box that adds to `base`. A press without a drag calls onClick instead. */
+  function boxSelect(e: ReactPointerEvent, base: Set<string>, onClick?: () => void) {
     const p0 = screenPoint(e)
     trackDrag(
       e,
@@ -165,7 +173,10 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
         const world = rectFrom(a, b)
         setSelection(new Set([...base, ...objects.filter((o) => intersects(o, world)).map((o) => o.id)]))
       },
-      () => setMarquee(null),
+      (moved) => {
+        setMarquee(null)
+        if (!moved) onClick?.()
+      },
     )
   }
 

@@ -79,11 +79,13 @@ export class Board {
     return m && ({ ...(m.toJSON() as Omit<BoardObject, 'id'>), id } as BoardObject)
   }
 
+  /** New text goes on top. New boxes and maps go to the bottom: they are mostly backgrounds and frames, so drawing one must not cover what is already there. */
   add(fields: NewObject): string {
     const id = crypto.randomUUID()
     this.doc.transact(() => {
       const m = new Y.Map<unknown>()
-      for (const [k, v] of Object.entries({ ...fields, z: fields.z ?? this.topZ() + 1 })) m.set(k, v)
+      const z = fields.z ?? (fields.type === 'text' ? this.topZ() + 1 : this.bottomZ() - 1)
+      for (const [k, v] of Object.entries({ ...fields, z })) m.set(k, v)
       this.objects.set(id, m)
     })
     return id
