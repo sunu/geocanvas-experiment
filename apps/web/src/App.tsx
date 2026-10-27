@@ -1,3 +1,4 @@
+import { PlusIcon } from '@phosphor-icons/react'
 import { connect, useConnectionStatus } from './board/connect'
 import { newRoomId, roomFromHash, roomHash } from './board/room'
 import { Canvas } from './canvas/Canvas'
@@ -26,6 +27,7 @@ export function App() {
       <Canvas board={board} status={status} />
       <div className="ttx-boardbar">
         <button title="Start a new, empty board with its own link" onClick={newBoard}>
+          <PlusIcon size={16} />
           New board
         </button>
       </div>

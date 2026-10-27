@@ -165,6 +165,9 @@ body,
 }
 
 .ttx-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   min-width: 32px;
   height: 32px;
@@ -249,7 +252,14 @@ body,
   box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 4px var(--ttx-accent);
 }
 
+.ttx-style__label {
+  color: var(--ttx-muted);
+}
+
 .ttx-style button:not(.ttx-swatch) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 32px;
   height: 28px;
   padding: 0;
@@ -295,6 +305,9 @@ body,
 }
 
 .ttx-boardbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 32px;
   padding: 0 12px;
   border: 0;

@@ -1,5 +1,7 @@
+import { MinusIcon, PlusIcon, TextAaIcon } from '@phosphor-icons/react'
 import type { Board, BoardObject } from '../board/board'
 import { requestFit } from './ObjectView'
+import { ICON } from './Toolbar'
 import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE, stepFontSize, type ColorName } from './style'
 
 type Styled = Extract<BoardObject, { type: 'box' | 'text' }>
@@ -42,9 +44,14 @@ export function StylePanel({ board, selected }: { board: Board; selected: BoardO
       {texts.length > 0 && (
         <>
           <span className="ttx-style__sep" />
-          <button title="Larger text" onClick={() => stepSize(1)}>A+</button>
+          <TextAaIcon size={ICON} className="ttx-style__label" aria-hidden />
+          <button title="Larger text" aria-label="Larger text" onClick={() => stepSize(1)}>
+            <PlusIcon size={ICON - 2} />
+          </button>
           <span className="ttx-style__size" title="Text size">{sizes.size === 1 ? [...sizes][0] : '–'}</span>
-          <button title="Smaller text" onClick={() => stepSize(-1)}>A−</button>
+          <button title="Smaller text" aria-label="Smaller text" onClick={() => stepSize(-1)}>
+            <MinusIcon size={ICON - 2} />
+          </button>
         </>
       )}
     </div>
