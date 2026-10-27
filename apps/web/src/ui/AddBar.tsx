@@ -6,6 +6,7 @@ import { nodeUIs } from './registry'
 import { palette } from '../palette/store'
 import { placeNew, revealCreated } from '../canvas/editorRef'
 import { focus } from '../canvas/focus'
+import { currentView, isMapNode } from '../canvas/pins'
 
 /**
  * Quick add. Each button runs the node type's '<type>.add' op, the same op as in the palette.
@@ -22,11 +23,18 @@ export function AddBar() {
 
   const add = async (t: NodeTypeDef) => {
     const opId = `${t.type}.add`
+    // A map in focus mode: pin the new node at the center of the map view.
+    const f = focus.get()
+    const map = f ? runtime.reader.node(f.nodeId) : undefined
+    const pin =
+      map && isMapNode(map) && t.type !== 'core.map' && !t.group
+        ? { pinTo: { parentId: map.id, lngLat: currentView(runtime, map).center } }
+        : undefined
     if (askFields(t).length) {
-      palette.open({ opId, target: { kind: 'canvas' } })
+      palette.open({ opId, target: { kind: 'canvas' }, args: pin })
       return
     }
-    const rec = await runtime.dispatch(opId, { kind: 'canvas' }, placeNew(t.defaultSize.w, t.defaultSize.h))
+    const rec = await runtime.dispatch(opId, { kind: 'canvas' }, pin ?? placeNew(t.defaultSize.w, t.defaultSize.h))
     revealCreated(rec.created)
   }
 

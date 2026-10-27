@@ -5,6 +5,7 @@ import type { TargetRef } from '../ops/types.js'
 import { validateDataLink } from '../reactivity/graph.js'
 import {
   createReader,
+  type Anchor,
   type CanvasDoc,
   type DocReader,
   type Layout,
@@ -20,6 +21,7 @@ export interface CreateNodeInput {
   props?: Record<string, unknown>
   layout?: Partial<Layout>
   parentId?: NodeId
+  anchor?: Anchor
 }
 
 /**
@@ -51,6 +53,10 @@ export class DocTx {
     const ynode = new Y.Map<unknown>()
     ynode.set('type', input.type)
     if (input.parentId) ynode.set('parentId', input.parentId)
+    if (input.anchor) {
+      if (!input.parentId) throw new Error('A pinned node needs a parent')
+      ynode.set('anchor', input.anchor)
+    }
     const yprops = new Y.Map<unknown>()
     for (const [k, v] of Object.entries(props)) if (v !== undefined) yprops.set(k, v)
     ynode.set('props', yprops)
@@ -91,6 +97,31 @@ export class DocTx {
     const ylayout = ynode.get('layout') as Y.Map<number>
     for (const [k, v] of Object.entries(patch)) {
       if (typeof v === 'number' && ylayout.get(k) !== v) ylayout.set(k, v)
+    }
+  }
+
+  /** Pin a node to a place in its parent, or remove the pin (undefined). */
+  setAnchor(id: NodeId, anchor: Anchor | undefined): void {
+    const ynode = this.doc.nodes.get(id)
+    if (!ynode) throw new Error(`Node ${id} does not exist`)
+    if (anchor) ynode.set('anchor', anchor)
+    else ynode.delete('anchor')
+  }
+
+  /** Move a node into a parent, or out to the canvas (undefined). */
+  setParent(id: NodeId, parentId: NodeId | undefined): void {
+    const ynode = this.doc.nodes.get(id)
+    if (!ynode) throw new Error(`Node ${id} does not exist`)
+    if (parentId) {
+      if (parentId === id) throw new Error('A node cannot be its own parent')
+      if (!this.doc.nodes.has(parentId)) throw new Error(`Parent node ${parentId} does not exist`)
+      // No cycles: the new parent must not be inside this node.
+      for (let p: string | undefined = parentId; p; p = this.reader.node(p)?.parentId) {
+        if (p === id) throw new Error('This would put a node inside itself')
+      }
+      ynode.set('parentId', parentId)
+    } else {
+      ynode.delete('parentId')
     }
   }
 

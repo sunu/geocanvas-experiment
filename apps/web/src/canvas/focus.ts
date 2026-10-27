@@ -35,17 +35,28 @@ export const focus = {
     editor.setCamera(camera, { animation: { duration: 320 } })
   },
 
-  /** Leave focus mode when the user stops editing the focused node (e.g. clicks outside). */
+  /**
+   * Stay in focus while the user works inside the focused node or with its pinned children.
+   * Selecting the focused node again makes it interactive again. Anything else leaves focus mode.
+   */
   watch(editor: Editor): () => void {
     return editor.store.listen(
       () => {
-        if (state && editor.getEditingShapeId() !== shapeIdOf(state.nodeId)) {
-          // Wait one frame: setEditingShape may run right after enter.
-          const nodeId = state.nodeId
-          requestAnimationFrame(() => {
-            if (state?.nodeId === nodeId && editor.getEditingShapeId() !== shapeIdOf(nodeId)) focus.exit(editor)
-          })
-        }
+        if (!state) return
+        const nodeId = state.nodeId
+        requestAnimationFrame(() => {
+          if (state?.nodeId !== nodeId) return
+          const fid = shapeIdOf(nodeId)
+          const editing = editor.getEditingShapeId()
+          const inside = (id: string) => id === fid || editor.getShape(id as typeof fid)?.parentId === fid
+          if (editing && inside(editing)) return
+          const sel = editor.getSelectedShapeIds()
+          if (sel.length && sel.every(inside)) {
+            if (!editing && sel.length === 1 && sel[0] === fid) editor.setEditingShape(fid)
+            return
+          }
+          focus.exit(editor)
+        })
       },
       { scope: 'session' },
     )

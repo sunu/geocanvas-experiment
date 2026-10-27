@@ -68,7 +68,9 @@ export function MapView({ node, derived, editing, width, height }: NodeViewProps
   const mapRef = useRef<MapRef>(null)
   const draft = useDrawing(node.id)
   const [hover, setHover] = useState<string>()
-  const data = derived?.result?.data as { aoi?: GeoJSON.Feature; features?: GeoJSON.FeatureCollection } | undefined
+  const data = derived?.result?.data as
+    | { aoi?: GeoJSON.Feature; features?: GeoJSON.FeatureCollection; pins?: { id: string; lngLat: [number, number] }[] }
+    | undefined
   const dark = node.props.basemap === 'dark' || node.props.basemap === 'satellite'
 
   // The view to show (doc units) and the render scale (see mapCamera.ts).
@@ -175,6 +177,23 @@ export function MapView({ node, derived, editing, width, height }: NodeViewProps
       const v = values[port]
       const f = layerFactories.get(spec.type)
       if (v && f) out.push(...f(v, { id: `${node.id}-${port}`, dark }))
+    }
+    // A dot at the exact place of each pinned card (the card's tail points at it).
+    if (data?.pins?.length) {
+      out.push(
+        new ScatterplotLayer({
+          id: `${node.id}-pins`,
+          data: data.pins,
+          getPosition: (d: { lngLat: [number, number] }) => d.lngLat,
+          getRadius: 4,
+          radiusUnits: 'pixels',
+          getFillColor: [52, 58, 64, 255],
+          getLineColor: [255, 255, 255, 255],
+          stroked: true,
+          lineWidthUnits: 'pixels',
+          getLineWidth: 1.5,
+        }),
+      )
     }
     if (draft?.length) {
       out.push(

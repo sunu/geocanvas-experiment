@@ -67,6 +67,7 @@ export function NodeFrame({ nodeId, width, height, editing }: { nodeId: string; 
       )}
       <div className="gc-node__body">{body}</div>
       {status === 'error' && !ui.bare && <div className="gc-node__errorbar">{derived?.error}</div>}
+      {node.anchor && <div className="gc-pin-tail" title="Pinned to a place on the map" />}
       <Ports side="in" ports={inputs} nodeId={node.id} width={width} />
       <Ports side="out" ports={outputs} nodeId={node.id} width={width} />
     </div>

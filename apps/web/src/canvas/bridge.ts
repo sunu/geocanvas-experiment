@@ -2,6 +2,8 @@ import { getIndices, type Editor, type TLShapeId } from 'tldraw'
 import type { CanvasRuntime, Layout, NodeRecord, ViewController } from '@geo-canvas/core'
 import { NODE_SHAPE, nodeIdOf, shapeIdOf, type NodeShape } from './NodeShapeUtil'
 import { focus } from './focus'
+import { isMapNode, pinPosition, placeUnder } from './pins'
+import { liveViews } from '../nodes/mapCamera'
 
 /**
  * Connects the tldraw editor to the canvas runtime.
@@ -14,6 +16,11 @@ export function bindEditor(editor: Editor, runtime: CanvasRuntime): () => void {
   project()
   const onNodes = () => project()
   runtime.doc.nodes.observeDeep(onNodes)
+  // Pins follow their map: when a map pans live (local), or its view or AOI is computed.
+  const stopLive = liveViews.subscribe(() => project())
+  const stopEngine = runtime.engine.subscribe((id) => {
+    if (isMapNode(runtime.reader.node(id)) && runtime.reader.children(id).some((c) => c.anchor)) project()
+  })
 
   // Shape ids that the user changed and that are not yet committed as an op.
   const moved = new Set<TLShapeId>()
@@ -54,16 +61,42 @@ export function bindEditor(editor: Editor, runtime: CanvasRuntime): () => void {
     if (deletes.length) void runtime.dispatch('core.node.delete', { kind: 'nodes', ids: deletes }, {})
 
     const layouts: Record<string, Partial<Layout>> = {}
+    const pinOps: { opId: string; ids: string[]; args: Record<string, unknown> }[] = []
     for (const sid of moved) {
       const nodeId = nodeIdOf(sid)
       const node = runtime.reader.node(nodeId)
       const shape = editor.getShape(sid) as NodeShape | undefined
       if (!node || !shape) continue
+      const resized = Math.abs(node.layout.w - shape.props.w) > 0.5 || Math.abs(node.layout.h - shape.props.h) > 0.5
       const page = editor.getShapePageTransform(sid).point()
+      const map = node.parentId ? runtime.reader.node(node.parentId) : undefined
+
+      // Pinned node: a drag moves the pin, or unpins it when the tail leaves the map view.
+      if (node.anchor && map && isMapNode(map)) {
+        if (resized) layouts[nodeId] = { w: round(shape.props.w), h: round(shape.props.h) }
+        else {
+          const place = placeUnder(runtime, map, { x: shape.x, y: shape.y, w: shape.props.w, h: shape.props.h })
+          if (place) pinOps.push({ opId: 'core.node.moveAnchor', ids: [nodeId], args: { lngLat: place } })
+          else pinOps.push({ opId: 'core.node.unpin', ids: [nodeId], args: { x: round(page.x), y: round(page.y) } })
+        }
+        continue
+      }
+
+      // Top-level node dropped on a map: pin it to the place under its tail.
+      if (!resized && !node.parentId && !isMapNode(node) && !runtime.registry.nodeType(node.type)?.group) {
+        const target = mapUnder(editor, runtime, nodeId, { x: page.x, y: page.y, w: shape.props.w, h: shape.props.h })
+        if (target) {
+          pinOps.push({ opId: 'core.node.pinToMap', ids: [nodeId], args: { mapId: target.map.id, lngLat: target.place } })
+          continue
+        }
+      }
+
       const next = { x: round(page.x), y: round(page.y), w: round(shape.props.w), h: round(shape.props.h) }
       if (!sameLayout(node.layout, next)) layouts[nodeId] = next
       // Children of a moved group move with it in tldraw. Their page position changes too.
+      // (Pinned children follow their anchor, not a layout.)
       for (const child of runtime.reader.children(nodeId)) {
+        if (child.anchor) continue
         const csid = shapeIdOf(child.id)
         if (!editor.getShape(csid)) continue
         const cp = editor.getShapePageTransform(csid).point()
@@ -71,6 +104,7 @@ export function bindEditor(editor: Editor, runtime: CanvasRuntime): () => void {
         if (!sameLayout(child.layout, cnext)) layouts[child.id] = cnext
       }
     }
+    for (const p of pinOps) void runtime.dispatch(p.opId, { kind: 'nodes', ids: p.ids }, p.args)
     moved.clear()
     const ids = Object.keys(layouts)
     if (ids.length) void runtime.dispatch('core.node.setLayout', { kind: 'nodes', ids }, { layouts })
@@ -80,7 +114,21 @@ export function bindEditor(editor: Editor, runtime: CanvasRuntime): () => void {
     clearTimeout(timer)
     stopListen()
     runtime.doc.nodes.unobserveDeep(onNodes)
+    stopLive()
+    stopEngine()
   }
+}
+
+/** The topmost map whose view contains the tail tip of a card at page rect r, and the place there. */
+function mapUnder(editor: Editor, runtime: CanvasRuntime, selfId: string, r: { x: number; y: number; w: number; h: number }) {
+  const maps = runtime.reader.nodes().filter((n) => isMapNode(n) && n.id !== selfId).reverse()
+  for (const map of maps) {
+    const mb = editor.getShapePageBounds(shapeIdOf(map.id))
+    if (!mb) continue
+    const place = placeUnder(runtime, map, { x: r.x - mb.x, y: r.y - mb.y, w: r.w, h: r.h })
+    if (place) return { map, place }
+  }
+  return undefined
 }
 
 function round(n: number) {
@@ -108,8 +156,9 @@ function projectDocToEditor(editor: Editor, runtime: CanvasRuntime) {
       wanted.add(id)
       if (busy.has(id)) return
       const parent = n.parentId && byId.get(n.parentId)
-      const x = parent ? n.layout.x - parent.layout.x : n.layout.x
-      const y = parent ? n.layout.y - parent.layout.y : n.layout.y
+      const pinned = parent && n.anchor && isMapNode(parent) ? pinPosition(runtime, parent, n) : undefined
+      const x = pinned ? pinned.x : parent ? n.layout.x - parent.layout.x : n.layout.x
+      const y = pinned ? pinned.y : parent ? n.layout.y - parent.layout.y : n.layout.y
       const parentId = parent ? shapeIdOf(parent.id) : editor.getCurrentPageId()
       const existing = editor.getShape(id) as NodeShape | undefined
       const props = { w: n.layout.w, h: n.layout.h, nodeType: n.type }

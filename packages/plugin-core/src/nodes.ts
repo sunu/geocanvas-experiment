@@ -83,16 +83,21 @@ export const mapNode: NodeTypeDef = {
     key: (node, inputs) => node.props.aoiOverride ?? inputs.aoi ?? null,
     args: (node, inputs) => (node.props.aoiOverride ?? inputs.aoi ? {} : undefined),
   },
-  compute: ({ node, inputs }) => {
+  compute: ({ node, inputs, reader }) => {
     const aoi = (node.props.aoiOverride as Aoi | undefined) ?? (inputs.aoi as Aoi | undefined)
+    // Nodes pinned to this map (the engine recomputes the map when a child changes).
+    const pins = reader
+      .children(node.id)
+      .filter((c) => c.anchor?.kind === 'geo')
+      .map((c) => ({ id: c.id, type: c.type, lngLat: c.anchor!.lngLat }))
     return {
       outputs: aoi ? { aoi } : {},
-      data: { aoi, features: inputs.features, overridden: !!node.props.aoiOverride },
+      data: { aoi, features: inputs.features, overridden: !!node.props.aoiOverride, pins },
     }
   },
   summarize: (n, data) => {
-    const d = data as { aoi?: Aoi; overridden?: boolean } | undefined
-    return `map "${n.props.title}"${d?.aoi ? `, AOI set${d.overridden ? ' by user' : ' from input'}` : ', no AOI'}`
+    const d = data as { aoi?: Aoi; overridden?: boolean; pins?: unknown[] } | undefined
+    return `map "${n.props.title}"${d?.aoi ? `, AOI set${d.overridden ? ' by user' : ' from input'}` : ', no AOI'}${d?.pins?.length ? `, ${d.pins.length} pinned nodes` : ''}`
   },
   defaultSize: { w: 520, h: 380 },
 }

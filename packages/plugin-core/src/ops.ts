@@ -104,6 +104,92 @@ export const fitToAoiOp = defineOp({
   apply: (tx, view, target) => tx.updateProps(only(target), { view }),
 })
 
+const lngLat = z.tuple([z.number().min(-180).max(180), z.number().min(-85.06).max(85.06)]).describe('[longitude, latitude]')
+const isMap = (type: string | undefined) => type === 'core.map'
+
+export const pinToMapOp = defineOp({
+  id: 'core.node.pinToMap',
+  title: 'Pin to map',
+  description: 'Pin the selected nodes to a place on a map. They move with the map when it pans or zooms.',
+  target: { kind: 'node' },
+  args: z.object({
+    mapId: z.string().meta({ nl: { extract: 'none' } }).describe('The map node'),
+    lngLat: lngLat.optional().describe('The place. Default: the center of the map view.'),
+  }),
+  nl: { examples: ['pin this note to the map', 'put this on the map'] },
+  when: (ctx) =>
+    ctx.target.kind === 'nodes' &&
+    ctx.target.ids.every((id) => !isMap(ctx.reader.node(id)?.type)) &&
+    ctx.reader.nodes().some((n) => isMap(n.type)),
+  defaults(ctx) {
+    // One map on the canvas: use it.
+    const maps = ctx.reader.nodes().filter((n) => isMap(n.type))
+    return maps.length === 1 ? { mapId: maps[0]!.id } : {}
+  },
+  prepare(ctx, args) {
+    const map = ctx.reader.node(args.mapId)
+    if (!isMap(map?.type)) throw new Error('mapId must be a map node')
+    const ids = ctx.target.kind === 'nodes' ? ctx.target.ids : []
+    for (const id of ids) {
+      const n = ctx.reader.node(id)!
+      if (isMap(n.type)) throw new Error('A map cannot be pinned to a map')
+      if (ctx.registry.nodeType(n.type)?.group) throw new Error('A group cannot be pinned to a map')
+    }
+    const view = map!.props.view as { center: [number, number] } | undefined
+    const place = args.lngLat ?? view?.center
+    if (!place) throw new Error('This map has no view yet. Give a place (lngLat).')
+    // Several nodes: fan them out a little so they do not cover each other.
+    return ids.map((id, i) => ({ id, mapId: args.mapId, lngLat: [place[0] + i * 0.02, place[1]] as [number, number] }))
+  },
+  apply(tx, plan) {
+    for (const p of plan) {
+      tx.setParent(p.id, p.mapId)
+      tx.setAnchor(p.id, { kind: 'geo', lngLat: p.lngLat })
+    }
+  },
+})
+
+export const moveAnchorOp = defineOp({
+  id: 'core.node.moveAnchor',
+  title: 'Move pin',
+  description: 'Move a pinned node to another place on its map.',
+  target: { kind: 'node', min: 1, max: 1 },
+  args: z.object({ lngLat }),
+  hidden: true,
+  when: (ctx) => !!ctx.reader.node(only(ctx.target))?.anchor,
+  apply: (tx, plan, target) => tx.setAnchor(only(target), { kind: 'geo', lngLat: plan.lngLat }),
+})
+
+export const unpinOp = defineOp({
+  id: 'core.node.unpin',
+  title: 'Unpin from map',
+  description: 'Take pinned nodes off their map and put them on the canvas.',
+  target: { kind: 'node' },
+  args: z.object({
+    x: z.number().meta({ advanced: true }).optional(),
+    y: z.number().meta({ advanced: true }).optional(),
+  }),
+  when: (ctx) => ctx.target.kind === 'nodes' && ctx.target.ids.some((id) => !!ctx.reader.node(id)?.anchor),
+  prepare(ctx, args) {
+    const ids = ctx.target.kind === 'nodes' ? ctx.target.ids : []
+    return ids
+      .map((id) => ctx.reader.node(id)!)
+      .filter((n) => n.anchor)
+      .map((n, i) => {
+        // Default place: to the right of the map.
+        const map = ctx.reader.node(n.parentId!)!
+        return { id: n.id, x: args.x ?? map.layout.x + map.layout.w + 40, y: (args.y ?? map.layout.y) + i * (n.layout.h + 16) }
+      })
+  },
+  apply(tx, plan) {
+    for (const p of plan) {
+      tx.setAnchor(p.id, undefined)
+      tx.setParent(p.id, undefined)
+      tx.setLayout(p.id, { x: p.x, y: p.y })
+    }
+  },
+})
+
 export const setBasemapOp = defineOp({
   id: 'core.map.setBasemap',
   title: 'Set basemap',
@@ -152,6 +238,9 @@ export const coreNodeOps = [
   setBasemapOp,
   setViewOp,
   fitToAoiOp,
+  pinToMapOp,
+  moveAnchorOp,
+  unpinOp,
   setChartSourceOp,
   setChartMarkOp,
 ]

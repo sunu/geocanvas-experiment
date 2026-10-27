@@ -205,3 +205,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .gc-map { overflow: hidden; }
 .gc-map__scaled { transform-origin: 0 0; }
 .gc-node--dimmed { opacity: 0.22; transition: opacity 0.2s; }
+
+/* Pinned cards */
+.gc-pin-tail { position: absolute; left: 50%; bottom: -12px; width: 0; height: 0; margin-left: -8px; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid var(--gc-pin, #343a40); pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }

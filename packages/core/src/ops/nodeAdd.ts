@@ -8,6 +8,11 @@ const placement = {
   y: z.number().meta({ advanced: true }).optional().describe('Top edge in canvas units'),
   w: z.number().positive().meta({ advanced: true }).optional().describe('Width'),
   h: z.number().positive().meta({ advanced: true }).optional().describe('Height'),
+  pinTo: z
+    .object({ parentId: z.string(), lngLat: z.tuple([z.number(), z.number()]) })
+    .meta({ advanced: true })
+    .optional()
+    .describe('Pin the new node to a place in a map'),
 }
 
 /**
@@ -25,11 +30,22 @@ export function nodeAddOp(def: NodeTypeDef): OpDef<any, any> {
     args: props.extend(placement),
     nl: { examples: [`add a ${def.title.toLowerCase()}`] },
     prepare: (_ctx, args: Record<string, unknown>) => {
-      const { x, y, w, h, ...rest } = args
-      return { id: ulid(), props: rest, layout: { x: x ?? 0, y: y ?? 0, w: w ?? def.defaultSize.w, h: h ?? def.defaultSize.h } }
+      const { x, y, w, h, pinTo, ...rest } = args as Record<string, any>
+      return {
+        id: ulid(),
+        props: rest,
+        layout: { x: x ?? 0, y: y ?? 0, w: w ?? def.defaultSize.w, h: h ?? def.defaultSize.h },
+        pinTo: pinTo as { parentId: string; lngLat: [number, number] } | undefined,
+      }
     },
-    apply(tx, plan: { id: string; props: Record<string, unknown>; layout: { x: number; y: number; w: number; h: number } }) {
-      tx.createNode({ id: plan.id, type: def.type, props: plan.props, layout: plan.layout })
+    apply(tx, plan: { id: string; props: Record<string, unknown>; layout: { x: number; y: number; w: number; h: number }; pinTo?: { parentId: string; lngLat: [number, number] } }) {
+      tx.createNode({
+        id: plan.id,
+        type: def.type,
+        props: plan.props,
+        layout: plan.layout,
+        ...(plan.pinTo ? { parentId: plan.pinTo.parentId, anchor: { kind: 'geo' as const, lngLat: plan.pinTo.lngLat } } : {}),
+      })
     },
   }
 }

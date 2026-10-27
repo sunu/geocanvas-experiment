@@ -11,12 +11,22 @@ export interface Layout {
   z: number
 }
 
+/**
+ * A node pinned to a place in its parent (e.g. a map). For a pinned node, the parent decides
+ * the position from the anchor; layout.x and layout.y are not used. layout.w and layout.h are.
+ */
+export interface Anchor {
+  kind: 'geo'
+  lngLat: [number, number]
+}
+
 export interface NodeRecord {
   id: NodeId
   type: string
   props: Record<string, unknown>
   layout: Layout
   parentId?: NodeId
+  anchor?: Anchor
 }
 
 export interface LinkEnd {
@@ -74,6 +84,7 @@ export function toNodeRecord(id: NodeId, ynode: Y.Map<unknown>): NodeRecord {
   const props = ynode.get('props') as Y.Map<unknown> | undefined
   const layout = ynode.get('layout') as Y.Map<number> | undefined
   const parentId = ynode.get('parentId') as string | undefined
+  const anchor = ynode.get('anchor') as Anchor | undefined
   return {
     id,
     type: ynode.get('type') as string,
@@ -86,6 +97,7 @@ export function toNodeRecord(id: NodeId, ynode: Y.Map<unknown>): NodeRecord {
       z: layout?.get('z') ?? 0,
     },
     ...(parentId ? { parentId } : {}),
+    ...(anchor ? { anchor } : {}),
   }
 }
 
