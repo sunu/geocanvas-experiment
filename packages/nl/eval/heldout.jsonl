@@ -1,0 +1,24 @@
+# Held-out NL eval cases. Do not tune the pipeline against these.
+# One JSON object per line. Lines starting with # are skipped.
+#   id      unique name
+#   by      who wrote it: "user" or "claude"
+#   sel     selection: none | seed | map | peopleChart | damageChart | summary | group | groupChild
+#   say     the request, as a user would type it
+#   op      expected op id, or "none" when no command fits
+#   target  expected target: canvas | seed | map | peopleChart | damageChart | summary | group | groupChild
+#   args    expected args (only the ones that matter). {"$prefix": "khu-2019-cyclone"} matches an event id.
+#   note    optional: why, or what is ambiguous
+{"id":"c-regen-40","by":"claude","sel":"groupChild","say":"go back further, like 40 years","op":"disasters.relatedEvents.regenerate","target":"group","args":{"yearRange":40}}
+{"id":"c-regen-floods-too","by":"claude","sel":"groupChild","say":"include floods and other types too","op":"disasters.relatedEvents.regenerate","target":"group","args":{"sameType":false}}
+{"id":"c-regen-narrow","by":"claude","sel":"group","say":"narrow it down to 150km around the storm","op":"disasters.relatedEvents.regenerate","target":"group","args":{"radiusKm":150}}
+{"id":"c-sitrep-nepal","by":"claude","sel":"none","say":"i want a sitrep for the nepal earthquake in 2015","op":"disasters.sitrep.create","target":"canvas","args":{"eventId":{"$prefix":"ktm-2015-earthquake"}}}
+{"id":"c-swap-haiti","by":"claude","sel":"seed","say":"swap this for the 2018 haiti earthquake","op":"disasters.event.change","target":"seed","args":{"eventId":{"$prefix":"sud-2018-earthquake"}}}
+{"id":"c-add-turkiye","by":"claude","sel":"seed","say":"add the 2005 Türkiye earthquake next to it","op":"disasters.event.add","target":"canvas","args":{"eventId":{"$prefix":"kmr-2005-earthquake"}},"note":"Selection is the seed, but the op acts on the canvas."}
+{"id":"c-aoi-smaller","by":"claude","sel":"map","say":"make the area of interest a bit smaller, like 25% smaller","op":"core.map.bufferAoi","target":"map","args":{"factor":0.75}}
+{"id":"c-satellite","by":"claude","sel":"map","say":"satellite view","op":"core.map.setBasemap","target":"map","args":{"basemap":"satellite"}}
+{"id":"c-pie","by":"claude","sel":"damageChart","say":"pie","op":"core.chart.setMark","target":"damageChart","args":{"mark":"arc"},"note":"One-word request."}
+{"id":"c-remove-chart","by":"claude","sel":"peopleChart","say":"get rid of this chart","op":"core.node.delete","target":"peopleChart","args":{}}
+{"id":"c-copy-card","by":"claude","sel":"groupChild","say":"copy this card","op":"core.node.duplicate","target":"groupChild","args":{}}
+{"id":"c-rename","by":"claude","sel":"summary","say":"rename it to Situation summary","op":"core.text.setContent","target":"summary","args":{"title":"Situation summary"},"note":"No quotes, so the rules cannot take the title; the LLM fallback must."}
+{"id":"c-note","by":"claude","sel":"none","say":"put a note on the board","op":"core.sticky.add","target":"canvas","args":{}}
+{"id":"c-where","by":"claude","sel":"groupChild","say":"show me where this is","op":"core.view.focus","target":"groupChild","args":{},"note":"Ambiguous: could also mean the map. Focus on the card is the expected answer."}

@@ -1,0 +1,325 @@
+{
+  "summary": {
+    "config": "jev",
+    "backends": {
+      "decider": "jev(typesafe/jev-1.14)",
+      "extractor": "rules+llm(mistralai/mistral-nemo)",
+      "embedder": "embed(sentence-transformers/all-minilm-l6-v2)"
+    },
+    "cases": 14,
+    "opAccuracy": "100.0%",
+    "exactArgs": "92.9%",
+    "fieldAccuracy": "90.0%",
+    "latencyMs": {
+      "p50": 1348,
+      "p95": 2818
+    },
+    "cost": {
+      "total": 0.0008779510000000001,
+      "perCommand": 0.00006271078571428572,
+      "calls": 33
+    },
+    "calibration": [
+      {
+        "band": "0–0.5",
+        "n": 0,
+        "accuracy": "-"
+      },
+      {
+        "band": "0.5–0.8",
+        "n": 1,
+        "accuracy": "100.0%"
+      },
+      {
+        "band": "0.8–0.95",
+        "n": 2,
+        "accuracy": "100.0%"
+      },
+      {
+        "band": "0.95–1",
+        "n": 11,
+        "accuracy": "100.0%"
+      }
+    ]
+  },
+  "rows": [
+    {
+      "id": "c-regen-40",
+      "say": "go back further, like 40 years",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "yearRange",
+          "expected": 40,
+          "got": 40,
+          "ok": true,
+          "confidence": 0.95,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.98,
+      "ms": 2021
+    },
+    {
+      "id": "c-regen-floods-too",
+      "say": "include floods and other types too",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "sameType",
+          "expected": false,
+          "got": false,
+          "ok": true,
+          "confidence": 1,
+          "source": "decider"
+        }
+      ],
+      "opConfidence": 1,
+      "ms": 1765
+    },
+    {
+      "id": "c-regen-narrow",
+      "say": "narrow it down to 150km around the storm",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "radiusKm",
+          "expected": 150,
+          "got": 150,
+          "ok": true,
+          "confidence": 0.95,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.97,
+      "ms": 508
+    },
+    {
+      "id": "c-sitrep-nepal",
+      "say": "i want a sitrep for the nepal earthquake in 2015",
+      "expectOp": "disasters.sitrep.create",
+      "gotOp": "disasters.sitrep.create",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "ktm-2015-earthquake"
+          },
+          "got": "ktm-2015-earthquake-12",
+          "ok": true,
+          "confidence": 0.76,
+          "source": "entity"
+        }
+      ],
+      "opConfidence": 0.98,
+      "ms": 450
+    },
+    {
+      "id": "c-swap-haiti",
+      "say": "swap this for the 2018 haiti earthquake",
+      "expectOp": "disasters.event.change",
+      "gotOp": "disasters.event.change",
+      "expectTarget": "seed",
+      "gotTarget": "seed",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "sud-2018-earthquake"
+          },
+          "got": "sud-2018-earthquake-13",
+          "ok": true,
+          "confidence": 0.97,
+          "source": "entity"
+        }
+      ],
+      "opConfidence": 1,
+      "ms": 500
+    },
+    {
+      "id": "c-add-turkiye",
+      "say": "add the 2005 Türkiye earthquake next to it",
+      "expectOp": "disasters.event.add",
+      "gotOp": "disasters.event.add",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "kmr-2005-earthquake"
+          },
+          "got": "kmr-2005-earthquake-7",
+          "ok": true,
+          "confidence": 0.78,
+          "source": "entity"
+        }
+      ],
+      "opConfidence": 0.72,
+      "ms": 486
+    },
+    {
+      "id": "c-aoi-smaller",
+      "say": "make the area of interest a bit smaller, like 25% smaller",
+      "expectOp": "core.map.bufferAoi",
+      "gotOp": "core.map.bufferAoi",
+      "expectTarget": "map",
+      "gotTarget": "map",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "factor",
+          "expected": 0.75,
+          "got": 0.75,
+          "ok": true,
+          "confidence": 0.9,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 1,
+      "ms": 2637
+    },
+    {
+      "id": "c-satellite",
+      "say": "satellite view",
+      "expectOp": "core.map.setBasemap",
+      "gotOp": "core.map.setBasemap",
+      "expectTarget": "map",
+      "gotTarget": "map",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "basemap",
+          "expected": "satellite",
+          "got": "satellite",
+          "ok": true,
+          "confidence": 1,
+          "source": "decider"
+        }
+      ],
+      "opConfidence": 0.98,
+      "ms": 1880
+    },
+    {
+      "id": "c-pie",
+      "say": "pie",
+      "expectOp": "core.chart.setMark",
+      "gotOp": "core.chart.setMark",
+      "expectTarget": "damageChart",
+      "gotTarget": "damageChart",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "mark",
+          "expected": "arc",
+          "got": "arc",
+          "ok": true,
+          "confidence": 1,
+          "source": "decider"
+        }
+      ],
+      "opConfidence": 0.95,
+      "ms": 1770
+    },
+    {
+      "id": "c-remove-chart",
+      "say": "get rid of this chart",
+      "expectOp": "core.node.delete",
+      "gotOp": "core.node.delete",
+      "expectTarget": "peopleChart",
+      "gotTarget": "peopleChart",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 1,
+      "ms": 1319
+    },
+    {
+      "id": "c-copy-card",
+      "say": "copy this card",
+      "expectOp": "core.node.duplicate",
+      "gotOp": "core.node.duplicate",
+      "expectTarget": "groupChild",
+      "gotTarget": "groupChild",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.99,
+      "ms": 1000
+    },
+    {
+      "id": "c-rename",
+      "say": "rename it to Situation summary",
+      "expectOp": "core.text.setContent",
+      "gotOp": "core.text.setContent",
+      "expectTarget": "summary",
+      "gotTarget": "summary",
+      "opOk": true,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "title",
+          "expected": "Situation summary",
+          "got": "Summary",
+          "ok": false,
+          "confidence": 0.7,
+          "source": "default"
+        }
+      ],
+      "opConfidence": 0.94,
+      "ms": 2818
+    },
+    {
+      "id": "c-note",
+      "say": "put a note on the board",
+      "expectOp": "core.sticky.add",
+      "gotOp": "core.sticky.add",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.98,
+      "ms": 1348
+    },
+    {
+      "id": "c-where",
+      "say": "show me where this is",
+      "expectOp": "core.view.focus",
+      "gotOp": "core.view.focus",
+      "expectTarget": "groupChild",
+      "gotTarget": "groupChild",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.9,
+      "ms": 1069
+    }
+  ]
+}

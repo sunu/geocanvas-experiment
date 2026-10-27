@@ -67,7 +67,7 @@ function argMatches(expected: unknown, actual: unknown): boolean {
 const cases: Case[] = fs
   .readFileSync(path.join(import.meta.dirname, casesFile), 'utf8')
   .split('\n')
-  .filter((l) => l.trim())
+  .filter((l) => l.trim() && !l.trimStart().startsWith('#'))
   .map((l) => JSON.parse(l))
   .filter((c: Case) => !only || c.id.includes(only))
 
