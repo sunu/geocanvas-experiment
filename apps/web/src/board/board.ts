@@ -1,5 +1,6 @@
 import * as Y from 'yjs'
 import type { Basemap } from '../map/basemaps'
+import type { ColorName } from '../canvas/style'
 
 /**
  * The shared board: one Yjs map of objects, keyed by id. Each object is a Y.Map of plain
@@ -20,9 +21,10 @@ interface Placed {
   z: number
 }
 
+/** color and fontSize are optional: objects made before they existed use the defaults in canvas/style.ts. */
 export type BoardObject =
-  | (Placed & { type: 'box' })
-  | (Placed & { type: 'text'; text: string })
+  | (Placed & { type: 'box'; color?: ColorName })
+  | (Placed & { type: 'text'; text: string; color?: ColorName; fontSize?: number })
   | (Placed & { type: 'map'; basemap: Basemap })
 
 export type ObjectType = BoardObject['type']
@@ -30,7 +32,7 @@ export type ObjectType = BoardObject['type']
 /** Fields for a new object: everything but id, and z is optional (default: on top). */
 export type NewObject = DistributiveOmit<BoardObject, 'id' | 'z'> & { z?: number }
 
-export type ObjectPatch = Partial<Omit<Placed, 'id'>> & { text?: string; basemap?: Basemap }
+export type ObjectPatch = Partial<Omit<Placed, 'id'>> & { text?: string; basemap?: Basemap; color?: ColorName; fontSize?: number }
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 

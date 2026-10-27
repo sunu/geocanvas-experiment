@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import type { Board, BoardObject, NewObject, ObjectType } from '../board/board'
 import { useObjects, type ConnectionStatus } from '../board/connect'
 import { intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
-import { ObjectView } from './ObjectView'
+import { ObjectView, requestFit } from './ObjectView'
+import { StylePanel } from './StylePanel'
 import { Toolbar, type Tool } from './Toolbar'
 
 const DEFAULT_SIZE: Record<ObjectType, { w: number; h: number }> = {
@@ -121,7 +122,14 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
       const o = byId.get([...selected][0]!)!
       trackDrag(e, (dx, dy) => {
         const z = cameraRef.current.z
-        board.update({ [o.id]: resized(o, handle, dx / z, dy / z) })
+        const r = resized(o, handle, dx / z, dy / z)
+        if (o.type === 'text') {
+          // A text's height follows its content: resizing changes only its width.
+          requestFit(o.id)
+          board.update({ [o.id]: { x: r.x, w: r.w } })
+        } else {
+          board.update({ [o.id]: r })
+        }
       })
       return
     }
@@ -262,6 +270,8 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
           return <div key={h} data-handle={h} className={`ttx-handle ttx-handle--${h}`} style={{ left: x, top: y }} />
         })}
       {marquee && <div className="ttx-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+
+      <StylePanel board={board} selected={objects.filter((o) => selected.has(o.id))} />
 
       <Toolbar
         board={board}

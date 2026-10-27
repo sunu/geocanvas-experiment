@@ -6,8 +6,6 @@
   --ttx-panel: #ffffff;
   --ttx-border: rgb(0 0 0 / 0.12);
   --ttx-accent: #2563eb;
-  --ttx-box-fill: #e0e7ff;
-  --ttx-box-stroke: #6366f1;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ttx-ink);
 }
@@ -53,24 +51,32 @@ body,
   box-sizing: border-box;
 }
 
+/* Fill and border color come from the object's color (canvas/style.ts). */
 .ttx-obj--box {
-  background: var(--ttx-box-fill);
-  border: 2px solid var(--ttx-box-stroke);
+  border: 2px solid;
   border-radius: 6px;
+}
+
+/* Font size and color come from the object. The plain div sets the height; the editor sits over it. */
+.ttx-text-wrap {
+  position: relative;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.4;
 }
 
 .ttx-text {
   box-sizing: border-box;
   width: 100%;
-  min-height: 100%;
   padding: 4px;
-  font: 20px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color: var(--ttx-ink);
+  font: inherit;
+  color: inherit;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .ttx-text--edit {
+  position: absolute;
+  inset: 0;
   display: block;
   height: 100%;
   margin: 0;
@@ -199,6 +205,67 @@ body,
 
 .ttx-status--disconnected {
   background: #ef4444;
+}
+
+/* --- Style panel (left; shown for selected boxes and texts) ------------- */
+
+.ttx-style {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.08);
+  z-index: 1000002;
+}
+
+.ttx-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.ttx-swatch.is-on {
+  box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 4px var(--ttx-accent);
+}
+
+.ttx-style button:not(.ttx-swatch) {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ttx-style button:not(.ttx-swatch):hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
+.ttx-style__sep {
+  width: 20px;
+  height: 1px;
+  margin: 2px 0;
+  background: var(--ttx-border);
+}
+
+.ttx-style__size {
+  font-size: 12px;
+  color: var(--ttx-muted);
 }
 
 /* --- Board actions (top left; outside the canvas, so clicks never reach it) --- */

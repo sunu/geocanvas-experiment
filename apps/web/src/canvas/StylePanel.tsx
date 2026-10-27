@@ -1,0 +1,52 @@
+import type { Board, BoardObject } from '../board/board'
+import { requestFit } from './ObjectView'
+import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE, stepFontSize, type ColorName } from './style'
+
+type Styled = Extract<BoardObject, { type: 'box' | 'text' }>
+type Text = Extract<BoardObject, { type: 'text' }>
+
+const colorOf = (o: Styled): ColorName => o.color ?? (o.type === 'box' ? DEFAULT_BOX_COLOR : DEFAULT_TEXT_COLOR)
+const sizeOf = (t: Text) => t.fontSize ?? DEFAULT_FONT_SIZE
+
+/** Color and text size for the selected boxes and texts. Hidden when none are selected. */
+export function StylePanel({ board, selected }: { board: Board; selected: BoardObject[] }) {
+  const styled = selected.filter((o): o is Styled => o.type === 'box' || o.type === 'text')
+  if (!styled.length) return null
+  const texts = styled.filter((o): o is Text => o.type === 'text')
+  const colors = new Set(styled.map(colorOf))
+  const sizes = new Set(texts.map(sizeOf))
+
+  // Each press is its own undo step.
+  const setColor = (color: ColorName) => {
+    board.undo.stopCapturing()
+    board.update(Object.fromEntries(styled.map((o) => [o.id, { color }])))
+  }
+  const stepSize = (dir: 1 | -1) => {
+    board.undo.stopCapturing()
+    for (const t of texts) requestFit(t.id)
+    board.update(Object.fromEntries(texts.map((t) => [t.id, { fontSize: stepFontSize(sizeOf(t), dir) }])))
+  }
+
+  return (
+    <div className="ttx-style" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+      {COLORS.map((c) => (
+        <button
+          key={c}
+          className={`ttx-swatch ${colors.size === 1 && colors.has(c) ? 'is-on' : ''}`}
+          style={{ background: PALETTE[c].ink }}
+          title={c}
+          aria-label={`Color ${c}`}
+          onClick={() => setColor(c)}
+        />
+      ))}
+      {texts.length > 0 && (
+        <>
+          <span className="ttx-style__sep" />
+          <button title="Larger text" onClick={() => stepSize(1)}>A+</button>
+          <span className="ttx-style__size" title="Text size">{sizes.size === 1 ? [...sizes][0] : '–'}</span>
+          <button title="Smaller text" onClick={() => stepSize(-1)}>A−</button>
+        </>
+      )}
+    </div>
+  )
+}
