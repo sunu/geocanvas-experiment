@@ -15,7 +15,7 @@ export function NodeFrame({ nodeId, width, height, editing }: { nodeId: string; 
   const ui = nodeUIs.get(node.type)
   const inputs = def ? registry.inputsOf(node) : {}
   const outputs = def ? registry.outputsOf(node) : {}
-  const title = String(node.props.title ?? def?.title ?? node.type)
+  const title = String(node.props.title || def?.title || node.type)
   const status = derived?.status
 
   if (!def || !ui) {

@@ -63,6 +63,8 @@ export interface NodeTypeDef {
   defaultSize: { w: number; h: number }
   /** A group holds child nodes of childType. */
   group?: { childType: string }
+  /** False: no '<type>.add' op and no button in the add bar (e.g. only ops make it). */
+  addable?: boolean
 }
 
 export interface DataFunctionDef {

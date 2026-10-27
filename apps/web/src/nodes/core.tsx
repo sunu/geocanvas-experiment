@@ -1,27 +1,39 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSession, useRegistry } from '../ui/context'
 import { registerNodeUI, registerWidget, type NodeViewProps } from '../ui/registry'
 import { catalog } from '../plugins'
 import { MapView, MapActions } from './MapView'
 import { ChartView } from './ChartView'
 
-function StickyView({ node, editing }: NodeViewProps) {
+/**
+ * Local draft text for inline editing. The draft is committed as one op when edit mode ends.
+ * (tldraw ends edit mode by unmounting the textarea, so onBlur does not fire.)
+ */
+function useInlineText(node: NodeViewProps['node'], editing: boolean) {
   const { runtime } = useSession()
-  const [text, setText] = useState(String(node.props.text ?? ''))
-  useEffect(() => setText(String(node.props.text ?? '')), [node.props.text])
+  const saved = String(node.props.text ?? '')
+  const [text, setText] = useState(saved)
+  const latest = useRef(text)
+  latest.current = text
+  useEffect(() => {
+    if (!editing) setText(saved)
+  }, [saved, editing])
+  const wasEditing = useRef(editing)
+  useEffect(() => {
+    if (wasEditing.current && !editing && latest.current !== saved) {
+      void runtime.dispatch('core.text.setContent', { kind: 'nodes', ids: [node.id] }, { text: latest.current })
+    }
+    wasEditing.current = editing
+  }, [editing, saved, runtime, node.id])
+  return [text, setText] as const
+}
+
+function StickyView({ node, editing }: NodeViewProps) {
+  const [text, setText] = useInlineText(node, editing)
   return (
     <div className={`gc-sticky gc-sticky--${node.props.color}`}>
       {editing ? (
-        <textarea
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => {
-            if (text !== node.props.text) {
-              void runtime.dispatch('core.text.setContent', { kind: 'nodes', ids: [node.id] }, { text })
-            }
-          }}
-        />
+        <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} />
       ) : (
         <div className="gc-sticky__text">{text || <span className="gc-muted">Double-click to write</span>}</div>
       )}
@@ -45,17 +57,30 @@ function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 }
 
-function TextView({ node, derived }: NodeViewProps) {
+/** Shows the rendered text. In edit mode (double-click) it shows the raw text with {{bindings}}. */
+function TextView({ node, derived, editing }: NodeViewProps) {
+  const [text, setText] = useInlineText(node, editing)
   const rendered = (derived?.result?.data as { rendered?: string } | undefined)?.rendered ?? String(node.props.text ?? '')
+  if (editing) {
+    return (
+      <textarea
+        className="gc-text gc-text--edit"
+        autoFocus
+        value={text}
+        placeholder="Markdown. Use {{port.field}} for values from linked nodes."
+        onChange={(e) => setText(e.target.value)}
+      />
+    )
+  }
   return (
     <div className="gc-text">
-      {rendered ? <MiniMarkdown text={rendered} /> : <span className="gc-muted">Empty. Use ⌘ → Edit text.</span>}
+      {rendered ? <MiniMarkdown text={rendered} /> : <span className="gc-muted">Empty. Double-click to write.</span>}
     </div>
   )
 }
 
-registerNodeUI('core.sticky', { View: StickyView, bare: true })
-registerNodeUI('core.text', { View: TextView, icon: '¶' })
+registerNodeUI('core.sticky', { View: StickyView, bare: true, icon: '🟨', editOnCreate: true })
+registerNodeUI('core.text', { View: TextView, icon: '¶', editOnCreate: true })
 registerNodeUI('core.map', { View: MapView, Actions: MapActions, icon: '🗺' })
 registerNodeUI('core.chart', { View: ChartView, icon: '📊' })
 

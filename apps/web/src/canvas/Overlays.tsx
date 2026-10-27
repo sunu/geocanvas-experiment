@@ -1,9 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useEditor, useValue } from 'tldraw'
 import type { LinkRecord } from '@geo-canvas/core'
 import { useLinks, usePeers, useRegistry, useSession } from '../ui/context'
 import { shapeIdOf } from './NodeShapeUtil'
 import { portOffset } from './ports'
+
+/** Re-render on tldraw store changes. 'all' also covers the camera. */
+function useStoreTick(scope: 'document' | 'all') {
+  const editor = useEditor()
+  const [tick, setTick] = useState(0)
+  useEffect(() => editor.store.listen(() => setTick((t) => t + 1), { scope }), [editor, scope])
+  return tick
+}
 
 /** Data links and visual arrows, drawn in page space under the shapes' ports. */
 export function LinksLayer() {
@@ -12,8 +20,10 @@ export function LinksLayer() {
   const registry = useRegistry()
   const { runtime } = useSession()
 
-  const paths = useValue(
-    'link paths',
+  // Recompute on every shape change in tldraw, so links follow a drag live
+  // (before the drag is committed to the doc).
+  const tick = useStoreTick('document')
+  const paths = useMemo(
     () =>
       links.flatMap((l) => {
         const a = runtime.reader.node(l.from.nodeId)
@@ -32,7 +42,8 @@ export function LinksLayer() {
         const dx = Math.max(60, Math.abs(x2 - x1) / 2)
         return [{ link: l, d: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`, mid: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 } }]
       }),
-    [editor, links, registry, runtime],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editor, links, registry, runtime, tick],
   )
 
   return (
@@ -68,8 +79,8 @@ function LinkPath({ link, d, mid }: { link: LinkRecord; d: string; mid: { x: num
 export function PeerSelections() {
   const editor = useEditor()
   const peers = usePeers()
-  const boxes = useValue(
-    'peer boxes',
+  const tick = useStoreTick('document')
+  const boxes = useMemo(
     () =>
       peers.flatMap((p) =>
         (p.selection ?? []).flatMap((id) => {
@@ -77,7 +88,8 @@ export function PeerSelections() {
           return b && p.user ? [{ key: `${p.clientId}-${id}`, b, color: p.user.color, name: p.user.name }] : []
         }),
       ),
-    [editor, peers],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editor, peers, tick],
   )
   return (
     <>
@@ -133,15 +145,16 @@ export function InFront() {
     provider.awareness.setLocalStateField('selection', selection)
   }, [provider, selection])
 
-  const cursors = useValue(
-    'cursors',
+  const tick = useStoreTick('all')
+  const cursors = useMemo(
     () =>
       peers.flatMap((p) => {
         if (!p.cursor || !p.user) return []
         const s = editor.pageToViewport(p.cursor)
         return [{ id: p.clientId, x: s.x, y: s.y, user: p.user }]
       }),
-    [editor, peers],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editor, peers, tick],
   )
   return (
     <>

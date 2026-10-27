@@ -3,7 +3,7 @@ import { Command } from 'cmdk'
 import { z } from 'zod'
 import type { OpDef, TargetRef } from '@geo-canvas/core'
 import { useRegistry, useSession } from '../ui/context'
-import { getEditor, selectionTarget, viewportCenter } from '../canvas/editorRef'
+import { getEditor, placeNew, revealCreated, selectionTarget, viewportCenter } from '../canvas/editorRef'
 import { palette, usePalette } from './store'
 import { AUTO_FIELDS, SchemaForm } from './SchemaForm'
 
@@ -28,7 +28,7 @@ function PickStep() {
   const { runtime } = useSession()
   const registry = useRegistry()
   const target = useTarget()
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(() => palette.get().query ?? '')
   // Selection, then enclosing groups, then canvas. Each section runs its ops on its own target.
   const scopes = useMemo(() => runtime.scopes(target), [runtime, target, registry])
 
@@ -80,10 +80,15 @@ function ArgsStep() {
     if (!op) return {}
     const base: Record<string, unknown> = { ...runtime.defaultsFor(op.id, target), ...(state.args ?? {}) }
     const props = schema.properties ?? {}
-    const c = viewportCenter()
+    const c = state.at ?? viewportCenter()
     if ('origin' in props && base.origin === undefined) base.origin = { x: Math.round(c.x - 600), y: Math.round(c.y - 300) }
-    if ('x' in props && base.x === undefined) base.x = Math.round(c.x - 100)
-    if ('y' in props && base.y === undefined) base.y = Math.round(c.y - 60)
+    // '<type>.add' ops: center the new node on the viewport (or the double-click point).
+    const nodeType = runtime.registry.nodeType(op.id.replace(/\.add$/, ''))
+    if ('x' in props && base.x === undefined) {
+      const w = (base.w as number | undefined) ?? nodeType?.defaultSize.w ?? 200
+      const h = (base.h as number | undefined) ?? nodeType?.defaultSize.h ?? 120
+      Object.assign(base, placeNew(w, h, c))
+    }
     return base
   })
   const [summary, setSummary] = useState<string>()
@@ -122,8 +127,9 @@ function ArgsStep() {
       return
     }
     palette.close()
-    // A new template fills the canvas: show all of it.
+    // A new template fills the canvas: show all of it. Other new nodes: select them.
     if (runtime.registry.template(op.id.replace(/\.create$/, ''))) getEditor()?.zoomToFit({ animation: { duration: 300 } })
+    else revealCreated(rec.created)
   }
 
   return (

@@ -20,7 +20,7 @@ export const eventNode: NodeTypeDef = {
   type: 'disasters.event',
   title: 'Disaster event',
   description: 'One natural disaster. Outputs the event and its footprint (affected area).',
-  props: z.object({ eventId: z.string().optional() }),
+  props: z.object({ eventId: eventIdArg.meta({ ask: true }).optional() }),
   outputs: {
     event: { type: 'disasters.event', label: 'Event' },
     footprint: { type: 'geo.aoi', label: 'Footprint' },
@@ -51,7 +51,7 @@ export const relatedEventsNode: NodeTypeDef = {
     sameType: z.boolean().default(true),
     radiusKm: z.number().min(10).max(3000).default(400),
     autoSync: z.boolean().default(true),
-    seedEventId: z.string().optional(),
+    seedEventId: z.string().meta({ advanced: true }).optional(),
   }),
   inputs: { event: { type: 'disasters.event', label: 'Seed event' } },
   outputs: { features: { type: 'geo.features', label: 'Event points' } },
@@ -165,18 +165,6 @@ export const regenerateOp = defineOp({
   describePlan: (p) => `${p.children.length} events replace ${p.oldChildren.length}`,
 })
 
-export const addEventOp = defineOp({
-  id: 'disasters.event.add',
-  title: 'Add disaster event',
-  description: 'Add a node for one disaster event.',
-  target: { kind: 'canvas' },
-  args: z.object({ eventId: eventIdArg, x: z.number().default(0), y: z.number().default(0) }),
-  prepare: (_ctx, args) => ({ ...args, id: ulid() }),
-  apply: (tx, plan) => {
-    tx.createNode({ id: plan.id, type: 'disasters.event', props: { eventId: plan.eventId }, layout: { x: plan.x, y: plan.y } })
-  },
-})
-
 // ---------- Data functions ----------
 
 const impactInputs = {
@@ -213,7 +201,7 @@ export function createDisastersPlugin(provider: DisasterProvider = new MockDisas
     dependsOn: ['core'],
     portTypes: [{ id: 'disasters.event', description: 'A disaster event with type, dates, severity, and footprint' }],
     nodeTypes: [eventNode, relatedEventsNode],
-    ops: [changeEventOp, regenerateOp, addEventOp],
+    ops: [changeEventOp, regenerateOp],
     providers: { [PROVIDER]: provider },
     dataFunctions: [
       {

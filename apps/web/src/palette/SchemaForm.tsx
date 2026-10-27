@@ -3,10 +3,20 @@ import { widgets } from '../ui/registry'
 
 type Schema = Record<string, any>
 
-/** Fields that the palette fills itself, e.g. the drop position of new nodes. */
-export const AUTO_FIELDS = new Set(['origin', 'x', 'y'])
+/** Fields that the palette fills itself. They show only under "Advanced". */
+export const AUTO_FIELDS = new Set(['origin', 'x', 'y', 'w', 'h'])
 
-/** A form made from a JSON Schema (from zod). Plugin widgets render fields with a `widget` hint. */
+/** Raw JSON fields (records, unknown values) are for power users. */
+function isAdvanced(key: string, s: Schema) {
+  if (s.advanced || AUTO_FIELDS.has(key)) return true
+  if (s.widget || s.enum) return false
+  return !s.type || (s.type === 'object' && !s.properties)
+}
+
+/**
+ * A form made from a JSON Schema (from zod). Plugin widgets render fields with a `widget` hint.
+ * Fields marked `ask` come first. Advanced fields fold away.
+ */
 export function SchemaForm({
   schema,
   value,
@@ -18,20 +28,29 @@ export function SchemaForm({
 }) {
   const props: Record<string, Schema> = schema.properties ?? {}
   const required = new Set<string>(schema.required ?? [])
-  const entries = Object.entries(props).filter(([k]) => !AUTO_FIELDS.has(k))
-  if (!entries.length) return <p className="gc-muted">This command has no arguments.</p>
+  const all = Object.entries(props)
+  const main = all.filter(([k, s]) => !isAdvanced(k, s)).sort(([, a], [, b]) => Number(!!b.ask) - Number(!!a.ask))
+  const advanced = all.filter(([k, s]) => isAdvanced(k, s))
+  const field = ([key, s]: [string, Schema]) => (
+    <label key={key} className="gc-field">
+      <span className="gc-field__label">
+        {s.title ?? humanize(key)}
+        {required.has(key) && s.default === undefined && <em> *</em>}
+      </span>
+      <Field schema={s} value={value[key]} onChange={(v) => onChange({ ...value, [key]: v })} />
+      {s.description && <span className="gc-field__help">{s.description}</span>}
+    </label>
+  )
+  if (!all.length) return <p className="gc-muted">This command has no arguments.</p>
   return (
     <div className="gc-form">
-      {entries.map(([key, s]) => (
-        <label key={key} className="gc-field">
-          <span className="gc-field__label">
-            {s.title ?? humanize(key)}
-            {required.has(key) && s.default === undefined && <em> *</em>}
-          </span>
-          <Field schema={s} value={value[key]} onChange={(v) => onChange({ ...value, [key]: v })} />
-          {s.description && <span className="gc-field__help">{s.description}</span>}
-        </label>
-      ))}
+      {main.map(field)}
+      {advanced.length > 0 && (
+        <details className="gc-advanced">
+          <summary>Advanced ({advanced.map(([k]) => k).join(', ')})</summary>
+          <div className="gc-form">{advanced.map(field)}</div>
+        </details>
+      )}
     </div>
   )
 }

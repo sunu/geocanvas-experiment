@@ -17,6 +17,17 @@ describe('dispatch', () => {
     expect(rt.oplog().map((e) => e.kind)).toEqual(['invocation'])
   })
 
+  it('adds a node through the generated <type>.add op and returns its id', async () => {
+    const rt = runtime(new Y.Doc())
+    const rec = await rt.dispatch('test.note.add', canvas, { text: 'quick', x: 10, y: 20 })
+    expect(rec.status, rec.error).toBe('applied')
+    expect(rec.created).toHaveLength(1)
+    const node = rt.reader.node(rec.created![0]!)!
+    expect(node).toMatchObject({ type: 'test.note', props: { text: 'quick' }, layout: { x: 10, y: 20, w: 100, h: 100 } })
+    expect(rt.availableOps(canvas).map((o) => o.id)).toContain('test.note.add')
+    expect(rt.availableOps(canvas).map((o) => o.id)).not.toContain('core.node.create')
+  })
+
   it('fails on bad args, unknown op, and wrong target', async () => {
     const rt = runtime(new Y.Doc())
     expect((await rt.dispatch('core.node.create', canvas, { type: 'nope' })).status).toBe('failed')

@@ -11,6 +11,10 @@ export interface PaletteState {
   note?: string
   /** Proposal id: run approves it instead of a new dispatch. */
   proposalId?: string
+  /** Text to start the search with, e.g. 'Add'. */
+  query?: string
+  /** Page point for new nodes (e.g. where the user double-clicked). */
+  at?: { x: number; y: number }
 }
 
 let state: PaletteState = { open: false }

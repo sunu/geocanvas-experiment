@@ -12,6 +12,8 @@ export const createNodeOp = defineOp({
   title: 'Add node',
   description: 'Add a node of a given type to the canvas.',
   target: { kind: 'canvas' },
+  // The palette shows one '<type>.add' op per node type instead.
+  hidden: true,
   args: z.object({
     type: z.string().meta({ widget: 'nodeType' }).describe('Node type'),
     props: z.record(z.string(), z.unknown()).optional(),

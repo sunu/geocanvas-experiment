@@ -179,3 +179,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .gc-eventpick__item:hover { background: var(--gc-node-head); }
 .gc-eventpick__item.is-on { background: var(--gc-accent); color: var(--gc-accent-text); }
 .gc-eventpick__name { flex: 1; }
+
+/* Add bar */
+.gc-addbar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 300; display: flex; gap: 4px; padding: 4px; background: var(--gc-panel); border: 1px solid var(--gc-border); border-radius: 10px; box-shadow: var(--gc-shadow); max-width: calc(100% - 32px); overflow-x: auto; }
+.gc-addbar__btn { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; padding: 6px 8px; border: none; background: none; border-radius: 6px; cursor: pointer; font-size: 11px; white-space: nowrap; }
+.gc-addbar__btn:hover { background: var(--gc-node-head); }
+.gc-addbar__btn--template { border-left: 1px solid var(--gc-border); border-radius: 0 6px 6px 0; }
+.gc-addbar__icon { font-size: 18px; line-height: 1; }
+.gc-advanced summary { cursor: pointer; color: var(--gc-muted); font-size: 12px; }
+.gc-advanced[open] summary { margin-bottom: 8px; }
+
+.gc-text--edit { width: 100%; border: none; outline: none; resize: none; background: transparent; font-family: ui-monospace, monospace; font-size: 12px; }

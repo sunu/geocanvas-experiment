@@ -17,6 +17,8 @@ export interface NodeUI {
   /** Hide the standard header (e.g. sticky notes). */
   bare?: boolean
   icon?: string
+  /** Go to edit mode right after the user adds one (sticky, text). */
+  editOnCreate?: boolean
 }
 
 export interface WidgetProps {

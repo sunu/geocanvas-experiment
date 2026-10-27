@@ -1,6 +1,7 @@
 import type { NodeRecord } from '../doc/schema.js'
 import type { OpDef } from '../ops/types.js'
 import { templateOp } from '../templates/instantiate.js'
+import { nodeAddOp } from '../ops/nodeAdd.js'
 import type {
   DataFunctionDef,
   NodeTypeDef,
@@ -29,6 +30,12 @@ export class Registry {
       addAll(this.dataFns, p.dataFunctions, (d) => d.id, p.id)
       addAll(this.templateDefs, p.templates, (d) => d.id, p.id)
       for (const [id, inst] of Object.entries(p.providers ?? {})) this.providerMap.set(id, inst)
+    }
+    // Each node type gets an add op, e.g. 'core.sticky.add'.
+    for (const t of this.nodeTypes.values()) {
+      if (t.addable === false) continue
+      const op = nodeAddOp(t)
+      if (!this.opDefs.has(op.id)) this.opDefs.set(op.id, op)
     }
     // Each template also gets its own palette op, e.g. 'disasters.sitrep.create'.
     for (const t of this.templateDefs.values()) {

@@ -10,11 +10,21 @@ import { linking } from './canvas/ports'
 import { Palette } from './palette/Palette'
 import { palette } from './palette/store'
 import { SidePanel, TopBar, EmptyState } from './ui/Chrome'
+import { AddBar, DoubleClickToAdd } from './ui/AddBar'
 import './nodes/core'
 import './nodes/disasters'
 
 const shapeUtils = [NodeShapeUtil]
-const components: TLComponents = { OnTheCanvas: OnCanvas, InFrontOfTheCanvas: InFront }
+function InFrontAll() {
+  return (
+    <>
+      <InFront />
+      <DoubleClickToAdd />
+    </>
+  )
+}
+
+const components: TLComponents = { OnTheCanvas: OnCanvas, InFrontOfTheCanvas: InFrontAll }
 
 export function App() {
   const [room] = useState(roomFromUrl)
@@ -37,6 +47,7 @@ export function App() {
               components={components}
               onMount={(editor: Editor) => {
                 setEditor(editor)
+                if (import.meta.env.DEV) Object.assign(window, { editor, runtime: session.runtime })
                 session.runtime.view = viewController(editor)
                 editor.user.updateUserPreferences({ colorScheme: 'system' })
                 const unbind = bindEditor(editor, session.runtime)
@@ -47,6 +58,7 @@ export function App() {
               }}
             />
             <EmptyState />
+            <AddBar />
           </div>
           <SidePanel />
         </div>

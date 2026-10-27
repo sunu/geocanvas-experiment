@@ -59,6 +59,8 @@ export interface OpDef<Args = any, Plan = Args> {
   risk?: 'low' | 'high'
   /** Hide from the palette and from tool export (internal ops). */
   hidden?: boolean
+  /** Hints for NL mode (plans/plan-003.md). */
+  nl?: { examples?: string[]; aliases?: string[] }
 }
 
 export function defineOp<Args, Plan = Args>(def: OpDef<Args, Plan>): OpDef<Args, Plan> {
@@ -79,6 +81,8 @@ export interface InvocationRecord {
   error?: string
   /** Text from describePlan, if the op has one. */
   summary?: string
+  /** Ids of nodes that the invocation created. */
+  created?: string[]
 }
 
 export type OplogEntry =

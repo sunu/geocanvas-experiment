@@ -9,7 +9,7 @@ export const stickyNode: NodeTypeDef = {
   title: 'Sticky note',
   description: 'A short note.',
   props: z.object({
-    text: z.string().default(''),
+    text: z.string().meta({ widget: 'textarea' }).default(''),
     color: z.enum(['yellow', 'blue', 'green', 'pink', 'orange']).default('yellow'),
   }),
   summarize: (n) => `sticky: ${String(n.props.text).slice(0, 80)}`,
@@ -32,9 +32,9 @@ export const textNode: NodeTypeDef = {
   description: 'Markdown text. Use {{port.field}} to show values from linked nodes.',
   props: z.object({
     title: z.string().default(''),
-    text: z.string().default(''),
+    text: z.string().meta({ widget: 'textarea' }).default(''),
     /** Names of the input ports. Each one can take a link. */
-    ports: z.array(z.string()).default(['context']),
+    ports: z.array(z.string()).meta({ advanced: true }).default(['context']),
   }),
   inputs: (node) =>
     Object.fromEntries(((node.props.ports as string[]) ?? []).map((p) => [p, { type: 'any', label: p }])) as PortMap,
@@ -52,7 +52,7 @@ export const mapNode: NodeTypeDef = {
     title: z.string().default('Map'),
     basemap: z.enum(['streets', 'light', 'dark', 'satellite']).default('light'),
     /** AOI that a user drew. It replaces the AOI from the input. */
-    aoiOverride: geojson.optional(),
+    aoiOverride: geojson.meta({ advanced: true, widget: 'aoi' }).optional(),
   }),
   inputs: {
     aoi: { type: 'geo.aoi', label: 'AOI' },
@@ -80,11 +80,11 @@ export const chartNode: NodeTypeDef = {
   props: z.object({
     title: z.string().default('Chart'),
     /** Id of a data function that a plugin registered. */
-    source: z.string().optional(),
-    params: z.record(z.string(), z.unknown()).default({}),
+    source: z.string().meta({ widget: 'dataFunction', ask: true }).optional(),
+    params: z.record(z.string(), z.unknown()).meta({ advanced: true }).default({}),
     mark: z.enum(['bar', 'line', 'arc', 'point']).default('bar'),
     /** Extra Vega-Lite properties that go over the default spec. */
-    spec: z.record(z.string(), z.unknown()).optional(),
+    spec: z.record(z.string(), z.unknown()).meta({ advanced: true }).optional(),
   }),
   inputs: (node, registry) => {
     const fn = node.props.source ? registry.dataFunction(String(node.props.source)) : undefined

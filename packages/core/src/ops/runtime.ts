@@ -267,6 +267,7 @@ export class CanvasRuntime {
       this.doc.ydoc.transact(() => {
         const tx = this.newTx()
         op.apply!(tx, plan, target)
+        if (tx.created.length) record.created = [...tx.created]
       }, origin)
     } catch (err) {
       record.status = 'failed'
