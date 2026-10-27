@@ -1,0 +1,16 @@
+{
+  "name": "geo-canvas",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "dev": "npm run dev -w apps/web",
+    "sync": "npm run start -w apps/sync-server"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

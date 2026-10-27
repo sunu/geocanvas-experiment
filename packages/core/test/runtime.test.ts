@@ -1,0 +1,120 @@
+import * as Y from 'yjs'
+import { describe, expect, it } from 'vitest'
+import { exportTools } from '../src/index.js'
+import { alice, bob, linkedDocs, runtime, tick } from './helpers.js'
+
+const canvas = { kind: 'canvas' } as const
+
+describe('dispatch', () => {
+  it('creates a node and logs the invocation', async () => {
+    const rt = runtime(new Y.Doc())
+    const rec = await rt.dispatch('core.node.create', canvas, { type: 'test.note', props: { text: 'hi' }, x: 5 })
+    expect(rec.status).toBe('applied')
+    const nodes = rt.reader.nodes()
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]!.props).toEqual({ text: 'hi' })
+    expect(nodes[0]!.layout.x).toBe(5)
+    expect(rt.oplog().map((e) => e.kind)).toEqual(['invocation'])
+  })
+
+  it('fails on bad args, unknown op, and wrong target', async () => {
+    const rt = runtime(new Y.Doc())
+    expect((await rt.dispatch('core.node.create', canvas, { type: 'nope' })).status).toBe('failed')
+    expect((await rt.dispatch('no.such.op', canvas, {})).status).toBe('failed')
+    expect((await rt.dispatch('core.node.delete', canvas, {})).status).toBe('failed')
+    expect(rt.reader.nodes()).toHaveLength(0)
+    expect(rt.oplog().every((e) => e.kind === 'invocation' && e.status === 'failed')).toBe(true)
+  })
+
+  it('syncs ops to a second client', async () => {
+    const [a, b] = linkedDocs()
+    const ra = runtime(a, alice)
+    const rb = runtime(b, bob)
+    await ra.dispatch('core.node.create', canvas, { type: 'test.note' })
+    expect(rb.reader.nodes()).toHaveLength(1)
+    expect(rb.oplog()).toHaveLength(1)
+  })
+})
+
+describe('undo', () => {
+  it('undoes one invocation per step', async () => {
+    const rt = runtime(new Y.Doc())
+    await rt.dispatch('core.node.create', canvas, { type: 'test.note' })
+    const id = rt.reader.nodes()[0]!.id
+    await rt.dispatch('core.node.move', { kind: 'nodes', ids: [id] }, { dx: 10 })
+    await rt.dispatch('core.node.move', { kind: 'nodes', ids: [id] }, { dx: 10 })
+    expect(rt.reader.node(id)!.layout.x).toBe(20)
+    rt.undo()
+    expect(rt.reader.node(id)!.layout.x).toBe(10)
+    rt.undo()
+    expect(rt.reader.node(id)!.layout.x).toBe(0)
+    rt.redo()
+    expect(rt.reader.node(id)!.layout.x).toBe(10)
+    expect(rt.oplog().filter((e) => e.kind !== 'invocation').map((e) => e.kind)).toEqual(['undo', 'undo', 'redo'])
+  })
+
+  it('undoes only my own ops', async () => {
+    const [a, b] = linkedDocs()
+    const ra = runtime(a, alice)
+    const rb = runtime(b, bob)
+    await ra.dispatch('core.node.create', canvas, { type: 'test.note', props: { text: 'a' } })
+    await rb.dispatch('core.node.create', canvas, { type: 'test.note', props: { text: 'b' } })
+    ra.undo()
+    expect(rb.reader.nodes().map((n) => n.props.text)).toEqual(['b'])
+    expect(rb.undo()).toBe(true)
+    expect(ra.reader.nodes()).toHaveLength(0)
+  })
+})
+
+describe('plugins', () => {
+  it('adds and removes ops when a plugin is enabled or disabled', async () => {
+    const [a, b] = linkedDocs()
+    const ra = runtime(a, alice)
+    const rb = runtime(b, bob)
+    expect(rb.registry.op('extra.thing.poke')).toBeUndefined()
+    await ra.dispatch('core.plugin.enable', canvas, { pluginId: 'extra' })
+    expect(rb.registry.op('extra.thing.poke')).toBeDefined()
+    await rb.dispatch('core.node.create', canvas, { type: 'extra.thing' })
+    const id = rb.reader.nodes()[0]!.id
+    expect(rb.availableOps({ kind: 'nodes', ids: [id] }).map((o) => o.id)).toContain('extra.thing.poke')
+    await ra.dispatch('core.plugin.disable', canvas, { pluginId: 'extra' })
+    expect(rb.registry.op('extra.thing.poke')).toBeUndefined()
+  })
+
+  it('filters palette ops by target', async () => {
+    const rt = runtime(new Y.Doc())
+    await rt.dispatch('core.node.create', canvas, { type: 'test.note' })
+    await rt.dispatch('core.node.create', canvas, { type: 'test.note' })
+    const [n1, n2] = rt.reader.nodes().map((n) => n.id)
+    const one = rt.availableOps({ kind: 'nodes', ids: [n1!] }).map((o) => o.id)
+    const two = rt.availableOps({ kind: 'nodes', ids: [n1!, n2!] }).map((o) => o.id)
+    expect(one).toContain('core.node.delete')
+    expect(one).not.toContain('core.node.connect')
+    expect(two).toContain('core.node.connect')
+    expect(one).not.toContain('test.group.regenerate')
+  })
+
+  it('exports ops as tool definitions', () => {
+    const rt = runtime(new Y.Doc())
+    const tools = exportTools(rt.registry.ops())
+    const t = tools.find((x) => x.name === 'test__group__regenerate')!
+    expect(t.input_schema).toMatchObject({ type: 'object', properties: { count: { type: 'integer' } } })
+  })
+})
+
+describe('proposals', () => {
+  it('runs a proposal only after approval', async () => {
+    const [a, b] = linkedDocs()
+    const agent = runtime(a, { kind: 'agent', id: 'agent-1' })
+    const user = runtime(b, bob)
+    const p = agent.propose('core.node.create', canvas, { type: 'test.note' })
+    await tick()
+    expect(user.reader.nodes()).toHaveLength(0)
+    expect(user.doc.proposals.size).toBe(1)
+    const rec = await user.approve(p.id)
+    expect(rec.status).toBe('applied')
+    expect(rec.parentId).toBe(p.id)
+    expect(agent.reader.nodes()).toHaveLength(1)
+    expect(user.doc.proposals.size).toBe(0)
+  })
+})
