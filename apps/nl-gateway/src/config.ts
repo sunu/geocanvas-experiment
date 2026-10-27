@@ -10,6 +10,8 @@ export function loadConfig() {
     deciderModel: process.env.NL_DECIDER_MODEL ?? 'typesafe/jev-1.14',
     extractorModel: process.env.NL_EXTRACTOR_MODEL ?? 'mistralai/mistral-nemo',
     embedModel: process.env.NL_EMBED_MODEL ?? 'sentence-transformers/all-minilm-l6-v2',
+    montyBaseUrl: process.env.MONTANDON_BASE_URL ?? '',
+    montyToken: process.env.MONTANDON_TOKEN ?? '',
     port: Number(process.env.NL_GATEWAY_PORT ?? 8787),
   }
 }

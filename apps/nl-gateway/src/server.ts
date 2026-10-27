@@ -10,6 +10,7 @@ import { loadConfig } from './config.js'
  *   POST /extract { text, fields }     -> { results }        (cheap LLM, fallback only)
  *   POST /embed   { texts }            -> { embeddings }     (small embedder)
  *   POST /log     any JSON             -> appends to data/nl-log.jsonl
+ *   POST /monty/search any STAC search body -> Montandon STAC API (adds the token)
  *   GET  /health                       -> models, key present, usage
  */
 const cfg = loadConfig()
@@ -46,11 +47,31 @@ async function call<T>(route: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Forward a STAC search to the Montandon API. The token stays here. */
+async function montySearch(req: http.IncomingMessage, res: http.ServerResponse) {
+  if (!cfg.montyBaseUrl || !cfg.montyToken) {
+    return send(res, 503, { error: 'Set MONTANDON_BASE_URL and MONTANDON_TOKEN in .env and restart the gateway.' })
+  }
+  try {
+    const r = await fetch(`${cfg.montyBaseUrl.replace(/\/$/, '')}/search`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${cfg.montyToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify(await body(req)),
+    })
+    res.writeHead(r.status, { 'content-type': 'application/json', 'access-control-allow-origin': '*' })
+    res.end(await r.text())
+  } catch (err) {
+    console.error(err)
+    send(res, 502, { error: String((err as Error).message ?? err) })
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' })
     return res.end()
   }
+  if (req.method === 'POST' && req.url === '/monty/search') return montySearch(req, res)
   const route = (req.url ?? '').replace(/^\/nl/, '').split('?')[0]
   try {
     if (req.method === 'GET' && route === '/health') {

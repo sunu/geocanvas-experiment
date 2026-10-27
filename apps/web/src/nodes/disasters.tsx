@@ -1,11 +1,35 @@
 import { useEffect, useState } from 'react'
-import type { DisasterEvent, DisasterProvider, EventSummary } from '@geo-canvas/plugin-disasters'
+import type { DisasterEvent, DisasterProvider, EventSummary, ImpactTotals } from '@geo-canvas/plugin-disasters'
 import type { NodeRecord } from '@geo-canvas/core'
 import { registerNodeUI, registerWidget, type NodeViewProps } from '../ui/registry'
 import { useRegistry, useSession } from '../ui/context'
 import { palette } from '../palette/store'
 
 const ICON: Record<string, string> = { cyclone: '🌀', flood: '🌊', earthquake: '🌋', drought: '☀️' }
+
+const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
+
+/** Headline impact numbers, when the data source has them. */
+function Impacts({ impacts }: { impacts?: ImpactTotals }) {
+  if (!impacts) return null
+  const items: [string, string | undefined][] = [
+    ['deaths', impacts.deaths !== undefined ? compact.format(impacts.deaths) : undefined],
+    ['affected', impacts.affected !== undefined ? compact.format(impacts.affected) : undefined],
+    ['displaced', impacts.displaced !== undefined ? compact.format(impacts.displaced) : undefined],
+    ['damage', impacts.damage !== undefined ? `$${compact.format(impacts.damage * 1e6)}` : undefined],
+  ]
+  const shown = items.filter(([, v]) => v !== undefined)
+  if (!shown.length) return null
+  return (
+    <div className="gc-event__impacts">
+      {shown.map(([label, v]) => (
+        <span key={label} className="gc-event__impact">
+          <b>{v}</b> {label}
+        </span>
+      ))}
+    </div>
+  )
+}
 
 function EventView({ derived }: NodeViewProps) {
   const event = (derived?.result?.data as { event?: DisasterEvent } | undefined)?.event
@@ -21,6 +45,8 @@ function EventView({ derived }: NodeViewProps) {
         <span>{event.type}</span>
         <span>{event.start} → {event.end}</span>
       </div>
+      {event.hazard && <div className="gc-event__hazard">{event.hazard.label}</div>}
+      <Impacts impacts={event.impacts} />
     </div>
   )
 }
@@ -90,6 +116,7 @@ registerWidget('disasters.event', ({ value, onChange }) => {
           >
             <span>{ICON[e.type]}</span>
             <span className="gc-eventpick__name">{e.name}</span>
+            {e.headline && <span className="gc-muted">{e.headline}</span>}
             <span className={`gc-sev gc-sev--${e.severity}`}>{e.severity}</span>
           </button>
         ))}

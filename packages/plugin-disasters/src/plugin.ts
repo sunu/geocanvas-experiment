@@ -38,7 +38,7 @@ export const eventNode: NodeTypeDef = {
     const e = (data as { event?: DisasterEvent })?.event
     return e ? `disaster event ${e.id}: ${e.name}, ${e.type}, severity ${e.severity}, ${e.start} to ${e.end}` : 'disaster event (none selected)'
   },
-  defaultSize: { w: 300, h: 140 },
+  defaultSize: { w: 300, h: 170 },
 }
 
 const CHILD = { w: 230, h: 120, gap: 12, cols: 3, header: 56 }
@@ -266,7 +266,7 @@ export function createDisastersPlugin(provider: DisasterProvider = new MockDisas
         inputs: z.object({ eventId: eventIdArg }),
         build: ({ eventId }) => ({
           nodes: [
-            { key: 'seed', type: 'disasters.event', props: { eventId }, layout: { x: 0, y: 0, w: 380, h: 150 } },
+            { key: 'seed', type: 'disasters.event', props: { eventId }, layout: { x: 0, y: 0, w: 380, h: 190 } },
             {
               key: 'summary',
               type: 'core.text',
@@ -278,11 +278,15 @@ export function createDisastersPlugin(provider: DisasterProvider = new MockDisas
                   '## {{event.name}}',
                   '**Type:** {{event.type}} · **Severity:** {{event.severity}}',
                   '**Dates:** {{event.start}} to {{event.end}}',
+                  '**Intensity:** {{event.hazard.label}}',
                   '',
-                  '**People affected in AOI:** {{people.total}}',
-                  '**Estimated damage in AOI:** USD {{damage.total}} m',
+                  '**Reported deaths:** {{event.impacts.deaths}}',
+                  '**People affected:** {{event.impacts.affected}}',
+                  '**Damage:** USD {{event.impacts.damage}} m',
                   '',
-                  '_Mock data._',
+                  '**Affected in AOI (by impact type):** {{people.total}}',
+                  '',
+                  '_Source: {{event.source}}_',
                 ].join('\n'),
               },
             },
@@ -290,7 +294,7 @@ export function createDisastersPlugin(provider: DisasterProvider = new MockDisas
             {
               key: 'people',
               type: 'core.chart',
-              props: { title: 'People affected by district', source: 'disasters.peopleAffected', mark: 'bar' },
+              props: { title: 'People impacted', source: 'disasters.peopleAffected', mark: 'bar' },
               layout: { x: 1040, y: 0, w: 440, h: 220 },
             },
             {

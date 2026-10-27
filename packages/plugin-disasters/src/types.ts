@@ -13,8 +13,25 @@ export interface DisasterEvent {
   year: number
   center: [number, number]
   severity: Severity
+  /** Where the data came from, e.g. "IFRC Montandon (EM-DAT)". */
+  source?: string
+  /** Hazard intensity, e.g. magnitude 7.8 or wind speed 204 km/h. Real data only. */
+  hazard?: { value: number; unit: string; label: string }
+  /** Headline impact totals across Monty sources. Damage is USD millions. Real data only. */
+  impacts?: ImpactTotals
+  /** Monty correlation id, set by the Monty provider. Links the event to its impact rows. */
+  corrId?: string
   /** Footprint: the area that the event affected. */
   footprint: GeoJSON.Feature<GeoJSON.Polygon>
+}
+
+export interface ImpactTotals {
+  deaths?: number
+  injured?: number
+  affected?: number
+  displaced?: number
+  /** USD millions. */
+  damage?: number
 }
 
 export interface EventSummary {
@@ -24,6 +41,8 @@ export interface EventSummary {
   year: number
   country: string
   severity: Severity
+  /** One-line headline for the picker, e.g. "53,000 deaths". */
+  headline?: string
 }
 
 export interface ImpactRow {

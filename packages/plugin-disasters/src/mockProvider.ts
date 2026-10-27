@@ -155,6 +155,7 @@ function makeEvents(): { events: DisasterEvent[]; districts: Map<string, Distric
         year,
         center: offset,
         severity,
+        source: 'Mock data',
         footprint: blob(offset, radius, rand, type === 'cyclone' ? 1.8 : type === 'flood' ? 1.4 : 1),
       })
     }

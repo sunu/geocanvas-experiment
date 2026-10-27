@@ -9,25 +9,25 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@deck.gl/core": "^9.4.0",
+    "@deck.gl/layers": "^9.4.0",
+    "@deck.gl/mapbox": "^9.4.0",
     "@geo-canvas/core": "*",
+    "@geo-canvas/nl": "*",
     "@geo-canvas/plugin-core": "*",
     "@geo-canvas/plugin-disasters": "*",
     "cmdk": "^1.1.1",
     "maplibre-gl": "^5.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "react-map-gl": "^8.1.3",
     "tldraw": "^5.5.0",
     "vega": "^6.4.0",
     "vega-embed": "^7.3.0",
     "vega-lite": "^6.5.0",
     "y-websocket": "^3.1.0",
     "yjs": "^13.6.0",
-    "zod": "^4.1.0",
-    "@deck.gl/core": "^9.4.0",
-    "@deck.gl/layers": "^9.4.0",
-    "@deck.gl/mapbox": "^9.4.0",
-    "react-map-gl": "^8.1.3",
-    "@geo-canvas/nl": "*"
+    "zod": "^4.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",

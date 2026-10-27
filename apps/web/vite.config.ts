@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     // NL gateway (holds the OpenRouter key).
-    proxy: { '/nl': 'http://localhost:8787' },
+    proxy: { '/nl': 'http://localhost:8787', '/monty': 'http://localhost:8787' },
   },
   // react-map-gl sits in the root node_modules. maplibre-gl@5 sits in this app.
   // deck.gl 9.4 interleaved mode does not work with maplibre-gl 6 yet.
