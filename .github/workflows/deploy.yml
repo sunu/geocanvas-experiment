@@ -24,8 +24,6 @@ jobs:
       - run: npm test
       - name: Build web app
         run: npm run build -w apps/web
-        env:
-          VITE_TLDRAW_LICENSE_KEY: ${{ secrets.TLDRAW_LICENSE_KEY }}
       - name: Deploy Worker
         working-directory: apps/worker
         env:

@@ -1,5 +1,7 @@
 import type { StyleSpecification } from 'maplibre-gl'
-import type { Basemap } from '@ttx/shapes'
+
+export const BASEMAPS = ['light', 'dark', 'streets', 'satellite'] as const
+export type Basemap = (typeof BASEMAPS)[number]
 
 /** Basemaps that need no API key. */
 const VECTOR_STYLES: Record<Exclude<Basemap, 'satellite'>, string> = {

@@ -8,14 +8,12 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, etc.) working in this
 
 At a high-level:
 1. Users can start a new board and select an event from Montandon. This will do initial board setup. Showing the event data, map, and related events in that geography.
-2. There are widgets for data selectors, map, charts, sticky notes. This is currently built on top of tldraw.
+2. There are widgets for data selectors, map, charts, sticky notes, on our own infinite canvas.
 3. There are agents running entirely in the browser to do specific actions. Create new components, run analysis etc.
 4. Data comes from Montandon via Duckdb. Additional data like OSM, Overture (buildings/infra) comes as geoparquet too.
 5. There's a way to ingest analysis run from Jupyternotebooks from a different project called Notebook Factory
 6. There are programmable actions and flow control in the advanced mode
 7. It is possible to create reports and export them
-
-We will build an abstraction for creating custom tldraw plugins so tldraw can be swapped out later.
 
 
 ## Shared working agreement
@@ -32,17 +30,19 @@ This file is the source of truth for repository-wide agent guidance. `CLAUDE.md`
 npm workspaces monorepo (TypeScript, ESM). Design docs go in `plans/`.
 
 ```
-packages/
-  shapes/        board schema shared by the browser and the Worker (custom shape props and migrations)
 apps/
-  web/           React + tldraw app (Vite). Custom shapes live in src/<shape>/.
-  worker/        Cloudflare Worker: serves the built web app and runs tldraw sync, one Durable Object per room
+  web/           React app (Vite): our own infinite canvas
+    src/board/     the shared board (Yjs) and the connection to the Worker
+    src/canvas/    camera, input, selection, toolbar, object views
+    src/map/       the map widget
+  worker/        Cloudflare Worker: serves the built web app; one Durable Object per room relays and stores the board
 ```
 
-- **The tldraw store is the source of truth.** There is no separate doc model; shapes hold the shared board state, and tldraw sync keeps rooms in step. The server validates every change against `@ttx/shapes`, so a custom shape's props and migrations must live there, not in `apps/web`.
-- **Multiplayer runs on our own Cloudflare Worker**, not on tldraw's servers and not on Yjs. `/connect/<room>` goes to that room's Durable Object, which runs tldraw's `TLSocketRoom` and stores the board in the Durable Object's SQLite. The app and the sync endpoint share one origin.
-- **Map widget** (`apps/web/src/map/`): a box shape with a live MapLibre map. Double-click enters edit mode (the map takes pan and zoom); Esc gives the wheel back to the canvas. The basemap is shared board state.
-- **Map views are per person.** The camera of a map is not in the shape; each person's view is kept in their browser (`localView.ts`), so nobody's map moves under them. Add a shared view only as a separate, explicit feature.
+- **Our own canvas, no tldraw.** tldraw needs a paid license off localhost, and the canvas we need is small. The design follows vsticky: a DOM "world" layer moved by one CSS transform. The camera is local to each person and never synced.
+- **The board is a Yjs doc** (`board/board.ts`): one map of objects (box, text, map), each a Y.Map of plain fields. Layer order is a float `z` per object, ties broken by id. Undo and redo cover only your own edits, one step per gesture (`undo.stopCapturing()` when a gesture starts). Text is stored as plain strings, with no encryption.
+- **Multiplayer runs on our own Cloudflare Worker.** `/connect/<room>` goes to that room's Durable Object, which speaks the standard y-websocket protocol, keeps the doc in memory and appends every update to its SQLite (compacted on load when there are many). The browser uses y-websocket's `WebsocketProvider`. Tabs of one browser also sync with each other directly (BroadcastChannel), so test multiplayer from two origins or two browsers, or the server is not involved.
+- **Input:** drag on empty canvas to select (shift adds); scroll pans; pinch or ⌘+scroll zooms; space+drag pans. Tools: V select, R box, T text, M map. `]` / `[` bring to front / send to back, with ⌘ one step. Delete removes. Double-click edits a text or lets a map take the pointer; Esc gives it back.
+- **Map widget** (`apps/web/src/map/`): a live MapLibre map in a box. The basemap is shared board state. **Map views are per person:** the camera of a map is not in the board; each person's view is kept in their browser (`localView.ts`), so nobody's map moves under them.
 - **MapLibre is pinned to v5** because deck.gl 9.4 draws into MapLibre's WebGL context (interleaved) only on v5. `npm audit` reports GHSA-jrc7-96c5-q579 (XSS in `DOM.sanitize()`, fixed only in v6). It is not reachable while maps load only our own basemap styles and show no popups with external HTML; revisit before adding either.
 - Rooms: `/#room=<name>`. There is no access control yet: anyone with the URL can open and edit any room, so keep real exercise data off the preview.
 
@@ -66,17 +66,15 @@ npm run deploy      # build the web app and deploy the Worker (needs `npx wrangl
 
 `npm run sync` also serves the last `npm run build` at :8787, the same way the deployed Worker does. Local room state is in `apps/worker/.wrangler/`.
 
-tldraw needs no license on localhost. Off localhost it requires a license key and hides the canvas without one. Set `VITE_TLDRAW_LICENSE_KEY` when building for a deployed host.
-
 ## Deploys
 
 GitHub Actions deploy every push to Cloudflare (`.github/workflows/deploy.yml`), after typecheck and tests pass:
 - `main` deploys to the `humanitarian-ttx` Worker.
-- Every other branch deploys to its own Worker, `humanitarian-ttx-<branch>` (naming rule in `.github/scripts/worker-name.sh`), with its own rooms. A branch that changes the board schema cannot break `main`'s boards.
+- Every other branch deploys to its own Worker, `humanitarian-ttx-<branch>` (naming rule in `.github/scripts/worker-name.sh`), with its own rooms. A branch that changes the board format cannot break `main`'s boards.
 - Deleting a branch deletes its Worker and its rooms (`delete-branch-worker.yml`).
 - The deployed URL is in each run's summary.
 
-Repository secrets: `CLOUDFLARE_API_TOKEN` (a token limited to editing Workers), `CLOUDFLARE_ACCOUNT_ID`, and `TLDRAW_LICENSE_KEY`.
+Repository secrets: `CLOUDFLARE_API_TOKEN` (a token limited to editing Workers) and `CLOUDFLARE_ACCOUNT_ID`.
 
 ## Before editing
 

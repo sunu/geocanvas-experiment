@@ -9,8 +9,9 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "@tldraw/sync-core": "^5.5.2",
-    "@ttx/shapes": "*"
+    "lib0": "^0.2.119",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.33"
   },
   "devDependencies": {
     "wrangler": "^4.153.0"
