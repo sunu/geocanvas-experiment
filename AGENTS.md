@@ -66,7 +66,17 @@ npm run deploy      # build the web app and deploy the Worker (needs `npx wrangl
 
 `npm run sync` also serves the last `npm run build` at :8787, the same way the deployed Worker does. Local room state is in `apps/worker/.wrangler/`.
 
-tldraw shows a "Get a license for production" notice off localhost. Set `VITE_TLDRAW_LICENSE_KEY` when building for a deployed host.
+tldraw needs no license on localhost. Off localhost it requires a license key and hides the canvas without one. Set `VITE_TLDRAW_LICENSE_KEY` when building for a deployed host.
+
+## Deploys
+
+GitHub Actions deploy every push to Cloudflare (`.github/workflows/deploy.yml`), after typecheck and tests pass:
+- `main` deploys to the `humanitarian-ttx` Worker.
+- Every other branch deploys to its own Worker, `humanitarian-ttx-<branch>` (naming rule in `.github/scripts/worker-name.sh`), with its own rooms. A branch that changes the board schema cannot break `main`'s boards.
+- Deleting a branch deletes its Worker and its rooms (`delete-branch-worker.yml`).
+- The deployed URL is in each run's summary.
+
+Repository secrets: `CLOUDFLARE_API_TOKEN` (a token limited to editing Workers), `CLOUDFLARE_ACCOUNT_ID`, and `TLDRAW_LICENSE_KEY`.
 
 ## Before editing
 
