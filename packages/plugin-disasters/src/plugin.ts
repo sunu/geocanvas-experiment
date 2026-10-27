@@ -12,7 +12,10 @@ const TYPES = ['cyclone', 'flood', 'earthquake', 'drought'] as const
 export const SEVERITY_RGB = { green: [47, 158, 68], orange: [240, 140, 0], red: [224, 49, 49] } as const
 
 const only = (t: TargetRef) => (t.kind === 'nodes' ? t.ids[0]! : '')
-const eventIdArg = z.string().meta({ widget: 'disasters.event' }).describe('Id of a disaster event')
+const eventIdArg = z
+  .string()
+  .meta({ widget: 'disasters.event', nl: { extract: 'entity', entity: 'disasters.event' } })
+  .describe('Id of a disaster event')
 
 // ---------- Node types ----------
 
@@ -93,6 +96,7 @@ export const changeEventOp = defineOp({
   description: 'Pick a different disaster event for this node. Linked nodes update.',
   target: { kind: 'node', types: ['disasters.event'], min: 1, max: 1 },
   args: z.object({ eventId: eventIdArg }),
+  nl: { examples: ['switch to the 2019 Khulna cyclone', 'use the Haiti earthquake instead'] },
   defaults: (ctx) => ({ eventId: ctx.reader.node(only(ctx.target))?.props.eventId as string | undefined }),
   async prepare(ctx, args) {
     const e = await ctx.provider<DisasterProvider>(PROVIDER).getEvent(args.eventId)
@@ -103,9 +107,18 @@ export const changeEventOp = defineOp({
 })
 
 const regenerateArgs = z.object({
-  yearRange: z.number().int().min(1).max(100).describe('How many years back from the seed event'),
-  sameType: z.boolean().describe('Only events of the same type as the seed'),
-  radiusKm: z.number().min(10).max(3000).describe('Search radius around the seed, in km'),
+  yearRange: z
+    .number().int().min(1).max(100)
+    .meta({ nl: { extract: 'years', examples: ['last 30 years', 'past decade'] } })
+    .describe('How many years back from the seed event'),
+  sameType: z
+    .boolean()
+    .meta({ nl: { examples: ['only cyclones', 'all disaster types', 'any type'] } })
+    .describe('Only events of the same type as the seed (false: all types)'),
+  radiusKm: z
+    .number().min(10).max(3000)
+    .meta({ nl: { extract: 'km', examples: ['within 200 km'] } })
+    .describe('Search radius around the seed, in km'),
 })
 
 export const regenerateOp = defineOp({
@@ -115,6 +128,10 @@ export const regenerateOp = defineOp({
     'Search again for disasters near the seed event and replace the events in this group. Use yearRange to set how many years back to search.',
   target: { kind: 'node', types: ['disasters.relatedEvents'], min: 1, max: 1 },
   args: regenerateArgs,
+  nl: {
+    examples: ['regenerate related disasters for the last 30 years', 'refresh related events', 'include all disaster types'],
+    aliases: ['refresh', 'rerun', 'update related'],
+  },
   defaults(ctx) {
     const p = ctx.reader.node(only(ctx.target))?.props ?? {}
     return { yearRange: p.yearRange as number, sameType: p.sameType as boolean, radiusKm: p.radiusKm as number }
@@ -225,6 +242,16 @@ export function createDisastersPlugin(provider: DisasterProvider = new MockDisas
           impactTable(inputs, ctx.provider<DisasterProvider>(PROVIDER), 'damage', (params as { top: number }).top),
       },
     ],
+    entities: [
+      {
+        id: 'disasters.event',
+        description: 'A disaster event, named by type, place, country, or year',
+        async search(query, limit, ctx) {
+          const events = await ctx.provider<DisasterProvider>(PROVIDER).listEvents()
+          return rankByWords(query, events.map((e) => ({ id: e.id, label: `${e.name} [${e.type}, ${e.severity}]` })), limit)
+        },
+      },
+    ],
     templates: [
       {
         id: 'disasters.sitrep',
@@ -285,4 +312,25 @@ export function createDisastersPlugin(provider: DisasterProvider = new MockDisas
       },
     ],
   })
+}
+
+const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'on', 'for', 'and', 'use', 'switch', 'change', 'instead', 'show', 'pick', 'event', 'disaster'])
+const SYNONYMS: Record<string, string> = { typhoon: 'cyclone', hurricane: 'cyclone', quake: 'earthquake', floods: 'flood', flooding: 'flood', droughts: 'drought', turkey: 'türkiye' }
+
+/** Word-overlap ranking. Enough to shortlist candidates; the decider picks the final one. */
+export function rankByWords<T extends { label: string }>(query: string, items: T[], limit: number): T[] {
+  const words = (s: string) =>
+    s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w)).map((w) => SYNONYMS[w] ?? w)
+  const q = new Set(words(query))
+  return items
+    .map((it) => {
+      const w = new Set(words(it.label))
+      let score = 0
+      for (const t of q) if (w.has(t)) score += /^\d{4}$/.test(t) ? 2 : 1
+      return { it, score }
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((x) => x.it)
 }

@@ -114,6 +114,21 @@ export interface TemplateDef<Inputs = any> {
   ): Promise<TemplateGraph> | TemplateGraph
 }
 
+/**
+ * Finds entities that a text names, for NL arg filling.
+ * Example: 'disasters.event' turns "the 2019 Khulna cyclone" into event ids.
+ * Args point to a resolver with meta { nl: { extract: 'entity', entity: '<id>' } }.
+ */
+export interface EntityResolverDef {
+  id: string
+  description: string
+  search(
+    query: string,
+    limit: number,
+    ctx: { provider<T>(id: string): T; reader: DocReader },
+  ): Promise<{ id: string; label: string }[]>
+}
+
 export interface Plugin {
   id: string
   version: string
@@ -125,6 +140,7 @@ export interface Plugin {
   dataFunctions?: DataFunctionDef[]
   providers?: Record<string, unknown>
   templates?: TemplateDef[]
+  entities?: EntityResolverDef[]
 }
 
 export function definePlugin(p: Plugin): Plugin {

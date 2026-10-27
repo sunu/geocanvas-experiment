@@ -3,6 +3,7 @@ import type { OpDef } from '../ops/types.js'
 import { templateOp } from '../templates/instantiate.js'
 import { nodeAddOp } from '../ops/nodeAdd.js'
 import type {
+  EntityResolverDef,
   DataFunctionDef,
   NodeTypeDef,
   Plugin,
@@ -20,6 +21,7 @@ export class Registry {
   private dataFns = new Map<string, DataFunctionDef>()
   private providerMap = new Map<string, unknown>()
   private templateDefs = new Map<string, TemplateDef>()
+  private entityDefs = new Map<string, EntityResolverDef>()
 
   constructor(plugins: Plugin[]) {
     this.plugins = sortByDependencies(plugins)
@@ -29,6 +31,7 @@ export class Registry {
       addAll(this.portTypes, p.portTypes, (d) => d.id, p.id)
       addAll(this.dataFns, p.dataFunctions, (d) => d.id, p.id)
       addAll(this.templateDefs, p.templates, (d) => d.id, p.id)
+      addAll(this.entityDefs, p.entities, (d) => d.id, p.id)
       for (const [id, inst] of Object.entries(p.providers ?? {})) this.providerMap.set(id, inst)
     }
     // Each node type gets an add op, e.g. 'core.sticky.add'.
@@ -70,6 +73,9 @@ export class Registry {
   }
   templates(): TemplateDef[] {
     return [...this.templateDefs.values()]
+  }
+  entity(id: string): EntityResolverDef | undefined {
+    return this.entityDefs.get(id)
   }
   provider<T>(id: string): T {
     if (!this.providerMap.has(id)) throw new Error(`Unknown provider: ${id}`)

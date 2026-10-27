@@ -8,7 +8,10 @@ export const setTextOp = defineOp({
   title: 'Edit text',
   description: 'Set the title and text of a text block or a sticky note.',
   target: { kind: 'node', types: ['core.text', 'core.sticky'], min: 1, max: 1 },
-  args: z.object({ text: z.string().meta({ widget: 'textarea' }), title: z.string().optional() }),
+  args: z.object({
+    text: z.string().meta({ widget: 'textarea', nl: { extract: 'text' } }),
+    title: z.string().meta({ nl: { extract: 'text' } }).optional(),
+  }),
   defaults: (ctx) => {
     const n = ctx.reader.node(only(ctx.target))
     return { text: String(n?.props.text ?? ''), title: n?.props.title as string | undefined }
@@ -56,7 +59,10 @@ export const scaleAoiOp = defineOp({
   title: 'Grow or shrink AOI',
   description: 'Scale the current AOI of a map around its center. factor 1.5 makes it 50% larger.',
   target: { kind: 'node', types: ['core.map'], min: 1, max: 1 },
-  args: z.object({ factor: z.number().min(0.1).max(10).default(1.5) }),
+  args: z.object({
+    factor: z.number().min(0.1).max(10).default(1.5).meta({ nl: { extract: 'factor', examples: ['50% bigger', 'half the size'] } }),
+  }),
+  nl: { examples: ['make the AOI 50% bigger', 'shrink the area by 20%'] },
   when: (ctx) => !!ctx.derived(only(ctx.target))?.result?.outputs?.aoi,
   prepare: (ctx, args) => {
     const aoi = ctx.derived(only(ctx.target))!.result!.outputs!.aoi as GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>
@@ -93,7 +99,12 @@ export const setChartMarkOp = defineOp({
   title: 'Set chart type',
   description: 'Show a chart as bars, a line, a pie, or points.',
   target: { kind: 'node', types: ['core.chart'] },
-  args: z.object({ mark: z.enum(['bar', 'line', 'arc', 'point']) }),
+  args: z.object({
+    mark: z
+      .enum(['bar', 'line', 'arc', 'point'])
+      .meta({ nl: { labels: { bar: 'bar chart', line: 'line chart', arc: 'pie or donut chart', point: 'scatter or dot plot' } } }),
+  }),
+  nl: { examples: ['show it as a pie chart', 'make this a line chart'] },
   apply: (tx, plan, target) => {
     for (const id of target.kind === 'nodes' ? target.ids : []) tx.updateProps(id, { mark: plan.mark })
   },

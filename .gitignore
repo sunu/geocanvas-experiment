@@ -3,3 +3,6 @@ dist
 .DS_Store
 *.log
 apps/sync-server/data
+.env
+.env.*
+!.env.example
