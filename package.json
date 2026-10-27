@@ -1,0 +1,20 @@
+{
+  "name": "humanitarian-ttx",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "sync": "npm run start -w apps/sync-server",
+    "build": "npm run build -w apps/web",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/shapes && tsc -p apps/web && tsc -p apps/sync-server"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

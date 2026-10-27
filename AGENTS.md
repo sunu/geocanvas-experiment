@@ -29,7 +29,21 @@ This file is the source of truth for repository-wide agent guidance. `CLAUDE.md`
 
 ## Repository layout
 
-The repository was reset to start the canvas again from a plain tldraw app, beginning with the map widget. Design docs live in `plans/`.
+npm workspaces monorepo (TypeScript, ESM). Design docs go in `plans/`.
+
+```
+packages/
+  shapes/        board schema shared by the browser and the sync server (custom shape props and migrations)
+apps/
+  web/           React + tldraw app (Vite). Custom shapes live in src/<shape>/.
+  sync-server/   tldraw sync server: one room per board, stored in data/<room>.db (node:sqlite)
+```
+
+- **The tldraw store is the source of truth.** There is no separate doc model; shapes hold the shared board state, and tldraw sync keeps rooms in step. The server validates every change against `@ttx/shapes`, so a custom shape's props and migrations must live there, not in `apps/web`.
+- **Map widget** (`apps/web/src/map/`): a box shape with a live MapLibre map. Double-click enters edit mode (the map takes pan and zoom); Esc gives the wheel back to the canvas. The basemap is shared board state.
+- **Map views are per person.** The camera of a map is not in the shape; each person's view is kept in their browser (`localView.ts`), so nobody's map moves under them. Add a shared view only as a separate, explicit feature.
+- **MapLibre is pinned to v5** because deck.gl 9.4 draws into MapLibre's WebGL context (interleaved) only on v5. `npm audit` reports GHSA-jrc7-96c5-q579 (XSS in `DOM.sanitize()`, fixed only in v6). It is not reachable while maps load only our own basemap styles and show no popups with external HTML; revisit before adding either.
+- Rooms: `http://localhost:5173/#room=<name>`. The Vite dev server proxies `/connect` to the sync server.
 
 The first prototype is on the `experiment` branch: a headless op runtime, typed data links, a disasters plugin on Montandon, and a natural-language command pipeline. It is a reference, not a base. Read it before rebuilding a part it covered, in particular:
 - `apps/web/src/nodes/MapView.tsx` and `plans/plan-005.md`: maps inside a canvas (MapLibre pinned to v5 for deck.gl, edit and focus modes, WebGL context limits, pixel ratio at canvas zoom).
@@ -37,7 +51,18 @@ The first prototype is on the `experiment` branch: a headless op runtime, typed 
 
 ## Setup and commands
 
-<!-- TODO: fill in when the app is scaffolded. -->
+Node 22.18 or later (the sync server runs TypeScript directly and uses `node:sqlite`).
+
+```sh
+npm install
+npm run sync        # sync server, ws://localhost:5858
+npm run dev         # web app, http://localhost:5173/#room=demo
+npm test            # vitest
+npm run typecheck
+npm run build
+```
+
+tldraw shows a "Get a license for production" notice; a license key is needed before any production deploy.
 
 ## Before editing
 
