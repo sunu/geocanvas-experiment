@@ -94,6 +94,20 @@ describe('plugins', () => {
     expect(one).not.toContain('test.group.regenerate')
   })
 
+  it('offers the ops of the parent group when a child is selected', async () => {
+    const rt = runtime(new Y.Doc())
+    await rt.dispatch('test.pipeline.create', canvas, { value: 1 })
+    await rt.engine.idle()
+    const group = rt.reader.nodes().find((n) => n.type === 'test.group')!
+    const child = rt.reader.children(group.id)[0]!
+    const scopes = rt.scopes({ kind: 'nodes', ids: [child.id] })
+    expect(scopes.map((s) => s.kind)).toEqual(['selection', 'group', 'canvas'])
+    expect(scopes[1]!.target).toEqual({ kind: 'nodes', ids: [group.id] })
+    expect(scopes[1]!.ops.map((o) => o.id)).toContain('test.group.regenerate')
+    expect(scopes[0]!.ops.map((o) => o.id)).not.toContain('test.group.regenerate')
+    expect(scopes[2]!.ops.every((o) => o.target.kind === 'canvas')).toBe(true)
+  })
+
   it('exports ops as tool definitions', () => {
     const rt = runtime(new Y.Doc())
     const tools = exportTools(rt.registry.ops())

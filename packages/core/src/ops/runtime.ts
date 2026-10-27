@@ -34,6 +34,13 @@ export class SystemOrigin {
 /** Transaction origin for writes to the op log and proposals. */
 export class LogOrigin {}
 
+export interface OpScope {
+  kind: 'selection' | 'group' | 'canvas'
+  label: string
+  target: TargetRef
+  ops: OpDef<any, any>[]
+}
+
 export interface DispatchOptions {
   actor?: Actor
   parentId?: string
@@ -159,9 +166,10 @@ export class CanvasRuntime {
   }
 
   /** Ops that apply to a target and pass their `when` check. For the palette. */
-  availableOps(target: TargetRef): OpDef<any, any>[] {
+  availableOps(target: TargetRef, kind?: 'node' | 'canvas'): OpDef<any, any>[] {
     return this._registry.ops().filter((op) => {
       if (op.hidden) return false
+      if (kind && op.target.kind !== kind) return false
       if (matchTarget(op.target, target, this.reader)) return false
       try {
         return op.when ? op.when(this.context(target, this.actor)) : true
@@ -169,6 +177,35 @@ export class CanvasRuntime {
         return false
       }
     })
+  }
+
+  /**
+   * Targets around a selection, nearest first: the selection, each enclosing group,
+   * then the canvas. With a child of a group selected, the group's ops are also in reach.
+   * The palette, NL mode, and the agent all use this.
+   */
+  scopes(target: TargetRef): OpScope[] {
+    const out: OpScope[] = []
+    const label = (ids: string[]) =>
+      ids.map((id) => {
+        const n = this.reader.node(id)
+        return String(n?.props.title ?? this._registry.nodeType(n?.type ?? '')?.title ?? n?.type ?? id)
+      }).join(', ')
+    if (target.kind === 'nodes' && target.ids.length) {
+      out.push({ kind: 'selection', label: label(target.ids), target, ops: this.availableOps(target, 'node') })
+      // Walk up while all selected nodes share one parent.
+      let ids = target.ids
+      for (;;) {
+        const parents = new Set(ids.map((id) => this.reader.node(id)?.parentId))
+        const [parent] = parents
+        if (parents.size !== 1 || !parent || !this.reader.node(parent)) break
+        const t: TargetRef = { kind: 'nodes', ids: [parent] }
+        out.push({ kind: 'group', label: label([parent]), target: t, ops: this.availableOps(t, 'node') })
+        ids = [parent]
+      }
+    }
+    out.push({ kind: 'canvas', label: 'Canvas', target: { kind: 'canvas' }, ops: this.availableOps({ kind: 'canvas' }, 'canvas') })
+    return out
   }
 
   /** Default args for an op on a target. For the palette form. */

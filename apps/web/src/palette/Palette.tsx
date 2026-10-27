@@ -29,39 +29,35 @@ function PickStep() {
   const registry = useRegistry()
   const target = useTarget()
   const [query, setQuery] = useState('')
-  const ops = useMemo(() => runtime.availableOps(target), [runtime, target, registry])
-  const nodeOps = ops.filter((o) => o.target.kind === 'node')
-  const canvasOps = ops.filter((o) => o.target.kind === 'canvas')
-  const selected = target.kind === 'nodes' ? target.ids.map((id) => runtime.reader.node(id)).filter(Boolean) : []
+  // Selection, then enclosing groups, then canvas. Each section runs its ops on its own target.
+  const scopes = useMemo(() => runtime.scopes(target), [runtime, target, registry])
 
-  const choose = (op: OpDef) => palette.set({ ...palette.get(), open: true, opId: op.id, target })
+  const choose = (op: OpDef, scopeTarget: TargetRef) =>
+    palette.set({ ...palette.get(), open: true, opId: op.id, target: scopeTarget })
 
   return (
     <Command label="Commands" loop>
-      <div className="gc-palette__context">
-        {selected.length
-          ? `Selection: ${selected.map((n) => registry.nodeType(n!.type)?.title ?? n!.type).join(', ')}`
-          : 'Canvas'}
-      </div>
+      <div className="gc-palette__context">{scopes.map((s) => s.label).join(' › ')}</div>
       <Command.Input autoFocus value={query} onValueChange={setQuery} placeholder="Type a command…" onKeyDown={(e) => e.key === 'Escape' && palette.close()} />
       <Command.List>
         <Command.Empty>No command matches.</Command.Empty>
-        {nodeOps.length > 0 && (
-          <Command.Group heading="Selection">
-            {nodeOps.map((op) => <OpItem key={op.id} op={op} onSelect={() => choose(op)} />)}
-          </Command.Group>
+        {scopes.map((scope) =>
+          scope.ops.length ? (
+            <Command.Group key={scope.kind + scope.label} heading={scope.kind === 'canvas' ? 'Canvas' : `${scope.kind === 'group' ? 'Group' : 'Selection'}: ${scope.label}`}>
+              {scope.ops.map((op) => (
+                <OpItem key={op.id} scopeKey={scope.kind + scope.label} op={op} onSelect={() => choose(op, scope.target)} />
+              ))}
+            </Command.Group>
+          ) : null,
         )}
-        <Command.Group heading="Canvas">
-          {canvasOps.map((op) => <OpItem key={op.id} op={op} onSelect={() => choose(op)} />)}
-        </Command.Group>
       </Command.List>
     </Command>
   )
 }
 
-function OpItem({ op, onSelect }: { op: OpDef; onSelect(): void }) {
+function OpItem({ op, scopeKey, onSelect }: { op: OpDef; scopeKey: string; onSelect(): void }) {
   return (
-    <Command.Item value={`${op.title} ${op.id} ${op.description}`} onSelect={onSelect}>
+    <Command.Item value={`${op.title} ${op.id} ${op.description} ${scopeKey}`} onSelect={onSelect}>
       <div className="gc-op">
         <span className="gc-op__title">{op.title}</span>
         <span className="gc-op__desc">{op.description}</span>
