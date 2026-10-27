@@ -3,6 +3,7 @@ import type { Layer } from '@deck.gl/core'
 import { GeoJsonLayer } from '@deck.gl/layers'
 import { tools } from '../tools/registry'
 import { stableJson } from '../tools/runner'
+import { rasterLayers } from './raster'
 
 /**
  * A data layer of a map: the recipe (tool id and input), not the data. The board stores the recipe;
@@ -29,6 +30,26 @@ export interface LayerState {
 
 /** Id of a new layer. Unique within one map is enough. */
 export const newLayerId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+
+/** Layers a person can add from a map's menu. Each gets `area` from the adder's view. */
+export const AREA_LAYERS: { label: string; tool: string; input: Record<string, unknown>; title: string }[] = [
+  { label: 'Population 2020 (constrained)', tool: 'data.population', input: { variant: 'constrained' }, title: 'Population 2020 (constrained)' },
+  { label: 'Population 2020 (unconstrained)', tool: 'data.population', input: { variant: 'unconstrained' }, title: 'Population 2020 (unconstrained)' },
+]
+
+/** True when a layer works on an area, which can be reset to someone's view. */
+export const hasArea = (l: MapLayer) => Array.isArray(l.input.area)
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+const round4 = (v: number) => Math.round(v * 1e4) / 1e4
+
+/**
+ * A map view's bounds as an area: [west, south, east, north], kept on the globe (a zoomed-out view can
+ * span more than 360 degrees) and rounded, so small pans do not change it more than needed.
+ */
+export function viewArea([[w, s], [e, n]]: [[number, number], [number, number]]): [number, number, number, number] {
+  return [round4(clamp(w, -180, 180)), round4(clamp(s, -90, 90)), round4(clamp(e, -180, 180)), round4(clamp(n, -90, 90))]
+}
 
 const recipeKey = (l: MapLayer) => stableJson([l.tool, l.input])
 
@@ -71,10 +92,13 @@ export function useLayerStates(layers: MapLayer[]): LayerState[] {
 /** Accent color of data layers, [r, g, b]. */
 const ACCENT = [37, 99, 235] as const
 
-/** deck.gl layers for the layers that have a result, by kind of result. */
+/** deck.gl layers for the layers that have a result, by kind of result. Rasters draw below features. */
 export function deckLayers(states: LayerState[]): Layer[] {
-  return states.flatMap((s): Layer[] => {
+  const rasters = states.filter((s) => s.output === 'geo.raster')
+  const others = states.filter((s) => s.output !== 'geo.raster')
+  return [...rasters, ...others].flatMap((s): Layer[] => {
     if (s.value === undefined) return []
+    if (s.output === 'geo.raster') return rasterLayers(s.value, { id: `layer-${s.id}` })
     if (s.output === 'geo.features') {
       return [
         new GeoJsonLayer({

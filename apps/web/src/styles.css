@@ -363,6 +363,11 @@ body,
 .ttx-map__gl {
   position: absolute;
   inset: 0;
+  /*
+   * Keep MapLibre's z-indexes inside the map. deck.gl's canvas sits in MapLibre's top-left control
+   * container (z-index 2), which would otherwise paint data layers over the hint and the layer list.
+   */
+  isolation: isolate;
 }
 
 .ttx-map__hint {
@@ -652,4 +657,53 @@ body,
 .ttx-layers button:hover {
   background: rgb(0 0 0 / 0.06);
   color: var(--ttx-ink);
+}
+
+.ttx-addlayer {
+  position: relative;
+  flex: none;
+}
+
+.ttx-addlayer > button {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ttx-ink);
+  cursor: pointer;
+}
+
+.ttx-addlayer > button:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
+.ttx-addlayer__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+.ttx-addlayer__menu button {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ttx-addlayer__menu button:hover {
+  background: rgb(0 0 0 / 0.06);
 }

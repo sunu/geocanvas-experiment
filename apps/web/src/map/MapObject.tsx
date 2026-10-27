@@ -1,12 +1,22 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
-import { XIcon } from '@phosphor-icons/react'
+import { CrosshairSimpleIcon, StackPlusIcon, XIcon } from '@phosphor-icons/react'
 import type { Board, BoardObject } from '../board/board'
 import type { Place } from '../data/geocode'
 import { BASEMAPS, basemapStyle, type Basemap } from './basemaps'
-import { attributionOf, deckLayers, newLayerId, useLayerStates, type LayerState, type MapLayer } from './layers'
+import {
+  AREA_LAYERS,
+  attributionOf,
+  deckLayers,
+  hasArea,
+  newLayerId,
+  useLayerStates,
+  viewArea,
+  type LayerState,
+  type MapLayer,
+} from './layers'
 import { loadView, saveView } from './localView'
 import { PlaceSearch } from './PlaceSearch'
 
@@ -106,11 +116,29 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
     setLayers([...layers, { id: newLayerId(), tool: 'data.geocode', input: { query: place.name, limit: 1 }, title: place.name }])
   }
 
+  /** This person's view as an area. Stored in the layer, so everyone sees the data for the same area. */
+  const myArea = () => {
+    const b = mapRef.current?.getBounds()
+    return b && viewArea(b.toArray() as [[number, number], [number, number]])
+  }
+
+  const addAreaLayer = (choice: (typeof AREA_LAYERS)[number]) => {
+    const area = myArea()
+    if (!area) return
+    setLayers([...layers, { id: newLayerId(), tool: choice.tool, input: { ...choice.input, area }, title: choice.title }])
+  }
+
+  const useMyView = (id: string) => {
+    const area = myArea()
+    if (area) setLayers(layers.map((l) => (l.id === id ? { ...l, input: { ...l.input, area } } : l)))
+  }
+
   return (
     <div className="ttx-map">
       <div className="ttx-map__header">
         <span className="ttx-map__title">Map</span>
         <PlaceSearch onGo={goTo} onPin={pin} />
+        <AddLayerMenu onAdd={addAreaLayer} />
         <select
           aria-label="Basemap"
           value={o.basemap}
@@ -130,18 +158,55 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {!editing && <div className="ttx-map__hint">Double-click to pan and zoom</div>}
-        <LayerList states={states} onRemove={(id) => setLayers(layers.filter((l) => l.id !== id))} />
+        <LayerList layers={layers} states={states} onUseMyView={useMyView} onRemove={(id) => setLayers(layers.filter((l) => l.id !== id))} />
       </div>
     </div>
   )
 }
 
-/** The map's data layers: title, status or attribution, and remove. Clickable whether or not the map is being edited. */
-function LayerList({ states, onRemove }: { states: LayerState[]; onRemove(id: string): void }) {
+/** "Add layer": data for the area this person is looking at. */
+function AddLayerMenu({ onAdd }: { onAdd(choice: (typeof AREA_LAYERS)[number]): void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="ttx-addlayer" onPointerDown={(e) => e.stopPropagation()}>
+      <button type="button" title="Add a data layer for your current view" aria-label="Add layer" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <StackPlusIcon size={16} />
+      </button>
+      {open && (
+        <div className="ttx-addlayer__menu" role="menu">
+          {AREA_LAYERS.map((c) => (
+            <button
+              key={c.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onAdd(c)
+                setOpen(false)
+              }}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface LayerListProps {
+  /** The recipes, in the same order as `states`. */
+  layers: MapLayer[]
+  states: LayerState[]
+  onUseMyView(id: string): void
+  onRemove(id: string): void
+}
+
+/** The map's data layers: title, status or attribution, and actions. Clickable whether or not the map is being edited. */
+function LayerList({ layers, states, onUseMyView, onRemove }: LayerListProps) {
   if (!states.length) return null
   return (
     <div className="ttx-layers" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-      {states.map((s) => {
+      {states.map((s, i) => {
         const note = s.error ?? (s.loading ? 'Loading…' : attributionOf(s.value))
         return (
           <div key={s.id} className={`ttx-layers__item ${s.error ? 'is-error' : ''}`}>
@@ -149,6 +214,11 @@ function LayerList({ states, onRemove }: { states: LayerState[]; onRemove(id: st
               <div className="ttx-layers__title">{s.title}</div>
               {note && <div className="ttx-layers__note">{note}</div>}
             </div>
+            {layers[i] && hasArea(layers[i]) && (
+              <button type="button" title="Show this layer for your current view, for everyone" aria-label={`Use my view for ${s.title}`} onClick={() => onUseMyView(s.id)}>
+                <CrosshairSimpleIcon size={12} />
+              </button>
+            )}
             <button type="button" title="Remove layer" aria-label={`Remove layer ${s.title}`} onClick={() => onRemove(s.id)}>
               <XIcon size={12} />
             </button>
