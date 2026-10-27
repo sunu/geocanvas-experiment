@@ -43,6 +43,7 @@ body,
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 0;
   transform-origin: 0 0;
 }
 
@@ -94,13 +95,23 @@ body,
   border: 1.5px dashed var(--ttx-accent);
 }
 
-/* Selection chrome is in screen space, above every object. */
+/*
+ * Selection chrome: screen space, one layer above the whole world. Safari can paint a transformed
+ * layer (the world) above siblings with a higher z-index, so the chrome gets its own composited
+ * layer (translateZ) and an explicit order above the world.
+ */
+.ttx-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform: translateZ(0);
+  pointer-events: none;
+}
+
 .ttx-selection,
 .ttx-marquee {
   position: absolute;
   box-sizing: border-box;
-  pointer-events: none;
-  z-index: 1000000;
 }
 
 .ttx-selection {
@@ -121,7 +132,7 @@ body,
   border: 1.5px solid var(--ttx-accent);
   border-radius: 2px;
   background: #fff;
-  z-index: 1000001;
+  pointer-events: auto;
 }
 
 .ttx-handle--nw,

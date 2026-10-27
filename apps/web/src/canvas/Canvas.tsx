@@ -269,18 +269,20 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
       </div>
 
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
-      {[...selected].map((id) => {
-        const r = toScreen(camera, byId.get(id)!)
-        return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
-      })}
-      {single &&
-        HANDLES.map((h) => {
-          const r = toScreen(camera, single)
-          const x = h.includes('w') ? r.x : r.x + r.w
-          const y = h.includes('n') ? r.y : r.y + r.h
-          return <div key={h} data-handle={h} className={`ttx-handle ttx-handle--${h}`} style={{ left: x, top: y }} />
+      <div className="ttx-chrome">
+        {[...selected].map((id) => {
+          const r = toScreen(camera, byId.get(id)!)
+          return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
         })}
-      {marquee && <div className="ttx-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+        {single &&
+          HANDLES.map((h) => {
+            const r = toScreen(camera, single)
+            const x = h.includes('w') ? r.x : r.x + r.w
+            const y = h.includes('n') ? r.y : r.y + r.h
+            return <div key={h} data-handle={h} className={`ttx-handle ttx-handle--${h}`} style={{ left: x, top: y }} />
+          })}
+        {marquee && <div className="ttx-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+      </div>
 
       <StylePanel board={board} selected={objects.filter((o) => selected.has(o.id))} />
 
