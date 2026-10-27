@@ -21,7 +21,37 @@ function num(token: string): number {
   return /^\d/.test(t) ? Number(t) : (WORDS[t] ?? NaN)
 }
 
-function first<T>(text: string, rules: [RegExp, (m: RegExpExecArray) => T][]): Parsed<T> | undefined {
+const UNITS: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11,
+  twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+}
+const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 }
+const WORD = `(?:${[...Object.keys(UNITS), ...Object.keys(TENS), 'hundred', 'thousand'].join('|')})`
+
+/**
+ * Turn runs of number words into digits: "two hundred" -> "200", "thirty-five" -> "35".
+ * Single small words stay ("a decade", "one year" -> "1 year" is fine either way).
+ */
+export function normalizeNumberWords(text: string): string {
+  const re = new RegExp(String.raw`\b${WORD}(?:(?:[\s-]+|\s+and\s+)${WORD})*\b`, 'gi')
+  return text.replace(re, (run) => {
+    let total = 0
+    let current = 0
+    for (const w of run.toLowerCase().split(/[\s-]+/).filter((x) => x !== 'and')) {
+      if (w in UNITS) current += UNITS[w]!
+      else if (w in TENS) current += TENS[w]!
+      else if (w === 'hundred') current = (current || 1) * 100
+      else if (w === 'thousand') {
+        total += (current || 1) * 1000
+        current = 0
+      }
+    }
+    return String(total + current)
+  })
+}
+
+function first<T>(raw: string, rules: [RegExp, (m: RegExpExecArray) => T][]): Parsed<T> | undefined {
+  const text = normalizeNumberWords(raw)
   let best: Parsed<T> | undefined
   for (const [re, fn] of rules) {
     const m = re.exec(text)
@@ -72,7 +102,8 @@ export function parsePercent(text: string): Parsed<number> | undefined {
 }
 
 /** All plain numbers in the text, with their positions. */
-export function allNumbers(text: string): Parsed<number>[] {
+export function allNumbers(raw: string): Parsed<number>[] {
+  const text = normalizeNumberWords(raw)
   const out: Parsed<number>[] = []
   const re = new RegExp(String.raw`\b${NUM}\b`, 'gi')
   for (let m = re.exec(text); m; m = re.exec(text)) {

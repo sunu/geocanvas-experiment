@@ -123,7 +123,7 @@ export interface Proposal {
   args: Record<string, unknown>
   opConfidence: number
   /** Best other commands, for "did you mean". */
-  alternatives: { opId: string; key: string; title: string; p: number }[]
+  alternatives: { opId: string; key: string; title: string; p: number; target: TargetRef }[]
   fields: Record<string, FieldDecision>
   trace: TraceEntry[]
 }

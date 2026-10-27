@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseFactor, parseKm, parseYears } from '../src/parsers.js'
-import { RuleExtractor } from '../src/backends/rules.js'
+import { ChainExtractor, RuleExtractor } from '../src/backends/rules.js'
 import type { FieldSpec } from '../src/types.js'
 
 describe('parsers', () => {
@@ -11,12 +11,14 @@ describe('parsers', () => {
     ['last 3 decades', 30],
     ['over the past twenty years', 20],
     ['in the last 5 yrs', 5],
+    ['the last thirty-five years', 35],
   ])('years: %s', (t, v) => expect(parseYears(t)?.value).toBe(v))
 
   it.each([
     ['within 200 km', 200],
     ['300 kilometres around', 300],
     ['a 100 mile radius', 161],
+    ['within two hundred kilometres', 200],
   ])('km: %s', (t, v) => expect(parseKm(t)?.value).toBe(v))
 
   it.each([
@@ -36,6 +38,23 @@ describe('parsers', () => {
 
 const f = (name: string, extract: FieldSpec['extract'], type: FieldSpec['type'] = 'number'): FieldSpec => ({
   name, title: name, type, extract, required: false,
+})
+
+describe('ChainExtractor', () => {
+  it('skips the model for number fields when no number is left in the text', async () => {
+    const seen: string[][] = []
+    const spy = { name: 'spy', extract: async (_t: string, fs: FieldSpec[]) => (seen.push(fs.map((x) => x.name)), {}) }
+    const chain = new ChainExtractor([new RuleExtractor(), spy])
+    await chain.extract('last 30 years', [f('yearRange', 'years', 'integer'), f('radiusKm', 'km')])
+    expect(seen).toEqual([])
+    await chain.extract('last 30 years and make it 7 fold', [f('yearRange', 'years', 'integer'), f('factor', 'factor')])
+    expect(seen).toEqual([['factor']])
+  })
+
+  it('always gives the first extractor every field', async () => {
+    const r = await new ChainExtractor([new RuleExtractor()]).extract('double the size', [f('factor', 'factor')])
+    expect(r.factor?.value).toBe(2)
+  })
 })
 
 describe('RuleExtractor', () => {

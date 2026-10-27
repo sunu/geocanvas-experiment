@@ -70,7 +70,7 @@ export async function propose(ctx: NlContext, cfg: PipelineConfig): Promise<Prop
     .sort((a, b) => b[1] - a[1])
   const alternatives = ranked.slice(0, 4).map(([key, p]) => {
     const c = shortlist.find((x) => x.key === key)!
-    return { key, opId: c.opId, title: `${c.title} (${c.scopeKind === 'canvas' ? 'canvas' : c.scopeLabel})`, p }
+    return { key, opId: c.opId, title: `${c.title} (${c.scopeKind === 'canvas' ? 'canvas' : c.scopeLabel})`, p, target: c.target }
   })
   const chosen = shortlist.find((c) => c.key === opAnswer.choice)
   if (!chosen) {
@@ -117,6 +117,12 @@ function retrieveByWords(utterance: string, cands: OpCandidate[], k: number) {
     .sort((a, b) => b.s - a.s)
     .slice(0, k)
     .map((x) => x.c)
+}
+
+/** Embed the candidate texts ahead of time (e.g. when the palette opens), so the first request is fast. */
+export async function warmUp(ctx: NlContext, embedder: Embedder | undefined): Promise<void> {
+  if (!embedder) return
+  await embedCached(embedder, ctx.candidates.map(describeCandidate))
 }
 
 const embedCache = new Map<string, number[]>()

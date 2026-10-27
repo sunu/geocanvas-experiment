@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { TargetRef } from '@geo-canvas/core'
+import type { Proposal } from '@geo-canvas/nl'
 
 export interface PaletteState {
   open: boolean
@@ -15,6 +16,10 @@ export interface PaletteState {
   query?: string
   /** Page point for new nodes (e.g. where the user double-clicked). */
   at?: { x: number; y: number }
+  /** NL request to run (the Ask step). */
+  ask?: string
+  /** NL proposal that prefilled the form. */
+  nl?: Proposal
 }
 
 let state: PaletteState = { open: false }

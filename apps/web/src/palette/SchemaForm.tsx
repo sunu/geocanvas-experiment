@@ -17,14 +17,23 @@ function isAdvanced(key: string, s: Schema) {
  * A form made from a JSON Schema (from zod). Plugin widgets render fields with a `widget` hint.
  * Fields marked `ask` come first. Advanced fields fold away.
  */
+export interface FieldMark {
+  source: 'decider' | 'extractor' | 'entity' | 'default'
+  confidence: number
+  span?: string
+}
+
 export function SchemaForm({
   schema,
   value,
   onChange,
+  marks,
 }: {
   schema: Schema
   value: Record<string, unknown>
   onChange(v: Record<string, unknown>): void
+  /** NL fill info per field: shows where a value came from and how sure it is. */
+  marks?: Record<string, FieldMark>
 }) {
   const props: Record<string, Schema> = schema.properties ?? {}
   const required = new Set<string>(schema.required ?? [])
@@ -36,6 +45,7 @@ export function SchemaForm({
       <span className="gc-field__label">
         {s.title ?? humanize(key)}
         {required.has(key) && s.default === undefined && <em> *</em>}
+        {marks?.[key] && <Mark m={marks[key]!} />}
       </span>
       <Field schema={s} value={value[key]} onChange={(v) => onChange({ ...value, [key]: v })} />
       {s.description && <span className="gc-field__help">{s.description}</span>}
@@ -52,6 +62,17 @@ export function SchemaForm({
         </details>
       )}
     </div>
+  )
+}
+
+function Mark({ m }: { m: FieldMark }) {
+  if (m.source === 'default') return <span className="gc-mark gc-mark--default">default</span>
+  const low = m.confidence < 0.6
+  return (
+    <span className={`gc-mark ${low ? 'gc-mark--low' : ''}`} title={m.span ? `From “${m.span}”` : undefined}>
+      {low ? 'check · ' : 'from request · '}
+      {Math.round(m.confidence * 100)}%
+    </span>
   )
 }
 

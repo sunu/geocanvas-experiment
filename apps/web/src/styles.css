@@ -191,3 +191,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .gc-text--edit { width: 100%; border: none; outline: none; resize: none; background: transparent; font-family: ui-monospace, monospace; font-size: 12px; }
 .gc-btn--on { background: var(--gc-node-head); }
+
+/* NL */
+.gc-mark { margin-left: 6px; font-weight: 400; font-size: 10px; padding: 0 5px; border-radius: 4px; background: #d3f9d8; color: #1b4d26; }
+.gc-mark--low { background: #fff3bf; color: #5c4400; }
+.gc-mark--default { background: var(--gc-node-head); color: var(--gc-muted); }
+.gc-why summary { cursor: pointer; color: var(--gc-muted); font-size: 12px; }
+.gc-why[open] { background: var(--gc-node-head); padding: 6px 10px; border-radius: 6px; }
+.gc-trace { font-size: 11px; margin-top: 6px; border-collapse: collapse; }
+.gc-trace td { padding: 1px 8px 1px 0; }
+.gc-alts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; margin-top: 4px; }
+.gc-spinner--inline { display: inline-block; vertical-align: -2px; width: 10px; height: 10px; }

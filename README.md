@@ -10,15 +10,20 @@ Spec: `plans/plan-001.md`. Status and changes: `plans/plan-002.md`.
 npm install
 npm run sync      # sync server on ws://localhost:1234
 npm run dev       # web app on http://localhost:5173/#room=demo
+npm run nl        # NL gateway on http://localhost:8787 (needs OPENROUTER_KEY in .env)
 ```
 
 Open the same room in two windows to see multiplayer.
+
+NL commands: copy `.env.example` to `.env` and set `OPENROUTER_KEY`. In the palette (⌘K), type a request in plain words and press Enter on "✨ Ask". Start with `?` to skip the command list.
 
 ## Test
 
 ```
 npm test
 npm run typecheck
+npm run nl:eval -- --config jev       # NL eval with Jev (needs the key)
+npm run nl:eval -- --config lexical   # offline baseline
 ```
 
 ## Layout
@@ -28,6 +33,8 @@ npm run typecheck
 | `packages/core` | Doc model, op runtime, undo, plugin registry, reactivity engine, templates. No UI. |
 | `packages/plugin-core` | Map, chart, text, and sticky node types and their ops. |
 | `packages/plugin-disasters` | Disaster event node, related-events group, mock data provider, sitrep template. |
+| `packages/nl` | NL pipeline: contracts, parsers, backends (Jev, embedder, LLM fallback, lexical), eval set and runner. |
+| `apps/nl-gateway` | Holds the OpenRouter key. Proxies decide, extract, embed. Writes the NL log. |
 | `apps/web` | React app: tldraw bridge, deck.gl maps, Vega-Lite charts, command palette. |
 | `apps/sync-server` | y-websocket compatible server with file persistence. |
 

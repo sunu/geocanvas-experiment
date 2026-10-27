@@ -37,6 +37,8 @@ export class RuleExtractor implements Extractor {
   }
 }
 
+const NUMERIC = new Set(['number', 'years', 'km', 'factor', 'percent'])
+
 /** Run extractors in order. A later one fills only the fields the earlier ones left empty. */
 export class ChainExtractor implements Extractor {
   readonly name: string
@@ -45,8 +47,11 @@ export class ChainExtractor implements Extractor {
   }
   async extract(text: string, fields: FieldSpec[]): Promise<Record<string, ExtractResult>> {
     const out: Record<string, ExtractResult> = {}
-    for (const e of this.chain) {
-      const rest = fields.filter((f) => !(f.name in out))
+    for (const [i, e] of this.chain.entries()) {
+      // After the first extractor: a number field is worth a (slow) model call only if a number is still free in the text.
+      const used = Object.values(out).map((r) => r.span).filter((s): s is string => !!s)
+      const freeNumbers = allNumbers(text).filter((n) => !used.some((u) => u.includes(n.span)))
+      const rest = fields.filter((f) => !(f.name in out) && (i === 0 || !NUMERIC.has(f.extract) || freeNumbers.length > 0))
       if (!rest.length) break
       Object.assign(out, await e.extract(text, rest))
     }
