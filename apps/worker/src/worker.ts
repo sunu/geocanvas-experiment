@@ -5,6 +5,7 @@ import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { montySearch } from './monty'
+import { UpdateLog } from './updateLog'
 
 /**
  * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
@@ -18,9 +19,10 @@ const MESSAGE_AWARENESS = 1
 /** Merge the stored updates into one row when there are more than this. */
 const COMPACT_AFTER = 500
 
-/** One board. Its Yjs updates are appended to the Durable Object's SQLite as they arrive. */
+/** One board. Its Yjs updates are appended to the Durable Object's SQLite as they arrive (updateLog.ts). */
 export class Room extends DurableObject<Env> {
   private doc = new Y.Doc()
+  private log: UpdateLog
   private awareness = new awarenessProtocol.Awareness(this.doc)
   /** Open sockets, with the awareness client ids each one controls. */
   private sockets = new Map<WebSocket, Set<number>>()
@@ -28,14 +30,13 @@ export class Room extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
     this.awareness.setLocalState(null)
-    const sql = ctx.storage.sql
-    sql.exec('CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY AUTOINCREMENT, data BLOB NOT NULL)')
-    const rows = sql.exec<{ data: ArrayBuffer }>('SELECT data FROM updates ORDER BY id').toArray()
-    for (const row of rows) Y.applyUpdate(this.doc, new Uint8Array(row.data), this)
-    if (rows.length > COMPACT_AFTER) this.compact()
+    this.log = new UpdateLog(ctx.storage)
+    const updates = this.log.readAll()
+    for (const update of updates) Y.applyUpdate(this.doc, update, this)
+    if (updates.length > COMPACT_AFTER) this.log.replaceAll(Y.encodeStateAsUpdate(this.doc))
 
     this.doc.on('update', (update: Uint8Array, origin: unknown) => {
-      if (origin !== this) sql.exec('INSERT INTO updates (data) VALUES (?)', toArrayBuffer(update))
+      if (origin !== this) this.log.append(update)
       this.broadcast(syncMessage((enc) => syncProtocol.writeUpdate(enc, update)))
     })
     this.awareness.on('update', ({ added, updated, removed }: AwarenessChange, socket: WebSocket | null) => {
@@ -95,19 +96,6 @@ export class Room extends DurableObject<Env> {
       if (socket.readyState === WebSocket.OPEN) socket.send(message)
     }
   }
-
-  private compact() {
-    const state = Y.encodeStateAsUpdate(this.doc)
-    this.ctx.storage.transactionSync(() => {
-      this.ctx.storage.sql.exec('DELETE FROM updates')
-      this.ctx.storage.sql.exec('INSERT INTO updates (data) VALUES (?)', toArrayBuffer(state))
-    })
-  }
-}
-
-/** SQLite blobs must be ArrayBuffers; a Uint8Array would not be stored as bytes. */
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.slice().buffer
 }
 
 interface AwarenessChange {
