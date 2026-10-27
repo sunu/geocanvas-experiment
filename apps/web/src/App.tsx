@@ -13,7 +13,7 @@ if (!room) {
 addEventListener('hashchange', () => location.reload())
 
 const { board, provider } = connect(room)
-if (import.meta.env.DEV) Object.assign(window, { board })
+if (import.meta.env.DEV) Object.assign(window, { board, provider })
 
 /** Open a new, empty board (through hashchange, which reloads into it). */
 function newBoard() {
