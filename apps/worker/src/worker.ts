@@ -4,11 +4,13 @@ import * as syncProtocol from 'y-protocols/sync'
 import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
+import { montySearch } from './monty'
 
 /**
  * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
  * /connect/<room> to that room's Durable Object, which speaks the standard y-websocket
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
+ * /monty/search proxies Montandon STAC searches with the token added (monty.ts).
  */
 
 const MESSAGE_SYNC = 0
@@ -130,7 +132,9 @@ function awarenessMessage(update: Uint8Array): Uint8Array {
 
 export default {
   async fetch(request, env) {
-    const roomId = /^\/connect\/([\w-]{1,64})$/.exec(new URL(request.url).pathname)?.[1]
+    const path = new URL(request.url).pathname
+    if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
+    const roomId = /^\/connect\/([\w-]{1,64})$/.exec(path)?.[1]
     if (!roomId) return new Response('Not found', { status: 404 })
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a websocket', { status: 426 })
     return env.ROOMS.get(env.ROOMS.idFromName(roomId)).fetch(request)

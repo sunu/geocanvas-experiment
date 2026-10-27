@@ -10,6 +10,7 @@ import {
   RectangleIcon,
   TextTIcon,
   TrashIcon,
+  WarningIcon,
   type Icon,
 } from '@phosphor-icons/react'
 import type { Board, ObjectType } from '../board/board'
@@ -22,6 +23,7 @@ const TOOLS: { tool: Tool; label: string; key: string; Icon: Icon }[] = [
   { tool: 'box', label: 'Box', key: 'R', Icon: RectangleIcon },
   { tool: 'text', label: 'Text', key: 'T', Icon: TextTIcon },
   { tool: 'map', label: 'Map', key: 'M', Icon: MapTrifoldIcon },
+  { tool: 'event', label: 'Event', key: 'E', Icon: WarningIcon },
 ]
 
 /** Toolbar icon size (px). */

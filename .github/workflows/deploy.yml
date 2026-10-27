@@ -30,8 +30,16 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BRANCH: ${{ github.ref_name }}
+          MONTANDON_TOKEN: ${{ secrets.MONTANDON_TOKEN }}
         run: |
           name=$(../../.github/scripts/worker-name.sh "$BRANCH")
-          npx wrangler deploy --name "$name" | tee deploy.log
+          # Secrets belong to one Worker, and each branch is its own Worker, so upload the Montandon token
+          # with every deploy. Without the repository secret, the Worker answers /monty/search with a 503.
+          secrets=()
+          if [ -n "$MONTANDON_TOKEN" ]; then
+            (umask 077 && jq -n '{MONTANDON_TOKEN: env.MONTANDON_TOKEN}' > "$RUNNER_TEMP/secrets.json")
+            secrets=(--secrets-file "$RUNNER_TEMP/secrets.json")
+          fi
+          npx wrangler deploy --name "$name" "${secrets[@]}" | tee deploy.log
           url=$(grep -oE 'https://[^ ]+\.workers\.dev' deploy.log | head -1)
           echo "Deployed \`$BRANCH\` to $url" >> "$GITHUB_STEP_SUMMARY"
