@@ -1,3 +1,8 @@
+# humanitarian-ttx
+**Agentic** Humanitarian Table Top Exercise for Data Exploration and Response
+
+---
+
 # Geo Canvas
 
 Multiplayer infinite canvas for geospatial work. All changes are typed ops. Plugins add node types, ops, data functions, and templates. The first plugin is `disasters`, with a situation report template.
