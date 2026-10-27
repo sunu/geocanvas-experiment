@@ -1,0 +1,9 @@
+{
+  "name": "@geo-canvas/nl-gateway",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "tsx src/server.ts" },
+  "dependencies": { "@geo-canvas/nl": "*" },
+  "devDependencies": { "tsx": "^4.23.0" }
+}

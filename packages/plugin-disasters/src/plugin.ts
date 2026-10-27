@@ -113,7 +113,12 @@ const regenerateArgs = z.object({
     .describe('How many years back from the seed event'),
   sameType: z
     .boolean()
-    .meta({ nl: { examples: ['only cyclones', 'all disaster types', 'any type'] } })
+    .meta({
+      nl: {
+        examples: ['only cyclones', 'all disaster types', 'any type'],
+        labels: { true: 'Only disasters of the same type as the seed event', false: 'All disaster types, any kind of disaster' },
+      },
+    })
     .describe('Only events of the same type as the seed (false: all types)'),
   radiusKm: z
     .number().min(10).max(3000)

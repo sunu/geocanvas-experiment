@@ -185,7 +185,7 @@ export const enablePluginOp = defineOp({
   title: 'Enable plugin',
   description: 'Turn on a plugin for this canvas. All users get its node types and ops.',
   target: { kind: 'canvas' },
-  args: z.object({ pluginId: z.string().meta({ widget: 'pluginId' }) }),
+  args: z.object({ pluginId: z.string().meta({ widget: 'pluginId', nl: { extract: 'entity', entity: 'core.plugin' } }) }),
   apply(tx, plan) {
     const list = (tx.reader.meta('enabledPlugins') as string[] | undefined) ?? []
     if (!list.includes(plan.pluginId)) tx.setMeta('enabledPlugins', [...list, plan.pluginId])
@@ -197,7 +197,7 @@ export const disablePluginOp = defineOp({
   title: 'Disable plugin',
   description: 'Turn off a plugin for this canvas.',
   target: { kind: 'canvas' },
-  args: z.object({ pluginId: z.string().meta({ widget: 'pluginId' }) }),
+  args: z.object({ pluginId: z.string().meta({ widget: 'pluginId', nl: { extract: 'entity', entity: 'core.plugin' } }) }),
   apply(tx, plan) {
     const list = (tx.reader.meta('enabledPlugins') as string[] | undefined) ?? []
     tx.setMeta('enabledPlugins', list.filter((p) => p !== plan.pluginId))

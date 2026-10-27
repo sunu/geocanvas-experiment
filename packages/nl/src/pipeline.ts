@@ -26,6 +26,7 @@ export interface PipelineConfig {
 }
 
 const NONE = 'none'
+const UNSET = 'unset'
 
 /**
  * Utterance -> one proposed invocation. Each step is a narrow typed task:
@@ -141,28 +142,26 @@ async function fillArgs(
   const fields = cand.fields.filter((f) => f.extract !== 'none' || f.type === 'enum' || f.type === 'boolean')
   if (!fields.length) return {}
 
-  // One batch of decider questions: "is it mentioned?" and the value for enums and booleans.
+  // One batch of decider questions. Enums and booleans are one choice each, with an explicit
+  // "unset" option, so a small classifier can answer them the same way.
   const questions: Record<string, Question> = {}
   for (const f of fields) {
-    const about = `${f.title}${f.description ? ` (${f.description})` : ''}`
-    if (!f.required) {
-      questions[`m:${f.name}`] = {
-        type: 'noul',
-        instructions: `Does the request say or imply what ${about} should be?`,
-        criteria: { true: `The request gives a value for ${f.title}.`, false: `The request does not mention ${f.title}.` },
-      }
-    }
+    const about = f.description ?? f.title
     if (f.type === 'enum' && f.enum) {
-      questions[`v:${f.name}`] = {
+      questions[f.name] = {
         type: 'choice',
-        instructions: `Which value of ${about} does the request ask for?`,
-        criteria: Object.fromEntries(f.enum.map((v) => [v, f.labels?.[v] ?? v])),
+        instructions: `Which ${f.title} does the request ask for?`,
+        criteria: { ...Object.fromEntries(f.enum.map((v) => [v, f.labels?.[v] ?? v])), [UNSET]: `The request does not say which ${f.title}.` },
       }
     } else if (f.type === 'boolean') {
-      questions[`v:${f.name}`] = {
-        type: 'noul',
-        instructions: `From the request: should "${f.description ?? f.title}" be true?`,
-        criteria: { true: `Yes: ${f.description ?? f.title}.`, false: `No, the opposite of: ${f.description ?? f.title}.` },
+      questions[f.name] = {
+        type: 'choice',
+        instructions: `What does the request say about: ${about}?`,
+        criteria: {
+          true: f.labels?.true ?? `Yes: ${about}.`,
+          false: f.labels?.false ?? `No: the opposite of "${about}".`,
+          [UNSET]: 'The request does not say.',
+        },
       }
     }
   }
@@ -180,32 +179,24 @@ async function fillArgs(
   ])
 
   const out: Record<string, FieldDecision> = {}
-  const fallback = (f: FieldSpec, p: number): FieldDecision => ({
+  const fallback = (f: FieldSpec, confidence: number): FieldDecision => ({
     value: cand.defaults[f.name] ?? f.default,
-    confidence: 1 - p,
+    confidence,
     source: 'default',
   })
   for (const f of fields) {
-    const m = answers[`m:${f.name}`]
-    const mentioned = f.required ? 1 : m?.type === 'noul' ? m.noul : 0.5
-    const v = answers[`v:${f.name}`]
-    if (f.type === 'enum' && v?.type === 'choice') {
-      out[f.name] = mentioned >= 0.5 ? { value: v.choice, confidence: Math.min(mentioned, v.confidence), source: 'decider' } : fallback(f, mentioned)
-    } else if (f.type === 'boolean' && v?.type === 'noul') {
-      const sure = Math.abs(v.noul - 0.5) * 2
-      out[f.name] = mentioned >= 0.5 ? { value: v.noul >= 0.5, confidence: Math.min(mentioned, sure), source: 'decider' } : fallback(f, mentioned)
+    const a = answers[f.name]
+    if ((f.type === 'enum' || f.type === 'boolean') && a?.type === 'choice') {
+      const value = f.type === 'boolean' ? a.choice === 'true' : a.choice
+      out[f.name] = a.choice === UNSET ? fallback(f, a.confidence) : { value, confidence: a.confidence, source: 'decider' }
     } else if (f.extract === 'entity') {
       const pick = entityPicks[entities.indexOf(f)]
-      out[f.name] = pick && (mentioned >= 0.5 || f.required)
-        ? { value: pick.id, confidence: pick.confidence, source: 'entity', span: pick.label }
-        : fallback(f, mentioned)
+      out[f.name] = pick ? { value: pick.id, confidence: pick.confidence, source: 'entity', span: pick.label } : fallback(f, 0.5)
     } else {
       const e = (extracted as Record<string, { value?: unknown; span?: string; confidence: number }>)[f.name]
-      if (e?.value !== undefined) {
-        out[f.name] = { value: clamp(f, e.value), confidence: e.confidence, source: 'extractor', span: e.span }
-      } else {
-        out[f.name] = fallback(f, mentioned)
-      }
+      out[f.name] = e?.value !== undefined
+        ? { value: clamp(f, e.value), confidence: e.confidence, source: 'extractor', span: e.span }
+        : fallback(f, 0.7)
     }
   }
   return out

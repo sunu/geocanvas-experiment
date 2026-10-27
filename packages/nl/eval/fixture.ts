@@ -3,8 +3,6 @@ import { CanvasRuntime, PluginCatalog, type TargetRef } from '@geo-canvas/core'
 import { corePlugin } from '@geo-canvas/plugin-core'
 import { createDisastersPlugin, MockDisasterProvider } from '@geo-canvas/plugin-disasters'
 
-export const SEED_EVENT = 'sof-2025-cyclone-17'
-
 /** A headless canvas with the situation report for a fixed seed event. */
 export async function sitrepFixture() {
   const provider = new MockDisasterProvider(0)
@@ -12,7 +10,8 @@ export async function sitrepFixture() {
   const runtime = new CanvasRuntime({ ydoc: new Y.Doc(), catalog, actor: { kind: 'user', id: 'eval' } })
   await runtime.dispatch('core.plugin.enable', { kind: 'canvas' }, { pluginId: 'disasters' })
   const events = await provider.listEvents()
-  const seedId = events.find((e) => e.id === SEED_EVENT)?.id ?? events.find((e) => e.id.startsWith('sof-') && e.type === 'cyclone')!.id
+  // Seed: the latest Sofala cyclone (events are sorted by year, newest first).
+  const seedId = events.find((e) => e.id.startsWith('sof-') && e.type === 'cyclone')!.id
   const rec = await runtime.dispatch('disasters.sitrep.create', { kind: 'canvas' }, { eventId: seedId })
   if (rec.status !== 'applied') throw new Error(rec.error)
   for (let i = 0; i < 5; i++) {

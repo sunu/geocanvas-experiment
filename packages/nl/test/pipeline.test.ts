@@ -10,24 +10,20 @@ import {
 } from '../src/index.js'
 import { sitrepFixture } from '../eval/fixture.js'
 
-/** A decider that follows a script: picks by substring, answers yes/no by key. */
+/** A decider that follows a script. A field choice is 'unset' unless the script picks a value. */
 class ScriptedDecider implements Decider {
   readonly name = 'scripted'
-  constructor(private script: { op: string; yes?: string[]; pick?: Record<string, (label: string) => boolean> }) {}
+  constructor(private script: { op: string; pick?: Record<string, (option: string) => boolean> }) {}
   async ask(_state: string, qs: Record<string, Question>) {
     const out: Record<string, Answer> = {}
     for (const [k, q] of Object.entries(qs)) {
-      if (q.type === 'choice') {
-        const keys = Object.keys(q.criteria)
-        const match =
-          k === 'op'
-            ? keys.find((x) => x.startsWith(this.script.op))
-            : keys.find((x) => this.script.pick?.[k]?.(`${x} ${q.criteria[x]}`)) ?? keys[0]
-        const choice = match ?? 'none'
-        out[k] = { type: 'choice', choice, confidence: 0.9, probabilities: { [choice]: 0.9 } }
-      } else if (q.type === 'noul') {
-        out[k] = { type: 'noul', noul: this.script.yes?.includes(k) ? 0.9 : 0.1 }
-      }
+      if (q.type !== 'choice') continue
+      const keys = Object.keys(q.criteria)
+      const choice =
+        k === 'op'
+          ? (keys.find((x) => x.startsWith(this.script.op)) ?? 'none')
+          : (keys.find((x) => this.script.pick?.[k]?.(`${x} ${q.criteria[x]}`)) ?? (keys.includes('unset') ? 'unset' : keys[0]!))
+      out[k] = { type: 'choice', choice, confidence: 0.9, probabilities: { [choice]: 0.9 } }
     }
     return out
   }
@@ -42,7 +38,7 @@ describe('pipeline', () => {
   it('maps a regenerate request on a group child to the group op with the year range', async () => {
     const ctx = buildContext(fx.runtime, fx.select('groupChild'), 'regenerate related disasters for the last 30 years')
     const p = await propose(ctx, {
-      decider: new ScriptedDecider({ op: 'disasters.relatedEvents.regenerate', yes: ['m:yearRange'] }),
+      decider: new ScriptedDecider({ op: 'disasters.relatedEvents.regenerate' }),
       extractor: new RuleExtractor(),
     })
     expect(p.opId).toBe('disasters.relatedEvents.regenerate')
@@ -52,13 +48,12 @@ describe('pipeline', () => {
     expect(p.fields.sameType?.source).toBe('default')
   })
 
-  it('fills a boolean when the decider says it is mentioned', async () => {
+  it('fills a boolean when the decider picks a value', async () => {
     const ctx = buildContext(fx.runtime, fx.select('group'), 'include all disaster types')
     const p = await propose(ctx, {
-      decider: new ScriptedDecider({ op: 'disasters.relatedEvents.regenerate', yes: ['m:sameType'] }),
+      decider: new ScriptedDecider({ op: 'disasters.relatedEvents.regenerate', pick: { sameType: (o) => o.startsWith('false') } }),
       extractor: new RuleExtractor(),
     })
-    // noul 0.1 for 'v:sameType' -> false
     expect(p.args.sameType).toBe(false)
     expect(p.fields.sameType?.source).toBe('decider')
   })
@@ -69,7 +64,6 @@ describe('pipeline', () => {
     const p = await propose(ctx, {
       decider: new ScriptedDecider({
         op: 'disasters.event.change',
-        yes: ['m:eventId'],
         pick: { e: (label) => label.includes('Khulna') && label.includes(String(target.year)) && label.includes('cyclone') },
       }),
       extractor: new RuleExtractor(),

@@ -1,0 +1,818 @@
+{
+  "summary": {
+    "config": "lexical",
+    "backends": {
+      "decider": "lexical",
+      "extractor": "rules",
+      "embedder": "none"
+    },
+    "cases": 40,
+    "opAccuracy": "80.0%",
+    "exactArgs": "62.5%",
+    "fieldAccuracy": "51.7%",
+    "latencyMs": {
+      "p50": 1,
+      "p95": 1
+    },
+    "cost": {
+      "total": 0,
+      "perCommand": 0,
+      "calls": 0
+    },
+    "calibration": [
+      {
+        "band": "0–0.5",
+        "n": 30,
+        "accuracy": "73.3%"
+      },
+      {
+        "band": "0.5–0.8",
+        "n": 3,
+        "accuracy": "100.0%"
+      },
+      {
+        "band": "0.8–0.95",
+        "n": 1,
+        "accuracy": "100.0%"
+      },
+      {
+        "band": "0.95–1",
+        "n": 6,
+        "accuracy": "100.0%"
+      }
+    ]
+  },
+  "rows": [
+    {
+      "id": "regen-years",
+      "say": "regenerate related disasters for the last 30 years",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "yearRange",
+          "expected": 30,
+          "got": 30,
+          "ok": true,
+          "confidence": 0.95,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.23009731055091556,
+      "ms": 4
+    },
+    {
+      "id": "regen-plain",
+      "say": "refresh related events",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.24919093851132693,
+      "ms": 1
+    },
+    {
+      "id": "regen-alltypes",
+      "say": "include all disaster types",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "sameType",
+          "expected": false,
+          "got": true,
+          "ok": false,
+          "confidence": 0.3999999999999999,
+          "source": "decider"
+        }
+      ],
+      "opConfidence": 0.2717401140168311,
+      "ms": 1
+    },
+    {
+      "id": "regen-decade-same",
+      "say": "only show cyclones from the past decade",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "core.text.add",
+      "expectTarget": "group",
+      "gotTarget": "canvas",
+      "opOk": false,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "yearRange",
+          "expected": 10,
+          "ok": false
+        },
+        {
+          "name": "sameType",
+          "expected": true,
+          "ok": false
+        }
+      ],
+      "opConfidence": 0.39317914543316346,
+      "ms": 1
+    },
+    {
+      "id": "regen-radius",
+      "say": "search for related disasters within 200 km",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "radiusKm",
+          "expected": 200,
+          "got": 200,
+          "ok": true,
+          "confidence": 0.95,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.14245095251634912,
+      "ms": 1
+    },
+    {
+      "id": "regen-50-any",
+      "say": "look back 50 years and include any type of disaster",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "yearRange",
+          "expected": 50,
+          "got": 50,
+          "ok": true,
+          "confidence": 0.95,
+          "source": "extractor"
+        },
+        {
+          "name": "sameType",
+          "expected": false,
+          "got": true,
+          "ok": false,
+          "confidence": 0.7,
+          "source": "default"
+        }
+      ],
+      "opConfidence": 0.30511571254567627,
+      "ms": 1
+    },
+    {
+      "id": "regen-wide",
+      "say": "widen the search radius to 1000 km",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "radiusKm",
+          "expected": 1000,
+          "got": 1000,
+          "ok": true,
+          "confidence": 0.95,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.9262672811059908,
+      "ms": 1
+    },
+    {
+      "id": "regen-decades",
+      "say": "rerun the related search for two decades",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "disasters.relatedEvents.regenerate",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "yearRange",
+          "expected": 20,
+          "got": 20,
+          "ok": true,
+          "confidence": 0.95,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.33076499724821146,
+      "ms": 1
+    },
+    {
+      "id": "change-khulna",
+      "say": "switch to the 2019 Khulna cyclone",
+      "expectOp": "disasters.event.change",
+      "gotOp": "disasters.event.change",
+      "expectTarget": "seed",
+      "gotTarget": "seed",
+      "opOk": true,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "khu-2019-cyclone"
+          },
+          "got": "sof-2025-cyclone-18",
+          "ok": false,
+          "confidence": 0.7,
+          "source": "default"
+        }
+      ],
+      "opConfidence": 0.9842674532940032,
+      "ms": 1
+    },
+    {
+      "id": "change-haiti",
+      "say": "use the 2025 Haiti earthquake instead",
+      "expectOp": "disasters.event.change",
+      "gotOp": "disasters.event.change",
+      "expectTarget": "seed",
+      "gotTarget": "seed",
+      "opOk": true,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "sud-2025-earthquake"
+          },
+          "got": "sof-2025-cyclone-18",
+          "ok": false,
+          "confidence": 0.7,
+          "source": "default"
+        }
+      ],
+      "opConfidence": 0.787610619469027,
+      "ms": 1
+    },
+    {
+      "id": "change-sindh",
+      "say": "change the disaster to the 2022 Sindh floods",
+      "expectOp": "disasters.event.change",
+      "gotOp": "disasters.event.change",
+      "expectTarget": "seed",
+      "gotTarget": "seed",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "snd-2022-flood"
+          },
+          "got": "snd-2022-flood-17",
+          "ok": true,
+          "confidence": 0.13028398005636246,
+          "source": "entity"
+        }
+      ],
+      "opConfidence": 0.22069345074298305,
+      "ms": 1
+    },
+    {
+      "id": "change-child",
+      "say": "change this event to the 2015 Leyte earthquake",
+      "expectOp": "disasters.event.change",
+      "gotOp": "disasters.event.change",
+      "expectTarget": "groupChild",
+      "gotTarget": "groupChild",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "ley-2015-earthquake"
+          },
+          "got": "ley-2015-earthquake-10",
+          "ok": true,
+          "confidence": 0.15761867296092316,
+          "source": "entity"
+        }
+      ],
+      "opConfidence": 0.27108705457825893,
+      "ms": 1
+    },
+    {
+      "id": "aoi-bigger",
+      "say": "make the AOI 50% bigger",
+      "expectOp": "core.map.bufferAoi",
+      "gotOp": "core.map.bufferAoi",
+      "expectTarget": "map",
+      "gotTarget": "map",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "factor",
+          "expected": 1.5,
+          "got": 1.5,
+          "ok": true,
+          "confidence": 0.9,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.5945357354979217,
+      "ms": 1
+    },
+    {
+      "id": "aoi-shrink",
+      "say": "shrink the area of interest by 20%",
+      "expectOp": "core.map.bufferAoi",
+      "gotOp": "core.map.bufferAoi",
+      "expectTarget": "map",
+      "gotTarget": "map",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "factor",
+          "expected": 0.8,
+          "got": 0.8,
+          "ok": true,
+          "confidence": 0.9,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.21353426215524604,
+      "ms": 1
+    },
+    {
+      "id": "aoi-double",
+      "say": "double the size of the AOI",
+      "expectOp": "core.map.bufferAoi",
+      "gotOp": "core.map.setAoi",
+      "expectTarget": "map",
+      "gotTarget": "map",
+      "opOk": false,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "factor",
+          "expected": 2,
+          "ok": false
+        }
+      ],
+      "opConfidence": 0.32874467387741774,
+      "ms": 1
+    },
+    {
+      "id": "basemap-sat",
+      "say": "switch to satellite imagery",
+      "expectOp": "core.map.setBasemap",
+      "gotOp": "core.node.delete",
+      "expectTarget": "map",
+      "gotTarget": "map",
+      "opOk": false,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "basemap",
+          "expected": "satellite",
+          "ok": false
+        }
+      ],
+      "opConfidence": 0.05882352941176468,
+      "ms": 1
+    },
+    {
+      "id": "basemap-dark",
+      "say": "use a dark basemap",
+      "expectOp": "core.map.setBasemap",
+      "gotOp": "core.map.setBasemap",
+      "expectTarget": "map",
+      "gotTarget": "map",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "basemap",
+          "expected": "dark",
+          "got": "dark",
+          "ok": true,
+          "confidence": 0.9911067193675889,
+          "source": "decider"
+        }
+      ],
+      "opConfidence": 0.48902974158946855,
+      "ms": 1
+    },
+    {
+      "id": "mark-pie",
+      "say": "show it as a pie chart",
+      "expectOp": "core.chart.setMark",
+      "gotOp": "core.chart.setMark",
+      "expectTarget": "peopleChart",
+      "gotTarget": "peopleChart",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "mark",
+          "expected": "arc",
+          "got": "arc",
+          "ok": true,
+          "confidence": 0.4992522432701895,
+          "source": "decider"
+        }
+      ],
+      "opConfidence": 0.42589703588143546,
+      "ms": 1
+    },
+    {
+      "id": "mark-line",
+      "say": "make this a line chart",
+      "expectOp": "core.chart.setMark",
+      "gotOp": "core.chart.setMark",
+      "expectTarget": "damageChart",
+      "gotTarget": "damageChart",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "mark",
+          "expected": "line",
+          "got": "line",
+          "ok": true,
+          "confidence": 0.49950099800399206,
+          "source": "decider"
+        }
+      ],
+      "opConfidence": 0.4962816063460589,
+      "ms": 1
+    },
+    {
+      "id": "mark-bar",
+      "say": "change it back to bars",
+      "expectOp": "core.chart.setMark",
+      "gotOp": "core.chart.setMark",
+      "expectTarget": "peopleChart",
+      "gotTarget": "peopleChart",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "mark",
+          "expected": "bar",
+          "got": "bar",
+          "ok": true,
+          "confidence": 0.9911067193675889,
+          "source": "decider"
+        }
+      ],
+      "opConfidence": 0.9543292102759277,
+      "ms": 1
+    },
+    {
+      "id": "mark-scatter",
+      "say": "scatter plot please",
+      "expectOp": "core.chart.setMark",
+      "gotOp": "core.node.delete",
+      "expectTarget": "damageChart",
+      "gotTarget": "damageChart",
+      "opOk": false,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "mark",
+          "expected": "point",
+          "ok": false
+        }
+      ],
+      "opConfidence": 0.05882352941176468,
+      "ms": 1
+    },
+    {
+      "id": "fit",
+      "say": "zoom to fit everything",
+      "expectOp": "core.view.fitAll",
+      "gotOp": "core.view.fitAll",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.6597496706192364,
+      "ms": 0
+    },
+    {
+      "id": "focus",
+      "say": "focus on this",
+      "expectOp": "core.view.focus",
+      "gotOp": "core.view.focus",
+      "expectTarget": "seed",
+      "gotTarget": "seed",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.9842674532940034,
+      "ms": 0
+    },
+    {
+      "id": "delete-summary",
+      "say": "delete this",
+      "expectOp": "core.node.delete",
+      "gotOp": "core.node.delete",
+      "expectTarget": "summary",
+      "gotTarget": "summary",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.9842674532940037,
+      "ms": 1
+    },
+    {
+      "id": "dup-map",
+      "say": "duplicate the map",
+      "expectOp": "core.node.duplicate",
+      "gotOp": "core.node.duplicate",
+      "expectTarget": "map",
+      "gotTarget": "map",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.1660589990056348,
+      "ms": 1
+    },
+    {
+      "id": "delete-group",
+      "say": "remove the whole related disasters group",
+      "expectOp": "core.node.delete",
+      "gotOp": "core.node.delete",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.11520030668966842,
+      "ms": 1
+    },
+    {
+      "id": "delete-child",
+      "say": "delete this event",
+      "expectOp": "core.node.delete",
+      "gotOp": "core.node.delete",
+      "expectTarget": "groupChild",
+      "gotTarget": "groupChild",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.18143918796447334,
+      "ms": 1
+    },
+    {
+      "id": "title",
+      "say": "set the title to \"Flood update\"",
+      "expectOp": "core.text.setContent",
+      "gotOp": "core.text.setContent",
+      "expectTarget": "summary",
+      "gotTarget": "summary",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "title",
+          "expected": "Flood update",
+          "got": "Flood update",
+          "ok": true,
+          "confidence": 0.9,
+          "source": "extractor"
+        }
+      ],
+      "opConfidence": 0.9842674532940032,
+      "ms": 0
+    },
+    {
+      "id": "move-right",
+      "say": "move it 100 to the right",
+      "expectOp": "core.node.move",
+      "gotOp": "core.node.move",
+      "expectTarget": "seed",
+      "gotTarget": "seed",
+      "opOk": true,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "dx",
+          "expected": 100,
+          "got": 0,
+          "ok": false,
+          "confidence": 0.7,
+          "source": "default"
+        }
+      ],
+      "opConfidence": 0.24759318686744028,
+      "ms": 0
+    },
+    {
+      "id": "add-sticky",
+      "say": "add a sticky note",
+      "expectOp": "core.sticky.add",
+      "gotOp": "core.sticky.add",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.37369337979094075,
+      "ms": 0
+    },
+    {
+      "id": "add-map",
+      "say": "add a map",
+      "expectOp": "core.map.add",
+      "gotOp": "core.map.add",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.24950149551345963,
+      "ms": 0
+    },
+    {
+      "id": "add-text",
+      "say": "add a text block",
+      "expectOp": "core.text.add",
+      "gotOp": "core.text.add",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.37369337979094075,
+      "ms": 0
+    },
+    {
+      "id": "add-chart",
+      "say": "new chart",
+      "expectOp": "core.chart.add",
+      "gotOp": "core.chart.add",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.4950592885375494,
+      "ms": 0
+    },
+    {
+      "id": "sitrep",
+      "say": "create a situation report for the 2019 Khulna cyclone",
+      "expectOp": "disasters.sitrep.create",
+      "gotOp": "disasters.sitrep.create",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "khu-2019-cyclone"
+          },
+          "got": "khu-2019-cyclone-17",
+          "ok": true,
+          "confidence": 0.13615363710481024,
+          "source": "entity"
+        }
+      ],
+      "opConfidence": 0.978515625,
+      "ms": 1
+    },
+    {
+      "id": "add-event",
+      "say": "add the 2017 Kahramanmaras earthquake to the canvas",
+      "expectOp": "disasters.event.add",
+      "gotOp": "core.sticky.add",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": false,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "kmr-2017-earthquake"
+          },
+          "ok": false
+        }
+      ],
+      "opConfidence": 0.1175263774912075,
+      "ms": 0
+    },
+    {
+      "id": "plugin-off",
+      "say": "turn off the disasters plugin",
+      "expectOp": "core.plugin.disable",
+      "gotOp": "core.plugin.disable",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "pluginId",
+          "expected": "disasters",
+          "ok": false,
+          "confidence": 0,
+          "source": "default"
+        }
+      ],
+      "opConfidence": 0.3732604373757457,
+      "ms": 0
+    },
+    {
+      "id": "none-weather",
+      "say": "what's the weather in Paris",
+      "expectOp": "none",
+      "gotOp": "core.plugin.enable",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": false,
+      "argsOk": false,
+      "fieldResults": [],
+      "opConfidence": 0.08333333333333331,
+      "ms": 0
+    },
+    {
+      "id": "none-joke",
+      "say": "tell me a joke",
+      "expectOp": "none",
+      "gotOp": "core.node.delete",
+      "expectTarget": "canvas",
+      "gotTarget": "seed",
+      "opOk": false,
+      "argsOk": false,
+      "fieldResults": [],
+      "opConfidence": 0.05882352941176468,
+      "ms": 0
+    },
+    {
+      "id": "regen-child-type",
+      "say": "show all kinds of disasters in the related list",
+      "expectOp": "disasters.relatedEvents.regenerate",
+      "gotOp": "core.node.delete",
+      "expectTarget": "group",
+      "gotTarget": "group",
+      "opOk": false,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "sameType",
+          "expected": false,
+          "ok": false
+        }
+      ],
+      "opConfidence": 0.09078560108671045,
+      "ms": 1
+    },
+    {
+      "id": "change-latest-haiti",
+      "say": "show the Haiti 2023 cyclone",
+      "expectOp": "disasters.event.change",
+      "gotOp": "disasters.event.change",
+      "expectTarget": "seed",
+      "gotTarget": "seed",
+      "opOk": true,
+      "argsOk": false,
+      "fieldResults": [
+        {
+          "name": "eventId",
+          "expected": {
+            "$prefix": "sud-2023-cyclone"
+          },
+          "got": "sof-2025-cyclone-18",
+          "ok": false,
+          "confidence": 0.7,
+          "source": "default"
+        }
+      ],
+      "opConfidence": 0.4926253687315637,
+      "ms": 1
+    }
+  ]
+}

@@ -149,6 +149,11 @@ export class CanvasRuntime {
     return this._registry
   }
 
+  /** All plugins this app knows about, enabled or not. */
+  availablePlugins() {
+    return this.catalog.list().map((p) => ({ id: p.id, title: p.title, alwaysOn: this.catalog.alwaysOn.includes(p.id) }))
+  }
+
   onRegistryChange(fn: (r: Registry) => void): () => void {
     this.registryListeners.add(fn)
     return () => this.registryListeners.delete(fn)

@@ -50,6 +50,10 @@ export function buildContext(runtime: CanvasRuntime, target: TargetRef, utteranc
     selectionSummary: lines.join('\n'),
     candidates,
     searchEntities: async (entity, query, limit) => {
+      // Built-in: plugins of the app catalog.
+      if (entity === 'core.plugin') {
+        return runtime.availablePlugins().filter((p) => !p.alwaysOn).slice(0, limit).map((p) => ({ id: p.id, label: `${p.title} plugin (${p.id})` }))
+      }
       const def = runtime.registry.entity(entity)
       if (!def) return []
       return def.search(query, limit, { provider: (id) => runtime.registry.provider(id), reader: runtime.reader })

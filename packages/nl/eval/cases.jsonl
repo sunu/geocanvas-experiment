@@ -1,0 +1,40 @@
+{"id":"regen-years","sel":"groupChild","say":"regenerate related disasters for the last 30 years","op":"disasters.relatedEvents.regenerate","target":"group","args":{"yearRange":30}}
+{"id":"regen-plain","sel":"group","say":"refresh related events","op":"disasters.relatedEvents.regenerate","target":"group","args":{}}
+{"id":"regen-alltypes","sel":"group","say":"include all disaster types","op":"disasters.relatedEvents.regenerate","target":"group","args":{"sameType":false}}
+{"id":"regen-decade-same","sel":"group","say":"only show cyclones from the past decade","op":"disasters.relatedEvents.regenerate","target":"group","args":{"yearRange":10,"sameType":true}}
+{"id":"regen-radius","sel":"groupChild","say":"search for related disasters within 200 km","op":"disasters.relatedEvents.regenerate","target":"group","args":{"radiusKm":200}}
+{"id":"regen-50-any","sel":"group","say":"look back 50 years and include any type of disaster","op":"disasters.relatedEvents.regenerate","target":"group","args":{"yearRange":50,"sameType":false}}
+{"id":"regen-wide","sel":"group","say":"widen the search radius to 1000 km","op":"disasters.relatedEvents.regenerate","target":"group","args":{"radiusKm":1000}}
+{"id":"regen-decades","sel":"groupChild","say":"rerun the related search for two decades","op":"disasters.relatedEvents.regenerate","target":"group","args":{"yearRange":20}}
+{"id":"change-khulna","sel":"seed","say":"switch to the 2019 Khulna cyclone","op":"disasters.event.change","target":"seed","args":{"eventId":{"$prefix":"khu-2019-cyclone"}}}
+{"id":"change-haiti","sel":"seed","say":"use the 2025 Haiti earthquake instead","op":"disasters.event.change","target":"seed","args":{"eventId":{"$prefix":"sud-2025-earthquake"}}}
+{"id":"change-sindh","sel":"seed","say":"change the disaster to the 2022 Sindh floods","op":"disasters.event.change","target":"seed","args":{"eventId":{"$prefix":"snd-2022-flood"}}}
+{"id":"change-child","sel":"groupChild","say":"change this event to the 2015 Leyte earthquake","op":"disasters.event.change","target":"groupChild","args":{"eventId":{"$prefix":"ley-2015-earthquake"}}}
+{"id":"aoi-bigger","sel":"map","say":"make the AOI 50% bigger","op":"core.map.bufferAoi","target":"map","args":{"factor":1.5}}
+{"id":"aoi-shrink","sel":"map","say":"shrink the area of interest by 20%","op":"core.map.bufferAoi","target":"map","args":{"factor":0.8}}
+{"id":"aoi-double","sel":"map","say":"double the size of the AOI","op":"core.map.bufferAoi","target":"map","args":{"factor":2}}
+{"id":"basemap-sat","sel":"map","say":"switch to satellite imagery","op":"core.map.setBasemap","target":"map","args":{"basemap":"satellite"}}
+{"id":"basemap-dark","sel":"map","say":"use a dark basemap","op":"core.map.setBasemap","target":"map","args":{"basemap":"dark"}}
+{"id":"mark-pie","sel":"peopleChart","say":"show it as a pie chart","op":"core.chart.setMark","target":"peopleChart","args":{"mark":"arc"}}
+{"id":"mark-line","sel":"damageChart","say":"make this a line chart","op":"core.chart.setMark","target":"damageChart","args":{"mark":"line"}}
+{"id":"mark-bar","sel":"peopleChart","say":"change it back to bars","op":"core.chart.setMark","target":"peopleChart","args":{"mark":"bar"}}
+{"id":"mark-scatter","sel":"damageChart","say":"scatter plot please","op":"core.chart.setMark","target":"damageChart","args":{"mark":"point"}}
+{"id":"fit","sel":"none","say":"zoom to fit everything","op":"core.view.fitAll","target":"canvas","args":{}}
+{"id":"focus","sel":"seed","say":"focus on this","op":"core.view.focus","target":"seed","args":{}}
+{"id":"delete-summary","sel":"summary","say":"delete this","op":"core.node.delete","target":"summary","args":{}}
+{"id":"dup-map","sel":"map","say":"duplicate the map","op":"core.node.duplicate","target":"map","args":{}}
+{"id":"delete-group","sel":"groupChild","say":"remove the whole related disasters group","op":"core.node.delete","target":"group","args":{}}
+{"id":"delete-child","sel":"groupChild","say":"delete this event","op":"core.node.delete","target":"groupChild","args":{}}
+{"id":"title","sel":"summary","say":"set the title to \"Flood update\"","op":"core.text.setContent","target":"summary","args":{"title":"Flood update"}}
+{"id":"move-right","sel":"seed","say":"move it 100 to the right","op":"core.node.move","target":"seed","args":{"dx":100}}
+{"id":"add-sticky","sel":"none","say":"add a sticky note","op":"core.sticky.add","target":"canvas","args":{}}
+{"id":"add-map","sel":"none","say":"add a map","op":"core.map.add","target":"canvas","args":{}}
+{"id":"add-text","sel":"none","say":"add a text block","op":"core.text.add","target":"canvas","args":{}}
+{"id":"add-chart","sel":"none","say":"new chart","op":"core.chart.add","target":"canvas","args":{}}
+{"id":"sitrep","sel":"none","say":"create a situation report for the 2019 Khulna cyclone","op":"disasters.sitrep.create","target":"canvas","args":{"eventId":{"$prefix":"khu-2019-cyclone"}}}
+{"id":"add-event","sel":"none","say":"add the 2017 Kahramanmaras earthquake to the canvas","op":"disasters.event.add","target":"canvas","args":{"eventId":{"$prefix":"kmr-2017-earthquake"}}}
+{"id":"plugin-off","sel":"none","say":"turn off the disasters plugin","op":"core.plugin.disable","target":"canvas","args":{"pluginId":"disasters"}}
+{"id":"none-weather","sel":"none","say":"what's the weather in Paris","op":"none","target":"canvas","args":{}}
+{"id":"none-joke","sel":"seed","say":"tell me a joke","op":"none","target":"canvas","args":{}}
+{"id":"regen-child-type","sel":"groupChild","say":"show all kinds of disasters in the related list","op":"disasters.relatedEvents.regenerate","target":"group","args":{"sameType":false}}
+{"id":"change-latest-haiti","sel":"seed","say":"show the Haiti 2023 cyclone","op":"disasters.event.change","target":"seed","args":{"eventId":{"$prefix":"sud-2023-cyclone"}}}

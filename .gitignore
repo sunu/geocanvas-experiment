@@ -6,3 +6,4 @@ apps/sync-server/data
 .env
 .env.*
 !.env.example
+apps/nl-gateway/data

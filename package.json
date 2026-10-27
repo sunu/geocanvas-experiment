@@ -10,7 +10,9 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "dev": "npm run dev -w apps/web",
-    "sync": "npm run start -w apps/sync-server"
+    "sync": "npm run start -w apps/sync-server",
+    "nl": "npm run start -w apps/nl-gateway",
+    "nl:eval": "npm run eval -w packages/nl --"
   },
   "devDependencies": {
     "typescript": "^5.9.0",
