@@ -67,21 +67,24 @@ export function bindEditor(editor: Editor, runtime: CanvasRuntime): () => void {
       const node = runtime.reader.node(nodeId)
       const shape = editor.getShape(sid) as NodeShape | undefined
       if (!node || !shape) continue
-      const resized = Math.abs(node.layout.w - shape.props.w) > 0.5 || Math.abs(node.layout.h - shape.props.h) > 0.5
       const page = editor.getShapePageTransform(sid).point()
       const map = node.parentId ? runtime.reader.node(node.parentId) : undefined
 
       // Pinned node: a drag moves the pin, or unpins it when the tail leaves the map view.
+      // Its shape is scaled with the map zoom, so compare with the scaled size.
       if (node.anchor && map && isMapNode(map)) {
-        if (resized) layouts[nodeId] = { w: round(shape.props.w), h: round(shape.props.h) }
+        const { scale, w, h } = pinPosition(runtime, map, node)
+        const resized = Math.abs(w - shape.props.w) > 0.5 || Math.abs(h - shape.props.h) > 0.5
+        if (resized) layouts[nodeId] = { w: round(shape.props.w / scale), h: round(shape.props.h / scale) }
         else {
-          const place = placeUnder(runtime, map, { x: shape.x, y: shape.y, w: shape.props.w, h: shape.props.h })
+          const place = placeUnder(runtime, map, { x: shape.x, y: shape.y, w: shape.props.w, h: shape.props.h }, scale)
           if (place) pinOps.push({ opId: 'core.node.moveAnchor', ids: [nodeId], args: { lngLat: place } })
           else pinOps.push({ opId: 'core.node.unpin', ids: [nodeId], args: { x: round(page.x), y: round(page.y) } })
         }
         continue
       }
 
+      const resized = Math.abs(node.layout.w - shape.props.w) > 0.5 || Math.abs(node.layout.h - shape.props.h) > 0.5
       // Top-level node dropped on a map: pin it to the place under its tail.
       if (!resized && !node.parentId && !isMapNode(node) && !runtime.registry.nodeType(node.type)?.group) {
         const target = mapUnder(editor, runtime, nodeId, { x: page.x, y: page.y, w: shape.props.w, h: shape.props.h })
@@ -159,9 +162,11 @@ function projectDocToEditor(editor: Editor, runtime: CanvasRuntime) {
       const pinned = parent && n.anchor && isMapNode(parent) ? pinPosition(runtime, parent, n) : undefined
       const x = pinned ? pinned.x : parent ? n.layout.x - parent.layout.x : n.layout.x
       const y = pinned ? pinned.y : parent ? n.layout.y - parent.layout.y : n.layout.y
+      const w = pinned ? pinned.w : n.layout.w
+      const h = pinned ? pinned.h : n.layout.h
       const parentId = parent ? shapeIdOf(parent.id) : editor.getCurrentPageId()
       const existing = editor.getShape(id) as NodeShape | undefined
-      const props = { w: n.layout.w, h: n.layout.h, nodeType: n.type }
+      const props = { w, h, nodeType: n.type }
       if (!existing) {
         editor.createShape<NodeShape>({ id, type: NODE_SHAPE, x, y, parentId, index: indices[i], props })
         return

@@ -7,7 +7,19 @@ import { useFocus } from './focus'
 
 const stop = (e: React.PointerEvent | React.MouseEvent) => e.stopPropagation()
 
-export function NodeFrame({ nodeId, width, height, editing }: { nodeId: string; width: number; height: number; editing: boolean }) {
+export function NodeFrame(props: { nodeId: string; width: number; height: number; editing: boolean }) {
+  const node = useNode(props.nodeId)
+  // A pinned card is scaled with its map: lay it out at its normal size, then scale it to the shape.
+  const scale = node?.anchor && node.layout.w > 0 ? props.width / node.layout.w : 1
+  if (Math.abs(scale - 1) < 1e-3) return <NodeFrameInner {...props} />
+  return (
+    <div style={{ width: props.width / scale, height: props.height / scale, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
+      <NodeFrameInner {...props} width={props.width / scale} height={props.height / scale} />
+    </div>
+  )
+}
+
+function NodeFrameInner({ nodeId, width, height, editing }: { nodeId: string; width: number; height: number; editing: boolean }) {
   const node = useNode(nodeId)
   const derived = useDerived(nodeId)
   const registry = useRegistry()

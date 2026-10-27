@@ -18,6 +18,8 @@ export interface Layout {
 export interface Anchor {
   kind: 'geo'
   lngLat: [number, number]
+  /** Map zoom at which the node shows at its layout size. It scales with the map from there. */
+  zoom?: number
 }
 
 export interface NodeRecord {

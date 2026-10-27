@@ -115,6 +115,7 @@ export const pinToMapOp = defineOp({
   args: z.object({
     mapId: z.string().meta({ nl: { extract: 'none' } }).describe('The map node'),
     lngLat: lngLat.optional().describe('The place. Default: the center of the map view.'),
+    zoom: z.number().meta({ advanced: true }).optional().describe('Map zoom at which the node has its normal size. Default: the current map zoom.'),
   }),
   nl: { examples: ['pin this note to the map', 'put this on the map'] },
   when: (ctx) =>
@@ -135,16 +136,18 @@ export const pinToMapOp = defineOp({
       if (isMap(n.type)) throw new Error('A map cannot be pinned to a map')
       if (ctx.registry.nodeType(n.type)?.group) throw new Error('A group cannot be pinned to a map')
     }
-    const view = map!.props.view as { center: [number, number] } | undefined
+    const view = map!.props.view as { center: [number, number]; zoom: number } | undefined
     const place = args.lngLat ?? view?.center
     if (!place) throw new Error('This map has no view yet. Give a place (lngLat).')
+    // The card shows at its size at the current map zoom, and scales with the map from there.
+    const zoom = args.zoom ?? view?.zoom
     // Several nodes: fan them out a little so they do not cover each other.
-    return ids.map((id, i) => ({ id, mapId: args.mapId, lngLat: [place[0] + i * 0.02, place[1]] as [number, number] }))
+    return ids.map((id, i) => ({ id, mapId: args.mapId, lngLat: [place[0] + i * 0.02, place[1]] as [number, number], zoom }))
   },
   apply(tx, plan) {
     for (const p of plan) {
       tx.setParent(p.id, p.mapId)
-      tx.setAnchor(p.id, { kind: 'geo', lngLat: p.lngLat })
+      tx.setAnchor(p.id, { kind: 'geo', lngLat: p.lngLat, ...(p.zoom !== undefined ? { zoom: p.zoom } : {}) })
     }
   },
 })
@@ -157,7 +160,8 @@ export const moveAnchorOp = defineOp({
   args: z.object({ lngLat }),
   hidden: true,
   when: (ctx) => !!ctx.reader.node(only(ctx.target))?.anchor,
-  apply: (tx, plan, target) => tx.setAnchor(only(target), { kind: 'geo', lngLat: plan.lngLat }),
+  // Keep the reference zoom: moving a pin does not change its scale.
+  apply: (tx, plan, target) => tx.setAnchor(only(target), { ...tx.reader.node(only(target))!.anchor!, lngLat: plan.lngLat }),
 })
 
 export const unpinOp = defineOp({

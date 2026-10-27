@@ -9,7 +9,7 @@ const placement = {
   w: z.number().positive().meta({ advanced: true }).optional().describe('Width'),
   h: z.number().positive().meta({ advanced: true }).optional().describe('Height'),
   pinTo: z
-    .object({ parentId: z.string(), lngLat: z.tuple([z.number(), z.number()]) })
+    .object({ parentId: z.string(), lngLat: z.tuple([z.number(), z.number()]), zoom: z.number().optional() })
     .meta({ advanced: true })
     .optional()
     .describe('Pin the new node to a place in a map'),
@@ -38,13 +38,16 @@ export function nodeAddOp(def: NodeTypeDef): OpDef<any, any> {
         pinTo: pinTo as { parentId: string; lngLat: [number, number] } | undefined,
       }
     },
-    apply(tx, plan: { id: string; props: Record<string, unknown>; layout: { x: number; y: number; w: number; h: number }; pinTo?: { parentId: string; lngLat: [number, number] } }) {
+    apply(tx, plan: { id: string; props: Record<string, unknown>; layout: { x: number; y: number; w: number; h: number }; pinTo?: { parentId: string; lngLat: [number, number]; zoom?: number } }) {
+      const pin = plan.pinTo
       tx.createNode({
         id: plan.id,
         type: def.type,
         props: plan.props,
         layout: plan.layout,
-        ...(plan.pinTo ? { parentId: plan.pinTo.parentId, anchor: { kind: 'geo' as const, lngLat: plan.pinTo.lngLat } } : {}),
+        ...(pin
+          ? { parentId: pin.parentId, anchor: { kind: 'geo' as const, lngLat: pin.lngLat, ...(pin.zoom !== undefined ? { zoom: pin.zoom } : {}) } }
+          : {}),
       })
     },
   }
