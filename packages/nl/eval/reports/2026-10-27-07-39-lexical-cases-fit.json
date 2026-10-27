@@ -1,0 +1,60 @@
+{
+  "summary": {
+    "config": "lexical",
+    "backends": {
+      "decider": "lexical",
+      "extractor": "rules",
+      "embedder": "none"
+    },
+    "cases": 1,
+    "opAccuracy": "100.0%",
+    "exactArgs": "100.0%",
+    "fieldAccuracy": "-",
+    "latencyMs": {
+      "p50": 3,
+      "p95": 3
+    },
+    "cost": {
+      "total": 0,
+      "perCommand": 0,
+      "calls": 0
+    },
+    "calibration": [
+      {
+        "band": "0–0.5",
+        "n": 0,
+        "accuracy": "-"
+      },
+      {
+        "band": "0.5–0.8",
+        "n": 1,
+        "accuracy": "100.0%"
+      },
+      {
+        "band": "0.8–0.95",
+        "n": 0,
+        "accuracy": "-"
+      },
+      {
+        "band": "0.95–1",
+        "n": 0,
+        "accuracy": "-"
+      }
+    ]
+  },
+  "rows": [
+    {
+      "id": "fit",
+      "say": "zoom to fit everything",
+      "expectOp": "core.view.fitAll",
+      "gotOp": "core.view.fitAll",
+      "expectTarget": "canvas",
+      "gotTarget": "canvas",
+      "opOk": true,
+      "argsOk": true,
+      "fieldResults": [],
+      "opConfidence": 0.6597496706192364,
+      "ms": 3
+    }
+  ]
+}

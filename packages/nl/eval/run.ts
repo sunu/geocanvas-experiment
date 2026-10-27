@@ -2,7 +2,7 @@
  * NL eval runner.
  *   npm run nl:eval -- --config jev        (needs OPENROUTER_KEY in .env)
  *   npm run nl:eval -- --config lexical    (offline baseline)
- *   options: --only <case id substring>
+ *   options: --only <case id substring>, --cases <file in eval/> (default cases.jsonl; held-out: heldout.jsonl)
  * Writes eval/reports/<date>-<config>.json and .md
  */
 import fs from 'node:fs'
@@ -38,6 +38,7 @@ const opt = (name: string, dflt?: string) => {
 }
 const configName = opt('config', 'jev')!
 const only = opt('only')
+const casesFile = opt('cases', 'cases.jsonl')!
 
 const envFile = path.resolve(import.meta.dirname, '../../../.env')
 if (fs.existsSync(envFile)) process.loadEnvFile(envFile)
@@ -64,7 +65,7 @@ function argMatches(expected: unknown, actual: unknown): boolean {
 }
 
 const cases: Case[] = fs
-  .readFileSync(path.join(import.meta.dirname, 'cases.jsonl'), 'utf8')
+  .readFileSync(path.join(import.meta.dirname, casesFile), 'utf8')
   .split('\n')
   .filter((l) => l.trim())
   .map((l) => JSON.parse(l))
@@ -141,12 +142,12 @@ const summary = {
 const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
 const dir = path.join(import.meta.dirname, 'reports')
 fs.mkdirSync(dir, { recursive: true })
-const base = path.join(dir, `${stamp}-${configName}${only ? `-${only}` : ''}`)
+const base = path.join(dir, `${stamp}-${configName}-${casesFile.replace(/\.jsonl$/, '')}${only ? `-${only}` : ''}`)
 fs.writeFileSync(`${base}.json`, JSON.stringify({ summary, rows }, null, 2))
 
 const failures = rows.filter((r) => !r.argsOk)
 const md = [
-  `# NL eval: ${configName}`,
+  `# NL eval: ${configName} on ${casesFile}`,
   '',
   `Backends: decider \`${summary.backends.decider}\`, extractor \`${summary.backends.extractor}\`, embedder \`${summary.backends.embedder}\`.`,
   '',
