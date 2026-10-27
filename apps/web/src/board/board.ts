@@ -10,6 +10,7 @@ import type { ColorName } from '../canvas/style'
  * Moving one object between two others only rewrites that object's `z`.
  *
  * Map views (center, zoom) are not here on purpose: each person pans their own maps.
+ * An event holds only its Montandon id; each person's browser fetches the event's details.
  */
 
 interface Placed {
@@ -26,13 +27,15 @@ export type BoardObject =
   | (Placed & { type: 'box'; color?: ColorName })
   | (Placed & { type: 'text'; text: string; color?: ColorName; fontSize?: number })
   | (Placed & { type: 'map'; basemap: Basemap })
+  /** eventId is absent until someone picks an event. */
+  | (Placed & { type: 'event'; eventId?: string })
 
 export type ObjectType = BoardObject['type']
 
 /** Fields for a new object: everything but id, and z is optional (default: on top). */
 export type NewObject = DistributiveOmit<BoardObject, 'id' | 'z'> & { z?: number }
 
-export type ObjectPatch = Partial<Omit<Placed, 'id'>> & { text?: string; basemap?: Basemap; color?: ColorName; fontSize?: number }
+export type ObjectPatch = Partial<Omit<Placed, 'id'>> & { text?: string; basemap?: Basemap; color?: ColorName; fontSize?: number; eventId?: string }
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
@@ -79,12 +82,16 @@ export class Board {
     return m && ({ ...(m.toJSON() as Omit<BoardObject, 'id'>), id } as BoardObject)
   }
 
-  /** New text goes on top. New boxes and maps go to the bottom: they are mostly backgrounds and frames, so drawing one must not cover what is already there. */
+  /**
+   * New texts and events go on top: they are content. New boxes and maps go to the bottom: they are mostly
+   * backgrounds and frames, so drawing one must not cover what is already there.
+   */
   add(fields: NewObject): string {
     const id = crypto.randomUUID()
     this.doc.transact(() => {
       const m = new Y.Map<unknown>()
-      const z = fields.z ?? (fields.type === 'text' ? this.topZ() + 1 : this.bottomZ() - 1)
+      const onTop = fields.type === 'text' || fields.type === 'event'
+      const z = fields.z ?? (onTop ? this.topZ() + 1 : this.bottomZ() - 1)
       for (const [k, v] of Object.entries({ ...fields, z })) m.set(k, v)
       this.objects.set(id, m)
     })

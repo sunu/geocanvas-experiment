@@ -15,12 +15,13 @@ function boardWith(n: number) {
 }
 
 describe('Board layer order', () => {
-  it('adds new text on top, and new boxes and maps at the bottom', () => {
+  it('adds new text and events on top, and new boxes and maps at the bottom', () => {
     const { board } = boardWith(2)
     board.add({ type: 'box', x: 10, y: 0, w: 10, h: 10 })
     board.add({ type: 'map', x: 11, y: 0, w: 10, h: 10, basemap: 'light' })
     board.add(item(12))
-    expect(order(board)).toEqual([11, 10, 0, 1, 12])
+    board.add({ type: 'event', x: 13, y: 0, w: 10, h: 10 })
+    expect(order(board)).toEqual([11, 10, 0, 1, 12, 13])
   })
 
   it('brings a selection to the front and sends it to the back, keeping its own order', () => {

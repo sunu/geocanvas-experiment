@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import type { Board, BoardObject } from '../board/board'
+import { EventObject } from '../events/EventObject'
 import { MapObject } from '../map/MapObject'
 import { DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE } from './style'
 
@@ -13,8 +14,17 @@ type TextObject = Extract<BoardObject, { type: 'text' }>
 const needsFit = new Set<string>()
 export const requestFit = (id: string) => needsFit.add(id)
 
+interface Props {
+  board: Board
+  object: BoardObject
+  layer: number
+  editing: boolean
+  /** The object is done editing, e.g. an event was picked. */
+  onDone(): void
+}
+
 /** One object on the canvas, in world coordinates. `layer` is its place in the stacking order. */
-export function ObjectView({ board, object: o, layer, editing }: { board: Board; object: BoardObject; layer: number; editing: boolean }) {
+export function ObjectView({ board, object: o, layer, editing, onDone }: Props) {
   const color = o.type === 'box' ? PALETTE[o.color ?? DEFAULT_BOX_COLOR] : undefined
   return (
     <div
@@ -31,6 +41,7 @@ export function ObjectView({ board, object: o, layer, editing }: { board: Board;
     >
       {o.type === 'text' && <TextContent board={board} object={o} editing={editing} />}
       {o.type === 'map' && <MapObject board={board} object={o} editing={editing} />}
+      {o.type === 'event' && <EventObject board={board} object={o} editing={editing} onDone={onDone} />}
     </div>
   )
 }

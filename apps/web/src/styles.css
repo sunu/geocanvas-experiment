@@ -377,3 +377,143 @@ body,
   pointer-events: none;
   white-space: nowrap;
 }
+
+/* --- Event -------------------------------------------------------------- */
+
+.ttx-event {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  font-size: 12px;
+}
+
+.ttx-event__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px;
+  flex: none;
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-event__title {
+  font-weight: 600;
+}
+
+.ttx-event__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ttx-event__empty {
+  margin: auto;
+  padding: 12px;
+  color: var(--ttx-muted);
+  text-align: center;
+}
+
+.ttx-event__details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+
+.ttx-event__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ttx-event__meta,
+.ttx-event__sources {
+  color: var(--ttx-muted);
+}
+
+.ttx-event__hazard {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ttx-event__impacts,
+.ttx-event__sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.ttx-event__impacts b {
+  font-size: 14px;
+}
+
+/* The picker: an editing event takes the pointer, so its input and list work like a normal page. */
+.ttx-eventpick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  user-select: text;
+}
+
+.ttx-eventpick input {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+}
+
+.ttx-eventpick__status {
+  color: var(--ttx-muted);
+}
+
+.ttx-eventpick__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ttx-eventpick__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ttx-eventpick__item:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
+.ttx-eventpick__item.is-on {
+  background: var(--ttx-accent);
+  color: #fff;
+}
+
+.ttx-eventpick__name {
+  flex: 1;
+}
+
+.ttx-eventpick__meta {
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.7;
+}

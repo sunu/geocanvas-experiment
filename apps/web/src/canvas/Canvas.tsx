@@ -10,12 +10,13 @@ const DEFAULT_SIZE: Record<ObjectType, { w: number; h: number }> = {
   box: { w: 200, h: 120 },
   text: { w: 240, h: 40 },
   map: { w: 520, h: 360 },
+  event: { w: 380, h: 320 },
 }
 const MIN_SIZE = 16
 /** Pointer travel (screen px) before a press becomes a drag. */
 const DRAG_THRESHOLD = 3
 const HANDLES = ['nw', 'ne', 'sw', 'se'] as const
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', r: 'box', t: 'text', m: 'map' }
+const TOOL_KEYS: Record<string, Tool> = { v: 'select', r: 'box', t: 'text', m: 'map', e: 'event' }
 const GRID = 24
 
 function newObject(type: ObjectType, r: Rect): NewObject {
@@ -111,7 +112,8 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
           const newId = board.add(newObject(type, r))
           setTool('select')
           setSelection(new Set([newId]))
-          if (type === 'text') setEditing(newId)
+          // A new text opens for typing; a new event opens its search.
+          if (type === 'text' || type === 'event') setEditing(newId)
         },
       )
       return
@@ -263,7 +265,7 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
     >
       <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})` }}>
         {objects.map((o, i) => (
-          <ObjectView key={o.id} board={board} object={o} layer={i} editing={o.id === editingId} />
+          <ObjectView key={o.id} board={board} object={o} layer={i} editing={o.id === editingId} onDone={() => setEditing(null)} />
         ))}
         {draft && <div className="ttx-draft" style={{ left: draft.x, top: draft.y, width: draft.w, height: draft.h }} />}
       </div>
