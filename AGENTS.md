@@ -34,10 +34,12 @@ apps/
   web/           React app (Vite): our own infinite canvas
     src/board/     the shared board (Yjs) and the connection to the Worker
     src/canvas/    camera, input, selection, toolbar, object views
-    src/map/       the map widget
+    src/map/       the map widget, its place search and data layers
     src/events/    the event widget: search Montandon, show one event across its sources
+    src/tools/     the tool registry: typed, read-only capabilities that widgets (and later agents) run
+    src/data/      data tools and their sources (geocoding)
   worker/        Cloudflare Worker: serves the built web app; one Durable Object per room relays and stores the board;
-                 /monty/search proxies Montandon with the token
+                 /monty/search and /tools/geocode proxy Montandon and OpenCage with their keys
 ```
 
 - **Our own canvas, no tldraw.** tldraw needs a paid license off localhost, and the canvas we need is small. The design follows vsticky: a DOM "world" layer moved by one CSS transform. The camera is local to each person and never synced.
@@ -45,16 +47,19 @@ apps/
 - **Multiplayer runs on our own Cloudflare Worker.** `/connect/<room>` goes to that room's Durable Object, which speaks the standard y-websocket protocol, keeps the doc in memory and appends every update to its SQLite (compacted on load when there are many). The browser uses y-websocket's `WebsocketProvider`. Tabs of one browser also sync with each other directly (BroadcastChannel), so test multiplayer from two origins or two browsers, or the server is not involved.
 - **Input:** drag on empty canvas to select; shift+drag selects from anywhere, even over a map or box, and adds to the selection; shift+click toggles one object; scroll pans; pinch or ⌘+scroll zooms; space+drag pans. Tools: V select, R box, T text, M map, E event. `]` / `[` bring to front / send to back, with ⌘ one step. Delete removes. Double-click edits a text, lets a map take the pointer, or opens an event's search; Esc gives it back. The left panel sets the color of selected boxes and texts, and A+ / A− the text size (`canvas/style.ts`: colors are stored by name). A text's height follows its content; only the person who changed it refits it.
 - **Icons:** Phosphor (`@phosphor-icons/react`, regular weight, imported as `<Name>Icon`; only imported icons are bundled). Icon-only buttons carry a `title` and an `aria-label`. For hazard and humanitarian-sector symbols, which Phosphor lacks (earthquake, volcano, displacement, clusters), consider the OCHA Humanitarian Icons; check their license first.
-- **Map widget** (`apps/web/src/map/`): a live MapLibre map in a box. The basemap is shared board state. **Map views are per person:** the camera of a map is not in the board; each person's view is kept in their browser (`localView.ts`), so nobody's map moves under them.
+- **Map widget** (`apps/web/src/map/`): a live MapLibre map in a box. The basemap is shared board state. **Map views are per person:** the camera of a map is not in the board; each person's view is kept in their browser (`localView.ts`), so nobody's map moves under them. "Go to place" in the header geocodes (`data.geocode`) and moves only your own view; its pin also marks the place for everyone, as a data layer.
+- **Tools** (`apps/web/src/tools/`, design in `plans/plan-006.md` on `feat/tools-registry`): a tool is a typed, read-only, async capability (`defineTool`: zod input, an `output` kind such as `geo.features`, `run`). Tools never write the board. All tools are listed in `tools/registry.ts` and run through one `ToolRunner`, which validates the input, caches results per browser by (id, parsed input) in an LRU, shares concurrent calls, and does not keep failures. Why the cache: every person's map runs its layers' tools, and services are slow or rate limited (OpenCage's free tier: 1 request/s). A tool can call another through `ctx.tool`.
+- **Map data layers** (`map/layers.ts`): a map's `layers` holds recipes (`{ id, tool, input, title }`), not data; each browser runs the tool and draws the result in the deck.gl overlay, chosen by the tool's `output` (`geo.features` as a `GeoJsonLayer`). One failing layer does not stop the others; the layer list shows errors and a result's `attribution`. A tool that works on an area gets the area at add time, from the adder's view, so everyone sees the same data although views are per person. `layers` is replaced as a whole, so two people adding a layer at the same moment keep only one.
 - **MapLibre 6.** It draws right-to-left labels (Arabic, Hebrew) itself, with no RTL plugin. It is ES modules only, and under Vite its worker must be imported as `maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url` and passed to `setWorkerUrl` (a plain `?url` import draws nothing in dev).
 - **deck.gl runs in overlay mode** (`MapboxOverlay({ interleaved: false })`): deck.gl 9.4's interleaved mode throws on every frame with MapLibre 6. Overlay costs a second WebGL context per map, and deck.gl layers draw above the map's labels. Revisit interleaved mode when deck.gl supports MapLibre 6.
 - **Event widget** (`apps/web/src/events/`): a disaster event from the Montandon STAC API. The board stores only `eventId`; each browser fetches the details (`monty.ts`, one shared client with a cache). Search text is read as country, hazard type, year and source (`search.ts`), turned into a CQL2 filter, and the leftover words rank by name. Hazard types use the UNDRR-ISC 2025 codes with their GLIDE and EM-DAT equivalents (`hazards.ts`; add a type only with its rows from the upstream table). Sources record one event under different `monty:corr_id`s, so an event's other sources are found by hazard, country and time, as upstream's correlation algorithm does.
-- **Montandon needs a bearer token, which never reaches the browser.** The browser posts STAC search bodies to `/monty/search`; the Worker adds `MONTANDON_TOKEN` and forwards them to `MONTANDON_BASE_URL` (`apps/worker/src/monty.ts`, standard `fetch` only, so it can move to another server). The base URL is a var in `wrangler.jsonc`: the staging API, as `agent-docs/features.md` scopes. Without the token, `/monty/search` answers 503. Anyone with a deployed URL can run searches through the token, as anyone can edit its boards.
+- **Montandon needs a bearer token, which never reaches the browser.** The browser posts STAC search bodies to `/monty/search`; the Worker adds `MONTANDON_TOKEN` and forwards them to `MONTANDON_BASE_URL` (`apps/worker/src/monty.ts`, standard `fetch` only, so it can move to another server). The base URL is a var in `wrangler.jsonc`: the staging API, as `agent-docs/features.md` scopes. Without the token, `/monty/search` answers 503. Anyone with a deployed URL can run searches through the token, as anyone can edit its boards. `/tools/geocode` works the same way for OpenCage (`apps/worker/src/geocode.ts`): it passes only `q, limit, countrycode, bounds, language`, adds `OPENCAGE_API_KEY`, and masks the key in any answer. OpenCage's public test key `6d0e711d72d74daeb2b0bfd2a5cdfdba` always answers with one place in Münster: use it to check the wiring without a real key.
 - **Rooms:** one board per `#room=<id>`. Opening the app without one, or pressing New board, starts a board with a random 16-character id (`board/room.ts`); the URL is the link to share. There is no access control: anyone with the link can edit, so keep real exercise data off the preview.
 
 The first prototype is on the `experiment` branch: a headless op runtime, typed data links, a disasters plugin on Montandon, and a natural-language command pipeline. It is a reference, not a base. Read it before rebuilding a part it covered, in particular:
 - `apps/web/src/nodes/MapView.tsx` and `plans/plan-005.md`: maps inside a canvas (edit and focus modes, WebGL context limits, pixel ratio at canvas zoom).
 - `packages/plugin-disasters/src/montyProvider.ts`: the Montandon queries that `apps/web/src/events/monty.ts` has not taken over yet: related events near an event, impact tables, and event footprints.
+- `feat/tools-registry` (`plans/plan-006.md`, `packages/plugin-data/`): the data tools not ported yet: WorldPop population as a COG raster, World Bank country boundaries and Overture buildings read from GeoParquet in Web Workers, with their measured sizes and timings.
 
 ## Setup and commands
 
@@ -62,9 +67,9 @@ Node 22 or later.
 
 ```sh
 npm install
-echo 'MONTANDON_TOKEN=<token>' > apps/worker/.dev.vars   # once; git-ignored. Needed for event search
+printf 'MONTANDON_TOKEN=<token>\nOPENCAGE_API_KEY=<key>\n' > apps/worker/.dev.vars   # once; git-ignored. Event search, place search
 npm run sync        # Worker + Durable Objects locally (wrangler dev), http://localhost:8787
-npm run dev         # web app with hot reload, http://localhost:5173 (proxies /connect and /monty to :8787)
+npm run dev         # web app with hot reload, http://localhost:5173 (proxies /connect, /monty and /tools to :8787)
 npm test            # vitest
 npm run typecheck
 npm run build
@@ -81,7 +86,7 @@ GitHub Actions deploy every push to Cloudflare (`.github/workflows/deploy.yml`),
 - Deleting a branch deletes its Worker and its rooms (`delete-branch-worker.yml`).
 - The deployed URL is in each run's summary.
 
-Repository secrets: `CLOUDFLARE_API_TOKEN` (a token limited to editing Workers), `CLOUDFLARE_ACCOUNT_ID`, and `MONTANDON_TOKEN`. Cloudflare keeps secrets per Worker and each branch is its own Worker, so the workflow uploads `MONTANDON_TOKEN` with every deploy (`--secrets-file`). Without it, deploys still pass and event search answers 503.
+Repository secrets: `CLOUDFLARE_API_TOKEN` (a token limited to editing Workers), `CLOUDFLARE_ACCOUNT_ID`, `MONTANDON_TOKEN` and `OPENCAGE_API_KEY`. Cloudflare keeps secrets per Worker and each branch is its own Worker, so the workflow uploads the API keys the repository has with every deploy (`--secrets-file`). A missing key does not fail the deploy; its route answers 503 (event search, place search).
 
 ## Before editing
 

@@ -1,5 +1,6 @@
 import * as Y from 'yjs'
 import type { Basemap } from '../map/basemaps'
+import type { MapLayer } from '../map/layers'
 import type { ColorName } from '../canvas/style'
 
 /**
@@ -10,7 +11,8 @@ import type { ColorName } from '../canvas/style'
  * Moving one object between two others only rewrites that object's `z`.
  *
  * Map views (center, zoom) are not here on purpose: each person pans their own maps.
- * An event holds only its Montandon id; each person's browser fetches the event's details.
+ * A map's data layers are recipes (tool and input), and an event holds only its Montandon id:
+ * each person's browser fetches the data.
  */
 
 interface Placed {
@@ -22,11 +24,15 @@ interface Placed {
   z: number
 }
 
-/** color and fontSize are optional: objects made before they existed use the defaults in canvas/style.ts. */
+/**
+ * color, fontSize and layers are optional: objects made before they existed use the defaults
+ * (canvas/style.ts; no layers).
+ */
 export type BoardObject =
   | (Placed & { type: 'box'; color?: ColorName })
   | (Placed & { type: 'text'; text: string; color?: ColorName; fontSize?: number })
-  | (Placed & { type: 'map'; basemap: Basemap })
+  /** layers is replaced as a whole: two people adding a layer at the same moment keep only one of the two. */
+  | (Placed & { type: 'map'; basemap: Basemap; layers?: MapLayer[] })
   /** eventId is absent until someone picks an event. */
   | (Placed & { type: 'event'; eventId?: string })
 
@@ -35,7 +41,14 @@ export type ObjectType = BoardObject['type']
 /** Fields for a new object: everything but id, and z is optional (default: on top). */
 export type NewObject = DistributiveOmit<BoardObject, 'id' | 'z'> & { z?: number }
 
-export type ObjectPatch = Partial<Omit<Placed, 'id'>> & { text?: string; basemap?: Basemap; color?: ColorName; fontSize?: number; eventId?: string }
+export type ObjectPatch = Partial<Omit<Placed, 'id'>> & {
+  text?: string
+  basemap?: Basemap
+  color?: ColorName
+  fontSize?: number
+  eventId?: string
+  layers?: MapLayer[]
+}
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
