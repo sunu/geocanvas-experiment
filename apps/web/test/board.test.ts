@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import * as Y from 'yjs'
 import { Board } from '../src/board/board'
+import { newRoomId, roomFromHash, roomHash } from '../src/board/room'
 
 const box = (x = 0) => ({ type: 'box' as const, x, y: 0, w: 10, h: 10 })
 const order = (b: Board) => b.list().map((o) => o.x)
@@ -99,5 +100,22 @@ describe('Board snapshot', () => {
     expect(calls).toBe(1)
     expect(b.snapshot()).not.toBe(first)
     expect(b.snapshot().map((o) => o.x)).toEqual([1, 2])
+  })
+})
+
+describe('rooms', () => {
+  it('reads the room from the URL hash', () => {
+    expect(roomFromHash('#room=abc-123')).toBe('abc-123')
+    expect(roomFromHash('#x=1&room=r_2')).toBe('r_2')
+    expect(roomFromHash('')).toBeUndefined()
+    expect(roomFromHash('#room=')).toBeUndefined()
+    expect(roomFromHash('#room=has spaces')).toBeUndefined()
+    expect(roomFromHash('#bedroom=abc')).toBeUndefined()
+  })
+
+  it('makes new room ids that the Worker accepts and that do not repeat', () => {
+    const ids = new Set(Array.from({ length: 1000 }, newRoomId))
+    expect(ids.size).toBe(1000)
+    for (const id of ids) expect(roomFromHash(roomHash(id))).toBe(id)
   })
 })

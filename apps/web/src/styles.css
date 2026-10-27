@@ -201,6 +201,37 @@ body,
   background: #ef4444;
 }
 
+/* --- Board actions (top left; outside the canvas, so clicks never reach it) --- */
+
+.ttx-boardbar {
+  position: fixed;
+  left: 16px;
+  top: 16px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.08);
+  z-index: 1000002;
+}
+
+.ttx-boardbar button {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ttx-boardbar button:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
 /* --- Map ---------------------------------------------------------------- */
 
 .ttx-map {

@@ -1,11 +1,17 @@
 import { useEffect, useRef } from 'react'
-import maplibregl from 'maplibre-gl'
+import { Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import type { Board, BoardObject } from '../board/board'
 import { BASEMAPS, basemapStyle, type Basemap } from './basemaps'
 import { loadView, saveView } from './localView'
 
 type MapBoardObject = Extract<BoardObject, { type: 'map' }>
+
+// MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
+// build the worker (?worker&url) and point MapLibre at it. MapLibre 6 also draws right-to-left
+// labels (Arabic, Hebrew) itself, so no RTL plugin is needed.
+setWorkerUrl(workerUrl)
 
 /**
  * A live MapLibre map on the canvas. Double-click to pan and zoom it (editing); Esc or a
@@ -14,12 +20,12 @@ type MapBoardObject = Extract<BoardObject, { type: 'map' }>
 export function MapObject({ board, object: o, editing }: { board: Board; object: MapBoardObject; editing: boolean }) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const glRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<maplibregl.Map>(null)
+  const mapRef = useRef<MapLibreMap>(null)
   const styleRef = useRef<Basemap>(o.basemap)
 
   useEffect(() => {
     const view = loadView(o.id)
-    const map = new maplibregl.Map({
+    const map = new MapLibreMap({
       container: glRef.current!,
       style: basemapStyle(styleRef.current),
       center: view.center,
@@ -27,8 +33,10 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
       bearing: view.bearing,
       attributionControl: { compact: true },
     })
-    // deck.gl draws data layers into the map's own WebGL context (interleaved), so a map costs one context.
-    map.addControl(new MapboxOverlay({ interleaved: true, layers: [] }) as unknown as maplibregl.IControl)
+    // deck.gl data layers go here. Overlay mode (its own canvas above the map), not interleaved:
+    // deck.gl 9.4's interleaved mode throws on every frame with MapLibre 6. The cost is a second
+    // WebGL context per map, and deck.gl layers draw above the map's labels.
+    map.addControl(new MapboxOverlay({ interleaved: false, layers: [] }) as unknown as IControl)
     map.on('moveend', () => {
       const c = map.getCenter()
       saveView(o.id, { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing() })

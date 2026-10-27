@@ -43,11 +43,12 @@ apps/
 - **Multiplayer runs on our own Cloudflare Worker.** `/connect/<room>` goes to that room's Durable Object, which speaks the standard y-websocket protocol, keeps the doc in memory and appends every update to its SQLite (compacted on load when there are many). The browser uses y-websocket's `WebsocketProvider`. Tabs of one browser also sync with each other directly (BroadcastChannel), so test multiplayer from two origins or two browsers, or the server is not involved.
 - **Input:** drag on empty canvas to select (shift adds); scroll pans; pinch or ⌘+scroll zooms; space+drag pans. Tools: V select, R box, T text, M map. `]` / `[` bring to front / send to back, with ⌘ one step. Delete removes. Double-click edits a text or lets a map take the pointer; Esc gives it back.
 - **Map widget** (`apps/web/src/map/`): a live MapLibre map in a box. The basemap is shared board state. **Map views are per person:** the camera of a map is not in the board; each person's view is kept in their browser (`localView.ts`), so nobody's map moves under them.
-- **MapLibre is pinned to v5** because deck.gl 9.4 draws into MapLibre's WebGL context (interleaved) only on v5. `npm audit` reports GHSA-jrc7-96c5-q579 (XSS in `DOM.sanitize()`, fixed only in v6). It is not reachable while maps load only our own basemap styles and show no popups with external HTML; revisit before adding either.
-- Rooms: `/#room=<name>`. There is no access control yet: anyone with the URL can open and edit any room, so keep real exercise data off the preview.
+- **MapLibre 6.** It draws right-to-left labels (Arabic, Hebrew) itself, with no RTL plugin. It is ES modules only, and under Vite its worker must be imported as `maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url` and passed to `setWorkerUrl` (a plain `?url` import draws nothing in dev).
+- **deck.gl runs in overlay mode** (`MapboxOverlay({ interleaved: false })`): deck.gl 9.4's interleaved mode throws on every frame with MapLibre 6. Overlay costs a second WebGL context per map, and deck.gl layers draw above the map's labels. Revisit interleaved mode when deck.gl supports MapLibre 6.
+- **Rooms:** one board per `#room=<id>`. Opening the app without one, or pressing New board, starts a board with a random 16-character id (`board/room.ts`); the URL is the link to share. There is no access control: anyone with the link can edit, so keep real exercise data off the preview.
 
 The first prototype is on the `experiment` branch: a headless op runtime, typed data links, a disasters plugin on Montandon, and a natural-language command pipeline. It is a reference, not a base. Read it before rebuilding a part it covered, in particular:
-- `apps/web/src/nodes/MapView.tsx` and `plans/plan-005.md`: maps inside a canvas (MapLibre pinned to v5 for deck.gl, edit and focus modes, WebGL context limits, pixel ratio at canvas zoom).
+- `apps/web/src/nodes/MapView.tsx` and `plans/plan-005.md`: maps inside a canvas (edit and focus modes, WebGL context limits, pixel ratio at canvas zoom).
 - `packages/plugin-disasters/src/montyProvider.ts`: how to query the Montandon STAC API (collections, `monty:corr_id`, GDACS episodes, EM-DAT units).
 
 ## Setup and commands
@@ -57,7 +58,7 @@ Node 22 or later.
 ```sh
 npm install
 npm run sync        # Worker + Durable Objects locally (wrangler dev), http://localhost:8787
-npm run dev         # web app with hot reload, http://localhost:5173/#room=demo (proxies /connect to :8787)
+npm run dev         # web app with hot reload, http://localhost:5173 (proxies /connect to :8787)
 npm test            # vitest
 npm run typecheck
 npm run build
