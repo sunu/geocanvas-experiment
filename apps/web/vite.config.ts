@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    // tldraw sync server (npm run sync).
-    proxy: { '/connect': { target: 'ws://localhost:5858', ws: true } },
+    // tldraw sync Worker (npm run sync).
+    proxy: { '/connect': { target: 'ws://localhost:8787', ws: true } },
   },
 })

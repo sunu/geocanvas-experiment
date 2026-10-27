@@ -8,10 +8,11 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
-    "sync": "npm run start -w apps/sync-server",
+    "sync": "npm run dev -w apps/worker",
     "build": "npm run build -w apps/web",
+    "deploy": "npm run build -w apps/web && npm run deploy -w apps/worker",
     "test": "vitest run",
-    "typecheck": "tsc -p packages/shapes && tsc -p apps/web && tsc -p apps/sync-server"
+    "typecheck": "npm run types -w apps/worker && tsc -p packages/shapes && tsc -p apps/web && tsc -p apps/worker"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

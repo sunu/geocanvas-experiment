@@ -76,6 +76,7 @@ export function App() {
       overrides={overrides}
       components={components}
       assetUrls={assetUrls}
+      licenseKey={import.meta.env.VITE_TLDRAW_LICENSE_KEY}
       onMount={(editor) => {
         if (import.meta.env.DEV) Object.assign(window, { editor })
       }}
