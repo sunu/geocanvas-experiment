@@ -6,14 +6,16 @@ import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { geocode } from './geocode'
 import { montySearch } from './monty'
+import { notebooksProxy } from './notebooks'
 import { UpdateLog } from './updateLog'
 
 /**
  * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
  * /connect/<room> to that room's Durable Object, which speaks the standard y-websocket
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
- * /monty/search proxies Montandon STAC searches with the token added (monty.ts), and
- * /tools/geocode proxies OpenCage with the key added (geocode.ts).
+ * /monty/search proxies Montandon STAC searches with the token added (monty.ts),
+ * /tools/geocode proxies OpenCage with the key added (geocode.ts), and /notebooks/* reads
+ * Notebook Factory, which sends no CORS headers (notebooks.ts).
  */
 
 const MESSAGE_SYNC = 0
@@ -147,6 +149,7 @@ export default {
     const path = new URL(request.url).pathname
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
     if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
+    if (path.startsWith('/notebooks/')) return notebooksProxy(request, env.NOTEBOOK_FACTORY_URL)
     const roomId = /^\/connect\/([\w-]{1,64})$/.exec(path)?.[1]
     if (!roomId) return new Response('Not found', { status: 404 })
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a websocket', { status: 426 })

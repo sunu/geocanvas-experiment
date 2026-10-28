@@ -8,7 +8,7 @@ const rect = { x: 1, y: 2, w: 30, h: 40 }
 
 describe('object type registry', () => {
   it('lists every type once, in toolbar order', () => {
-    expect(objectTypes.map((d) => d.type)).toEqual(['box', 'text', 'sticky', 'map', 'event'])
+    expect(objectTypes.map((d) => d.type)).toEqual(['box', 'text', 'sticky', 'map', 'event', 'notebook'])
   })
 
   it('gives each type its own one-letter tool key, apart from the select tool (v)', () => {
@@ -25,7 +25,7 @@ describe('object type registry', () => {
     }
   })
 
-  it('puts new texts, sticky notes and events on top, and new boxes and maps at the bottom', () => {
+  it('puts new texts, sticky notes, events and notebooks on top, and new boxes and maps at the bottom', () => {
     const board = new Board(new Y.Doc())
     const add = (type: BoardObject['type'], x: number) => {
       const def = objectType(type)!
@@ -36,7 +36,18 @@ describe('object type registry', () => {
     add('map', 2)
     add('event', 3)
     add('sticky', 4)
-    expect(board.list().map((o) => o.x)).toEqual([2, 1, 0, 3, 4])
+    add('notebook', 5)
+    expect(board.list().map((o) => o.x)).toEqual([2, 1, 0, 3, 4, 5])
+  })
+
+  it('makes a notebook: no run yet, opening its run picker, with its view shared once set', () => {
+    const notebook = objectType('notebook')!
+    expect(notebook.create(rect)).toEqual({ type: 'notebook', ...rect })
+    expect(notebook).toMatchObject({ key: 'n', editable: true, editOnCreate: true, layer: 'top' })
+    const board = new Board(new Y.Doc())
+    const id = board.add(notebook.create(rect), notebook.layer)
+    board.update({ [id]: { runId: 'run-1', view: 'notebook' } })
+    expect(board.get(id)).toMatchObject({ runId: 'run-1', view: 'notebook' })
   })
 
   it('knows which types the side panel can color and size, with a default color from the palette', () => {
