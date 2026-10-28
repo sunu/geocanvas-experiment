@@ -5,7 +5,10 @@ import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { geocode } from './geocode'
+import { hapiProxy } from './hapi'
 import { montySearch, stacSearch } from './monty'
+import { notebooksProxy } from './notebooks'
+import { reliefwebUpdates } from './reliefweb'
 import { Agent, AGENT, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
@@ -14,8 +17,10 @@ import { UpdateLog } from './updateLog'
  * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
  * /connect/<room> to that room's Durable Object, which speaks the standard y-websocket
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
- * /monty/search proxies Montandon STAC searches with the token added (monty.ts), and
- * /tools/geocode proxies OpenCage with the key added (geocode.ts).
+ * /monty/search proxies Montandon STAC searches with the token added (monty.ts),
+ * /tools/geocode proxies OpenCage with the key added (geocode.ts), and /notebooks/* and
+ * /reliefweb/updates read Notebook Factory and ReliefWeb, which send no CORS headers (notebooks.ts, reliefweb.ts),
+ * and /hapi/* reads HDX HAPI with the app identifier added (hapi.ts).
  * Each room also runs the board's agent (Agent in @ttx/plugins), which answers the chat messages
  * that no browser tab answers on its own key.
  */
@@ -179,6 +184,9 @@ export default {
     const path = new URL(request.url).pathname
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
     if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
+    if (path.startsWith('/notebooks/')) return notebooksProxy(request, env.NOTEBOOK_FACTORY_URL)
+    if (path === '/reliefweb/updates') return reliefwebUpdates(request)
+    if (path.startsWith('/hapi/')) return hapiProxy(request, env.HAPI_APP_IDENTIFIER)
     const roomId = /^\/connect\/([\w-]{1,64})$/.exec(path)?.[1]
     if (!roomId) return new Response('Not found', { status: 404 })
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a websocket', { status: 426 })

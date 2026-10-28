@@ -19,6 +19,26 @@ export interface LayerState {
   error?: string
 }
 
+/** The bbox [west, south, east, north] of a feature collection's coordinates, or undefined when it has none. */
+export function boundsOf(fc: GeoJSON.FeatureCollection): Bbox | undefined {
+  let w = Infinity
+  let s = Infinity
+  let e = -Infinity
+  let n = -Infinity
+  const walk = (c: unknown): void => {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === 'number') {
+      const [x, y] = c as number[]
+      if (x! < w) w = x!
+      if (x! > e) e = x!
+      if (y! < s) s = y!
+      if (y! > n) n = y!
+    } else for (const part of c) walk(part)
+  }
+  for (const f of fc.features) if (f.geometry && 'coordinates' in f.geometry) walk(f.geometry.coordinates)
+  return w <= e ? [w, s, e, n] : undefined
+}
+
 /** A map view's bounds ([[west, south], [east, north]]) as a layer's area. */
 export function viewArea([[west, south], [east, north]]: [[number, number], [number, number]]): Bbox {
   return bboxOf({ west, south, east, north })

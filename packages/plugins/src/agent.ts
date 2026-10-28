@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { Chat, defineOp, definePlugin, type TurnUndo } from '@ttx/core'
 
 /**
- * Ops for the board's agent. The agent itself runs in the room Durable Object (apps/worker/src/agent/).
+ * Ops for the board's agent. The agent itself (src/agent/) runs in the room Durable Object, or in a browser on a person's own key.
  *
  * A person cannot undo the agent's writes with ⌘Z (each runtime undoes only its own), and the agent's
  * undo stack is lost when its room leaves memory. So each agent reply stores what undoing it needs.

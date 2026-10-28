@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MontyClient, type StacSearch } from '../src/monty/client'
+import { MontyClient, type FootprintFeature, type StacSearch } from '../src/monty/client'
 import { stacItem, type FakeItem } from './stacFixture'
 
 /** Records every request and answers event searches with `events`. Other collections answer empty. */
@@ -71,6 +71,16 @@ const impact = (collection: string, corrId: string, type: string, value: number)
   collection,
   properties: { 'monty:corr_id': corrId, 'monty:impact_detail': { type, value } },
 })
+/** Hazard items with footprints: GDACS's flood extent, and an EM-DAT item without a geometry. */
+const hazard = (collection: string, corrId: string, geometry: FootprintFeature['geometry'] | null) => ({
+  id: `${collection}-${corrId}`,
+  collection,
+  geometry,
+  properties: { 'monty:corr_id': corrId, title: 'Flood in Nepal' },
+})
+const EXTENT = { type: 'MultiPolygon', coordinates: [[[[85.6, 28.2], [85.7, 28.4], [85.4, 28.6], [85.6, 28.2]]]] }
+const HAZARDS = [hazard('gdacs-hazards', 'A', EXTENT), hazard('emdat-hazards', 'B', null)]
+
 const IMPACTS = [
   impact('gdacs-impacts', 'A', 'death', 10),
   impact('emdat-impacts', 'B', 'death', 25),
@@ -91,12 +101,16 @@ function multiSourceApi(opts: { correlationFails?: boolean; lookupFails?: number
     requests.push(body)
     if (body.ids) {
       if (lookupFailures-- > 0) throw new Error('Monty search failed (502)')
-      return { features: [GDACS] }
+      return { features: [GDACS, EMDAT, USGS].filter((f) => (body.ids as string[]).includes(f.id)) }
     }
     const collections = body.collections as string[]
     if (body.datetime && collections.every((c) => c.endsWith('-events'))) {
       if (opts.correlationFails) throw new Error('Monty search failed (500)')
       return { features: [GDACS, EMDAT, USGS] }
+    }
+    if (collections.some((c) => c.endsWith('-hazards'))) {
+      const wanted = corrIdsOf(body.filter)
+      return { features: HAZARDS.filter((h) => wanted.includes(h.properties['monty:corr_id'])) }
     }
     if (collections.some((c) => c.endsWith('-impacts'))) {
       const wanted = corrIdsOf(body.filter)
@@ -200,5 +214,38 @@ describe('Monty client: getEvent requests', () => {
     const { client } = multiSourceApi({ lookupFails: 1 })
     await expect(client.getEvent('gdacs-event-1')).rejects.toThrow(/502/)
     expect((await client.getEvent('gdacs-event-1')).id).toBe('gdacs-event-1')
+  })
+})
+
+describe('Monty client: where an event happened', () => {
+  it("has every source's hazard footprints above the event points, and skips items without a geometry", async () => {
+    const fc = await multiSourceApi().client.getFootprint('gdacs-event-1')
+    expect(fc.features.map((f) => [f.properties.kind, f.properties.source, f.geometry.type])).toEqual([
+      ['hazard', 'gdacs', 'MultiPolygon'],
+      ['event', 'gdacs', 'Point'],
+      ['event', 'emdat', 'Point'],
+      ['event', 'usgs', 'Point'],
+    ])
+    expect(fc.features[0]!.geometry).toEqual(EXTENT)
+  })
+
+  it("reads each source's event items from its own collection, and their hazards by correlation id", async () => {
+    const { requests, client } = multiSourceApi()
+    await client.getFootprint('gdacs-event-1')
+    const items = requests.filter((r) => r.ids).at(-1)!
+    expect(items.ids).toEqual(['gdacs-event-1', 'emdat-event-2', 'usgs-event-3'])
+    expect(items.collections).toEqual(['gdacs-events', 'emdat-events', 'usgs-events'])
+    const hazards = requests.find((r) => (r.collections as string[]).includes('gfd-hazards') && r.limit === 100)!
+    expect(corrIdsOf(hazards.filter).sort()).toEqual(['A', 'B', 'C'])
+  })
+
+  it('asks once per event, and again after a failure', async () => {
+    const { requests, client } = multiSourceApi()
+    const [a, b] = await Promise.all([client.getFootprint('gdacs-event-1'), client.getFootprint('gdacs-event-1')])
+    expect(a).toBe(b)
+    expect(requests.filter((r) => r.limit === 100)).toHaveLength(1)
+    const failing = multiSourceApi({ lookupFails: 1 }).client
+    await expect(failing.getFootprint('gdacs-event-1')).rejects.toThrow(/502/)
+    expect((await failing.getFootprint('gdacs-event-1')).features.length).toBeGreaterThan(0)
   })
 })
