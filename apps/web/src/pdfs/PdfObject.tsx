@@ -76,15 +76,22 @@ export function useDoc(fileId: string | undefined): { value?: PDFDocumentProxy; 
   return fileId && state?.fileId === fileId ? state : {}
 }
 
-/** One page, as wide as its box, drawn again when the box's width changes. */
+/** One page, as wide as its box, drawn again when the box's width changes. A page that cannot be drawn says why. */
 function Page({ doc, page }: { doc: PDFDocumentProxy; page: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const width = useWidth(canvasRef)
+  const [error, setError] = useState<string>()
   useEffect(() => {
     if (!width) return
-    return renderPage(doc, page, canvasRef.current!, width)
+    setError(undefined)
+    return renderPage(doc, page, canvasRef.current!, width, (err) => setError(String((err as Error)?.message ?? err)))
   }, [doc, page, width])
-  return <canvas ref={canvasRef} className="ttx-pdf__page" aria-label={`Page ${page}`} />
+  return (
+    <>
+      <canvas ref={canvasRef} className="ttx-pdf__page" aria-label={`Page ${page}`} hidden={!!error} />
+      {error && <div className="ttx-pdf__empty">Could not draw page {page}: {error}</div>}
+    </>
+  )
 }
 
 /**
