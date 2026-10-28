@@ -1,0 +1,72 @@
+import { z } from 'zod'
+import { defineTool } from '../tools/tool'
+import { areaSchema } from './area'
+import type { Bbox } from './geocode'
+import { LAYERCAKE_ATTRIBUTION, MAX_ROW_GROUPS } from './layercake'
+import type { LayercakeRequest, LayercakeResponse } from './layercake.worker'
+
+/** Health facilities in an area, as points. */
+export interface HealthSource {
+  query(area: Bbox, opts?: { signal?: AbortSignal }): Promise<GeoJSON.FeatureCollection<GeoJSON.Point>>
+}
+
+/**
+ * Health facilities read in the browser from Layercake's GeoParquet. The reader (hyparquet) runs in a
+ * worker started on the first query, so it adds nothing to the main bundle and the footer is read once per page.
+ */
+export class LayercakeHealth implements HealthSource {
+  private worker?: Worker
+  private nextId = 0
+  private pending = new Map<number, (res: LayercakeResponse) => void>()
+
+  private start(): Worker {
+    const w = new Worker(new URL('./layercake.worker.ts', import.meta.url), { type: 'module' })
+    w.onmessage = ({ data }: MessageEvent<LayercakeResponse>) => {
+      this.pending.get(data.id)?.(data)
+      this.pending.delete(data.id)
+    }
+    return w
+  }
+
+  async query(area: Bbox, opts: { signal?: AbortSignal } = {}) {
+    opts.signal?.throwIfAborted()
+    const worker = (this.worker ??= this.start())
+    const id = this.nextId++
+    const post = (msg: LayercakeRequest) => worker.postMessage(msg)
+    // An abort stops the worker's downloads for this query.
+    const onAbort = () => post({ kind: 'abort', id })
+    opts.signal?.addEventListener('abort', onAbort, { once: true })
+    try {
+      const res = await new Promise<LayercakeResponse>((resolve) => {
+        this.pending.set(id, resolve)
+        post({ kind: 'query', id, bbox: area })
+      })
+      opts.signal?.throwIfAborted()
+      if (!res.ok) throw new Error(res.error)
+      return res.value
+    } finally {
+      opts.signal?.removeEventListener('abort', onAbort)
+    }
+  }
+}
+
+/** The health facilities tool, on top of a source (Layercake through a worker in the app, a fake in tests). */
+export function healthFacilitiesTool(source: HealthSource) {
+  return defineTool({
+    id: 'data.healthFacilities',
+    title: 'Health facilities',
+    description:
+      'OpenStreetMap health facilities in an area, as points: everything tagged healthcare=*, and the older ' +
+      'amenity=hospital, clinic, doctors, dentist or pharmacy. Polygons (e.g. a hospital campus) are shown at the ' +
+      'center of their bbox. Properties: osm (e.g. "way/123"), name, kind (healthcare tag, else amenity), amenity, ' +
+      'healthcare, operator, emergency. Coverage is what OpenStreetMap mappers have recorded, which varies a lot by place. ' +
+      `Works for an area up to about a country: larger areas fail before any download (at most ${MAX_ROW_GROUPS} parts ` +
+      'of the planet file, ~2.3 MB each).',
+    input: z.object({ area: areaSchema }),
+    output: 'geo.features',
+    async run({ area }, ctx) {
+      const fc = await source.query(area, { signal: ctx.signal })
+      return { ...fc, attribution: LAYERCAKE_ATTRIBUTION }
+    },
+  })
+}
