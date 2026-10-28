@@ -1701,3 +1701,87 @@ body,
 .ttx-country__sub {
   color: var(--ttx-muted);
 }
+
+.ttx-country__select {
+  align-self: flex-start;
+  max-width: 100%;
+  font: inherit;
+}
+
+/* A horizontal bar: name, value, and the bar's length relative to the largest. */
+.ttx-country__bar {
+  display: grid;
+  grid-template-columns: minmax(0, 9em) 2.5em 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.ttx-country__barname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttx-country__barvalue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ttx-country__bartrack span,
+.ttx-country__monthbar span {
+  display: block;
+  background: var(--ttx-accent);
+  border-radius: 2px;
+}
+
+.ttx-country__bartrack span {
+  height: 8px;
+}
+
+.ttx-country__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ttx-country__chips > span {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.06);
+}
+
+/* Month bars: twelve columns, bars grow up from the base line. */
+.ttx-country__months {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+}
+
+.ttx-country__month {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.ttx-country__monthbar {
+  display: flex;
+  align-items: flex-end;
+  height: 40px;
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-country__monthbar span {
+  width: 100%;
+  min-height: 1px;
+}
+
+.ttx-country__month.is-partial .ttx-country__monthbar span {
+  opacity: 0.4;
+}
+
+.ttx-country__monthname {
+  color: var(--ttx-muted);
+  font-size: 10px;
+  text-align: center;
+}
