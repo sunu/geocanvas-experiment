@@ -26,6 +26,12 @@ export function glidesOf(event: Pick<DisasterEvent, 'id' | 'sources'>): string[]
   return [...new Set(ids.flatMap((id) => (id.startsWith('glide-event-') ? [id.slice('glide-event-'.length).toUpperCase()] : [])))].filter((g) => GLIDE.test(g))
 }
 
+/** A feed on the board for the same disaster: the same GLIDE numbers, in any order. */
+export function feedFor(objects: readonly AnyObject[], glides: string[]): ReliefWebBoardObject | undefined {
+  const key = [...glides].sort().join(',')
+  return objects.find((o): o is ReliefWebBoardObject => o.type === 'reliefweb' && [...((o as ReliefWebBoardObject).glides ?? [])].sort().join(',') === key)
+}
+
 export const reliefwebPlugin = definePlugin({
   id: 'reliefweb',
   title: 'ReliefWeb',

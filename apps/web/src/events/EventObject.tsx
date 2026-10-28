@@ -6,7 +6,7 @@ import { createLiveSearch, type LiveState } from './liveSearch'
 import { monty } from './monty'
 import { overviewOf } from '@ttx/plugins/monty/search'
 import { sourceLabel } from '@ttx/plugins/monty/sources'
-import { glidesOf, type EventBoardObject } from '@ttx/plugins'
+import { feedFor, glidesOf, type EventBoardObject } from '@ttx/plugins'
 import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from '@ttx/plugins/monty/types'
 
 /** Phosphor has no earthquake symbol; a seismograph pulse stands in (see AGENTS.md on hazard icons). */
@@ -37,12 +37,32 @@ export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewP
     runtime.beginGesture()
     runtime.dispatch('event.setEvent', { kind: 'objects', ids: [o.id] }, { eventId })
     onDone()
+    addFeedOnPick(eventId)
   }
 
   /** A ReliefWeb feed to the right of the event, for its GLIDE numbers, for everyone. */
   const addFeed = (event: DisasterEvent) => {
+    const at = (runtime.board.get(o.id) as EventBoardObject | undefined) ?? o
     runtime.beginGesture()
-    runtime.dispatch('reliefweb.add', { kind: 'canvas' }, { x: o.x + o.w + GAP, y: o.y, glides: glidesOf(event), title: event.name })
+    runtime.dispatch('reliefweb.add', { kind: 'canvas' }, { x: at.x + at.w + GAP, y: at.y, glides: glidesOf(event), title: event.name })
+  }
+
+  /**
+   * When someone picks an event that ReliefWeb knows (it has GLIDE numbers), add its feed beside it. Only the
+   * browser that picked does this: every browser loads the event, and each adding a feed would add one per
+   * person. Not when the card shows another event by then, or when the board already has a feed for it.
+   * The feed is its own undo step, after the pick: it comes once the event's details have loaded.
+   */
+  const addFeedOnPick = (eventId: string) => {
+    monty.getEvent(eventId).then(
+      (event) => {
+        const glides = glidesOf(event)
+        const current = runtime.board.get(o.id) as EventBoardObject | undefined
+        if (!glides.length || current?.eventId !== eventId || feedFor(runtime.board.list(), glides)) return
+        addFeed(event)
+      },
+      () => {}, // the card shows the error
+    )
   }
 
   return (

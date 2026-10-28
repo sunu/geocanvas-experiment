@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { exportTools, Runtime, type Actor } from '@ttx/core'
-import { glidesOf, plugins, type ReliefWebBoardObject } from '../src/index'
+import { feedFor, glidesOf, plugins, type ReliefWebBoardObject } from '../src/index'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
 const canvas = { kind: 'canvas' } as const
@@ -29,6 +29,18 @@ describe('GLIDE numbers of an event', () => {
     expect(glidesOf({ id: 'emdat-event-2026-0326-NPL', sources: [{ source: 'emdat', eventIds: ['emdat-event-2026-0326-NPL'] }] })).toEqual([])
     expect(glidesOf({ id: 'x', sources: [{ source: 'glide', eventIds: ['glide-event-not-a-glide'] }] })).toEqual([])
     expect(glidesOf({ id: 'x' })).toEqual([])
+  })
+})
+
+describe('a feed for a disaster', () => {
+  it('finds a feed with the same GLIDE numbers, in any order, so a picked event does not get a second one', () => {
+    const rt = new Runtime({ doc: new Y.Doc(), plugins, actor: ada })
+    rt.dispatch('event.add', canvas, {})
+    const id = rt.dispatch('reliefweb.add', canvas, { glides: ['FF-2026-000162-NPL', 'FL-2026-000167-NPL'] }).created![0]!
+    const objects = rt.board.list()
+    expect(feedFor(objects, ['FL-2026-000167-NPL', 'FF-2026-000162-NPL'])?.id).toBe(id)
+    expect(feedFor(objects, ['FF-2026-000162-NPL'])).toBeUndefined()
+    expect(feedFor(objects, ['TC-2026-000001-MOZ'])).toBeUndefined()
   })
 })
 
