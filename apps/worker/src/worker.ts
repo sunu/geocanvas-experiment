@@ -4,14 +4,12 @@ import * as syncProtocol from 'y-protocols/sync'
 import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
-import { Agent, AGENT } from './agent/agent'
-import { openRouter } from './agent/openrouter'
 import { geocode } from './geocode'
 import { hapiProxy } from './hapi'
 import { montySearch, stacSearch } from './monty'
 import { notebooksProxy } from './notebooks'
 import { reliefwebUpdates } from './reliefweb'
-import { eventsSearch, geocodeTools, OpenCageGeocoder, OPENCAGE_URL } from '@ttx/plugins'
+import { Agent, AGENT, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
 
@@ -23,7 +21,8 @@ import { UpdateLog } from './updateLog'
  * /tools/geocode proxies OpenCage with the key added (geocode.ts), and /notebooks/* and
  * /reliefweb/updates read Notebook Factory and ReliefWeb, which send no CORS headers (notebooks.ts, reliefweb.ts),
  * and /hapi/* reads HDX HAPI with the app identifier added (hapi.ts).
- * Each room also runs the board's agent (agent/agent.ts), which answers the board's chat.
+ * Each room also runs the board's agent (Agent in @ttx/plugins), which answers the chat messages
+ * that no browser tab answers on its own key.
  */
 
 const MESSAGE_SYNC = 0
@@ -85,6 +84,8 @@ export class Room extends DurableObject<Env> {
     new Agent({
       doc: this.doc,
       complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
+      accepts: forRoom,
+      turnsPerHour: TURNS_PER_HOUR,
       tools: [
         ...(env.OPENCAGE_API_KEY ? geocodeTools(new OpenCageGeocoder({ url: OPENCAGE_URL, key: env.OPENCAGE_API_KEY })) : []),
         ...(env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : []),
