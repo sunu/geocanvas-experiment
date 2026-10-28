@@ -27,6 +27,13 @@ export async function hapiAll(endpoint: string, params: Record<string, string | 
   }
 }
 
+/**
+ * HAPI gives a province or district it could not match to a P-code a code like "MZ01-XXX", and its province can be
+ * wrong: in October 2026, Mozambique's Quissanga (Cabo Delgado) was under Niassa, and Nampula's districts under Sofala.
+ * Such rows count in a country's totals, but not in an area.
+ */
+export const unmatched = (r: Row) => /XXX/.test(`${r.admin1_code ?? ''} ${r.admin2_code ?? ''}`)
+
 export interface Country {
   code: string
   name: string

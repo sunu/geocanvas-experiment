@@ -5,12 +5,31 @@ import { MapboxOverlay } from '@deck.gl/mapbox'
 import { CrosshairSimpleIcon, StackPlusIcon, XIcon } from '@phosphor-icons/react'
 import type { ObjectViewProps } from '../canvas/registry'
 import { Views, type Runtime } from '@ttx/core'
-import { BASEMAPS, DATA_LAYERS, hasArea, MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type DataLayerKey, type MapBoardObject, type MapLayer } from '@ttx/plugins'
+import {
+  ADMIN_LEVEL_NAME,
+  ADMIN_LEVELS,
+  BASEMAPS,
+  DATA_LAYERS,
+  hasArea,
+  INDICATORS,
+  MAP_HEADER_PX,
+  viewOfArea,
+  type AdminLevel,
+  type Basemap,
+  type Bbox,
+  type DataLayerKey,
+  type Indicator,
+  type MapBoardObject,
+  type MapLayer,
+  type PlaceFeatures,
+} from '@ttx/plugins'
 import type { Place } from '@ttx/plugins'
+import { countryName } from '@ttx/plugins/monty/countries'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/api'
 import { tools } from '../tools/registry'
+import { ADMIN_AREAS, classify, codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
 import { basemapStyle } from './basemaps'
 import { attributionOf, boundsOf, deckLayers, truncationOf, useLayerStates, viewArea, type LayerState } from './layers'
 import { PlaceSearch } from './PlaceSearch'
@@ -43,6 +62,17 @@ export function fitMapTo(runtime: Runtime, mapId: string, [west, south, east, no
   new Views(runtime.board.doc).set(runtime.actor.id, mapId, { center, zoom: Math.min(zoom, FIT_MAX_ZOOM), bearing: 0 })
 }
 
+/** Fit a map to a country, found by name with the geocoder. Without a geocoder (no key), the view stays. */
+function fitMapToCountry(runtime: Runtime, mapId: string, iso3: string) {
+  tools.run<PlaceFeatures>('data.geocode', { query: countryName(iso3) ?? iso3, limit: 1 }).then(
+    (fc) => {
+      const bbox = fc.features[0]?.properties.bbox
+      if (bbox) fitMapTo(runtime, mapId, bbox)
+    },
+    () => {},
+  )
+}
+
 /** Fit a map to a layer's data once it has loaded (from the tool cache when the map already ran it). */
 export function fitMapToLayer(runtime: Runtime, mapId: string, layer: MapLayer) {
   tools.run<GeoJSON.FeatureCollection>(layer.tool, layer.input).then(
@@ -68,6 +98,12 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
   const styleRef = useRef<Basemap>(o.basemap)
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
+  /** The latest states, for map events. */
+  const statesRef = useRef(states)
+  /** MapLibre layers can be added: the style has loaded, and no basemap change is under way. */
+  const styleReadyRef = useRef(false)
+  /** The value under the pointer on a choropleth, while editing. */
+  const [hover, setHover] = useState<{ text: string; x: number; y: number }>()
 
   useEffect(() => {
     const views = new Views(runtime.board.doc)
@@ -88,6 +124,21 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
     // WebGL context per map, and deck.gl layers draw above the map's labels.
     const overlay = new MapboxOverlay({ interleaved: false, layers: [] })
     map.addControl(overlay as unknown as IControl)
+    // COD-AB boundaries and choropleths are MapLibre layers (adminAreas.ts): a basemap change drops them.
+    map.on('style.load', () => {
+      styleReadyRef.current = true
+      syncAdminLayers(map, statesRef.current)
+    })
+    map.on('mousemove', (e) => {
+      const ids = fillLayerIds(map)
+      const f = ids.length ? map.queryRenderedFeatures(e.point, { layers: ids })[0] : undefined
+      const a = f && (statesRef.current.find((s) => s.id === dataLayerOf(f.layer.id))?.value as AdminAreas | undefined)
+      if (!f || !a?.values) return setHover(undefined)
+      const t = codab(a.level)
+      const v = a.values[f.properties[t.pcode]]
+      setHover({ text: `${f.properties[t.name]}: ${v === undefined ? 'no data' : `${v.toLocaleString('en-US')} ${a.unit ?? ''}`}`, x: e.point.x, y: e.point.y })
+    })
+    map.on('mouseout', () => setHover(undefined))
 
     /** `at` of my view as this map last wrote or showed it: a change with another `at` came from elsewhere. */
     let shownAt = views.get(me, o.id)?.at
@@ -124,18 +175,23 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
       map.remove()
       mapRef.current = null
       overlayRef.current = null
+      styleReadyRef.current = false
     }
   }, [runtime, o.id])
 
   // Layers whose result arrived or changed. deck.gl diffs by layer id and data, so unchanged layers are cheap.
   useEffect(() => {
     overlayRef.current?.setProps({ layers: deckLayers(states) })
+    statesRef.current = states
+    if (mapRef.current && styleReadyRef.current) syncAdminLayers(mapRef.current, states)
   })
 
   useEffect(() => {
     if (styleRef.current === o.basemap) return
     styleRef.current = o.basemap
-    mapRef.current?.setStyle(basemapStyle(o.basemap))
+    // A full reload, so 'style.load' fires and the COD-AB layers are added again.
+    styleReadyRef.current = false
+    mapRef.current?.setStyle(basemapStyle(o.basemap), { diff: false })
   }, [o.basemap])
 
   useEffect(() => {
@@ -193,6 +249,12 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
     if (added) fitMapToLayer(runtime, o.id, added)
   }
 
+  /** A HAPI figure by province or district, for everyone; this person's view fits the country. */
+  const addChoropleth = (country: string, indicator: Indicator, level: AdminLevel, sector?: string) => {
+    layerOp('map.addChoropleth', { country, indicator, level, ...(sector && { sector }) })
+    fitMapToCountry(runtime, o.id, country)
+  }
+
   const useMyView = (layerId: string) => {
     const area = myArea()
     if (area) layerOp('map.setLayerArea', { layerId, area })
@@ -203,7 +265,13 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
       <div className="ttx-map__header">
         <span className="ttx-map__title">Map</span>
         <PlaceSearch onGo={goTo} onPin={pin} />
-        <AddLayerMenu board={runtime.board as Board} onAdd={addDataLayer} onAddNotebookResult={addNotebookResult} />
+        <AddLayerMenu
+          board={runtime.board as Board}
+          onAdd={addDataLayer}
+          onAddBoundaries={(level) => layerOp('map.addBoundaries', { level })}
+          onAddChoropleth={addChoropleth}
+          onAddNotebookResult={addNotebookResult}
+        />
         <select
           aria-label="Basemap"
           value={o.basemap}
@@ -223,6 +291,11 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {!editing && <div className="ttx-map__hint">Double-click to pan and zoom</div>}
+        {editing && hover && (
+          <div className="ttx-map__hover" style={{ left: hover.x + 12, top: hover.y + 12 }}>
+            {hover.text}
+          </div>
+        )}
         <LayerList layers={layers} states={states} onUseMyView={useMyView} onRemove={(layerId) => layerOp('map.removeLayer', { layerId })} />
       </div>
     </div>
@@ -244,11 +317,16 @@ function legacyView(mapId: string): { center: [number, number]; zoom: number; be
 interface AddLayerMenuProps {
   board: Board
   onAdd(layer: DataLayerKey): void
+  onAddBoundaries(level: AdminLevel): void
+  onAddChoropleth(country: string, indicator: Indicator, level: AdminLevel, sector?: string): void
   onAddNotebookResult(runId: string, name: string, title: string): void
 }
 
-/** "Add layer": data for the area this person is looking at, and the GeoJSON results of notebooks on the board. */
-function AddLayerMenu({ board, onAdd, onAddNotebookResult }: AddLayerMenuProps) {
+/**
+ * "Add layer": data for the area this person is looking at, admin boundaries, the HDX HAPI figures of the country
+ * widgets on the board by area, and the GeoJSON results of notebooks on the board.
+ */
+function AddLayerMenu({ board, onAdd, onAddBoundaries, onAddChoropleth, onAddNotebookResult }: AddLayerMenuProps) {
   const [open, setOpen] = useState(false)
   return (
     <div className="ttx-addlayer" onPointerDown={(e) => e.stopPropagation()}>
@@ -271,6 +349,27 @@ function AddLayerMenu({ board, onAdd, onAddNotebookResult }: AddLayerMenuProps) 
               {DATA_LAYERS[k].label}
             </button>
           ))}
+          <div className="ttx-addlayer__label">Boundaries</div>
+          {ADMIN_LEVELS.map((level) => (
+            <button
+              key={level}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onAddBoundaries(level)
+                setOpen(false)
+              }}
+            >
+              {ADMIN_LEVEL_NAME[level].many} (COD-AB)
+            </button>
+          ))}
+          <CountryData
+            board={board}
+            onPick={(...args) => {
+              onAddChoropleth(...args)
+              setOpen(false)
+            }}
+          />
           <NotebookResults
             board={board}
             onPick={(runId, name, title) => {
@@ -281,6 +380,36 @@ function AddLayerMenu({ board, onAdd, onAddNotebookResult }: AddLayerMenuProps) 
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * The HDX HAPI figures of the who's where and conflict widgets on this board, as choropleths by province or district.
+ * Who's where gives its sector filter to the layer.
+ */
+function CountryData({ board, onPick }: { board: Board; onPick(country: string, indicator: Indicator, level: AdminLevel, sector?: string): void }) {
+  const objects = useObjects(board)
+  const items = new Map<string, { country: string; indicator: Indicator; sector?: string }>()
+  for (const o of objects) {
+    if (o.type === 'presence' && o.country) items.set(`${o.country}:organizations:${o.sector}`, { country: o.country, indicator: 'organizations', sector: o.sector || undefined })
+    if (o.type === 'conflict' && o.country) items.set(`${o.country}:conflictEvents`, { country: o.country, indicator: 'conflictEvents' })
+  }
+  return (
+    <>
+      <div className="ttx-addlayer__label">Country data on this board</div>
+      {!items.size ? (
+        <div className="ttx-addlayer__note">Add a who's where or conflict widget to color a country's areas by its data</div>
+      ) : (
+        [...items].flatMap(([key, { country, indicator, sector }]) =>
+          ADMIN_LEVELS.map((level) => (
+            <button key={`${key}:${level}`} type="button" role="menuitem" onClick={() => onPick(country, indicator, level, sector)}>
+              {INDICATORS[indicator].name}
+              {sector ? ` (${sector})` : ''} by {ADMIN_LEVEL_NAME[level].one} <span className="ttx-addlayer__sub">· {countryName(country) ?? country}</span>
+            </button>
+          )),
+        )
+      )}
+    </>
   )
 }
 
@@ -349,6 +478,7 @@ function LayerList({ layers, states, onUseMyView, onRemove }: LayerListProps) {
           <div key={s.id} className={`ttx-layers__item ${s.error ? 'is-error' : ''}`}>
             <div className="ttx-layers__text">
               <div className="ttx-layers__title">{s.title}</div>
+              {s.output === ADMIN_AREAS && s.value !== undefined && <AdminLegend areas={s.value as AdminAreas} />}
               {note && <div className="ttx-layers__note">{note}</div>}
             </div>
             {layers[i] && hasArea(layers[i]) && (
@@ -362,6 +492,28 @@ function LayerList({ layers, states, onUseMyView, onRemove }: LayerListProps) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** A choropleth's classes, and the areas left out because HAPI could not place them. */
+function AdminLegend({ areas }: { areas: AdminAreas }) {
+  if (!areas.values) return null
+  const { legend } = classify(areas.values)
+  return (
+    <div className="ttx-layers__legend">
+      {legend.classes.map((c) => (
+        <span key={c.label}>
+          <i style={{ background: c.color }} />
+          {c.label}
+        </span>
+      ))}
+      {areas.unit && <span className="ttx-layers__note">{areas.unit}</span>}
+      {!!areas.unmatched && (
+        <div className="ttx-layers__note">
+          Left out: {areas.unmatched.toLocaleString('en-US')} {areas.unit} in areas HDX HAPI could not place
+        </div>
+      )}
     </div>
   )
 }

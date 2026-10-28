@@ -3,6 +3,8 @@ import { OvertureParquet, overtureTool } from '../data/buildings'
 import { geocodeTools, OpenCageGeocoder } from '@ttx/plugins'
 import { healthFacilitiesTool, LayercakeHealth } from '../data/health'
 import { populationTool, SourceCoopPopulation } from '../data/population'
+import { choroplethTool } from '../hapi/choropleth'
+import { boundariesTool } from '../map/adminAreas'
 import { notebookFactory } from '../notebooks/api'
 import { notebookArtifactTool } from '../notebooks/artifact'
 import { ToolRunner } from '@ttx/core'
@@ -15,4 +17,6 @@ export const tools = new ToolRunner([
   overtureTool(new OvertureParquet()),
   healthFacilitiesTool(new LayercakeHealth()),
   notebookArtifactTool(notebookFactory),
+  boundariesTool,
+  choroplethTool,
 ])
