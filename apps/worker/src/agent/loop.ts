@@ -1,4 +1,4 @@
-import { exportTools, opIdOf, summarizeBoard, Views, type AgentReply, type AnyObject, type Runtime, type ToolCallRecord, type UserMessage } from '@ttx/core'
+import { exportTools, opIdOf, summarizeBoard, Views, type AgentReply, type AnyObject, type ChatEntry, type Runtime, type ToolCallRecord, type UserMessage } from '@ttx/core'
 import { areaOfView, MAP_HEADER_PX } from '@ttx/plugins'
 import type { Complete, FunctionTool, Message } from './openrouter'
 import { boardGet, type ReadTool } from './tools'
@@ -12,11 +12,16 @@ export const MAX_SIZE_FACTOR = 4
 /** Space between objects that one turn adds side by side, in canvas units. */
 export const GAP = 24
 
+/** The request shows at most this many earlier chat entries, from at most this long before it, so the model knows what "the copy" is. */
+export const HISTORY_ENTRIES = 10
+export const HISTORY_MS = 3_600_000
+
 const SYSTEM = `You are the agent on a shared whiteboard for a humanitarian table-top exercise. People ask you to change the board, and you change it with the tools.
 
 Rules:
-- "This", "these", "it" and "the selected ..." mean the objects under "Selected" in the request, and only those. Act only on those ids.
-- If the request needs objects and nothing is selected, or you are not sure which objects the person means, do not guess: ask.
+- "This", "these", "it" and "the selected ..." mean the objects under "Selected" in the request.
+- A name for a given object ("the duplicate", "the copy", "the new map", "the one you added") means the object that the recent chat names, also when it is not selected. Find its id in the recent chat.
+- If the request needs objects and nothing is selected or named, or you are not sure which objects the person means, do not guess: ask.
 - When you add an object, leave out x, y, w and h: it goes in the middle of the person's view, at its type's default size, and each further object you add goes to the right of the last one. Give x and y only to put it at a given place (e.g. next to an object), and w and h only when the person asks for a size.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner.
 - To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
@@ -36,7 +41,32 @@ function describe(runtime: Runtime, o: AnyObject): string {
   return `- ${o.type} ${o.id}${extra ? `: ${extra}` : ''}`
 }
 
-function request(runtime: Runtime, message: UserMessage): string {
+/** An id with its object's type, or "(deleted)". */
+function named(runtime: Runtime, id: string): string {
+  const o = runtime.board.get(id)
+  return o ? `${o.type} ${id}` : `${id} (deleted)`
+}
+
+/** The earlier chat, one line per entry, with the ids each message selected and each reply changed and added. */
+function recentChat(runtime: Runtime, history: ChatEntry[], message: UserMessage): string {
+  const lines = history
+    .filter((e) => message.at - e.at < HISTORY_MS)
+    .slice(-HISTORY_ENTRIES)
+    .map((e) => {
+      if (e.kind === 'user') {
+        const selected = e.selection.length ? ` [selected: ${e.selection.map((id) => named(runtime, id)).join(', ')}]` : ''
+        return `- ${e.actor.name ?? e.actor.id}: ${e.text}${selected}`
+      }
+      const did = [
+        ...e.calls.filter((c) => c.status === 'applied' && c.ids?.length).map((c) => `${c.tool} on ${c.ids!.join(', ')}`),
+        ...(e.undo?.created ?? []).map((id) => `added ${named(runtime, id)}`),
+      ]
+      return `- Agent: ${e.text}${did.length ? ` [${did.join('; ')}]` : ''}`
+    })
+  return lines.length ? `Recent chat, oldest first:\n${lines.join('\n')}\n\n` : ''
+}
+
+function request(runtime: Runtime, message: UserMessage, history: ChatEntry[]): string {
   const selected = message.selection.flatMap((id) => {
     const o = runtime.board.get(id)
     return o ? [describe(runtime, o)] : []
@@ -51,7 +81,7 @@ function request(runtime: Runtime, message: UserMessage): string {
   })
   const mapViews = maps.length ? `\n\nWhat ${message.actor.name ?? 'they'} see on each map:\n${maps.join('\n')}` : ''
   const center = message.center ? `\n\nView center: (${Math.round(message.center.x)}, ${Math.round(message.center.y)})` : ''
-  return `${who} asks: ${message.text}\n\nSelected (${selected.length}):\n${selected.join('\n') || '(nothing)'}${mapViews}${center}`
+  return `${recentChat(runtime, history, message)}${who} asks: ${message.text}\n\nSelected (${selected.length}):\n${selected.join('\n') || '(nothing)'}${mapViews}${center}`
 }
 
 /**
@@ -63,12 +93,14 @@ export async function runTurn(
   message: UserMessage,
   complete: Complete,
   extraTools: ReadTool[] = [],
+  /** The chat entries before `message`, oldest first. */
+  history: ChatEntry[] = [],
 ): Promise<Omit<AgentReply, 'kind' | 'id' | 'at'>> {
   const readTools = [boardGet, ...extraTools]
   const tools = agentTools(runtime, readTools)
   const messages: Message[] = [
     { role: 'system', content: `${SYSTEM}\n\nThe board now, bottom to top:\n${summarizeBoard(runtime.board, runtime.registry) || '(empty)'}` },
-    { role: 'user', content: request(runtime, message) },
+    { role: 'user', content: request(runtime, message, history) },
   ]
   const calls: ToolCallRecord[] = []
   const created: string[] = []

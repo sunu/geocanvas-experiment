@@ -41,7 +41,9 @@ Selection is local to each person. Many people can select different objects at t
 - `actor`: the id, name and color of the sender.
 - `selection`: the ids that the sender had selected when they sent the message.
 
-The prompt gives the agent these ids, each with a short summary. "These" or "this" means these ids only. A change to the selection after the message, or the selection of another person, cannot change what the agent acts on. `Runtime.callTool` refuses ids that do not exist.
+The prompt gives the agent these ids, each with a short summary. "These" or "this" means these ids. A change to the selection after the message, or the selection of another person, cannot change what the agent acts on. `Runtime.callTool` refuses ids that do not exist.
+
+The request also gives the recent chat: the last 10 entries of the hour before the message. Each user message shows its selection, and each reply shows the ids that its tool calls changed and the ids that it added. Thus a name for an object ("the duplicate", "the map you added") can refer to an object that is not selected. Without the recent chat, each turn knows nothing of the turns before it, and "move the duplicate down" moved the selected original. If the selection and the chat point to different objects and the words do not tell which, the agent asks.
 
 People also publish their selection to awareness (presence), so each person sees what the others selected. The agent does not use awareness for its decisions.
 
@@ -103,7 +105,7 @@ Each browser is one person: an id, a generated name and a color, kept in `localS
 - `Room` makes the agent runtime and a `Chat`. It watches `chat`. For each user message without a reply, it queues one turn.
 - `loop.ts`:
   - The tools are `exportTools` of all ops that are not hidden and are not view ops, plus the read tools.
-  - The system prompt gives the rules and the board summary. The user message gives the sender's name, the text, and the selection ids with summaries.
+  - The system prompt gives the rules and the board summary. The user message gives the recent chat (§2.4), the sender's name, the text, and the selection ids with summaries.
   - Each tool call runs through `runtime.callTool(name, input, agentActor)`. The tool result is the invocation record: status, error and created ids.
 - While the agent works, the Durable Object sets its own awareness state to `{ user: { name: 'Agent' }, status: 'thinking' }`.
 - When the room comes back into memory, the agent replies "Interrupted. Please ask again." to each user message that has no reply. It does not start these turns again.

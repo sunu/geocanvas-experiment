@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, Runtime, Views, type Actor, type AgentReply } from '@ttx/core'
+import { Chat, Runtime, Views, type Actor, type AgentReply, type ChatEntry } from '@ttx/core'
 import { plugins } from '@ttx/plugins'
 import { Agent, TURNS_PER_HOUR } from '../src/agent/agent'
-import { MAX_STEPS, runTurn } from '../src/agent/loop'
+import { HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn } from '../src/agent/loop'
 import type { Complete, Message } from '../src/agent/openrouter'
 import { eventsSearch, geocodeSearch, type ReadTool } from '../src/agent/tools'
 import type { MontyClient } from '@ttx/plugins/monty/client'
@@ -168,6 +168,20 @@ describe('runTurn', () => {
     expect(model.seen[1]!.at(-1)).toMatchObject({ role: 'tool', content: expect.stringContaining('401') })
   })
 
+  it(`shows the last ${HISTORY_ENTRIES} chat entries of the last hour`, async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const old: ChatEntry = { kind: 'user', id: 'old', actor: ada, text: 'too old', selection: [], at: message.at - HISTORY_MS }
+    const recent = Array.from({ length: HISTORY_ENTRIES + 1 }, (_, i): ChatEntry => ({ kind: 'user', id: `m${i}`, actor: ben, text: `message ${i}`, selection: [], at: message.at - 1000 + i }))
+    const model = scripted()
+    await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], [old, ...recent])
+    const request = model.seen[0]![1]!.content as string
+    expect(request).not.toContain('too old')
+    expect(request).not.toContain('message 0\n')
+    expect(request).toContain(`Recent chat, oldest first:\n- Ben: message 1\n`)
+    expect(request).toContain(`- Ben: message ${HISTORY_ENTRIES}\n\nAda (person id ada) asks: now`)
+  })
+
   it(`stops after ${MAX_STEPS} model calls`, async () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'loop', selection: [] })
@@ -209,6 +223,19 @@ describe('Agent', () => {
     expect(replies(chat).map((r) => r.replyTo)).toEqual([first.id, second.id])
     expect(most).toBe(1)
     expect(busy).toEqual([true, false])
+  })
+
+  it('shows the earlier turns, so "the duplicate" can name an object that is not selected', async () => {
+    const { doc, chat, a } = board()
+    const model = scripted(tools(call('core__object__duplicate', { ids: [a], args: {} })), { role: 'assistant', content: 'Duplicated it.' })
+    new Agent({ doc, complete: model.complete })
+    chat.send({ actor: ada, text: 'duplicate this', selection: [a] })
+    for (let i = 0; i < 10; i++) await settle()
+    chat.send({ actor: ada, text: 'move the duplicate down', selection: [a] })
+    for (let i = 0; i < 10; i++) await settle()
+    const copy = replies(chat)[0]!.undo!.created[0]!
+    const request = model.seen.at(-1)![1]!.content as string
+    expect(request).toContain(`- Ada: duplicate this [selected: box ${a}]\n- Agent: Duplicated it. [core.object.duplicate on ${a}; added box ${copy}]`)
   })
 
   it('answers messages a lost turn left, without running them again', () => {

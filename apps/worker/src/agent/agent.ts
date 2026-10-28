@@ -66,7 +66,9 @@ export class Agent {
           continue
         }
         this.turns.push(now)
-        this.chat.reply(await runTurn(this.runtime, message, this.complete, this.tools))
+        const entries = this.chat.list()
+        const history = entries.slice(0, entries.findIndex((e) => e.id === message.id))
+        this.chat.reply(await runTurn(this.runtime, message, this.complete, this.tools, history))
       }
     } finally {
       this.busy = false
