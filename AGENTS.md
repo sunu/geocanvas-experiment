@@ -33,7 +33,8 @@ npm workspaces monorepo (TypeScript, ESM). Design docs go in `plans/`.
 apps/
   web/           React app (Vite): our own infinite canvas
     src/board/     the shared board (Yjs) and the connection to the Worker
-    src/canvas/    camera, input, selection, toolbar, object views
+    src/canvas/    camera, input, selection, toolbar, side panel
+    src/objects/   object types: one definition per type (box, text, map, event) and the registry that lists them
     src/map/       the map widget
     src/events/    the event widget: search Montandon, show one event across its sources
   worker/        Cloudflare Worker: serves the built web app; one Durable Object per room relays and stores the board;
@@ -41,7 +42,7 @@ apps/
 ```
 
 - **Our own canvas, no tldraw.** tldraw needs a paid license off localhost, and the canvas we need is small. The design follows vsticky: a DOM "world" layer moved by one CSS transform. The camera is local to each person and never synced.
-- **The board is a Yjs doc** (`board/board.ts`): one map of objects (box, text, map, event), each a Y.Map of plain fields. Layer order is a float `z` per object, ties broken by id. New texts and events go on top; new boxes and maps go to the bottom, since they are mostly backgrounds. Undo and redo cover only your own edits, one step per gesture (`undo.stopCapturing()` when a gesture starts). Text is stored as plain strings, with no encryption.
+- **The board is a Yjs doc** (`board/board.ts`): one map of objects, each a Y.Map of plain fields. Each object type declares its fields and behaviour in `objects/` (see "Adding an object type"). Layer order is a float `z` per object, ties broken by id; each type says whether new ones go on top (texts, events) or to the bottom (boxes, maps: mostly backgrounds). Undo and redo cover only your own edits, one step per gesture (`undo.stopCapturing()` when a gesture starts). Text is stored as plain strings, with no encryption.
 - **Multiplayer runs on our own Cloudflare Worker.** `/connect/<room>` goes to that room's Durable Object, which speaks the standard y-websocket protocol, keeps the doc in memory and appends every update to its SQLite (compacted on load when there are many). Cloudflare caps a SQLite row at 2 MB, so larger updates are split across rows (`apps/worker/src/updateLog.ts`). Websockets use Cloudflare's Hibernation API (`ctx.acceptWebSocket`): the room leaves memory between messages, so open but idle tabs cost no Durable Object time. With `socket.accept()` a room is billed for as long as any tab is connected, which used up the free plan's daily allowance (13,000 GB-s, reset at 00:00 UTC) and took every board offline. Presence (awareness) is kept in memory only: it starts empty after a wake and browsers re-send theirs every 15 s; which presence ids a socket controls is kept on the socket (`serializeAttachment`). The browser uses y-websocket's `WebsocketProvider`. Tabs of one browser also sync with each other directly (BroadcastChannel), so test multiplayer from two origins or two browsers, or the server is not involved.
 - **Input:** drag on empty canvas to select; shift+drag selects from anywhere, even over a map or box, and adds to the selection; shift+click toggles one object; scroll pans; pinch or ⌘+scroll zooms; space+drag pans. Tools: V select, R box, T text, M map, E event. `]` / `[` bring to front / send to back, with ⌘ one step. Delete removes. Double-click edits a text, lets a map take the pointer, or opens an event's search; Esc gives it back. The left panel sets the color of selected boxes and texts, and A+ / A− the text size (`canvas/style.ts`: colors are stored by name). A text's height follows its content; only the person who changed it refits it.
 - **Icons:** Phosphor (`@phosphor-icons/react`, regular weight, imported as `<Name>Icon`; only imported icons are bundled). Icon-only buttons carry a `title` and an `aria-label`. For hazard and humanitarian-sector symbols, which Phosphor lacks (earthquake, volcano, displacement, clusters), consider the OCHA Humanitarian Icons; check their license first.
@@ -51,6 +52,17 @@ apps/
 - **Event widget** (`apps/web/src/events/`): a disaster event from the Montandon STAC API. The board stores only `eventId`; each browser fetches the details (`monty.ts`, one shared client with a cache). Search text is read as country, hazard type, year and source (`search.ts`), turned into a CQL2 filter, and the leftover words rank by name. Hazard types use the UNDRR-ISC 2025 codes with their GLIDE and EM-DAT equivalents (`hazards.ts`; add a type only with its rows from the upstream table). Sources record one event under different `monty:corr_id`s, so an event's other sources are found by hazard, country and time, as upstream's correlation algorithm does.
 - **Montandon needs a bearer token, which never reaches the browser.** The browser posts STAC search bodies to `/monty/search`; the Worker adds `MONTANDON_TOKEN` and forwards them to `MONTANDON_BASE_URL` (`apps/worker/src/monty.ts`, standard `fetch` only, so it can move to another server). The base URL is a var in `wrangler.jsonc`: the staging API, as `agent-docs/features.md` scopes. Without the token, `/monty/search` answers 503. Anyone with a deployed URL can run searches through the token, as anyone can edit its boards.
 - **Rooms:** one board per `#room=<id>`. Opening the app without one, or pressing New board, starts a board with a random 16-character id (`board/room.ts`); the URL is the link to share. There is no access control: anyone with the link can edit, so keep real exercise data off the preview.
+
+### Adding an object type
+
+Each type is one file in `apps/web/src/objects/`, listed in `objects/registry.ts`. The canvas, toolbar and side panel read everything from there, so a new type needs no changes elsewhere.
+
+1. Declare its stored fields by adding them to `ObjectFields` from the type's file (`declare module '../board/board'`). The `BoardObject` union and the update types follow from it. A field added later, when objects of that type already exist on boards, must be optional, with a default where it is read.
+2. Export an `ObjectTypeDef` (`objects/types.ts`): label, tool key (one lowercase letter, not `v`), Phosphor icon, size when placed with a click, `layer` (`top` for content, `bottom` for backgrounds), `create` with the fields' starting values, and a `View` component. Then the behaviour it needs: `editable` (double-click), `editOnCreate`, `widthOnly`, `defaultColor` and `textSize` (side panel), `isEmpty` (removed when left empty).
+3. Add it to `OBJECT_TYPES` in `objects/registry.ts`; its position is its place in the toolbar. A type with fields but no entry there does not compile.
+4. Store references to data (an event id, a tool recipe), not the data itself: each browser fetches what it shows.
+
+Older tabs show a placeholder for a type they do not know, so a board stays usable while people reload after a deploy.
 
 The first prototype is on the `experiment` branch: a headless op runtime, typed data links, a disasters plugin on Montandon, and a natural-language command pipeline. It is a reference, not a base. Read it before rebuilding a part it covered, in particular:
 - `apps/web/src/nodes/MapView.tsx` and `plans/plan-005.md`: maps inside a canvas (edit and focus modes, WebGL context limits, pixel ratio at canvas zoom).

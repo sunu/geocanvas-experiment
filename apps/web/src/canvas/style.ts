@@ -1,6 +1,6 @@
 /**
  * Colors and text sizes for boxes and text. Objects store a color by name, so the palette can be
- * retuned without touching boards. Objects made before these fields existed get the defaults.
+ * retuned without touching boards. Each type's default color is in its definition (objects/).
  */
 
 export const COLORS = ['ink', 'gray', 'red', 'orange', 'yellow', 'green', 'blue', 'purple'] as const
@@ -18,8 +18,6 @@ export const PALETTE: Record<ColorName, { ink: string; fill: string; stroke: str
   purple: { ink: '#9333ea', fill: '#f3e8ff', stroke: '#a855f7' },
 }
 
-export const DEFAULT_BOX_COLOR: ColorName = 'blue'
-export const DEFAULT_TEXT_COLOR: ColorName = 'ink'
 
 export const FONT_SIZES = [12, 14, 16, 20, 24, 32, 40, 48, 64, 80, 96] as const
 export const DEFAULT_FONT_SIZE = 20

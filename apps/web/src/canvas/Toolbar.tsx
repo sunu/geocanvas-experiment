@@ -6,24 +6,19 @@ import {
   ArrowLineUpIcon,
   ArrowUpIcon,
   CursorIcon,
-  MapTrifoldIcon,
-  RectangleIcon,
-  TextTIcon,
   TrashIcon,
-  WarningIcon,
   type Icon,
 } from '@phosphor-icons/react'
 import type { Board, ObjectType } from '../board/board'
 import type { ConnectionStatus } from '../board/connect'
+import { objectTypes } from '../objects/registry'
 
 export type Tool = 'select' | ObjectType
 
+/** The select tool, then one tool per object type (objects/registry.ts). */
 const TOOLS: { tool: Tool; label: string; key: string; Icon: Icon }[] = [
   { tool: 'select', label: 'Select', key: 'V', Icon: CursorIcon },
-  { tool: 'box', label: 'Box', key: 'R', Icon: RectangleIcon },
-  { tool: 'text', label: 'Text', key: 'T', Icon: TextTIcon },
-  { tool: 'map', label: 'Map', key: 'M', Icon: MapTrifoldIcon },
-  { tool: 'event', label: 'Event', key: 'E', Icon: WarningIcon },
+  ...objectTypes.map((d) => ({ tool: d.type, label: d.label, key: d.key.toUpperCase(), Icon: d.Icon })),
 ]
 
 /** Toolbar icon size (px). */

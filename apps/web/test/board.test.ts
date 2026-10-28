@@ -3,7 +3,7 @@ import * as Y from 'yjs'
 import { Board } from '../src/board/board'
 import { newRoomId, roomFromHash, roomHash } from '../src/board/room'
 
-/** Texts stack in the order they are added (new boxes and maps go to the bottom instead). */
+/** Objects stack in the order they are added (unless added at the bottom). */
 const item = (x = 0) => ({ type: 'text' as const, x, y: 0, w: 10, h: 10, text: '' })
 const order = (b: Board) => b.list().map((o) => o.x)
 
@@ -15,12 +15,12 @@ function boardWith(n: number) {
 }
 
 describe('Board layer order', () => {
-  it('adds new text and events on top, and new boxes and maps at the bottom', () => {
+  it('adds new objects on top, or at the bottom when asked', () => {
     const { board } = boardWith(2)
-    board.add({ type: 'box', x: 10, y: 0, w: 10, h: 10 })
-    board.add({ type: 'map', x: 11, y: 0, w: 10, h: 10, basemap: 'light' })
+    board.add(item(10), 'bottom')
+    board.add(item(11), 'bottom')
     board.add(item(12))
-    board.add({ type: 'event', x: 13, y: 0, w: 10, h: 10 })
+    board.add(item(13), 'top')
     expect(order(board)).toEqual([11, 10, 0, 1, 12, 13])
   })
 
