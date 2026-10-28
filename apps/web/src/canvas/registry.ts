@@ -23,6 +23,10 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
   editable?: boolean
   /** A new one opens for editing at once. */
   editOnCreate?: boolean
+  /** Resizing changes only its width: its height follows its content. */
+  widthOnly?: boolean
+  /** Removed when editing ends with nothing in it. */
+  isEmpty?(object: O): boolean
 }
 
 const uis = new Map<string, ObjectUI>()

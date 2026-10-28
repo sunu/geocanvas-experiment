@@ -1,6 +1,7 @@
 import type { z } from 'zod'
 import type { AnyObject } from '../doc/board.js'
 import type { OpDef } from '../ops/types.js'
+import type { ColorName } from '../style.js'
 
 /** A kind of object on the board, e.g. 'text' or 'event'. */
 export interface ObjectTypeDef {
@@ -15,6 +16,10 @@ export interface ObjectTypeDef {
   layer: 'top' | 'bottom'
   /** False: no '<type>.add' op. */
   addable?: boolean
+  /** Its color can be set (a `color` field); objects with none stored use this one. */
+  defaultColor?: ColorName
+  /** Its text size can be set (a `fontSize` field). */
+  textSize?: boolean
   /** Short text about one object, for an LLM's view of the board. */
   summarize?(object: AnyObject): string
 }

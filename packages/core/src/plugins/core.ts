@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { AnyObject } from '../doc/board.js'
 import type { BoardTx } from '../doc/tx.js'
-import { defineOp, type TargetRef } from '../ops/types.js'
+import { defineOp, type OpContext, type TargetRef } from '../ops/types.js'
 import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, stepFontSize, type ColorName } from '../style.js'
 import { definePlugin, type ObjectTypeDef } from './types.js'
 
@@ -20,6 +20,7 @@ export const boxType: ObjectTypeDef = {
   fields: z.object({ color: colorField }),
   defaultSize: { w: 200, h: 120 },
   layer: 'bottom',
+  defaultColor: DEFAULT_BOX_COLOR,
   summarize: (o) => `${(o as BoxObject).color ?? DEFAULT_BOX_COLOR}`,
 }
 
@@ -34,6 +35,8 @@ export const textType: ObjectTypeDef = {
   }),
   defaultSize: { w: 240, h: 40 },
   layer: 'top',
+  defaultColor: DEFAULT_TEXT_COLOR,
+  textSize: true,
   summarize: (o) => JSON.stringify((o as TextObject).text.slice(0, 200)),
 }
 
@@ -114,24 +117,40 @@ const layerOps = [
   layerOp('core.object.sendBackward', 'Send backward', 'Draw the selected objects one place lower.', (tx, ids) => tx.step(ids, -1)),
 ]
 
-type Styled = BoxObject | TextObject
-const colorOf = (o: Styled): ColorName => o.color ?? (o.type === 'box' ? DEFAULT_BOX_COLOR : DEFAULT_TEXT_COLOR)
+/** Objects whose type has a color (`defaultColor`) or a text size (`textSize`). */
+const styled = (ctx: OpContext, option: 'defaultColor' | 'textSize') =>
+  idsOf(ctx.target).every((id) => {
+    const o = ctx.board.get(id)
+    return !!o && !!ctx.registry.objectType(o.type)?.[option]
+  })
+const colorOf = (ctx: OpContext, id: string): ColorName | undefined => {
+  const o = ctx.board.get(id) as (AnyObject & { color?: ColorName }) | undefined
+  return o && (o.color ?? ctx.registry.objectType(o.type)?.defaultColor)
+}
+const sizeOf = (o: AnyObject) => (o as AnyObject & { fontSize?: number }).fontSize ?? DEFAULT_FONT_SIZE
+
+/** Ops on any type with a color or text size. They check the types themselves, since a target spec lists fixed types. */
+function checkStyled(ctx: OpContext, option: 'defaultColor' | 'textSize') {
+  if (!styled(ctx, option)) throw new Error(option === 'defaultColor' ? 'Only objects with a color can be colored' : 'Only objects with text have a text size')
+}
 
 const setColor = defineOp({
   id: 'core.object.setColor',
   title: 'Set color',
-  description: 'Set the color of the selected boxes and texts.',
-  target: { kind: 'objects', types: ['box', 'text'] },
+  description: 'Set the color of the selected objects (boxes and texts).',
+  target: { kind: 'objects' },
+  when: (ctx) => styled(ctx, 'defaultColor'),
   args: z.object({ color: z.enum(COLORS).meta({ widget: 'color' }).describe('Color') }),
   defaults: (ctx) => {
-    const first = ctx.board.get(idsOf(ctx.target)[0] ?? '') as Styled | undefined
-    return first ? { color: colorOf(first) } : {}
+    const color = colorOf(ctx, idsOf(ctx.target)[0] ?? '')
+    return color ? { color } : {}
   },
+  prepare: (ctx, args) => (checkStyled(ctx, 'defaultColor'), args),
   apply: (tx, { color }, target) => tx.update(Object.fromEntries(idsOf(target).map((id) => [id, { color }]))),
 })
 
 const textTarget = { kind: 'objects', types: ['text'] } as const
-const sizeOf = (t: TextObject) => t.fontSize ?? DEFAULT_FONT_SIZE
+const sizedTarget = { kind: 'objects' } as const
 
 /** Typing in a text. One op log entry per editing gesture. */
 const setText = defineOp({
@@ -149,12 +168,14 @@ const setFontSize = defineOp({
   id: 'text.setFontSize',
   title: 'Set text size',
   description: 'Set the font size of the selected texts, in canvas units.',
-  target: textTarget,
+  target: sizedTarget,
+  when: (ctx) => styled(ctx, 'textSize'),
   args: z.object({ fontSize: z.number().int().positive().describe('Font size') }),
   defaults: (ctx) => {
-    const first = ctx.board.get(idsOf(ctx.target)[0] ?? '') as TextObject | undefined
+    const first = ctx.board.get(idsOf(ctx.target)[0] ?? '')
     return first ? { fontSize: sizeOf(first) } : {}
   },
+  prepare: (ctx, args) => (checkStyled(ctx, 'textSize'), args),
   apply: (tx, { fontSize }, target) => tx.update(Object.fromEntries(idsOf(target).map((id) => [id, { fontSize }]))),
 })
 
@@ -163,10 +184,13 @@ const stepSize = (dir: 1 | -1) =>
     id: dir === 1 ? 'text.larger' : 'text.smaller',
     title: dir === 1 ? 'Larger text' : 'Smaller text',
     description: `Make the selected texts one size ${dir === 1 ? 'larger' : 'smaller'}.`,
-    target: textTarget,
+    target: sizedTarget,
+    when: (ctx) => styled(ctx, 'textSize'),
     args: z.object({}),
-    prepare: (ctx) =>
-      Object.fromEntries(idsOf(ctx.target).map((id) => [id, { fontSize: stepFontSize(sizeOf(ctx.board.get(id) as TextObject), dir) }])),
+    prepare: (ctx) => {
+      checkStyled(ctx, 'textSize')
+      return Object.fromEntries(idsOf(ctx.target).map((id) => [id, { fontSize: stepFontSize(sizeOf(ctx.board.get(id)!), dir) }]))
+    },
     apply: (tx, sizes) => tx.update(sizes),
   })
 

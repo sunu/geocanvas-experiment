@@ -13,14 +13,21 @@ interface Props {
 
 /** One object on the canvas, in world coordinates. `layer` is its place in the stacking order. Its type's UI fills it. */
 export function ObjectView({ runtime, object: o, layer, editing, onDone }: Props) {
-  const ui = objectUI(o.type)
+  // A board can hold objects of a type this build does not know, made by a newer version (e.g. a tab
+  // opened before a deploy).
+  const known = !!runtime.registry.objectType(o.type)
+  const ui = known ? objectUI(o.type) : undefined
   return (
     <div
       data-id={o.id}
       className={`ttx-obj ttx-obj--${o.type} ${editing ? 'is-editing' : ''}`}
       style={{ left: o.x, top: o.y, width: o.w, height: o.h, zIndex: layer, ...ui?.frameStyle?.(o) }}
     >
-      {ui?.View && <ui.View runtime={runtime} object={o} editing={editing} onDone={onDone} />}
+      {!known ? (
+        <div className="ttx-unknown">This object needs a newer version of the app. Reload to see it.</div>
+      ) : (
+        ui?.View && <ui.View runtime={runtime} object={o} editing={editing} onDone={onDone} />
+      )}
     </div>
   )
 }

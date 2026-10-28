@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import type { Runtime, TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects, type ConnectionStatus } from '../board/connect'
-import { publishSelection, usePeers, type Awareness } from '../board/presence'
+import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
 import { ObjectView } from './ObjectView'
+import { Peers } from './Peers'
 import { objectUI } from './registry'
 import { StylePanel } from './StylePanel'
 import { tools, Toolbar, type Tool } from './Toolbar'
@@ -67,14 +68,17 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   const selected = useMemo(() => new Set([...selection].filter((id) => byId.has(id))), [selection, byId])
   const editingId = editing && byId.has(editing) ? editing : null
 
-  // Others see what this person selected, and the agent chat sends it with each message.
-  useEffect(() => publishSelection(awareness, selected), [awareness, selected])
+  // Others see what this person selected, and the agent chat sends it with each message. Keyed by
+  // the ids, so other board changes send nothing.
+  const selectionKey = [...selected].sort().join(',')
+  useEffect(() => publishSelection(awareness, selectionKey ? selectionKey.split(',') : []), [awareness, selectionKey])
+  const sendCursor = useMemo(() => cursorSender(awareness), [awareness])
 
-  // A text left empty when editing ends is removed.
+  // An object left empty when editing ends (e.g. a text with nothing typed) is removed.
   const lastEditing = useRef<string | null>(null)
   useEffect(() => {
     const prev = lastEditing.current && board.get(lastEditing.current)
-    if (prev && prev.id !== editingId && prev.type === 'text' && !prev.text.trim()) {
+    if (prev && prev.id !== editingId && objectUI(prev.type)?.isEmpty?.(prev)) {
       runtime.dispatch('core.object.delete', objectsTarget([prev.id]), {})
     }
     lastEditing.current = editingId
@@ -153,10 +157,13 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         if (!board.get(o.id)) return // someone else deleted it
         const z = cameraRef.current.z
         const r = resized(o, handle, dx / z, dy / z)
-        // A text's height follows its content: resizing changes only its width.
-        if (o.type === 'text') requestFit(o.id)
-        const rect = o.type === 'text' ? { x: r.x, w: r.w } : r
-        runtime.dispatch('core.object.setRect', objectsTarget([o.id]), { rects: { [o.id]: rect } })
+        if (objectUI(o.type)?.widthOnly) {
+          // Its height follows its content (a text): resizing changes only its width.
+          requestFit(o.id)
+          runtime.dispatch('core.object.setRect', objectsTarget([o.id]), { rects: { [o.id]: { x: r.x, w: r.w } } })
+        } else {
+          runtime.dispatch('core.object.setRect', objectsTarget([o.id]), { rects: { [o.id]: r } })
+        }
       })
       return
     }
@@ -317,6 +324,11 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px` }}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
+      onPointerMove={(e) => {
+        const p = screenPoint(e)
+        sendCursor(toWorld(cameraRef.current, p.x, p.y))
+      }}
+      onPointerLeave={() => sendCursor(null)}
     >
       <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})` }}>
         {objects.map((o, i) => (
@@ -327,23 +339,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
 
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
-        {peers.flatMap((peer) =>
-          (peer.selection ?? []).flatMap((id, i) => {
-            const o = byId.get(id)
-            if (!o) return []
-            const r = toScreen(camera, o)
-            const color = peer.user?.color
-            return (
-              <div key={`${peer.clientId}:${id}`} className="ttx-selection ttx-selection--peer" style={{ left: r.x, top: r.y, width: r.w, height: r.h, borderColor: color }}>
-                {i === 0 && peer.user?.name && (
-                  <span className="ttx-selection__name" style={{ background: color }}>
-                    {peer.user.name}
-                  </span>
-                )}
-              </div>
-            )
-          }),
-        )}
+        <Peers peers={peers} camera={camera} byId={byId} />
         {[...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />

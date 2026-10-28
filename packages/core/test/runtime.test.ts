@@ -154,6 +154,23 @@ describe('dispatch', () => {
     expect(rt.board.get(id)).toMatchObject({ fontSize: 24 })
   })
 
+  it("colors and sizes only objects whose type has a color or text size, with the type's default color", () => {
+    const rt = runtime()
+    const text = addText(rt)
+    const box = rt.dispatch('box.add', canvas, {}).created![0]!
+    const pin = rt.dispatch('pin.add', canvas, {}).created![0]!
+    expect(rt.defaultsFor('core.object.setColor', objects(box))).toEqual({ color: 'blue' })
+    expect(rt.defaultsFor('core.object.setColor', objects(text))).toEqual({ color: 'ink' })
+    const ids = (target: { kind: 'objects'; ids: string[] }) => rt.availableOps(target).map((op) => op.id)
+    expect(ids(objects(text, box))).toContain('core.object.setColor')
+    expect(ids(objects(text, box))).not.toContain('text.larger')
+    expect(ids(objects(text))).toContain('text.larger')
+    expect(ids(objects(text, pin))).not.toContain('core.object.setColor')
+    expect(rt.dispatch('core.object.setColor', objects(text, pin), { color: 'red' })).toMatchObject({ status: 'failed' })
+    expect(rt.dispatch('text.larger', objects(box), {})).toMatchObject({ status: 'failed' })
+    expect(rt.board.get(text)).not.toHaveProperty('color')
+  })
+
   it('duplicates objects with all their fields, next to the originals', () => {
     const rt = runtime()
     const id = rt.dispatch('text.add', canvas, { text: 'copy me', x: 1, y: 2, color: 'green' }).created![0]!

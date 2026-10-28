@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import { defineOp, definePlugin, Views, type AnyObject } from '@ttx/core'
-import { MAP_HEADER_PX, viewOfArea } from './mapView.js'
+import { defineOp, definePlugin, Views, type AnyObject, type BoardTx, type OpContext } from '@ttx/core'
+import { bboxOf, DATA_LAYERS, mapLayer, newLayerId, type DataLayerKey, type MapLayer } from './mapLayers.js'
+import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
 
 /** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
 
@@ -19,8 +20,36 @@ const area = z.object({
 })
 export type MapArea = z.infer<typeof area>
 
-/** Each person's view of a map is not here: it is in the doc's `views` (Views in @ttx/core). */
-export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap }
+/**
+ * Each person's view of a map is not here: it is in the doc's `views` (Views in @ttx/core).
+ * `layers` (mapLayers.ts) is optional: maps made before it have none. It is replaced as a whole, so two
+ * people adding a layer at the same moment keep only one of the two.
+ */
+export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[] }
+
+const oneMap = { kind: 'objects', types: ['map'], min: 1, max: 1 } as const
+
+/** The one map an op targets. */
+const mapOf = (ctx: OpContext) => ctx.board.get(ctx.target.kind === 'objects' ? (ctx.target.ids[0] ?? '') : '') as MapBoardObject
+
+/**
+ * `area`, or the area the runner sees on the map: their own view, or for an agent the view of the person it
+ * acts for. The UI passes `area`, since a view is saved only a second after a pan.
+ */
+function areaFor(ctx: OpContext, map: MapBoardObject, given: MapArea | undefined) {
+  if (given) return bboxOf(given)
+  const views = new Views(ctx.board.doc)
+  const me = ctx.actor.kind === 'user' ? ctx.actor.id : ctx.actor.onBehalfOf
+  const view = (me && views.get(me, map.id)) || views.latest(map.id)?.view
+  if (!view) throw new Error('Give `area`: nobody has looked at this map yet')
+  return bboxOf(areaOfView(view, map.w, map.h - MAP_HEADER_PX))
+}
+
+/** A layer write: the map's whole new list (see MapBoardObject). */
+const setLayers = (tx: BoardTx, id: string, layers: MapLayer[]) => tx.update({ [id]: { layers } })
+
+const dataLayer = z.enum(Object.keys(DATA_LAYERS) as [DataLayerKey, ...DataLayerKey[]])
+const layerId = z.string().describe("The layer's id, from the map's layers")
 
 const forPeople = z
   .union([z.literal('everyone'), z.array(z.string()).min(1)])
@@ -36,10 +65,13 @@ export const mapPlugin = definePlugin({
       type: 'map',
       title: 'Map',
       description: 'A live map. Its basemap is shared; each person has their own view (use map.showArea to change one).',
-      fields: z.object({ basemap: basemap.default('light') }),
+      fields: z.object({ basemap: basemap.default('light'), layers: z.array(mapLayer).optional() }),
       defaultSize: { w: 520, h: 360 },
       layer: 'bottom',
-      summarize: (o) => `basemap ${(o as MapBoardObject).basemap}`,
+      summarize: (o) => {
+        const { basemap, layers } = o as MapBoardObject
+        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id})`).join(', ')}` : ''}`
+      },
     },
   ],
   ops: [
@@ -78,6 +110,66 @@ export const mapPlugin = definePlugin({
       apply(tx, changes) {
         for (const { person, id, view } of changes) tx.setView(person, id, view)
       },
+    }),
+    defineOp({
+      id: 'map.addLayer',
+      title: 'Add data layer',
+      description: `Add a data layer to a map, for everyone, with the data of one area: ${Object.entries(DATA_LAYERS)
+        .map(([k, d]) => `${k} (${d.label})`)
+        .join(', ')}. Without an area: the area the asker sees on the map.`,
+      target: oneMap,
+      args: z.object({ layer: dataLayer.describe('Which data'), area: area.optional() }),
+      prepare(ctx, { layer, area }) {
+        const map = mapOf(ctx)
+        const d = DATA_LAYERS[layer]
+        const added: MapLayer = { id: newLayerId(), tool: d.tool, input: { ...d.input, area: areaFor(ctx, map, area) }, title: d.title }
+        return { id: map.id, layers: [...(map.layers ?? []), added] }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.pinPlace',
+      title: 'Pin place',
+      description: 'Mark a place on a map for everyone, by name: the layer finds the place again in each browser (data.geocode).',
+      target: oneMap,
+      args: z.object({ place: z.string().min(1).describe('The place, e.g. "Beira, Mozambique"') }),
+      prepare(ctx, { place }) {
+        const map = mapOf(ctx)
+        const added: MapLayer = { id: newLayerId(), tool: 'data.geocode', input: { query: place, limit: 1 }, title: place }
+        return { id: map.id, layers: [...(map.layers ?? []), added] }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.setLayerArea',
+      title: 'Set layer area',
+      description: "Show a map's data layer for another area, for everyone. Without an area: the area the asker sees on the map.",
+      target: oneMap,
+      args: z.object({ layerId, area: area.optional() }),
+      prepare(ctx, { layerId, area }) {
+        const map = mapOf(ctx)
+        const layers = map.layers ?? []
+        const layer = layers.find((l) => l.id === layerId)
+        if (!layer) throw new Error(`The map has no layer ${layerId}`)
+        if (!Array.isArray(layer.input.area)) throw new Error(`Layer ${layerId} has no area`)
+        const bbox = areaFor(ctx, map, area)
+        return { id: map.id, layers: layers.map((l) => (l.id === layerId ? { ...l, input: { ...l.input, area: bbox } } : l)) }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.removeLayer',
+      title: 'Remove data layer',
+      description: "Remove a data layer from a map, for everyone.",
+      target: oneMap,
+      args: z.object({ layerId }),
+      prepare(ctx, { layerId }) {
+        const map = mapOf(ctx)
+        const layers = map.layers ?? []
+        if (!layers.some((l) => l.id === layerId)) throw new Error(`The map has no layer ${layerId}`)
+        return { id: map.id, layers: layers.filter((l) => l.id !== layerId) }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
     }),
   ],
 })

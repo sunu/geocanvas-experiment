@@ -1,34 +1,65 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { geocodeSearch } from '../src/agent/tools'
+import { geocode } from '../src/geocode'
+
+const KEY = 'secret-key-123'
+const get = (params: Record<string, string>, method = 'GET') =>
+  new Request(`https://board.example/tools/geocode?${new URLSearchParams(params)}`, { method })
 
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const run = (text: string) => geocodeSearch.run({ text }, undefined as never)
-
-describe('geocode__search', () => {
-  it("turns Photon's extent [west, north, east, south] into an area, and asks for English names", async () => {
-    const fetch = vi.fn(async (_url: string) =>
-      Response.json({
-        features: [
-          { geometry: { coordinates: [78.67, 22.35] }, properties: { name: 'India', type: 'country', countrycode: 'IN', extent: [67.9, 35.7, 97.4, 6.6] } },
-          { geometry: { coordinates: [85.3, 27.7] }, properties: { name: 'Village', type: 'house' } },
-        ],
-      }),
+describe('OpenCage proxy', () => {
+  it('passes only allowed params, adds the key and no_annotations, and returns the response as is', async () => {
+    const body = JSON.stringify({ results: [{ formatted: 'Beira' }], status: { code: 200, message: 'OK' } })
+    const upstream = vi.fn(async (_url: URL) => new Response(body, { status: 200 }))
+    vi.stubGlobal('fetch', upstream)
+    const res = await geocode(
+      get({ q: '-19.8,34.8', limit: '1', countrycode: 'mz', bounds: '30,-27,41,-10', language: 'pt', key: 'evil', no_annotations: '0', abbrv: '1' }),
+      KEY,
     )
-    vi.stubGlobal('fetch', fetch)
-    const [india, village] = JSON.parse(await run('India'))
-    expect(new URL(fetch.mock.calls[0]![0]).searchParams.get('lang')).toBe('en')
-    expect(india).toMatchObject({ name: 'India', area: { west: 67.9, south: 6.6, east: 97.4, north: 35.7 } })
-    // A point gets a small area around it.
-    expect(village.area).toEqual({ west: 85.25, south: expect.closeTo(27.65), east: 85.35, north: expect.closeTo(27.75) })
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe(body)
+    const url = upstream.mock.calls[0]![0]
+    expect(url.origin + url.pathname).toBe('https://api.opencagedata.com/geocode/v1/json')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      q: '-19.8,34.8',
+      limit: '1',
+      countrycode: 'mz',
+      bounds: '30,-27,41,-10',
+      language: 'pt',
+      no_annotations: '1',
+      key: KEY,
+    })
   })
 
-  it('says when nothing is found, and fails on an error', async () => {
-    vi.stubGlobal('fetch', async () => Response.json({ features: [] }))
-    expect(await run('nowhere')).toBe('No places found.')
-    vi.stubGlobal('fetch', async () => new Response('busy', { status: 503 }))
-    await expect(run('India')).rejects.toThrow(/Photon 503/)
+  it('keeps the upstream status, and never returns the key', async () => {
+    vi.stubGlobal('fetch', async () => new Response(`{"status":{"code":402,"message":"quota exceeded for ${KEY}"}}`, { status: 402 }))
+    const res = await geocode(get({ q: 'x' }), KEY)
+    expect(res.status).toBe(402)
+    expect(await res.text()).not.toContain(KEY)
+
+    vi.stubGlobal('fetch', async () => {
+      throw new Error(`connect failed ?key=${KEY}`)
+    })
+    const failed = await geocode(get({ q: 'x' }), KEY)
+    expect(failed.status).toBe(502)
+    expect(await failed.text()).not.toContain(KEY)
+  })
+
+  it('answers 503 without a key, and does not call OpenCage', async () => {
+    const upstream = vi.fn()
+    vi.stubGlobal('fetch', upstream)
+    const res = await geocode(get({ q: 'x' }), undefined)
+    expect(res.status).toBe(503)
+    expect((await res.json()).error).toMatch(/OPENCAGE_API_KEY/)
+    expect(upstream).not.toHaveBeenCalled()
+  })
+
+  it('only accepts GET', async () => {
+    const upstream = vi.fn()
+    vi.stubGlobal('fetch', upstream)
+    expect((await geocode(get({ q: 'x' }, 'POST'), KEY)).status).toBe(405)
+    expect(upstream).not.toHaveBeenCalled()
   })
 })

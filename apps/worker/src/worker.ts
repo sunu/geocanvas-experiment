@@ -7,6 +7,7 @@ import * as decoding from 'lib0/decoding'
 import { Agent, AGENT } from './agent/agent'
 import { openRouter } from './agent/openrouter'
 import { eventsSearch, geocodeSearch } from './agent/tools'
+import { geocode } from './geocode'
 import { montySearch, stacSearch } from './monty'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
@@ -15,7 +16,8 @@ import { UpdateLog } from './updateLog'
  * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
  * /connect/<room> to that room's Durable Object, which speaks the standard y-websocket
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
- * /monty/search proxies Montandon STAC searches with the token added (monty.ts).
+ * /monty/search proxies Montandon STAC searches with the token added (monty.ts), and
+ * /tools/geocode proxies OpenCage with the key added (geocode.ts).
  * Each room also runs the board's agent (agent/agent.ts), which answers the board's chat.
  */
 
@@ -175,6 +177,7 @@ export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
+    if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
     const roomId = /^\/connect\/([\w-]{1,64})$/.exec(path)?.[1]
     if (!roomId) return new Response('Not found', { status: 404 })
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a websocket', { status: 426 })

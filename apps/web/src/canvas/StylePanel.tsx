@@ -3,48 +3,49 @@ import type { Runtime } from '@ttx/core'
 import type { BoardObject } from '../board/board'
 import { requestFit } from './coreUI'
 import { ICON } from './Toolbar'
-import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE, type ColorName } from './style'
+import { COLORS, DEFAULT_FONT_SIZE, PALETTE, type ColorName } from './style'
 
-type Styled = Extract<BoardObject, { type: 'box' | 'text' }>
-type Text = Extract<BoardObject, { type: 'text' }>
+/** The fields this panel edits, on any type that has them (ObjectTypeDef.defaultColor, .textSize). */
+type Styleable = BoardObject & { color?: ColorName; fontSize?: number }
 
-const colorOf = (o: Styled): ColorName => o.color ?? (o.type === 'box' ? DEFAULT_BOX_COLOR : DEFAULT_TEXT_COLOR)
-const sizeOf = (t: Text) => t.fontSize ?? DEFAULT_FONT_SIZE
+const sizeOf = (o: BoardObject) => (o as Styleable).fontSize ?? DEFAULT_FONT_SIZE
 
-/** Color and text size for the selected boxes and texts. Hidden when none are selected. */
+/** Color and text size for the selected objects whose type has them. Hidden when there are none. */
 export function StylePanel({ runtime, selected }: { runtime: Runtime; selected: BoardObject[] }) {
-  const styled = selected.filter((o): o is Styled => o.type === 'box' || o.type === 'text')
-  if (!styled.length) return null
-  const texts = styled.filter((o): o is Text => o.type === 'text')
-  const colors = new Set(styled.map(colorOf))
-  const sizes = new Set(texts.map(sizeOf))
+  const type = (o: BoardObject) => runtime.registry.objectType(o.type)
+  const colored = selected.filter((o) => type(o)?.defaultColor)
+  const sized = selected.filter((o) => type(o)?.textSize)
+  if (!colored.length && !sized.length) return null
+  const colors = new Set(colored.map((o) => (o as Styleable).color ?? type(o)!.defaultColor!))
+  const sizes = new Set(sized.map(sizeOf))
 
   // Each press is its own undo step.
   const setColor = (color: ColorName) => {
     runtime.beginGesture()
-    runtime.dispatch('core.object.setColor', { kind: 'objects', ids: styled.map((o) => o.id) }, { color })
+    runtime.dispatch('core.object.setColor', { kind: 'objects', ids: colored.map((o) => o.id) }, { color })
   }
   const stepSize = (dir: 1 | -1) => {
     runtime.beginGesture()
-    for (const t of texts) requestFit(t.id)
-    runtime.dispatch(dir === 1 ? 'text.larger' : 'text.smaller', { kind: 'objects', ids: texts.map((t) => t.id) }, {})
+    for (const o of sized) requestFit(o.id)
+    runtime.dispatch(dir === 1 ? 'text.larger' : 'text.smaller', { kind: 'objects', ids: sized.map((o) => o.id) }, {})
   }
 
   return (
     <div className="ttx-style" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-      {COLORS.map((c) => (
-        <button
-          key={c}
-          className={`ttx-swatch ${colors.size === 1 && colors.has(c) ? 'is-on' : ''}`}
-          style={{ background: PALETTE[c].ink }}
-          title={c}
-          aria-label={`Color ${c}`}
-          onClick={() => setColor(c)}
-        />
-      ))}
-      {texts.length > 0 && (
+      {colored.length > 0 &&
+        COLORS.map((c) => (
+          <button
+            key={c}
+            className={`ttx-swatch ${colors.size === 1 && colors.has(c) ? 'is-on' : ''}`}
+            style={{ background: PALETTE[c].ink }}
+            title={c}
+            aria-label={`Color ${c}`}
+            onClick={() => setColor(c)}
+          />
+        ))}
+      {sized.length > 0 && (
         <>
-          <span className="ttx-style__sep" />
+          {colored.length > 0 && <span className="ttx-style__sep" />}
           <TextAaIcon size={ICON} className="ttx-style__label" aria-hidden />
           <button title="Larger text" aria-label="Larger text" onClick={() => stepSize(1)}>
             <PlusIcon size={ICON - 2} />

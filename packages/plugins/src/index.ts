@@ -12,4 +12,5 @@ export const plugins = [corePlugin, mapPlugin, eventsPlugin, agentPlugin]
 export { agentPlugin } from './agent.js'
 export { eventsPlugin, type EventBoardObject } from './events.js'
 export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
+export { bboxOf, DATA_LAYERS, hasArea, mapLayer, newLayerId, type Bbox, type DataLayerKey, type MapLayer } from './mapLayers.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'

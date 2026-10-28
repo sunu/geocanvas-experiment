@@ -25,6 +25,8 @@ registerObjectUI('text', {
   tool: { key: 'T', label: 'Text', Icon: TextTIcon },
   editable: true,
   editOnCreate: true,
+  widthOnly: true,
+  isEmpty: (o) => !o.text.trim(),
 })
 
 /** A color in a form: the same swatches as the style panel. */

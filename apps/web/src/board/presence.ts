@@ -2,37 +2,77 @@ import { useSyncExternalStore } from 'react'
 import type { WebsocketProvider } from 'y-websocket'
 import type { Actor } from '@ttx/core'
 
+export type Awareness = WebsocketProvider['awareness']
+
 /**
- * Presence (awareness): who is in the room and what each person has selected. Not stored; each browser
- * re-sends its own every 15 s. The room's agent sets `status` while it works (apps/worker/src/agent/).
+ * Presence: who is on the board, where their pointer is and what they have selected. It travels
+ * over Yjs awareness (relayed by the room, never stored), so it disappears when someone leaves;
+ * browsers re-send theirs every 15 s. Cursors are in world coordinates, so they land in the right
+ * place whatever each person's camera. The room's agent is a peer too: it sets `status` while it
+ * works (apps/worker/src/agent/), with no cursor or selection.
  */
-export interface Presence {
-  user?: Actor
-  selection?: string[]
+
+/** One person's (or the agent's) shared state, as this browser receives it. */
+export interface Peer {
+  clientId: number
+  /** The person (connect.ts) or the agent, with a name and color. */
+  user: Actor & { name: string; color: string }
+  /** World point, or absent when their pointer is off the canvas. */
+  cursor?: { x: number; y: number }
+  /** Ids of the objects they have selected. */
+  selection: string[]
   status?: 'thinking'
 }
 
-export interface Peer extends Presence {
-  clientId: number
+/** Everyone else with a user, from awareness states (clientId -> state). */
+export function peersFrom(states: Map<number, Record<string, unknown>>, selfId: number): Peer[] {
+  const peers: Peer[] = []
+  for (const [clientId, state] of states) {
+    const user = state.user as Peer['user'] | undefined
+    if (clientId === selfId || !user?.name || !user.color) continue
+    const cursor = state.cursor as Peer['cursor'] | null | undefined
+    const selection = Array.isArray(state.selection) ? (state.selection as string[]) : []
+    const status = state.status === 'thinking' ? ('thinking' as const) : undefined
+    peers.push({ clientId, user, ...(cursor && { cursor }), selection, ...(status && { status }) })
+  }
+  return peers
 }
 
-export type Awareness = WebsocketProvider['awareness']
+/** The peers list of each awareness, kept until the next change (React needs the same array until then). */
+const peersCache = new WeakMap<Awareness, Peer[]>()
+
+/** Others on the board: other people and the agent. Re-renders when anyone's presence changes. */
+export function usePeers(awareness: Awareness): Peer[] {
+  return useSyncExternalStore(
+    (onChange) => {
+      const update = () => {
+        peersCache.delete(awareness)
+        onChange()
+      }
+      awareness.on('change', update)
+      return () => awareness.off('change', update)
+    },
+    () => {
+      let peers = peersCache.get(awareness)
+      if (!peers) {
+        peers = peersFrom(awareness.getStates() as Map<number, Record<string, unknown>>, awareness.clientID)
+        peersCache.set(awareness, peers)
+      }
+      return peers
+    },
+  )
+}
 
 const NO_SELECTION: string[] = []
-// useSyncExternalStore needs the same array until something changes.
-const peersCache = new WeakMap<Awareness, Peer[]>()
-const watched = new WeakSet<Awareness>()
-
-/** Everyone else in the room: other tabs and the agent. Re-renders on any presence change. */
-export function usePeers(awareness: Awareness): Peer[] {
-  return useSyncExternalStore((onChange) => subscribe(awareness, onChange), () => peersOf(awareness))
-}
 
 /** What this tab has selected, as it last published it. */
 export function useOwnSelection(awareness: Awareness): string[] {
   return useSyncExternalStore(
-    (onChange) => subscribe(awareness, onChange),
-    () => (awareness.getLocalState() as Presence | null)?.selection ?? NO_SELECTION,
+    (onChange) => {
+      awareness.on('change', onChange)
+      return () => awareness.off('change', onChange)
+    },
+    () => ((awareness.getLocalState() as { selection?: string[] } | null)?.selection ?? NO_SELECTION),
   )
 }
 
@@ -40,23 +80,28 @@ export function publishSelection(awareness: Awareness, ids: Iterable<string>) {
   awareness.setLocalStateField('selection', [...ids])
 }
 
-function subscribe(awareness: Awareness, onChange: () => void) {
-  awareness.on('change', onChange)
-  return () => awareness.off('change', onChange)
-}
+/** Pointer moves are sent at most this often (ms). Each one wakes the room for a moment. */
+export const CURSOR_INTERVAL = 100
 
-function peersOf(awareness: Awareness): Peer[] {
-  if (!watched.has(awareness)) {
-    watched.add(awareness)
-    awareness.on('change', () => peersCache.delete(awareness))
+/**
+ * Shares this person's cursor, at most once per CURSOR_INTERVAL. The last position is always sent,
+ * so others see where the pointer stopped. null hides the cursor (pointer left the canvas).
+ */
+export function cursorSender(awareness: Pick<Awareness, 'setLocalStateField'>, interval = CURSOR_INTERVAL) {
+  let last = 0
+  let pending: { x: number; y: number } | null | undefined
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const flush = () => {
+    timer = undefined
+    last = Date.now()
+    awareness.setLocalStateField('cursor', pending ?? null)
+    pending = undefined
   }
-  let peers = peersCache.get(awareness)
-  if (!peers) {
-    peers = []
-    for (const [clientId, state] of awareness.getStates()) {
-      if (clientId !== awareness.clientID && state) peers.push({ clientId, ...(state as Presence) })
-    }
-    peersCache.set(awareness, peers)
+  return (point: { x: number; y: number } | null) => {
+    pending = point
+    if (timer) return
+    const wait = interval - (Date.now() - last)
+    if (wait <= 0) flush()
+    else timer = setTimeout(flush, wait)
   }
-  return peers
 }
