@@ -4,10 +4,11 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
-import { Views, type SavedView } from '@ttx/core'
-import type { Basemap, MapBoardObject, MapLayer } from '@ttx/plugins'
+import { Views, type Runtime, type SavedView } from '@ttx/core'
+import { MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type MapBoardObject, type MapLayer } from '@ttx/plugins'
+import { tools } from '../tools/registry'
 import { basemapStyle } from './basemaps'
-import { attributionOf, deckLayers, useLayerStates } from './layers'
+import { attributionOf, boundsOf, deckLayers, useLayerStates } from './layers'
 import { registerLiveMap } from './live'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
@@ -20,6 +21,32 @@ const WORLD = { center: [20, 10] as [number, number], zoom: 1, bearing: 0 }
 /** A view is saved this long after the map stops moving, so a series of pans is one write. */
 const SAVE_AFTER_MS = 1000
 const NO_LAYERS: MapLayer[] = []
+
+/** Closest zoom when fitting a view to data, so a single point does not zoom in to the street. */
+const FIT_MAX_ZOOM = 14
+
+/**
+ * Fit this person's view of a map to a bbox, e.g. to a layer they just added. It is written as their view,
+ * as their own pans are (no op log entry, no undo): the map starts there, or flies there if it is on screen.
+ * Nobody else's view moves.
+ */
+export function fitMapTo(runtime: Runtime, mapId: string, [west, south, east, north]: Bbox) {
+  const map = runtime.board.get(mapId)
+  if (!map) return
+  const { center, zoom } = viewOfArea({ west, south, east, north }, map.w, map.h - MAP_HEADER_PX)
+  new Views(runtime.board.doc).set(runtime.actor.id, mapId, { center, zoom: Math.min(zoom, FIT_MAX_ZOOM), bearing: 0 })
+}
+
+/** Fit a map to a layer's data once it has loaded (from the tool cache when the map already ran it). */
+export function fitMapToLayer(runtime: Runtime, mapId: string, layer: MapLayer) {
+  tools.run<GeoJSON.FeatureCollection>(layer.tool, layer.input).then(
+    (fc) => {
+      const b = boundsOf(fc)
+      if (b) fitMapTo(runtime, mapId, b)
+    },
+    () => {}, // the layer list shows the error
+  )
+}
 
 /**
  * A live MapLibre map on the canvas. Double-click to pan and zoom it (editing); Esc or a

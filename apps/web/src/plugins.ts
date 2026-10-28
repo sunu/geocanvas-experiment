@@ -2,6 +2,10 @@
 import './canvas/coreUI'
 import './map/ui'
 import './events/ui'
+import './notebooks/ui'
+import './reliefweb/ui'
+import './hapi/ui'
+import './images/ui'
 
 /** The plugins every board loads (@ttx/plugins). A new object type or op comes in through a plugin there. */
 export { plugins } from '@ttx/plugins'
