@@ -8,7 +8,8 @@ import * as Y from 'yjs'
  * Moving one object between two others only rewrites that object's `z`.
  *
  * Map views (center, zoom) are not here on purpose: each person pans their own maps.
- * An event holds only its Montandon id; each person's browser fetches the event's details.
+ * A map's data layers are recipes (tool and input), and an event holds only its Montandon id:
+ * each person's browser fetches the data.
  *
  * Object types are defined in objects/ (one file each, listed in objects/registry.ts).
  */
