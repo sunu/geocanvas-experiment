@@ -52,9 +52,10 @@ export class Room extends DurableObject<Env> {
       if (origin !== this) this.log.append(update)
       this.broadcast(syncMessage((enc) => syncProtocol.writeUpdate(enc, update)))
     })
-    this.awareness.on('update', ({ added, updated, removed }: AwarenessChange, socket: WebSocket | null) => {
+    this.awareness.on('update', ({ added, updated, removed }: AwarenessChange, socket: unknown) => {
       // Which presence ids a socket controls is kept on the socket, so it survives hibernation.
-      if (socket) {
+      // The origin is the socket for a browser's update, and 'local' for the agent's own presence.
+      if (socket instanceof WebSocket) {
         const ids = new Set(presenceIds(socket))
         for (const id of added) ids.add(id)
         for (const id of removed) ids.delete(id)

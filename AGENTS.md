@@ -32,24 +32,29 @@ npm workspaces monorepo (TypeScript, ESM). Design docs go in `plans/`.
 ```
 packages/
   core/          @ttx/core, no React: the board (reads), BoardTx (the only writes), the op runtime,
-                 the plugin registry, tool export, and the builtin 'core' plugin (box, text, object and view ops)
+                 the plugin registry, tool export, the builtin 'core' plugin (box, text, object and view ops),
+                 and the board's agent chat (chat.ts)
+  plugins/       @ttx/plugins, no React: the headless plugins every board loads (map, events, agent). The web app
+                 and the Worker's agent both use this list
 apps/
   web/           React app (Vite): our own infinite canvas
-    src/plugins.ts the plugins every board loads, and their UI
-    src/board/     typed board objects and the connection to the Worker
+    src/plugins.ts the plugins every board loads (@ttx/plugins), and their UI
+    src/board/     typed board objects, the connection to the Worker, and presence (who selected what)
     src/canvas/    camera, input, selection, toolbar, object views, the UI registry (registry.ts)
     src/palette/   the command palette (⌘K) and forms made from op schemas
-    src/map/       the map plugin (plugin.ts) and widget
-    src/events/    the events plugin (plugin.ts) and widget: search Montandon, show one event across its sources
-  worker/        Cloudflare Worker: serves the built web app; one Durable Object per room relays and stores the board;
-                 /monty/search proxies Montandon with the token
+    src/map/       the map widget (its plugin is in @ttx/plugins)
+    src/events/    the event widget: search Montandon, show one event across its sources
+    src/agent/     the agent chat sidebar
+  worker/        Cloudflare Worker: serves the built web app; one Durable Object per room relays and stores the board
+                 and runs the board's agent (src/agent/); /monty/search proxies Montandon with the token
 ```
 
 - **Our own canvas, no tldraw.** tldraw needs a paid license off localhost, and the canvas we need is small. The design follows vsticky: a DOM "world" layer moved by one CSS transform. The camera is local to each person and never synced.
 - **The board is a Yjs doc** (`packages/core/src/doc/board.ts`): one map of objects (box, text, map, event), each a Y.Map of plain fields. Layer order is a float `z` per object, ties broken by id. The object type sets where a new object goes (`layer`): texts and events on top, boxes and maps at the bottom, since they are mostly backgrounds. Text is stored as plain strings, with no encryption. The doc also has an `oplog` array (see ops below).
 - **Ops are the only write path** (`plans/plan-007.md`). The UI, the palette and agents do not write the doc. They dispatch an op on the `Runtime` (`packages/core/src/ops/runtime.ts`). An op has a zod `args` schema, an optional read-only `prepare`, and a sync `apply` that writes through `BoardTx` in one transaction. `BoardTx` checks every add and update against the object type's schema. Use `runtime.dispatch` (sync) for gestures and typing, and `runtime.invoke` (async) for the palette and tools. Undo and redo cover only your own edits, one step per gesture: call `runtime.beginGesture()` when a gesture starts (a press, a key, a button). An op with `gesture: true` (drag, typing) writes one op log entry per gesture, not one per frame. If `apply` throws after a write, that write stays (Yjs has no rollback), so check input before the first write.
-- **Plugins** add object types and ops (`definePlugin`). Each object type gets a `<type>.add` op. Core uses the same API (`packages/core/src/plugins/core.ts`). To add a type: write a headless `plugin.ts` (zod fields, ops), add its UI with `registerObjectUI` (view, tool, edit behavior) and, for special form fields, `registerWidget`, then list it in `apps/web/src/plugins.ts`. Never change a stored type name or field: old boards use them.
+- **Plugins** add object types and ops (`definePlugin`). Each object type gets a `<type>.add` op. Core uses the same API (`packages/core/src/plugins/core.ts`). To add a type: write a headless plugin in `packages/plugins` (zod fields, ops) and list it there, then add its UI with `registerObjectUI` (view, tool, edit behavior) and, for special form fields, `registerWidget`, imported from `apps/web/src/plugins.ts`. Never change a stored type name or field: old boards use them.
 - **Tools:** `exportTools(runtime.availableOps(target))` gives JSON Schema tool definitions with input `{ ids, args }`. `runtime.callTool(name, input, actor)` runs one. Hidden ops are not tools, and an op with `risk: 'high'` runs only for a user actor. `summarizeBoard` gives an LLM a short text of the board. In dev, `window.runtime` is in the console.
+- **The board agent** (`plans/plan-008.md`) runs in each room's Durable Object, as a headless `Runtime` with the actor `{ kind: 'agent' }` on the doc the room holds (`apps/worker/src/agent/`). People talk to it in the chat sidebar. The chat is a `chat` array in the board doc, one shared thread per board (`packages/core/src/chat.ts`). Each message stores the ids its sender had selected, and the agent acts on those ids only, never on a live selection. The agent answers one message at a time with a plain tool loop on OpenRouter (`AGENT_MODEL` in `wrangler.jsonc`), at most 8 model calls per turn and 20 turns per room per hour. Each reply stores what undoing it needs; its Undo button runs the hidden op `agent.undoTurn`. Read-only agent tools (`board__get`) are not ops. Without `OPENROUTER_API_KEY`, the agent answers that it is not configured. The Durable Object also sets the agent's presence while it works; its awareness origin is then `'local'`, not a socket.
 - **Multiplayer runs on our own Cloudflare Worker.** `/connect/<room>` goes to that room's Durable Object, which speaks the standard y-websocket protocol, keeps the doc in memory and appends every update to its SQLite (compacted on load when there are many). Cloudflare caps a SQLite row at 2 MB, so larger updates are split across rows (`apps/worker/src/updateLog.ts`). Websockets use Cloudflare's Hibernation API (`ctx.acceptWebSocket`): the room leaves memory between messages, so open but idle tabs cost no Durable Object time. With `socket.accept()` a room is billed for as long as any tab is connected, which used up the free plan's daily allowance (13,000 GB-s, reset at 00:00 UTC) and took every board offline. Presence (awareness) is kept in memory only: it starts empty after a wake and browsers re-send theirs every 15 s; which presence ids a socket controls is kept on the socket (`serializeAttachment`). The browser uses y-websocket's `WebsocketProvider`. Tabs of one browser also sync with each other directly (BroadcastChannel), so test multiplayer from two origins or two browsers, or the server is not involved.
 - **Input:** drag on empty canvas to select; shift+drag selects from anywhere, even over a map or box, and adds to the selection; shift+click toggles one object; scroll pans; pinch or ⌘+scroll zooms; space+drag pans. Tools: V select, R box, T text, M map, E event (each object type's UI registers its tool). ⌘K opens the command palette. `]` / `[` bring to front / send to back, with ⌘ one step. Delete removes. Double-click edits a text, lets a map take the pointer, or opens an event's search; Esc gives it back. The left panel sets the color of selected boxes and texts, and A+ / A− the text size (`canvas/style.ts`: colors are stored by name). A text's height follows its content; only the person who changed it refits it.
 - **Icons:** Phosphor (`@phosphor-icons/react`, regular weight, imported as `<Name>Icon`; only imported icons are bundled). Icon-only buttons carry a `title` and an `aria-label`. For hazard and humanitarian-sector symbols, which Phosphor lacks (earthquake, volcano, displacement, clusters), consider the OCHA Humanitarian Icons; check their license first.
@@ -71,6 +76,7 @@ Node 22 or later.
 ```sh
 npm install
 echo 'MONTANDON_TOKEN=<token>' > apps/worker/.dev.vars   # once; git-ignored. Needed for event search
+echo 'OPENROUTER_API_KEY=<key>' >> apps/worker/.dev.vars # needed for the board agent
 npm run sync        # Worker + Durable Objects locally (wrangler dev), http://localhost:8787
 npm run dev         # web app with hot reload, http://localhost:5173 (proxies /connect and /monty to :8787)
 npm test            # vitest
@@ -89,7 +95,7 @@ GitHub Actions deploy every push to Cloudflare (`.github/workflows/deploy.yml`),
 - Deleting a branch deletes its Worker and its rooms (`delete-branch-worker.yml`).
 - The deployed URL is in each run's summary, and on the branch's pull request as one comment that each deploy updates (`.github/scripts/pr-preview-comment.sh`). A pull request opened after the branch deployed gets the link from `pr-preview-link.yml`.
 
-Repository secrets: `CLOUDFLARE_API_TOKEN` (a token limited to editing Workers), `CLOUDFLARE_ACCOUNT_ID`, and `MONTANDON_TOKEN`. Cloudflare keeps secrets per Worker and each branch is its own Worker, so the workflow uploads `MONTANDON_TOKEN` with every deploy (`--secrets-file`). Without it, deploys still pass and event search answers 503.
+Repository secrets: `CLOUDFLARE_API_TOKEN` (a token limited to editing Workers), `CLOUDFLARE_ACCOUNT_ID`, `MONTANDON_TOKEN` and `OPENROUTER_API_KEY`. Cloudflare keeps secrets per Worker and each branch is its own Worker, so the workflow uploads `MONTANDON_TOKEN` and `OPENROUTER_API_KEY` with every deploy (`--secrets-file`). Without them, deploys still pass; event search answers 503 and the agent answers that it is not configured.
 
 ## Before editing
 

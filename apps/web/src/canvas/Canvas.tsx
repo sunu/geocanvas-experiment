@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import type { Runtime, TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects, type ConnectionStatus } from '../board/connect'
+import { publishSelection, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
@@ -45,9 +46,10 @@ function trackDrag(
  * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
  * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
  */
-export function Canvas({ runtime, status }: { runtime: Runtime; status: ConnectionStatus }) {
+export function Canvas({ runtime, status, awareness }: { runtime: Runtime; status: ConnectionStatus; awareness: Awareness }) {
   const board = runtime.board as Board
   const objects = useObjects(board)
+  const peers = usePeers(awareness)
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, z: 1 })
   const [tool, setTool] = useState<Tool>('select')
   const [selection, setSelection] = useState<Set<string>>(() => new Set())
@@ -64,6 +66,9 @@ export function Canvas({ runtime, status }: { runtime: Runtime; status: Connecti
   const byId = useMemo(() => new Map(objects.map((o) => [o.id, o])), [objects])
   const selected = useMemo(() => new Set([...selection].filter((id) => byId.has(id))), [selection, byId])
   const editingId = editing && byId.has(editing) ? editing : null
+
+  // Others see what this person selected, and the agent chat sends it with each message.
+  useEffect(() => publishSelection(awareness, selected), [awareness, selected])
 
   // A text left empty when editing ends is removed.
   const lastEditing = useRef<string | null>(null)
@@ -321,6 +326,23 @@ export function Canvas({ runtime, status }: { runtime: Runtime; status: Connecti
 
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
+        {peers.flatMap((peer) =>
+          (peer.selection ?? []).flatMap((id, i) => {
+            const o = byId.get(id)
+            if (!o) return []
+            const r = toScreen(camera, o)
+            const color = peer.user?.color
+            return (
+              <div key={`${peer.clientId}:${id}`} className="ttx-selection ttx-selection--peer" style={{ left: r.x, top: r.y, width: r.w, height: r.h, borderColor: color }}>
+                {i === 0 && peer.user?.name && (
+                  <span className="ttx-selection__name" style={{ background: color }}>
+                    {peer.user.name}
+                  </span>
+                )}
+              </div>
+            )
+          }),
+        )}
         {[...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />

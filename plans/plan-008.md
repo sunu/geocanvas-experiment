@@ -1,6 +1,6 @@
 # Plan 008 — A board agent: chat sidebar, selection snapshot, agent in the room Durable Object
 
-Date: 2026-10-28. Status: in progress on `feat/agent`.
+Date: 2026-10-28. Status: sections 2 to 3.5 implemented on `feat/agent`; section 3.6 is next.
 
 ## 1. Context
 
