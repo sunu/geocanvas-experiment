@@ -61,6 +61,41 @@ body,
   border-radius: 6px;
 }
 
+/* Fill and border color come from the note's color; its text is always dark (objects/sticky.tsx). */
+.ttx-sticky {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.12);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.3;
+}
+
+.ttx-sticky__text {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  font: inherit;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ttx-sticky__text--edit {
+  display: block;
+  margin: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  user-select: text;
+}
+
 /* An object type this build does not know (made by a newer version of the app). */
 .ttx-unknown {
   box-sizing: border-box;
