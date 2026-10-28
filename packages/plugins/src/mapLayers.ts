@@ -43,6 +43,16 @@ export const DATA_LAYERS = {
 
 export type DataLayerKey = keyof typeof DATA_LAYERS
 
+/**
+ * Administrative boundaries from OCHA's COD-AB, with P-codes: provinces (level 1) and districts (level 2). The tool
+ * returns no shapes: each browser draws the vector tiles itself (apps/web/src/map/adminAreas.ts), so a layer needs
+ * no area. HAPI figures are joined to the same tiles by P-code (hapi.choropleth).
+ */
+export const BOUNDARIES_TOOL = 'boundaries.codab'
+export const ADMIN_LEVELS = [1, 2] as const
+export type AdminLevel = (typeof ADMIN_LEVELS)[number]
+export const ADMIN_LEVEL_NAME: Record<AdminLevel, { one: string; many: string }> = { 1: { one: 'province', many: 'Provinces' }, 2: { one: 'district', many: 'Districts' } }
+
 /** Id of a new layer. Unique within one map is enough. */
 export const newLayerId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 

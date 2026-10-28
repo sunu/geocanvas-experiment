@@ -33,7 +33,7 @@ function setup() {
   const doc = new Y.Doc()
   const all = [...plugins, pins]
   const person = new Runtime({ doc, plugins: all, actor: ada })
-  const view: ViewController = { fitAll() {}, zoomTo() {}, resetZoom() {}, center: () => ({ x: 1000, y: 500 }) }
+  const view: ViewController = { fitAll() {}, zoomTo() {}, resetZoom() {}, focus() {}, center: () => ({ x: 1000, y: 500 }) }
   let selection: string[] = []
   const executor = new Executor({ doc, plugins: all, person: ada, view: () => view, selection: () => selection, tools: [echo] })
   return { doc, person, executor, select: (ids: string[]) => (selection = ids) }

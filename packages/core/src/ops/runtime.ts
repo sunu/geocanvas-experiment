@@ -150,6 +150,16 @@ export class Runtime {
     return this.invoke(opId, target, args ?? {}, { actor })
   }
 
+  /**
+   * Apply changes made in a draft of this board (ops/draft.ts) as this runtime's own write: one undo
+   * step, so undo takes back the whole share. The draft's op log entries come with the update.
+   */
+  applyDraft(update: Uint8Array) {
+    this.beginGesture()
+    Y.applyUpdate(this.board.doc, update, new this.Origin(crypto.randomUUID()))
+    this.undoManager.stopCapturing()
+  }
+
   undo(): boolean {
     this.flush()
     const item = this.undoManager.undo()

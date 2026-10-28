@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { exportTools, Runtime, type Actor } from '@ttx/core'
-import { plugins, type CountryBoardObject, type PresenceBoardObject } from '../src/index'
+import { plugins, type CountryBoardObject, type MapBoardObject, type PresenceBoardObject } from '../src/index'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
 const canvas = { kind: 'canvas' } as const
@@ -68,5 +68,40 @@ describe("who's where and conflict", () => {
     const { rt } = setup()
     const names = exportTools(rt.availableOps(canvas)).map((t) => t.name)
     expect(names).toEqual(expect.arrayContaining(['presence__add', 'conflict__add']))
+  })
+})
+
+describe('HDX HAPI figures and boundaries on a map', () => {
+  function withMap() {
+    const { rt } = setup()
+    const map = rt.dispatch('map.add', canvas, { x: 0, y: 0 }).created![0]!
+    return { rt, target: { kind: 'objects' as const, ids: [map] }, layers: () => (rt.board.get(map) as MapBoardObject).layers }
+  }
+
+  it('adds province or district boundaries, with no area', () => {
+    const { rt, target, layers } = withMap()
+    rt.dispatch('map.addBoundaries', target, { level: 1 })
+    rt.dispatch('map.addBoundaries', target, { level: 2 })
+    expect(layers()).toEqual([
+      { id: expect.any(String), tool: 'boundaries.codab', input: { level: 1 }, title: 'Provinces (COD-AB)' },
+      { id: expect.any(String), tool: 'boundaries.codab', input: { level: 2 }, title: 'Districts (COD-AB)' },
+    ])
+    expect(rt.dispatch('map.addBoundaries', target, { level: 3 }).status).toBe('failed')
+  })
+
+  it('colors areas by a HAPI figure, as a recipe that names the figure, with a sector for organizations only', () => {
+    const { rt, target, layers } = withMap()
+    rt.dispatch('map.addChoropleth', target, { country: 'MOZ', indicator: 'organizations', level: 1, sector: 'HEA' })
+    rt.dispatch('map.addChoropleth', target, { country: 'SDN', indicator: 'conflictEvents', level: 2, sector: 'HEA' })
+    expect(layers()).toEqual([
+      { id: expect.any(String), tool: 'hapi.choropleth', input: { country: 'MOZ', indicator: 'organizations', level: 1, sector: 'HEA' }, title: 'Organizations (HEA) by province · Mozambique' },
+      { id: expect.any(String), tool: 'hapi.choropleth', input: { country: 'SDN', indicator: 'conflictEvents', level: 2 }, title: 'Conflict events by district · Sudan' },
+    ])
+    expect(rt.dispatch('map.addChoropleth', target, { country: 'MOZ', indicator: 'rainfall' }).status).toBe('failed')
+  })
+
+  it('are tools for the agent', () => {
+    const { rt, target } = withMap()
+    expect(exportTools(rt.availableOps(target)).map((t) => t.name)).toEqual(expect.arrayContaining(['map__addBoundaries', 'map__addChoropleth']))
   })
 })

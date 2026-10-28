@@ -12,6 +12,8 @@ import {
 } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
 import type { ConnectionStatus } from '../board/connect'
+import { NameButton } from '../board/NameButton'
+import type { Awareness } from '../board/presence'
 import { toolTypes } from './registry'
 
 /** 'select', or the object type to draw. */
@@ -36,10 +38,11 @@ interface Props {
   zoom: number
   onResetZoom(): void
   status: ConnectionStatus
+  awareness: Awareness
   onPalette(): void
 }
 
-export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, status, onPalette }: Props) {
+export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, status, awareness, onPalette }: Props) {
   const none = selection.size === 0
   // Each button press is its own undo step.
   const act = (opId: string) => () => {
@@ -89,6 +92,7 @@ export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, s
       </button>
       <span className="ttx-toolbar__sep" />
       <button title="Reset zoom to 100%" onClick={onResetZoom}>{Math.round(zoom * 100)}%</button>
+      <NameButton actor={runtime.actor} awareness={awareness} />
       <span className={`ttx-status ttx-status--${status}`} title={status} />
     </div>
   )

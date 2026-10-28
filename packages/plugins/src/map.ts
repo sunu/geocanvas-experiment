@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { defineOp, definePlugin, Views, type AnyObject, type BoardTx, type OpContext } from '@ttx/core'
-import { bboxOf, DATA_LAYERS, mapLayer, newLayerId, type DataLayerKey, type MapLayer } from './mapLayers.js'
+import { ADMIN_LEVEL_NAME, ADMIN_LEVELS, BOUNDARIES_TOOL, bboxOf, DATA_LAYERS, mapLayer, newLayerId, type AdminLevel, type DataLayerKey, type MapLayer } from './mapLayers.js'
 import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
 
 /** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
@@ -123,6 +123,19 @@ export const mapPlugin = definePlugin({
         const map = mapOf(ctx)
         const d = DATA_LAYERS[layer]
         const added: MapLayer = { id: newLayerId(), tool: d.tool, input: { ...d.input, area: areaFor(ctx, map, area) }, title: d.title }
+        return { id: map.id, layers: [...(map.layers ?? []), added] }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.addBoundaries',
+      title: 'Add boundaries',
+      description: "Add OCHA's administrative boundaries (COD-AB) to a map, for everyone: provinces (level 1) or districts (level 2), with their P-codes, in the 112 countries COD-AB covers.",
+      target: oneMap,
+      args: z.object({ level: z.union(ADMIN_LEVELS.map((l) => z.literal(l))).default(1).describe('1 for provinces, 2 for districts') }),
+      prepare(ctx, { level }) {
+        const map = mapOf(ctx)
+        const added: MapLayer = { id: newLayerId(), tool: BOUNDARIES_TOOL, input: { level }, title: `${ADMIN_LEVEL_NAME[level as AdminLevel].many} (COD-AB)` }
         return { id: map.id, layers: [...(map.layers ?? []), added] }
       },
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),

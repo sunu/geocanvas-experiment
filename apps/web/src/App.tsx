@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PlugsConnectedIcon, PlugsIcon, PlusIcon, RobotIcon } from '@phosphor-icons/react'
+import { FolderOpenIcon, PlugsConnectedIcon, PlugsIcon, PlusIcon, RobotIcon } from '@phosphor-icons/react'
 import { eventsSearch } from '@ttx/plugins'
 import { startBrowserAgent } from './agent/browserAgent'
 import { ChatPanel } from './agent/ChatPanel'
@@ -11,6 +11,7 @@ import { startBridge, useBridgeStatus } from './mcp/bridge'
 import { Executor } from './mcp/executor'
 import { plugins } from './plugins'
 import { tools } from './tools/registry'
+import { UploadsPanel } from './uploads/UploadsPanel'
 
 /** The board to join: #room=<id>. Without one, start a new board and put its id in the URL to share. */
 let room = roomFromHash(location.hash)
@@ -21,7 +22,7 @@ if (!room) {
 // Editing the hash to change room does not reload the page by itself.
 addEventListener('hashchange', () => location.reload())
 
-const { board, runtime, provider, chat } = connect(room)
+const { board, runtime, provider, chat, uploads } = connect(room)
 // Answers only the messages this tab sends on the person's own key; idle otherwise.
 startBrowserAgent(provider.doc, provider.awareness)
 // On a local app paired with the MCP companion (apps/mcp): an external agent works on this board through this tab.
@@ -38,7 +39,7 @@ void startBridge(
   { room, person: runtime.actor },
 )
 // In dev, run ops and tools from the console, e.g. runtime.callTool('box__add', { args: { x: 0, y: 0 } }).
-if (import.meta.env.DEV) Object.assign(window, { board, runtime, provider, chat })
+if (import.meta.env.DEV) Object.assign(window, { board, runtime, provider, chat, uploads })
 
 /** Open a new, empty board (through hashchange, which reloads into it). */
 function newBoard() {
@@ -50,7 +51,7 @@ const BRIDGE_LABEL = { connecting: 'Connecting to the MCP companion…', connect
 export function App() {
   const status = useConnectionStatus(provider)
   const bridge = useBridgeStatus()
-  const [chatOpen, setChatOpen] = useState(false)
+  const [panel, setPanel] = useState<'agent' | 'uploads'>()
   return (
     <>
       <Canvas runtime={runtime} status={status} awareness={provider.awareness} />
@@ -67,11 +68,17 @@ export function App() {
         )}
       </div>
       {/* The open panel takes this corner and has its own close button. */}
-      {chatOpen ? (
-        <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} onClose={() => setChatOpen(false)} />
+      {panel === 'agent' ? (
+        <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} onClose={() => setPanel(undefined)} />
+      ) : panel === 'uploads' ? (
+        <UploadsPanel runtime={runtime} uploads={uploads} onClose={() => setPanel(undefined)} />
       ) : (
         <div className="ttx-boardbar ttx-boardbar--right">
-          <button title="Ask the board's agent to change the board" onClick={() => setChatOpen(true)}>
+          <button title="Files uploaded to this board, to put back or share" onClick={() => setPanel('uploads')}>
+            <FolderOpenIcon size={16} />
+            Uploads
+          </button>
+          <button title="Ask the board's agent to change the board" onClick={() => setPanel('agent')}>
             <RobotIcon size={16} />
             Agent
           </button>

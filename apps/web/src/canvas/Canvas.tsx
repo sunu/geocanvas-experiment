@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import type { Runtime, TargetRef } from '@ttx/core'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { Draft, type Runtime, type TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects, type ConnectionStatus } from '../board/connect'
 import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
+import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
 import { ObjectView } from './ObjectView'
+import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { Peers } from './Peers'
-import { objectUI } from './registry'
+import { isFocusable, objectUI } from './registry'
 import { StylePanel } from './StylePanel'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
@@ -19,6 +21,25 @@ const HANDLES = ['nw', 'ne', 'sw', 'se'] as const
 const GRID = 24
 
 const objectsTarget = (ids: Iterable<string>): TargetRef => ({ kind: 'objects', ids: [...ids] })
+
+/**
+ * In-focus mode (canvas/focus.ts): one object fills the screen, drawn from this person's draft of the
+ * board, so what they change there reaches others only when they share it. Local, like the camera.
+ */
+interface Focus {
+  id: string
+  /** The camera to go back to. */
+  saved: Camera
+  draft: Draft
+  /** The screen area the object fills. */
+  area: Rect
+  /** The object's local rectangle once the zoom-in ends; null while it animates. */
+  rect: Rect | null
+}
+
+const NO_OBJECTS: BoardObject[] = []
+const noSubscribe = () => () => {}
+const noObjects = () => NO_OBJECTS
 
 /** Follow a press until release. onMove gets the screen distance from the press once it passes the threshold. */
 function trackDrag(
@@ -59,9 +80,22 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   const [draft, setDraft] = useState<Rect | null>(null) // world, while drawing a new object
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [focus, setFocus] = useState<Focus | null>(null)
+  /** Leaving focus with unshared changes: the Share / Discard / Keep editing dialog is open. */
+  const [asking, setAsking] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const cameraRef = useRef(camera)
   cameraRef.current = camera
+  const focusRef = useRef(focus)
+  focusRef.current = focus
+  const stopAnimation = useRef<() => void>(undefined)
+
+  // The focused object as the draft has it: this person's changes, and everyone else's as they arrive.
+  const draftBoard = focus?.draft.runtime.board as Board | undefined
+  const draftObjects = useSyncExternalStore(draftBoard?.subscribe ?? noSubscribe, draftBoard?.snapshot ?? noObjects)
+  const focused = focus ? draftObjects.find((o) => o.id === focus.id) : undefined
+  const focusedUI = focused && objectUI(focused.type)
 
   // Someone else may delete what we have selected or are editing.
   const byId = useMemo(() => new Map(objects.map((o) => [o.id, o])), [objects])
@@ -97,6 +131,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         const el = rootRef.current
         if (el) setCamera((c) => zoomAt(c, 1 / c.z, el.clientWidth / 2, el.clientHeight / 2))
       },
+      focus: (id) => enterFocusRef.current(id),
       center: () => viewCenter(),
     }
     return () => {
@@ -113,6 +148,11 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     if (e.button === 2) return
     const target = e.target as HTMLElement
     const id = target.closest<HTMLElement>('[data-id]')?.dataset.id
+    if (focusRef.current) {
+      // The focused object has the pointer; a press anywhere else leaves focus.
+      if (id !== focusRef.current.id) requestExit()
+      return
+    }
     if (editingId && id === editingId) return // the text box or live map has the pointer
     if (editingId) setEditing(null)
     runtime.beginGesture()
@@ -218,6 +258,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   }
 
   function onDoubleClick(e: ReactMouseEvent) {
+    if (focusRef.current) return
     const id = (e.target as HTMLElement).closest<HTMLElement>('[data-id]')?.dataset.id
     const o = id && byId.get(id)
     if (!o || !objectUI(o.type)?.editable) return
@@ -229,6 +270,8 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   useEffect(() => {
     const root = rootRef.current!
     const onWheel = (e: WheelEvent) => {
+      // In focus the canvas stays still: the focused object scrolls or zooms itself.
+      if (focusRef.current) return
       e.preventDefault()
       const r = root.getBoundingClientRect()
       if (e.ctrlKey || e.metaKey) {
@@ -244,6 +287,16 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
+      if (focus) {
+        // In focus only Esc (leave) and undo, on the draft. The exit dialog handles its own Esc.
+        if (e.key === 'Escape') requestExit()
+        else if (mod && e.key.toLowerCase() === 'z' && !(e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')) {
+          e.preventDefault()
+          if (e.shiftKey) focus.draft.runtime.redo()
+          else focus.draft.runtime.undo()
+        }
+        return
+      }
       if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setPaletteOpen((open) => !open)
@@ -281,6 +334,9 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         const up = e.code === 'BracketRight'
         const opId = mod ? (up ? 'core.object.bringForward' : 'core.object.sendBackward') : up ? 'core.object.bringToFront' : 'core.object.sendToBack'
         runtime.dispatch(opId, objectsTarget(selected), {})
+      } else if (!mod && !e.altKey && e.key.toLowerCase() === 'f' && selected.size === 1) {
+        const o = byId.get([...selected][0]!)
+        if (o && isFocusable(objectUI(o.type))) enterFocus(o.id)
       } else if (!mod && !e.altKey) {
         const t = tools().find((t) => t.key.toLowerCase() === e.key.toLowerCase())
         if (t) setTool(t.tool)
@@ -295,7 +351,96 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [runtime, editingId, selected, paletteOpen])
+  }, [runtime, editingId, selected, paletteOpen, focus])
+
+  /** Open an object in focus mode: zoom until it fills the screen, then lay it out at that size, on a draft. */
+  function enterFocus(id: string) {
+    if (focusRef.current) return
+    const o = board.get(id)
+    if (!o || !isFocusable(objectUI(o.type))) throw new Error(`${o ? runtime.registry.objectType(o.type)?.title : 'This object'} has no focus mode`)
+    const el = rootRef.current!
+    const area = focusArea(el.clientWidth, el.clientHeight)
+    const saved = cameraRef.current
+    setEditing(null)
+    setPaletteOpen(false)
+    setSelection(new Set([id]))
+    setFocus({ id, saved, draft: new Draft(runtime), area, rect: null })
+    stopAnimation.current?.()
+    stopAnimation.current = animateCamera(saved, fillCamera(o, area), setCamera, () => {
+      const layout = focusedLayout(o, area)
+      setFocus((f) => (f?.id === id ? { ...f, rect: layout.rect } : f))
+      setCamera(layout.camera)
+    })
+  }
+  const enterFocusRef = useRef(enterFocus)
+  enterFocusRef.current = enterFocus
+
+  /** Send the draft's changes to everyone; the type may add its own first (a map shares its view). */
+  function share(f: Focus) {
+    const o = f.draft.runtime.board.get(f.id) as BoardObject | undefined
+    const ui = o && objectUI(o.type)
+    if (o && isFocusable(ui)) ui.beforeShare?.(f.draft.runtime, o)
+    f.draft.share()
+  }
+
+  /** Esc, the leave button or a press outside: ask first if there is anything unshared. */
+  function requestExit() {
+    const f = focusRef.current
+    if (!f) return
+    if (f.draft.hasUnshared()) setAsking(true)
+    else leaveFocus(false)
+  }
+
+  /** Leave focus, sharing the draft's changes or dropping them, and zoom back out to where this person was. */
+  function leaveFocus(shareChanges: boolean) {
+    const f = focusRef.current
+    if (!f) return
+    if (shareChanges) share(f)
+    stopAnimation.current?.()
+    setAsking(false)
+    setFocus(null)
+    const o = board.get(f.id)
+    if (!o) return setCamera(f.saved)
+    const from = fillCamera(o, f.area)
+    setCamera(from)
+    stopAnimation.current = animateCamera(from, f.saved, setCamera)
+  }
+
+  // The draft lives as long as its focus. Closed after the object's view has let go of it.
+  useEffect(() => {
+    if (!focus) return
+    const draft = focus.draft
+    return () => draft.close()
+  }, [focus?.draft])
+
+  // Someone else deleted the focused object: there is nothing left to show or share.
+  useEffect(() => {
+    if (!focus || focused) return
+    leaveFocus(false)
+    setNotice('Someone deleted the object you were focused on.')
+  })
+
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 4000)
+    return () => clearTimeout(t)
+  }, [notice])
+
+  // The window resized in focus: fill the new area.
+  useEffect(() => {
+    if (!focus) return
+    const onResize = () => {
+      const el = rootRef.current
+      const f = focusRef.current
+      if (!el || !f?.rect) return
+      const area = focusArea(el.clientWidth, el.clientHeight)
+      const layout = focusedLayout(f.rect, area)
+      setFocus({ ...f, area, rect: layout.rect })
+      setCamera(layout.camera)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [focus?.id])
 
   /** Run an op from the palette as its own undo step, then show what it added. */
   async function runFromPalette(opId: string, target: TargetRef, args: unknown) {
@@ -314,13 +459,13 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     return toWorld(cameraRef.current, el.clientWidth / 2, el.clientHeight / 2)
   }
 
-  const single = selected.size === 1 && !editingId ? byId.get([...selected][0]!) : undefined
+  const single = selected.size === 1 && !editingId && !focus ? byId.get([...selected][0]!) : undefined
   const grid = GRID * camera.z
 
   return (
     <div
       ref={rootRef}
-      className={`ttx-canvas ${spaceHeld ? 'is-panning' : ''} ${tool !== 'select' ? 'is-drawing' : ''}`}
+      className={`ttx-canvas ${spaceHeld ? 'is-panning' : ''} ${tool !== 'select' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''}`}
       style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px` }}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
@@ -331,16 +476,38 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       onPointerLeave={() => sendCursor(null)}
     >
       <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})` }}>
-        {objects.map((o, i) => (
-          <ObjectView key={o.id} runtime={runtime} object={o} layer={i} editing={o.id === editingId} onDone={() => setEditing(null)} />
-        ))}
+        {objects.map((o, i) =>
+          o.id === focus?.id ? (
+            // Same key and place as when not focused, so the view is not remounted (a map keeps its WebGL contexts).
+            <ObjectView
+              key={o.id}
+              runtime={focus.draft.runtime}
+              object={focused ?? o}
+              layer={objects.length}
+              editing
+              onDone={() => {}}
+              focused={{ rect: focus.rect }}
+            />
+          ) : (
+            <ObjectView
+              key={o.id}
+              runtime={runtime}
+              object={o}
+              layer={i}
+              editing={o.id === editingId}
+              onDone={() => setEditing(null)}
+              onFocus={isFocusable(objectUI(o.type)) ? () => enterFocus(o.id) : undefined}
+            />
+          ),
+        )}
         {draft && <div className="ttx-draft" style={{ left: draft.x, top: draft.y, width: draft.w, height: draft.h }} />}
       </div>
 
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
-        <Peers peers={peers} camera={camera} byId={byId} />
-        {[...selected].map((id) => {
+        {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
+        {!focus && <Peers peers={peers} camera={camera} byId={byId} />}
+        {!focus && [...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
         })}
@@ -354,9 +521,26 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         {marquee && <div className="ttx-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
       </div>
 
-      <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} />
+      {focus && focused && isFocusable(focusedUI) && (
+        <OptionsPanel
+          draft={focus.draft}
+          object={focused}
+          ui={focusedUI}
+          title={runtime.registry.objectType(focused.type)?.title ?? focused.type}
+          onShare={() => share(focus)}
+          onExit={requestExit}
+        />
+      )}
+      {asking && <ExitDialog onShare={() => leaveFocus(true)} onDiscard={() => leaveFocus(false)} onStay={() => setAsking(false)} />}
+      {notice && (
+        <div className="ttx-notice" role="status">
+          {notice}
+        </div>
+      )}
 
-      <Toolbar
+      {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} />}
+
+      {!focus && <Toolbar
         runtime={runtime}
         tool={tool}
         onTool={setTool}
@@ -367,8 +551,9 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
           setCamera((c) => zoomAt(c, 1 / c.z, r.width / 2, r.height / 2))
         }}
         status={status}
+        awareness={awareness}
         onPalette={() => setPaletteOpen(true)}
-      />
+      />}
 
       {paletteOpen && (
         <Palette runtime={runtime} selection={[...selected]} center={viewCenter} run={runFromPalette} onClose={() => setPaletteOpen(false)} />

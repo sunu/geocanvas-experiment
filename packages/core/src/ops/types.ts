@@ -32,6 +32,11 @@ export interface ViewController {
   fitAll(): void
   zoomTo(ids: string[]): void
   resetZoom(): void
+  /**
+   * In-focus mode: the object fills the screen with its options beside it, and changes made there
+   * stay this person's until they share them. Throws for an object without a focus mode.
+   */
+  focus(id: string): void
   /** The middle of the view, in canvas units. */
   center(): { x: number; y: number }
 }

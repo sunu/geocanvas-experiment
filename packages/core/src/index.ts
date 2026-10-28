@@ -1,5 +1,6 @@
 export { Board, readObject, type AnyObject, type Placed } from './doc/board.js'
 export { BoardTx } from './doc/tx.js'
+export { Draft } from './ops/draft.js'
 export { Runtime, matchTarget, GESTURE_IDLE_MS, type RuntimeOptions, type DispatchOptions } from './ops/runtime.js'
 export { defineOp, type Actor, type InvocationRecord, type OpContext, type OpDef, type OplogEntry, type TargetRef, type TargetSpec, type ViewController } from './ops/types.js'
 export { exportTools, exportToolDefs, summarizeBoard, toolNameOf, opIdOf, type ToolDefinition } from './ops/tools.js'
@@ -11,3 +12,4 @@ export { corePlugin, boxType, stickyType, textType, type BoxObject, type StickyO
 export * from './style.js'
 export { Chat, type AgentReply, type ChatEntry, type ToolCallRecord, type TurnUndo, type UserMessage } from './chat.js'
 export { Views, type SavedView } from './views.js'
+export { Uploads, MAX_UPLOAD_BYTES, UPLOAD_ID, uploadUrl, type Upload, type UploadKind } from './uploads.js'
