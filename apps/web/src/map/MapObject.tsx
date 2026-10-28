@@ -200,12 +200,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     }
   }, [credits])
 
-  // Layers whose result arrived or changed. deck.gl diffs by layer id and data, so unchanged layers are cheap.
+  // Only when a layer or its result changed: new deck.gl layers make deck.gl redraw all their data, and the canvas
+  // re-renders the map on every camera move.
   useEffect(() => {
     overlayRef.current?.setProps({ layers: deckLayers(states) })
     statesRef.current = states
     if (mapRef.current && styleReadyRef.current) syncAdminLayers(mapRef.current, states)
-  })
+  }, [states])
 
   useEffect(() => {
     if (styleRef.current === o.basemap) return

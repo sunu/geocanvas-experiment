@@ -306,6 +306,28 @@ body,
   background: #ef4444;
 }
 
+.ttx-toolbar__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  flex: none;
+  padding: 0 4px 0 10px;
+}
+
+.ttx-toolbar__name input {
+  width: 160px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 4px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+
 /* --- Style panel (left; shown for selected boxes and texts) ------------- */
 
 .ttx-style {
