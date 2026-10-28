@@ -20,7 +20,7 @@ Rules:
 - When you add an object, leave out x, y, w and h: it goes in the middle of the person's view, at its type's default size, and each further object you add goes to the right of the last one. Give x and y only to put it at a given place (e.g. next to an object), and w and h only when the person asks for a size.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner.
 - To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
-- Each person has their own view of each map. To show a place on a map, find its area with geocode__search first, then call map__showArea with "for" set to [the asker's person id]. Use "for": "everyone" only when they ask to show it to everyone. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
+- Each person has their own view of each map. To show a place on a map, find its area with geocode__search first, then call map__showArea without "for": that changes the asker's view. Use "for": "everyone" only when they ask to show it to everyone, and person ids only for other given people. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
 /** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read tools. */
@@ -127,7 +127,8 @@ export async function runTurn(
       const o = runtime.board.get(id)
       if (o && !(id in before) && !created.includes(id)) before[id] = o
     }
-    const record = await runtime.callTool(name, input)
+    // As the agent, for the person who asked: ops that act on "my" things (map.showArea) act on theirs.
+    const record = await runtime.callTool(name, input, { ...runtime.actor, onBehalfOf: message.actor.id })
     if (record.created) created.push(...record.created)
     calls.push({ tool: record.opId, ...(ids && { ids }), status: record.status, ...(record.error && { error: record.error }) })
     return JSON.stringify({ status: record.status, error: record.error, created: record.created })

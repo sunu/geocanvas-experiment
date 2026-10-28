@@ -135,7 +135,7 @@ Design:
 - A person is one browser: the id, name and color are in `localStorage`. Two tabs of one person show the same views. Undo stays per tab, because each tab has its own runtime.
 - The map widget writes the view of its person 1 s after the map stops moving. This write has no op log entry and no undo. When the view of its person changes from a different source (the agent, a different tab), the map flies to it.
 - A person who has no view of a map starts at the latest view (highest `at`) that anyone saved.
-- The op `map.showArea` changes views through `BoardTx.setView`. Its `for` argument is a list of person ids, or `'everyone'`. Without `for`, it changes the view of the person who runs it. The agent must give `for`. The op converts the area to a center and a zoom from the size of the map (`packages/plugins/src/mapView.ts`).
+- The op `map.showArea` changes views through `BoardTx.setView`. Its `for` argument is a list of person ids, or `'everyone'`. Without `for`, it changes the view of the person who runs it. For the agent, that is the person it acts for: the loop runs each tool call with the actor `{ kind: 'agent', onBehalfOf: <person id of the asker> }`. An agent without `onBehalfOf` must give `for`. The op converts the area to a center and a zoom from the size of the map (`packages/plugins/src/mapView.ts`).
 - The agent gets the person id of the asker, and the area that the asker sees on each map.
 - Deleting an object deletes its views. Undoing an agent turn (`BoardTx.restore`) keeps them, and does not change views back.
 - Views that were in `localStorage` before this change move to the doc when the map opens for the first time.

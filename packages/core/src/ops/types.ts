@@ -9,6 +9,8 @@ export interface Actor {
   name?: string
   /** For showing who did what (chat, presence). A CSS color. */
   color?: string
+  /** For an agent: the id of the person it acts for, e.g. whose map view "zoom to India" changes. */
+  onBehalfOf?: string
 }
 
 /** What an invocation acts on. */

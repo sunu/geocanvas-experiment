@@ -25,7 +25,7 @@ export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap }
 const forPeople = z
   .union([z.literal('everyone'), z.array(z.string()).min(1)])
   .optional()
-  .describe("Whose views to change: person ids, or 'everyone'. Without it: the person who runs it.")
+  .describe("Whose views to change: person ids, or 'everyone'. Without it: the person who runs it, or the person an agent acts for.")
 
 export const mapPlugin = definePlugin({
   id: 'map',
@@ -64,13 +64,14 @@ export const mapPlugin = definePlugin({
       nl: { aliases: ['zoom to', 'pan to', 'fly to'] },
       prepare(ctx, { for: who, ...a }) {
         const views = new Views(ctx.board.doc)
-        if (!who && ctx.actor.kind !== 'user') throw new Error("Give `for`: the ids of the people whose views to change, or 'everyone'")
+        const me = ctx.actor.kind === 'user' ? ctx.actor.id : ctx.actor.onBehalfOf
+        if (!who && !me) throw new Error("Give `for`: the ids of the people whose views to change, or 'everyone'")
         return (ctx.target.kind === 'objects' ? ctx.target.ids : []).flatMap((id) => {
           const o = ctx.board.get(id)!
           const { center, zoom } = viewOfArea(a, o.w, o.h - MAP_HEADER_PX)
           // 'everyone': each person who has a view of it. The runner's view too, so people who open the map
           // later start here (they start at its latest view).
-          const people = who === 'everyone' ? [...new Set([...views.of(id).map((v) => v.person), ctx.actor.id])] : (who ?? [ctx.actor.id])
+          const people = who === 'everyone' ? [...new Set([...views.of(id).map((v) => v.person), ctx.actor.id])] : (who ?? [me!])
           return people.map((person) => ({ person, id, view: { center, zoom, bearing: 0 } }))
         })
       },

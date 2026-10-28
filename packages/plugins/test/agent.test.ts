@@ -153,10 +153,17 @@ describe('map.showArea', () => {
     expect(views.latest(map)?.view.zoom).toBeGreaterThan(9)
   })
 
-  it('asks an agent whose views to change, and refuses an area outside the globe', async () => {
-    const { people, bot, add } = setup()
+  it('changes the view of the person an agent acts for; without one it asks whose', async () => {
+    const { doc, bot, add } = setup()
     const map = add('map', { x: 0, y: 0 })
     expect((await bot.callTool('map__showArea', { ids: [map], args: india })).error).toMatch(/Give `for`/)
+    expect((await bot.callTool('map__showArea', { ids: [map], args: india }, { ...agent, onBehalfOf: 'ben' })).status).toBe('applied')
+    expect(new Views(doc).of(map).map((v) => v.person)).toEqual(['ben'])
+  })
+
+  it('refuses an area outside the globe', async () => {
+    const { people, add } = setup()
+    const map = add('map', { x: 0, y: 0 })
     expect((await people.invoke('map.showArea', { kind: 'objects', ids: [map] }, { ...india, north: 120 })).status).toBe('failed')
   })
 })

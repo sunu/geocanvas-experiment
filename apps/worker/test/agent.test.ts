@@ -121,7 +121,8 @@ describe('runTurn', () => {
       if (last.role === 'tool' && last.content.includes('India')) return tools(call('map__add', { args: { x: 0, y: 0 } }))
       if (!map && last.role === 'tool') {
         map = (JSON.parse(last.content) as { created: string[] }).created[0]!
-        return tools(call('map__showArea', { ids: [map], args: { ...india, for: [ada.id] } }))
+        // No `for`: the agent acts for Ada, so it is her view.
+        return tools(call('map__showArea', { ids: [map], args: india }))
       }
       return { role: 'assistant', content: 'Done.' }
     }
