@@ -1,8 +1,11 @@
 import { z } from 'zod'
 import { defineOp, definePlugin, type AnyObject } from '@ttx/core'
-import { BASEMAPS, type Basemap } from './basemaps'
 
-/** The map object type and its ops. No React here: the view is registered in map/ui.ts. */
+/** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
+
+/** Stored in each map's `basemap` field. The styles are in apps/web/src/map/basemaps.ts. */
+export const BASEMAPS = ['light', 'dark', 'streets', 'satellite'] as const
+export type Basemap = (typeof BASEMAPS)[number]
 
 export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap }
 

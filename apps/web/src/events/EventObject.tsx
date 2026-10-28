@@ -6,7 +6,7 @@ import { createLiveSearch, type LiveState } from './liveSearch'
 import { monty } from './monty'
 import { overviewOf } from './search'
 import { sourceLabel } from './sources'
-import type { EventBoardObject } from './plugin'
+import type { EventBoardObject } from '@ttx/plugins'
 import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from './types'
 
 /** Phosphor has no earthquake symbol; a seismograph pulse stands in (see AGENTS.md on hazard icons). */

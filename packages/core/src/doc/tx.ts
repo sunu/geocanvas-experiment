@@ -27,13 +27,16 @@ export class BoardTx {
     return this.board.list()
   }
 
-  /** Add an object. Without `z`, it goes on top or at the bottom, as its type says. */
-  add(type: string, fields: Record<string, unknown>): string {
+  /**
+   * Add an object. Without `z`, it goes on top or at the bottom, as its type says.
+   * `id` is for restoring a deleted object with its old id; it must not be in use.
+   */
+  add(type: string, fields: Record<string, unknown>, id: string = crypto.randomUUID()): string {
     const def = this.registry.objectType(type)
     if (!def) throw new Error(`Unknown object type: ${type}`)
+    if (this.board.objects.has(id)) throw new Error(`Object ${id} already exists`)
     const z = typeof fields.z === 'number' ? fields.z : def.layer === 'top' ? this.topZ() + 1 : this.bottomZ() - 1
     const parsed = this.registry.objectSchema(type).parse({ ...fields, z })
-    const id = crypto.randomUUID()
     const m = new Y.Map<unknown>()
     m.set('type', type)
     for (const [k, v] of Object.entries(parsed)) if (v !== undefined) m.set(k, v)

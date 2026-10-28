@@ -7,6 +7,8 @@ export interface Actor {
   kind: 'user' | 'agent' | 'system'
   id: string
   name?: string
+  /** For showing who did what (chat, presence). A CSS color. */
+  color?: string
 }
 
 /** What an invocation acts on. */

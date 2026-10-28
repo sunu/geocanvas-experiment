@@ -3,9 +3,9 @@ import { Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import type { ObjectViewProps } from '../canvas/registry'
-import { BASEMAPS, basemapStyle, type Basemap } from './basemaps'
+import { BASEMAPS, type Basemap, type MapBoardObject } from '@ttx/plugins'
+import { basemapStyle } from './basemaps'
 import { loadView, saveView } from './localView'
-import type { MapBoardObject } from './plugin'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
 // build the worker (?worker&url) and point MapLibre at it. MapLibre 6 also draws right-to-left

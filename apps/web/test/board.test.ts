@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { corePlugin, Runtime } from '@ttx/core'
-import { eventsPlugin } from '../src/events/plugin'
-import { mapPlugin } from '../src/map/plugin'
+import { eventsPlugin, mapPlugin } from '@ttx/plugins'
 import { newRoomId, roomFromHash, roomHash } from '../src/board/room'
 
 // The headless plugins of plugins.ts (that file also loads the React views).

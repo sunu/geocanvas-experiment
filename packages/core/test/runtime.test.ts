@@ -126,6 +126,10 @@ describe('dispatch', () => {
     expect(() =>
       rt.board.doc.transact(() => new BoardTx(rt.board, rt.registry).update({ [id]: { colour: 'red' } })),
     ).toThrow(/no field colour/)
+    // An add with a given id (restoring a deleted object) must not replace an object.
+    expect(() => rt.board.doc.transact(() => new BoardTx(rt.board, rt.registry).add('box', { x: 0, y: 0, w: 1, h: 1 }, box))).toThrow(
+      /already exists/,
+    )
     // Only the failed records' log entries differ; the objects did not change.
     rt.flush()
     expect(rt.board.list()).toEqual(runtimeFromUpdate(before).board.list())

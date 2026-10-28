@@ -1,6 +1,5 @@
 import type { Board as CoreBoard, BoxObject, TextObject } from '@ttx/core'
-import type { EventBoardObject } from '../events/plugin'
-import type { MapBoardObject } from '../map/plugin'
+import type { EventBoardObject, MapBoardObject } from '@ttx/plugins'
 
 /**
  * The objects of this app's plugins (plugins.ts), for typed reads in the UI. The board itself and

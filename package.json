@@ -12,7 +12,7 @@
     "build": "npm run build -w apps/web",
     "deploy": "npm run build -w apps/web && npm run deploy -w apps/worker",
     "test": "vitest run",
-    "typecheck": "npm run types -w apps/worker && tsc -p packages/core && tsc -p apps/web && tsc -p apps/worker"
+    "typecheck": "npm run types -w apps/worker && tsc -p packages/core && tsc -p packages/plugins && tsc -p apps/web && tsc -p apps/worker"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

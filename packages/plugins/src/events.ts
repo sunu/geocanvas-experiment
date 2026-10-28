@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { defineOp, definePlugin, type AnyObject } from '@ttx/core'
 
 /**
- * The event object type and its ops. No React here: the view is registered in events/ui.ts.
- * The board stores only the Montandon event id; each browser fetches the details (monty.ts).
+ * The event object type and its ops. No React here: the view is registered in apps/web/src/events/ui.ts.
+ * The board stores only the Montandon event id; each browser fetches the details (apps/web/src/events/monty.ts).
  */
 
 /** eventId is absent until someone picks an event. */
