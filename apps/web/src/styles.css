@@ -430,6 +430,20 @@ body,
   background: rgb(0 0 0 / 0.06);
 }
 
+/* Whether an external agent can reach this tab (mcp/bridge.ts). */
+.ttx-boardbar__mcp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--ttx-muted);
+}
+
+.ttx-boardbar__mcp.is-connected {
+  color: #0f766e;
+}
+
 /* --- Map ---------------------------------------------------------------- */
 
 .ttx-map {
@@ -977,6 +991,12 @@ body,
 .ttx-chat__undone {
   margin-top: 6px;
   color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+.ttx-chat__undo-error {
+  margin-top: 4px;
+  color: #dc2626;
   font-size: 12px;
 }
 

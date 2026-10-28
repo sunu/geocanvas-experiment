@@ -35,12 +35,17 @@ export interface ToolCallRecord {
   error?: string
 }
 
-/** What undoing an agent turn needs (op agent.undoTurn). */
+/** What undoing an agent turn needs (ops agent.undoTurn and agent.revert). */
 export interface TurnUndo {
   /** Objects the turn added. */
   created: string[]
   /** Objects the turn changed or deleted, as they were before its first change. */
   before: Record<string, AnyObject>
+  /**
+   * The objects of `created` and `before` as the turn left them (null: deleted). Undo refuses when one has
+   * changed since, so it never overwrites a later edit. Absent in replies from before it was added.
+   */
+  after?: Record<string, AnyObject | null>
 }
 
 export interface AgentReply {

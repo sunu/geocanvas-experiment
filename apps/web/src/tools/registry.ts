@@ -9,6 +9,7 @@ import { choroplethTool } from '../hapi/choropleth'
 import { boundariesTool } from '../map/adminAreas'
 import { notebookFactory } from '../notebooks/api'
 import { notebookArtifactTool } from '../notebooks/artifact'
+import { notebookRunsTool } from '../notebooks/runs'
 import { ToolRunner } from '@ttx/core'
 
 /** Every tool the app has, and the one runner for them, so all maps on the board share one cache. */
@@ -19,6 +20,7 @@ export const tools = new ToolRunner([
   overtureTool(new OvertureParquet()),
   healthFacilitiesTool(new LayercakeHealth()),
   notebookArtifactTool(notebookFactory),
+  notebookRunsTool(notebookFactory),
   eventFootprintTool(monty),
   boundariesTool,
   choroplethTool,
