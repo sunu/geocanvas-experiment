@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { FolderOpenIcon, PlusIcon, RobotIcon } from '@phosphor-icons/react'
 import { startBrowserAgent } from './agent/browserAgent'
 import { ChatPanel } from './agent/ChatPanel'
 import { connect, useConnectionStatus } from './board/connect'
 import { newRoomId, roomFromHash, roomHash } from './board/room'
 import { Canvas } from './canvas/Canvas'
+import { TitleBar } from './chrome/TitleBar'
+import { UserMenu } from './chrome/UserMenu'
 import { UploadsPanel } from './uploads/UploadsPanel'
 
 /** The board to join: #room=<id>. Without one, start a new board and put its id in the URL to share. */
@@ -29,32 +30,17 @@ function newBoard() {
 
 export function App() {
   const status = useConnectionStatus(provider)
-  const [panel, setPanel] = useState<'agent' | 'uploads'>()
+  const [uploadsOpen, setUploadsOpen] = useState(false)
   return (
     <>
       <Canvas runtime={runtime} status={status} awareness={provider.awareness} />
-      <div className="ttx-boardbar">
-        <button title="Start a new, empty board with its own link" onClick={newBoard}>
-          <PlusIcon size={16} />
-          New board
-        </button>
-      </div>
-      {/* The open panel takes this corner and has its own close button. */}
-      {panel === 'agent' ? (
-        <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} onClose={() => setPanel(undefined)} />
-      ) : panel === 'uploads' ? (
-        <UploadsPanel runtime={runtime} uploads={uploads} onClose={() => setPanel(undefined)} />
+      <TitleBar onNewBoard={newBoard} />
+      <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} />
+      {/* The open gallery takes the user menu's corner and has its own close button. */}
+      {uploadsOpen ? (
+        <UploadsPanel runtime={runtime} uploads={uploads} onClose={() => setUploadsOpen(false)} />
       ) : (
-        <div className="ttx-boardbar ttx-boardbar--right">
-          <button title="Files uploaded to this board, to put back or share" onClick={() => setPanel('uploads')}>
-            <FolderOpenIcon size={16} />
-            Uploads
-          </button>
-          <button title="Ask the board's agent to change the board" onClick={() => setPanel('agent')}>
-            <RobotIcon size={16} />
-            Agent
-          </button>
-        </div>
+        <UserMenu name={runtime.actor.name ?? 'You'} onUploads={() => setUploadsOpen(true)} />
       )}
     </>
   )

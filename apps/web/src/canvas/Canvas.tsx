@@ -157,7 +157,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     if (editingId) setEditing(null)
     runtime.beginGesture()
 
-    if (e.button === 1 || spaceHeld) {
+    if (e.button === 1 || spaceHeld || tool === 'hand') {
       const start = cameraRef.current
       trackDrag(e, (dx, dy) => setCamera({ ...start, x: start.x + dx, y: start.y + dy }))
       return
@@ -465,7 +465,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   return (
     <div
       ref={rootRef}
-      className={`ttx-canvas ${spaceHeld ? 'is-panning' : ''} ${tool !== 'select' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''}`}
+      className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''}`}
       style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px` }}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
@@ -544,14 +544,12 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         runtime={runtime}
         tool={tool}
         onTool={setTool}
-        selection={selected}
         zoom={camera.z}
         onResetZoom={() => {
           const r = rootRef.current!.getBoundingClientRect()
           setCamera((c) => zoomAt(c, 1 / c.z, r.width / 2, r.height / 2))
         }}
         status={status}
-        onPalette={() => setPaletteOpen(true)}
       />}
 
       {paletteOpen && (

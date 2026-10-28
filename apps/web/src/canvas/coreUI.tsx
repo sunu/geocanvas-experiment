@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import { NoteIcon, RectangleIcon, TextTIcon } from '@phosphor-icons/react'
+import { NoteIcon, ShapesIcon, TextTIcon } from '@phosphor-icons/react'
 import type { StickyObject, TextObject } from '@ttx/core'
 import { registerObjectUI, registerWidget, type ObjectViewProps } from './registry'
 import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STICKY_COLOR, DEFAULT_TEXT_COLOR, PALETTE } from './style'
@@ -17,7 +17,7 @@ registerObjectUI('box', {
     const color = PALETTE[o.color ?? DEFAULT_BOX_COLOR]
     return { background: color.fill, borderColor: color.stroke }
   },
-  tool: { key: 'R', label: 'Box', Icon: RectangleIcon },
+  tool: { key: 'R', label: 'Box', Icon: ShapesIcon },
 })
 
 registerObjectUI('text', {
