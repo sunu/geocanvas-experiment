@@ -9,6 +9,10 @@ export interface ObjectViewProps<O extends BoardObject = BoardObject> {
   editing: boolean
   /** The object is done editing, e.g. an event was picked. */
   onDone(): void
+  /** It fills the screen in focus mode; `runtime` is then this person's draft of the board. */
+  focused: boolean
+  /** Open it in focus mode: for a focus button in its header. Only for focusable types, and not while focused. */
+  onFocus?(): void
 }
 
 /** How the canvas shows one object type. Plugins' object types are headless; their UI registers here. */
@@ -29,9 +33,23 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
   isEmpty?(object: O): boolean
 }
 
+/**
+ * A type with in-focus mode (agent-docs/tasks/in-focus-widgets.md): its view fills the screen, with
+ * its Options panel beside it. Both get this person's draft of the board as `runtime`, so changes made
+ * there reach others only when shared.
+ */
+export interface FocusableObjectUI<O extends BoardObject = BoardObject> extends ObjectUI<O> {
+  /** Contextual tools, beside the object in focus. Every change is an op on `runtime` (the draft). */
+  Options: ComponentType<ObjectViewProps<O>>
+  /** Ops to run on the draft just before it is shared, e.g. a map shares its view. */
+  beforeShare?(runtime: Runtime, object: O): void
+}
+
+export const isFocusable = (ui: ObjectUI | undefined): ui is FocusableObjectUI => !!ui && 'Options' in ui
+
 const uis = new Map<string, ObjectUI>()
 
-export function registerObjectUI<T extends BoardObject['type']>(type: T, ui: ObjectUI<Extract<BoardObject, { type: T }>>) {
+export function registerObjectUI<T extends BoardObject['type']>(type: T, ui: ObjectUI<Extract<BoardObject, { type: T }>> | FocusableObjectUI<Extract<BoardObject, { type: T }>>) {
   uis.set(type, ui as unknown as ObjectUI)
 }
 

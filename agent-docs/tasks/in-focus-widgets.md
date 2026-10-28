@@ -94,8 +94,8 @@ Requirement: "changes in in-focus mode are not shared to other people unless you
 - **In:** the ⤢ button in the widget header, `F` on one selected focusable widget, or the palette.
 - **Out:** Esc, ⤡, or the backdrop. With unshared changes, the Share / Discard / Keep editing dialog opens (§4).
 - **Share** button in the focus header: shares changes (and a map's view) without leaving focus (§4).
-- **Ops:** `core.view.focus` (target: one object) and `core.view.exitFocus`, as view ops with `applyView`.
-  - `ViewController` gains `focus(id)` and `exitFocus()`.
+- **Op:** `core.view.focus` (target: one object), a view op with `applyView`; `ViewController` gains `focus(id)`, which throws for a type without focus mode.
+  - There is no exit op: in focus the palette is off, and the only keys are Esc and undo.
   - The room's agent has no `ViewController`, so it can never change what a person sees.
 
 ### 5.2 Rendering
@@ -113,6 +113,7 @@ Requirement: "changes in in-focus mode are not shared to other people unless you
 
 - Focus is local, like the camera.
 - Peers see your cursor and selection, but not your draft edits until you press Share or exit with Share.
+- In focus, you do not see others' cursors and outlines: they are drawn at stored positions and sizes, which the focused layout does not match.
 - Peers get no sign of unshared edits: no presence field.
 
 ### 5.4 Keeping the widget mounted
@@ -127,12 +128,12 @@ Switching the widget's `runtime` prop between main and draft must not remount it
 |---|---|
 | `packages/core/src/ops/draft.ts` (new, step 1 done) | Fork, forward main updates, encode the draft's unshared changes, `hasUnshared()` |
 | `packages/core/src/ops/runtime.ts` | `applyDraft(update)`: one undo step per share |
-| `packages/core/src/ops/types.ts`, `plugins/core.ts` | `ViewController.focus` / `exitFocus`; the two view ops |
+| `packages/core/src/ops/types.ts`, `plugins/core.ts` | `ViewController.focus`; the `core.view.focus` op (step 2 done) |
 | `apps/web/src/canvas/focus.ts` (new) | Local focus state (id, saved camera, draft), animation, enter, share, exit, discard |
 | `apps/web/src/canvas/OptionsPanel.tsx` (new) | Panel shell (title, Share, exit) rendering `ui.Options` with the draft runtime; the Share / Discard / Keep editing dialog |
 | `apps/web/src/canvas/registry.ts` | `FocusableObjectUI`, `isFocusable`, `focused` prop |
 | `apps/web/src/canvas/Canvas.tsx`, `ObjectView.tsx` | Size override, hiding others, `F` key, wheel off, ⌘Z to the draft during focus |
-| `apps/web/src/map/MapObject.tsx`, `map/ui.ts`, `map/MapOptions.tsx` (new) | Split the effect (§5.4); header controls move to the Map's `Options` (step 2) |
+| `apps/web/src/map/MapObject.tsx`, `map/ui.ts`, `map/MapOptions.tsx` (new), `map/live.ts` (new) | Split the effect (§5.4); header controls move to the Map's `Options`, which reaches the live map through `live.ts` (step 2 done) |
 
 Later milestones add `packages/plugins/src/table.ts`, `apps/web/src/table/`, and `apps/web/src/data/query.ts` with `duckdb.worker.ts` (steps 8–10).
 
