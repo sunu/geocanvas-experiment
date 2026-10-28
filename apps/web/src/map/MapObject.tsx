@@ -4,11 +4,15 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { CrosshairSimpleIcon, StackPlusIcon, XIcon } from '@phosphor-icons/react'
 import type { ObjectViewProps } from '../canvas/registry'
-import { Views } from '@ttx/core'
-import { BASEMAPS, DATA_LAYERS, hasArea, type Basemap, type DataLayerKey, type MapBoardObject, type MapLayer } from '@ttx/plugins'
+import { Views, type Runtime } from '@ttx/core'
+import { BASEMAPS, DATA_LAYERS, hasArea, MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type DataLayerKey, type MapBoardObject, type MapLayer } from '@ttx/plugins'
 import type { Place } from '@ttx/plugins'
+import type { Board } from '../board/board'
+import { useObjects } from '../board/connect'
+import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/api'
+import { tools } from '../tools/registry'
 import { basemapStyle } from './basemaps'
-import { attributionOf, deckLayers, truncationOf, useLayerStates, viewArea, type LayerState } from './layers'
+import { attributionOf, boundsOf, deckLayers, truncationOf, useLayerStates, viewArea, type LayerState } from './layers'
 import { PlaceSearch } from './PlaceSearch'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
@@ -23,6 +27,32 @@ const SAVE_AFTER_MS = 1000
 /** Zoom for a place without a bbox. */
 const POINT_ZOOM = 10
 const NO_LAYERS: MapLayer[] = []
+
+/** Closest zoom when fitting a view to data, so a single point does not zoom in to the street. */
+const FIT_MAX_ZOOM = 14
+
+/**
+ * Fit this person's view of a map to a bbox, e.g. to a layer they just added. It is written as their view,
+ * as their own pans are (no op log entry, no undo): the map starts there, or flies there if it is on screen.
+ * Nobody else's view moves.
+ */
+export function fitMapTo(runtime: Runtime, mapId: string, [west, south, east, north]: Bbox) {
+  const map = runtime.board.get(mapId)
+  if (!map) return
+  const { center, zoom } = viewOfArea({ west, south, east, north }, map.w, map.h - MAP_HEADER_PX)
+  new Views(runtime.board.doc).set(runtime.actor.id, mapId, { center, zoom: Math.min(zoom, FIT_MAX_ZOOM), bearing: 0 })
+}
+
+/** Fit a map to a layer's data once it has loaded (from the tool cache when the map already ran it). */
+export function fitMapToLayer(runtime: Runtime, mapId: string, layer: MapLayer) {
+  tools.run<GeoJSON.FeatureCollection>(layer.tool, layer.input).then(
+    (fc) => {
+      const b = boundsOf(fc)
+      if (b) fitMapTo(runtime, mapId, b)
+    },
+    () => {}, // the layer list shows the error
+  )
+}
 
 /**
  * A live MapLibre map on the canvas. Double-click to pan and zoom it (editing); Esc or a
@@ -155,6 +185,14 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
     if (area) layerOp('map.addLayer', { layer, area })
   }
 
+  /** A notebook's GeoJSON file, for everyone; this person's view fits it once it loads. */
+  const addNotebookResult = (runId: string, name: string, title: string) => {
+    const before = new Set(layers.map((l) => l.id))
+    layerOp('map.addNotebookResult', { runId, name, title })
+    const added = (runtime.board.get(o.id) as MapBoardObject | undefined)?.layers?.find((l) => !before.has(l.id))
+    if (added) fitMapToLayer(runtime, o.id, added)
+  }
+
   const useMyView = (layerId: string) => {
     const area = myArea()
     if (area) layerOp('map.setLayerArea', { layerId, area })
@@ -165,7 +203,7 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
       <div className="ttx-map__header">
         <span className="ttx-map__title">Map</span>
         <PlaceSearch onGo={goTo} onPin={pin} />
-        <AddLayerMenu onAdd={addDataLayer} />
+        <AddLayerMenu board={runtime.board as Board} onAdd={addDataLayer} onAddNotebookResult={addNotebookResult} />
         <select
           aria-label="Basemap"
           value={o.basemap}
@@ -203,16 +241,23 @@ function legacyView(mapId: string): { center: [number, number]; zoom: number; be
   }
 }
 
-/** "Add layer": data for the area this person is looking at. */
-function AddLayerMenu({ onAdd }: { onAdd(layer: DataLayerKey): void }) {
+interface AddLayerMenuProps {
+  board: Board
+  onAdd(layer: DataLayerKey): void
+  onAddNotebookResult(runId: string, name: string, title: string): void
+}
+
+/** "Add layer": data for the area this person is looking at, and the GeoJSON results of notebooks on the board. */
+function AddLayerMenu({ board, onAdd, onAddNotebookResult }: AddLayerMenuProps) {
   const [open, setOpen] = useState(false)
   return (
     <div className="ttx-addlayer" onPointerDown={(e) => e.stopPropagation()}>
-      <button type="button" title="Add a data layer for your current view" aria-label="Add layer" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" title="Add a data layer" aria-label="Add layer" aria-expanded={open} onClick={() => setOpen(!open)}>
         <StackPlusIcon size={16} />
       </button>
       {open && (
         <div className="ttx-addlayer__menu" role="menu">
+          <div className="ttx-addlayer__label">For your current view</div>
           {(Object.keys(DATA_LAYERS) as DataLayerKey[]).map((k) => (
             <button
               key={k}
@@ -226,9 +271,62 @@ function AddLayerMenu({ onAdd }: { onAdd(layer: DataLayerKey): void }) {
               {DATA_LAYERS[k].label}
             </button>
           ))}
+          <NotebookResults
+            board={board}
+            onPick={(runId, name, title) => {
+              onAddNotebookResult(runId, name, title)
+              setOpen(false)
+            }}
+          />
         </div>
       )}
     </div>
+  )
+}
+
+/** The GeoJSON files of the notebook runs on this board. Asked for only while the menu is open. */
+function NotebookResults({ board, onPick }: { board: Board; onPick(runId: string, name: string, title: string): void }) {
+  const objects = useObjects(board)
+  const runIds = [...new Set(objects.flatMap((o) => (o.type === 'notebook' && o.runId ? [o.runId] : [])))]
+  const key = runIds.join(',')
+  const [files, setFiles] = useState<{ runId: string; runTitle: string; name: string }[]>()
+
+  useEffect(() => {
+    let current = true
+    Promise.all(runIds.map((id) => notebookFactory.getRun(id).catch(() => undefined))).then((runs) => {
+      if (!current) return
+      setFiles(runs.flatMap((r) => (r ? Object.keys(r.artifacts ?? {}).filter(isGeoJson).map((name) => ({ runId: r.id, runTitle: r.title, name })) : [])))
+    })
+    return () => {
+      current = false
+    }
+    // `key` stands for runIds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+
+  return (
+    <>
+      <div className="ttx-addlayer__label">Notebook results</div>
+      {!runIds.length ? (
+        <div className="ttx-addlayer__note">Add a notebook to the board to show its results here</div>
+      ) : !files ? (
+        <div className="ttx-addlayer__note">Loading…</div>
+      ) : !files.length ? (
+        <div className="ttx-addlayer__note">The notebooks on this board have no GeoJSON results</div>
+      ) : (
+        files.map((f) => (
+          <button
+            key={`${f.runId}/${f.name}`}
+            type="button"
+            role="menuitem"
+            title={f.runTitle}
+            onClick={() => onPick(f.runId, f.name, notebookResultTitle(f.name, f.runTitle))}
+          >
+            {f.name} <span className="ttx-addlayer__sub">· {f.runTitle}</span>
+          </button>
+        ))
+      )}
+    </>
   )
 }
 
