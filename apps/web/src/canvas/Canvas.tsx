@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Draft, type Runtime, type TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects, type ConnectionStatus } from '../board/connect'
@@ -11,6 +11,7 @@ import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { Peers } from './Peers'
 import { isFocusable, objectUI } from './registry'
+import { placeFiles } from '../uploads/drop'
 import { StylePanel } from './StylePanel'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
@@ -257,6 +258,16 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     )
   }
 
+  /** Files dropped on the board: upload them and place each where it was dropped (uploads/drop.ts). An image object takes a picture dropped on it first. */
+  function onDropFiles(e: DragEvent<HTMLDivElement>) {
+    const files = [...e.dataTransfer.files]
+    if (e.defaultPrevented || focusRef.current || !files.length) return
+    e.preventDefault()
+    const p = screenPoint(e)
+    setNotice(files.length === 1 ? `Uploading ${files[0]!.name}…` : `Uploading ${files.length} files…`)
+    void placeFiles(runtime, files, toWorld(cameraRef.current, p.x, p.y)).then((failed) => setNotice(failed.length ? `Could not add ${failed.join('; ')}` : null))
+  }
+
   function onDoubleClick(e: ReactMouseEvent) {
     if (focusRef.current) return
     const id = (e.target as HTMLElement).closest<HTMLElement>('[data-id]')?.dataset.id
@@ -474,6 +485,8 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         sendCursor(toWorld(cameraRef.current, p.x, p.y))
       }}
       onPointerLeave={() => sendCursor(null)}
+      onDragOver={(e) => !focus && e.dataTransfer.types.includes('Files') && e.preventDefault()}
+      onDrop={onDropFiles}
     >
       <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})` }}>
         {objects.map((o, i) =>

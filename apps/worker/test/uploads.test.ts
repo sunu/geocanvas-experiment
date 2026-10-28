@@ -35,9 +35,16 @@ describe('uploads', () => {
     expect(new Uint8Array(await got.arrayBuffer())).toEqual(PNG)
   })
 
-  it('refuses files that are too large or not a kept type, and ids it did not make', async () => {
+  it('keeps a PDF as a document, with a larger limit than images', async () => {
+    const { bucket } = fakeBucket()
+    const pdf = new Uint8Array(MAX_UPLOAD_BYTES.media + 1)
+    pdf.set([...'%PDF-1.7'].map((c) => c.charCodeAt(0)))
+    expect(await storeUpload(post(pdf), bucket, 'abc123')).toMatchObject({ kind: 'document', contentType: 'application/pdf' })
+  })
+
+  it('refuses files that are too large for their kind or not a kept type, and ids it did not make', async () => {
     const { bucket, stored } = fakeBucket()
-    const big = new Uint8Array(MAX_UPLOAD_BYTES + 1)
+    const big = new Uint8Array(MAX_UPLOAD_BYTES.media + 1)
     big.set(PNG)
     expect(((await storeUpload(post(big), bucket, 'abc123')) as Response).status).toBe(413)
     const svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'

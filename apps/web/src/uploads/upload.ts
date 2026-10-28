@@ -1,17 +1,18 @@
-import { MAX_UPLOAD_BYTES, uploadUrl } from '@ttx/core'
+import { MAX_UPLOAD_BYTES, UPLOAD_TYPES, uploadUrl, type UploadKind } from '@ttx/core'
 
-/** File types the room keeps (apps/worker/src/uploads.ts checks the file's bytes too). Images only for now. */
-export const UPLOAD_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+/** The file types of one kind, e.g. for a file input's `accept`. */
+export const typesOf = (kind: UploadKind) => Object.keys(UPLOAD_TYPES).filter((t) => UPLOAD_TYPES[t] === kind)
 
-export const MAX_UPLOAD_MB = MAX_UPLOAD_BYTES / 1024 / 1024
+export const maxMb = (kind: UploadKind) => MAX_UPLOAD_BYTES[kind] / 1024 / 1024
 
 /**
  * Store a file for the board and get its id. The room lists it in the board's uploads (@ttx/core uploads.ts)
  * and keeps the person with it, for when uploads belong to accounts.
  */
 export async function uploadFile(file: File, room: string, person: string): Promise<string> {
-  if (!UPLOAD_TYPES.includes(file.type)) throw new Error('Choose a PNG, JPEG, GIF or WebP image')
-  if (file.size > MAX_UPLOAD_BYTES) throw new Error(`Files can be at most ${MAX_UPLOAD_MB} MB; this one is ${(file.size / 1024 / 1024).toFixed(1)} MB`)
+  const kind = UPLOAD_TYPES[file.type]
+  if (!kind) throw new Error('Choose a PNG, JPEG, GIF or WebP image, or a PDF')
+  if (file.size > MAX_UPLOAD_BYTES[kind]) throw new Error(`This file can be at most ${maxMb(kind)} MB; it is ${(file.size / 1024 / 1024).toFixed(1)} MB`)
   const query = new URLSearchParams({ room, name: file.name })
   const res = await fetch(`/uploads?${query}`, {
     method: 'POST',
@@ -22,6 +23,12 @@ export async function uploadFile(file: File, room: string, person: string): Prom
   if (!res.ok || !body.id) throw new Error(body.error ?? `Upload failed (${res.status})`)
   return body.id
 }
+
+/** The header of an image's or a PDF's card (world units): its height is added to the content's when fitting the frame. */
+const HEADER_PX = 32
+
+/** The frame's height for content of this size (a picture, a page) shown at width w: the header and the content. */
+export const frameHeight = (w: number, content: { w: number; h: number }) => Math.round((w * content.h) / content.w) + HEADER_PX
 
 /** A file's full link, to share outside the board. */
 export const fileLink = (id: string) => new URL(uploadUrl(id), location.origin).href
