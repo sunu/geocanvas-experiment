@@ -77,8 +77,10 @@ export function NotebookObject({ board, object: o, editing, onDone }: ObjectView
               src={run.value.output_url}
               title={run.value.title}
               loading="lazy"
-              // Its own origin, and no access to the board's: the notebook's scripts (interactive outputs) run isolated.
-              sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads"
+              // The page keeps Notebook Factory's origin (allow-same-origin): its scripts are ES modules, which load
+              // with CORS, and from a sandbox's opaque "null" origin every one of them was blocked. It is still
+              // isolated from the board, a different origin; the sandbox also keeps it from navigating the board's tab.
+              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"
               style={{ pointerEvents: editing ? 'auto' : 'none' }}
             />
             {!editing && <div className="ttx-notebook__hint">Double-click to scroll and use the notebook</div>}
