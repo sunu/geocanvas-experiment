@@ -753,8 +753,9 @@ body,
 
 /* --- Agent chat (right; outside the canvas, so clicks never reach it) ---- */
 
-.ttx-boardbar button.is-on {
-  background: rgb(0 0 0 / 0.08);
+.ttx-boardbar--right {
+  left: auto;
+  right: 16px;
 }
 
 .ttx-chat {

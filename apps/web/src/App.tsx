@@ -34,12 +34,18 @@ export function App() {
           <PlusIcon size={16} />
           New board
         </button>
-        <button className={chatOpen ? 'is-on' : ''} title="Ask the board's agent to change the board" aria-pressed={chatOpen} onClick={() => setChatOpen((open) => !open)}>
-          <RobotIcon size={16} />
-          Agent
-        </button>
       </div>
-      {chatOpen && <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} onClose={() => setChatOpen(false)} />}
+      {/* The open panel takes this corner and has its own close button. */}
+      {chatOpen ? (
+        <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} onClose={() => setChatOpen(false)} />
+      ) : (
+        <div className="ttx-boardbar ttx-boardbar--right">
+          <button title="Ask the board's agent to change the board" onClick={() => setChatOpen(true)}>
+            <RobotIcon size={16} />
+            Agent
+          </button>
+        </div>
+      )}
     </>
   )
 }
