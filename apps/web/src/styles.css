@@ -2267,6 +2267,128 @@ body:has(.ttx-canvas.is-focus) .ttx-boardbar {
   text-align: center;
 }
 
+/* Annotation tools, top right while a map is edited. Above the deck.gl canvas. */
+.ttx-map__tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 6px rgb(0 0 0 / 0.12);
+}
+
+.ttx-map__tools button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ttx-ink);
+  cursor: pointer;
+}
+
+.ttx-map__tools button:hover {
+  background: var(--ttx-bg);
+}
+
+.ttx-map__tools button.is-on {
+  background: var(--ttx-accent);
+  color: #fff;
+}
+
+/*
+ * A sticky note pinned to a place on a map (MapStickies.tsx): a MapLibre marker whose bottom left corner is on the
+ * place, where the note's tail points. The same size at any zoom. z-index 3: above deck.gl's canvas (2).
+ */
+.ttx-mapsticky {
+  z-index: 3;
+  padding: 0 0 10px 0;
+}
+
+.ttx-mapsticky.is-editable {
+  cursor: grab;
+}
+
+.ttx-mapsticky__note {
+  position: relative;
+  width: 140px;
+  max-height: 120px;
+  margin-left: -1px;
+  border-radius: 2px 2px 2px 0;
+  /* The canvas's yellow sticky. */
+  background: color-mix(in srgb, #fef9c3 60%, #eab308);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.25), 0 4px 10px rgb(0 0 0 / 0.2);
+  color: #18181b;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+/* The tail, from the note's bottom left corner down to the place. */
+.ttx-mapsticky__note::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 100%;
+  border-left: 10px solid color-mix(in srgb, #fef9c3 60%, #eab308);
+  border-bottom: 10px solid transparent;
+}
+
+.ttx-mapsticky__text {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  padding: 6px 8px;
+  overflow: hidden;
+  font: inherit;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ttx-mapsticky__text--edit {
+  height: 80px;
+  margin: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: auto;
+  background: transparent;
+  cursor: text;
+}
+
+.ttx-mapsticky__empty {
+  opacity: 0.5;
+}
+
+.ttx-mapsticky__remove {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #18181b;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ttx-mapsticky.is-editable:hover .ttx-mapsticky__remove {
+  display: grid;
+}
+
 /* The value under the pointer on a choropleth, while a map is edited. Above the deck.gl canvas. */
 .ttx-map__hover {
   position: absolute;

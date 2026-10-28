@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
+import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl, type MapMouseEvent } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
+import { NoteIcon } from '@phosphor-icons/react'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { Views, type Runtime, type SavedView } from '@ttx/core'
-import { MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type MapBoardObject, type MapLayer, type PlaceFeatures } from '@ttx/plugins'
+import { MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import { tools } from '../tools/registry'
 import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
 import { basemapStyle } from './basemaps'
 import { attributionOf, boundsOf, deckLayers, useLayerStates } from './layers'
 import { registerLiveMap } from './live'
+import { MapStickies } from './MapStickies'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
 // build the worker (?worker&url) and point MapLibre at it. MapLibre 6 also draws right-to-left
@@ -23,6 +25,7 @@ const WORLD = { center: [20, 10] as [number, number], zoom: 1, bearing: 0 }
 /** A view is saved this long after the map stops moving, so a series of pans is one write. */
 const SAVE_AFTER_MS = 1000
 const NO_LAYERS: MapLayer[] = []
+const NO_ANNOTATIONS: MapAnnotation[] = []
 
 /** Closest zoom when fitting a view to data, so a single point does not zoom in to the street. */
 const FIT_MAX_ZOOM = 14
@@ -70,6 +73,8 @@ export function fitMapToLayer(runtime: Runtime, mapId: string, layer: MapLayer) 
  * Its tools and its list of data layers are in its Options panel, in focus mode (MapOptions.tsx). The
  * map itself shows only the data; the layers' attributions, which their licenses require, join the
  * basemap's in MapLibre's attribution control.
+ *
+ * Annotations are drawn on the map itself, and added with the tools at its top right while it is edited.
  */
 export function MapObject({ runtime, object: o, editing, focused, onFocus }: ObjectViewProps<MapBoardObject>) {
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -90,6 +95,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const styleReadyRef = useRef(false)
   /** The value under the pointer on a choropleth, while editing. */
   const [hover, setHover] = useState<{ text: string; x: number; y: number }>()
+  /** The live map, for what is drawn on it with React (stickies). */
+  const [liveMap, setLiveMap] = useState<MapLibreMap>()
+  /** The next click on the map adds a sticky there. */
+  const [placing, setPlacing] = useState(false)
+  /** The sticky being written in. */
+  const [writing, setWriting] = useState<string>()
+  const annotations = o.annotations ?? NO_ANNOTATIONS
 
   useEffect(() => {
     const views = new Views(runtimeRef.current.board.doc)
@@ -132,6 +144,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     map.on('mouseout', () => setHover(undefined))
     mapRef.current = map
     overlayRef.current = overlay
+    setLiveMap(map)
     return () => {
       forget()
       resize.disconnect()
@@ -139,8 +152,54 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       mapRef.current = null
       overlayRef.current = null
       styleReadyRef.current = false
+      setLiveMap(undefined)
     }
   }, [o.id])
+
+  // Leaving edit mode ends placing and writing.
+  useEffect(() => {
+    if (editing) return
+    setPlacing(false)
+    setWriting(undefined)
+  }, [editing])
+
+  // Writing in a sticky ends with a press on the map outside it. Not on blur: a note's text box loses focus when
+  // its marker is put in the page again (React mounts twice in development).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !writing) return
+    const onDown = (e: MapMouseEvent) => {
+      if (!(e.originalEvent.target as Element).closest('.ttx-mapsticky')) setWriting(undefined)
+    }
+    map.on('mousedown', onDown)
+    return () => void map.off('mousedown', onDown)
+  }, [writing])
+
+  // Placing a sticky: the next click on the map, not on a note, adds one there, for everyone, and opens it to write.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !placing) return
+    const onClick = (e: MapMouseEvent) => {
+      if ((e.originalEvent.target as Element).closest('.ttx-mapsticky')) return
+      setPlacing(false)
+      const rt = runtimeRef.current
+      const before = new Set((rt.board.get(o.id) as MapBoardObject | undefined)?.annotations?.map((a) => a.id))
+      const p = e.lngLat.wrap()
+      rt.beginGesture()
+      rt.dispatch('map.addSticky', { kind: 'objects', ids: [o.id] }, { lng: p.lng, lat: p.lat })
+      const added = (rt.board.get(o.id) as MapBoardObject | undefined)?.annotations?.find((a) => !before.has(a.id))
+      if (added) {
+        rt.beginGesture()
+        setWriting(added.id)
+      }
+    }
+    map.getCanvas().style.cursor = 'crosshair'
+    map.on('click', onClick)
+    return () => {
+      map.getCanvas().style.cursor = ''
+      map.off('click', onClick)
+    }
+  }, [placing, o.id])
 
   // Save this person's pans as their view, in the doc the runtime has (a draft in focus mode), and follow
   // changes to their view from elsewhere (the agent, another tab).
@@ -234,6 +293,31 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       </div>
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
+        {liveMap && (
+          <MapStickies
+            runtime={runtime}
+            map={liveMap}
+            mapId={o.id}
+            stickies={annotations.filter((a) => a.kind === 'sticky')}
+            editable={editing}
+            writing={writing}
+            onWrite={setWriting}
+          />
+        )}
+        {editing && (
+          <div className="ttx-map__tools" role="toolbar" aria-label="Annotate">
+            <button
+              type="button"
+              className={placing ? 'is-on' : undefined}
+              title={placing ? 'Click on the map to place the note' : 'Sticky note: click on the map to place it'}
+              aria-label="Sticky note"
+              aria-pressed={placing}
+              onClick={() => setPlacing((p) => !p)}
+            >
+              <NoteIcon size={16} />
+            </button>
+          </div>
+        )}
         {!editing && <div className="ttx-map__hint">Double-click to pan and zoom</div>}
         {editing && hover && (
           <div className="ttx-map__hover" style={{ left: hover.x + 12, top: hover.y + 12 }}>
