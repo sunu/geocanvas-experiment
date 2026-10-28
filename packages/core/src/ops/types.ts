@@ -30,6 +30,8 @@ export interface ViewController {
   fitAll(): void
   zoomTo(ids: string[]): void
   resetZoom(): void
+  /** The middle of the view, in canvas units. */
+  center(): { x: number; y: number }
 }
 
 export interface OpDef<Args = any, Plan = Args> {

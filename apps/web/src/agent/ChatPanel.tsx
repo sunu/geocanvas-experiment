@@ -23,7 +23,8 @@ export function ChatPanel({ runtime, chat, awareness, onClose }: { runtime: Runt
     e?.preventDefault()
     const message = text.trim()
     if (!message) return
-    chat.send({ actor: runtime.actor, text: message, selection: [...selection] })
+    // The view center tells the agent where to put new objects.
+    chat.send({ actor: runtime.actor, text: message, selection: [...selection], center: runtime.view?.center() })
     setText('')
   }
 
@@ -85,7 +86,7 @@ function AgentEntry({ reply, runtime, undone }: { reply: AgentReply; runtime: Ru
           {reply.calls.map((c, i) => (
             <li key={i} className={c.status === 'failed' ? 'is-failed' : ''} title={c.error}>
               {c.status === 'applied' ? <CheckIcon size={12} /> : <WarningIcon size={12} />}
-              {runtime.registry.op(c.tool)?.title ?? c.tool}
+              {c.title ?? runtime.registry.op(c.tool)?.title ?? c.tool}
               {c.ids?.length ? ` (${c.ids.length})` : ''}
             </li>
           ))}

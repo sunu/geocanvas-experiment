@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { MontyClient, type StacSearch } from '../src/events/monty'
-import { describeSearch, overviewOf, parseSearch } from '../src/events/search'
-import { sourceLabel } from '../src/events/sources'
+import { MontyClient, type StacSearch } from '../src/monty/client'
+import { describeSearch, overviewOf, parseSearch } from '../src/monty/search'
+import { sourceLabel } from '../src/monty/sources'
 import { stacItem, type FakeItem } from './stacFixture'
 
 describe('parse a search', () => {

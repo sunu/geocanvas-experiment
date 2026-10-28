@@ -15,12 +15,16 @@ export interface UserMessage {
   text: string
   /** What the sender had selected when they sent it. The agent acts on these ids, not on a live selection. */
   selection: string[]
+  /** The middle of the sender's view, in canvas units: where the agent puts new objects. */
+  center?: { x: number; y: number }
   at: number
 }
 
 /** One tool call of an agent turn. */
 export interface ToolCallRecord {
   tool: string
+  /** For tools that are not ops; an op's title comes from the registry. */
+  title?: string
   ids?: string[]
   status: 'applied' | 'failed'
   error?: string

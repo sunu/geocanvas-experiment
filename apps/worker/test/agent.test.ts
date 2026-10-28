@@ -5,6 +5,8 @@ import { plugins } from '@ttx/plugins'
 import { Agent, TURNS_PER_HOUR } from '../src/agent/agent'
 import { MAX_STEPS, runTurn } from '../src/agent/loop'
 import type { Complete, Message } from '../src/agent/openrouter'
+import { eventsSearch } from '../src/agent/tools'
+import type { MontyClient } from '@ttx/plugins/monty/client'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
 const ben: Actor = { kind: 'user', id: 'ben', name: 'Ben' }
@@ -81,6 +83,40 @@ describe('runTurn', () => {
     expect(reply.calls).toEqual([{ tool: 'core.object.delete', ids: ['nope'], status: 'failed', error: 'Object nope does not exist' }])
     expect(model.seen[1]!.at(-1)).toMatchObject({ role: 'tool', content: expect.stringContaining('does not exist') })
     expect(reply.undo).toBeUndefined()
+  })
+
+  it('searches Montandon, then adds the event it found near the view center', async () => {
+    const { doc, person, chat } = board()
+    const found = { id: 'gdacs-event-1', name: 'Flood in Nepal', type: 'flood', start: '2026-09-01', year: 2026, country: 'NPL', source: 'GDACS' }
+    const searches: string[] = []
+    const monty = { findEvents: async (text: string) => (searches.push(text), [found]) } as unknown as MontyClient
+    const message = chat.send({ actor: ada, text: 'add the recent flood in Nepal', selection: [], center: { x: 1000, y: 500 } })
+    const model = scripted(
+      tools(call('events__search', { text: 'nepal flood' })),
+      tools(call('event__add', { args: { eventId: found.id, x: 1000, y: 500 } })),
+      { role: 'assistant', content: 'Added the Nepal flood.' },
+    )
+    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [eventsSearch(monty)])
+
+    expect(model.seen[0]![1]!.content).toContain('View center: (1000, 500)')
+    expect(searches).toEqual(['nepal flood'])
+    expect(model.seen[1]!.at(-1)).toMatchObject({ role: 'tool', content: expect.stringContaining('gdacs-event-1') })
+    expect(person.board.list().find((o) => o.type === 'event')).toMatchObject({ eventId: found.id, x: 1000, y: 500 })
+    expect(reply.calls.map((c) => [c.title ?? c.tool, c.status])).toEqual([
+      ['Search events', 'applied'],
+      ['event.add', 'applied'],
+    ])
+    expect(reply.undo!.created).toHaveLength(1)
+  })
+
+  it('reports a failed search to the model', async () => {
+    const { doc, chat } = board()
+    const monty = { findEvents: async () => Promise.reject(new Error('Montandon search failed (401)')) } as unknown as MontyClient
+    const message = chat.send({ actor: ada, text: 'add a flood', selection: [] })
+    const model = scripted(tools(call('events__search', { text: 'flood' })))
+    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [eventsSearch(monty)])
+    expect(reply.calls).toEqual([{ tool: 'events__search', title: 'Search events', status: 'failed', error: 'Montandon search failed (401)' }])
+    expect(model.seen[1]!.at(-1)).toMatchObject({ role: 'tool', content: expect.stringContaining('401') })
   })
 
   it(`stops after ${MAX_STEPS} model calls`, async () => {

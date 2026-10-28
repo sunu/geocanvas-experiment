@@ -6,7 +6,9 @@ import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { Agent, AGENT } from './agent/agent'
 import { openRouter } from './agent/openrouter'
-import { montySearch } from './monty'
+import { eventsSearch } from './agent/tools'
+import { montySearch, stacSearch } from './monty'
+import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
 
 /**
@@ -69,6 +71,7 @@ export class Room extends DurableObject<Env> {
     new Agent({
       doc: this.doc,
       complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
+      tools: env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : [],
       // The agent's presence: people see "Agent is thinking…" while it works.
       onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
       keepAlive: (work) => ctx.waitUntil(work),

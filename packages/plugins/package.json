@@ -3,7 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./monty/*": "./src/monty/*.ts"
+  },
   "dependencies": {
     "@ttx/core": "*",
     "zod": "^4.6.7"

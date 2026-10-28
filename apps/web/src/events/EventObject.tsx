@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { HurricaneIcon, PulseIcon, SunIcon, WarningIcon, WavesIcon, type Icon } from '@phosphor-icons/react'
 import type { ObjectViewProps } from '../canvas/registry'
-import { countryName } from './countries'
+import { countryName } from '@ttx/plugins/monty/countries'
 import { createLiveSearch, type LiveState } from './liveSearch'
 import { monty } from './monty'
-import { overviewOf } from './search'
-import { sourceLabel } from './sources'
+import { overviewOf } from '@ttx/plugins/monty/search'
+import { sourceLabel } from '@ttx/plugins/monty/sources'
 import type { EventBoardObject } from '@ttx/plugins'
-import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from './types'
+import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from '@ttx/plugins/monty/types'
 
 /** Phosphor has no earthquake symbol; a seismograph pulse stands in (see AGENTS.md on hazard icons). */
 const TYPE_ICON: Record<DisasterType, Icon> = { cyclone: HurricaneIcon, flood: WavesIcon, earthquake: PulseIcon, drought: SunIcon }

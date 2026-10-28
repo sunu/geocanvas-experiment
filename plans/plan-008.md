@@ -1,6 +1,6 @@
 # Plan 008 — A board agent: chat sidebar, selection snapshot, agent in the room Durable Object
 
-Date: 2026-10-28. Status: sections 2 to 3.5 implemented on `feat/agent`; section 3.6 is next.
+Date: 2026-10-28. Status: implemented on `feat/agent`.
 
 ## 1. Context
 
@@ -112,9 +112,9 @@ Each tab has an actor with a generated name and color, kept in `localStorage`. A
 
 A panel on the right, opened from the board bar. It shows the messages, the selection that each message had ("2 selected"), the tool calls of each reply, the Undo button, and "Agent is thinking…".
 
-### 3.6 Next: event search as a tool
+### 3.6 Event search as a tool
 
-- Move the Montandon client (`apps/web/src/events/monty.ts` and the files that it imports) into `@ttx/plugins`. `MontyClient` already takes a search function. The browser gives the `/monty/search` function. The Durable Object gives a function that calls Montandon with the token.
+- The Montandon client and the files that it imports are in `packages/plugins/src/monty/`. `MontyClient` takes a search function. The browser gives the `/monty/search` function. The Durable Object gives a function that calls Montandon with the token.
 - The read tool `events__search { text, limit }` returns short summaries. The agent then calls `event__add`.
 - Each user message also stores the center of the sender's view, so that the agent can put new objects where the person looks.
 

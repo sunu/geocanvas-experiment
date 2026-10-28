@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { disasterTypeOf, hazardCodes, hazardTypesIn } from '../src/events/hazards'
+import { disasterTypeOf, hazardCodes, hazardTypesIn } from '../src/monty/hazards'
 
 describe('hazard codes', () => {
   it('lists the UNDRR-ISC, GLIDE and EM-DAT codes of each type', () => {

@@ -254,7 +254,7 @@ describe('sync, undo and the op log', () => {
 describe('view ops', () => {
   it('move only this person camera and stay out of the shared log', () => {
     const rt = runtime()
-    const view: ViewController = { fitAll: vi.fn(), zoomTo: vi.fn(), resetZoom: vi.fn() }
+    const view: ViewController = { fitAll: vi.fn(), zoomTo: vi.fn(), resetZoom: vi.fn(), center: () => ({ x: 0, y: 0 }) }
     expect(rt.availableOps(canvas).map((o) => o.id)).not.toContain('core.view.fitAll')
     rt.view = view
     expect(rt.availableOps(canvas).map((o) => o.id)).toContain('core.view.fitAll')

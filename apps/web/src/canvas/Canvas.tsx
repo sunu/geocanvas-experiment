@@ -93,6 +93,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         const el = rootRef.current
         if (el) setCamera((c) => zoomAt(c, 1 / c.z, el.clientWidth / 2, el.clientHeight / 2))
       },
+      center: () => viewCenter(),
     }
     return () => {
       runtime.view = undefined

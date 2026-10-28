@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MontyClient, type StacSearch } from '../src/events/monty'
+import { MontyClient, type StacSearch } from '../src/monty/client'
 import { stacItem, type FakeItem } from './stacFixture'
 
 /** Records every request and answers event searches with `events`. Other collections answer empty. */

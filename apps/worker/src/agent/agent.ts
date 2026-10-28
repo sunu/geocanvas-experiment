@@ -3,6 +3,7 @@ import { Chat, Runtime, type Actor } from '@ttx/core'
 import { plugins } from '@ttx/plugins'
 import { runTurn } from './loop'
 import type { Complete } from './openrouter'
+import type { ReadTool } from './tools'
 
 export const AGENT: Actor = { kind: 'agent', id: 'agent', name: 'Agent', color: '#7c3aed' }
 
@@ -17,6 +18,7 @@ export class Agent {
   readonly runtime: Runtime
   readonly chat: Chat
   private complete: Complete | undefined
+  private tools: ReadTool[]
   private onBusy: (busy: boolean) => void
   private keepAlive: (work: Promise<void>) => void
   private busy = false
@@ -26,12 +28,15 @@ export class Agent {
     doc: Y.Doc
     /** The model; undefined when no API key is set. */
     complete: Complete | undefined
+    /** Read tools beside board__get, e.g. Montandon search when the token is set. */
+    tools?: ReadTool[]
     /** Called when a turn starts (true) and when the queue is empty (false). */
     onBusy?: (busy: boolean) => void
     /** Given the promise of the running turns, so the room stays in memory until they end. */
     keepAlive?: (work: Promise<void>) => void
   }) {
     this.complete = opts.complete
+    this.tools = opts.tools ?? []
     this.onBusy = opts.onBusy ?? (() => {})
     this.keepAlive = opts.keepAlive ?? (() => {})
     this.runtime = new Runtime({ doc: opts.doc, plugins, actor: AGENT })
@@ -61,7 +66,7 @@ export class Agent {
           continue
         }
         this.turns.push(now)
-        this.chat.reply(await runTurn(this.runtime, message, this.complete))
+        this.chat.reply(await runTurn(this.runtime, message, this.complete, this.tools))
       }
     } finally {
       this.busy = false
