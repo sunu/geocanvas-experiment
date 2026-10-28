@@ -4,14 +4,14 @@ import * as syncProtocol from 'y-protocols/sync'
 import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
-import { Agent, AGENT } from './agent/agent'
-import { openRouter } from './agent/openrouter'
 import { geocode } from './geocode'
 import { hapiProxy } from './hapi'
 import { montySearch, stacSearch } from './monty'
 import { notebooksProxy } from './notebooks'
 import { reliefwebUpdates } from './reliefweb'
-import { eventsSearch, geocodeTools, OpenCageGeocoder, OPENCAGE_URL } from '@ttx/plugins'
+import { json, serveUpload, storeUpload } from './uploads'
+import { uploadUrl, Uploads } from '@ttx/core'
+import { Agent, AGENT, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
 
@@ -23,13 +23,18 @@ import { UpdateLog } from './updateLog'
  * /tools/geocode proxies OpenCage with the key added (geocode.ts), and /notebooks/* and
  * /reliefweb/updates read Notebook Factory and ReliefWeb, which send no CORS headers (notebooks.ts, reliefweb.ts),
  * and /hapi/* reads HDX HAPI with the app identifier added (hapi.ts).
- * Each room also runs the board's agent (agent/agent.ts), which answers the board's chat.
+ * POST /uploads goes to the room the file is for, which stores it in R2 and lists it on the board;
+ * GET /uploads/<id> serves it (uploads.ts).
+ * Each room also runs the board's agent (Agent in @ttx/plugins), which answers the chat messages
+ * that no browser tab answers on its own key.
  */
 
 const MESSAGE_SYNC = 0
 const MESSAGE_AWARENESS = 1
 /** Merge the stored updates into one row when there are more than this: on load, and while the room runs. */
 const COMPACT_AFTER = 500
+/** Same rule as the browser's #room=<id>. */
+const ROOM_ID = /^[\w-]{1,64}$/
 
 /**
  * One board. Its Yjs updates are appended to the Durable Object's SQLite as they arrive (updateLog.ts).
@@ -47,6 +52,7 @@ export class Room extends DurableObject<Env> {
   /** Updates in the log since it was last compacted. */
   private logged = 0
   private awareness = new awarenessProtocol.Awareness(this.doc)
+  private uploads = new Uploads(this.doc)
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -85,6 +91,8 @@ export class Room extends DurableObject<Env> {
     new Agent({
       doc: this.doc,
       complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
+      accepts: forRoom,
+      turnsPerHour: TURNS_PER_HOUR,
       tools: [
         ...(env.OPENCAGE_API_KEY ? geocodeTools(new OpenCageGeocoder({ url: OPENCAGE_URL, key: env.OPENCAGE_API_KEY })) : []),
         ...(env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : []),
@@ -100,7 +108,8 @@ export class Room extends DurableObject<Env> {
     this.logged = 1
   }
 
-  override async fetch(): Promise<Response> {
+  override async fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname === '/uploads') return this.upload(request)
     const { 0: client, 1: socket } = new WebSocketPair()
     this.ctx.acceptWebSocket(socket)
     socket.serializeAttachment({ presenceIds: [] } satisfies SocketAttachment)
@@ -110,6 +119,15 @@ export class Room extends DurableObject<Env> {
     const states = [...this.awareness.getStates().keys()]
     if (states.length) socket.send(awarenessMessage(awarenessProtocol.encodeAwarenessUpdate(this.awareness, states)))
     return new Response(null, { status: 101, webSocket: client })
+  }
+
+  /** Store a file for this board and add it to the board's uploads list, which syncs like any edit. */
+  private async upload(request: Request): Promise<Response> {
+    const room = new URL(request.url).searchParams.get('room')!
+    const upload = await storeUpload(request, this.env.UPLOADS, room)
+    if (upload instanceof Response) return upload
+    this.uploads.add(upload)
+    return json(201, { id: upload.id, url: uploadUrl(upload.id) })
   }
 
   override webSocketMessage(socket: WebSocket, message: string | ArrayBuffer) {
@@ -186,6 +204,13 @@ export default {
     if (path.startsWith('/notebooks/')) return notebooksProxy(request, env.NOTEBOOK_FACTORY_URL)
     if (path === '/reliefweb/updates') return reliefwebUpdates(request)
     if (path.startsWith('/hapi/')) return hapiProxy(request, env.HAPI_APP_IDENTIFIER)
+    if (path === '/uploads') {
+      if (request.method !== 'POST') return json(405, { error: 'POST only' })
+      const room = new URL(request.url).searchParams.get('room') ?? ''
+      if (!ROOM_ID.test(room)) return json(400, { error: 'Name the room the file is for: ?room=<room>' })
+      return env.ROOMS.get(env.ROOMS.idFromName(room)).fetch(request)
+    }
+    if (path.startsWith('/uploads/')) return serveUpload(request, env.UPLOADS)
     const roomId = /^\/connect\/([\w-]{1,64})$/.exec(path)?.[1]
     if (!roomId) return new Response('Not found', { status: 404 })
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a websocket', { status: 426 })

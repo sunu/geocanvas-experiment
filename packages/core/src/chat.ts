@@ -17,6 +17,11 @@ export interface UserMessage {
   selection: string[]
   /** The middle of the sender's view, in canvas units: where the agent puts new objects. */
   center?: { x: number; y: number }
+  /**
+   * Who answers: absent, the room's agent on the server's key; else the browser tab with this id, on its
+   * sender's own key (apps/web/src/agent/browserAgent.ts). The message never holds the key.
+   */
+  browserTab?: string
   at: number
 }
 

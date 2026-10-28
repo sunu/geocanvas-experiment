@@ -1,20 +1,8 @@
-import { corePlugin } from '@ttx/core'
-import { agentPlugin } from './agent.js'
-import { eventsPlugin } from './events.js'
-import { hapiPlugin } from './hapi.js'
-import { mapPlugin } from './map.js'
-import { notebooksPlugin } from './notebooks.js'
-import { reliefwebPlugin } from './reliefweb.js'
-
-/**
- * The headless plugins: object types and ops, with no UI. The web app adds their UI
- * (apps/web/src/plugins.ts); the room Durable Object runs the agent on them.
- */
-export const plugins = [corePlugin, mapPlugin, eventsPlugin, notebooksPlugin, reliefwebPlugin, hapiPlugin, agentPlugin]
-
+export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
 export { boardGet, eventsSearch } from './agentTools.js'
-export { eventsPlugin, type EventBoardObject } from './events.js'
+export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
+export { imagesPlugin, type ImageBoardObject } from './images.js'
 export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
 export { CHOROPLETH_TOOL, choroplethLayer, hapiPlugin, INDICATORS, type Indicator, type ConflictBoardObject, type CountryBoardObject, type PresenceBoardObject } from './hapi.js'
@@ -35,3 +23,6 @@ export {
   type MapLayer,
 } from './mapLayers.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
+export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
+export { agentTools, GAP, HISTORY_ENTRIES, HISTORY_MS, MAX_SIZE_FACTOR, MAX_STEPS, runTurn } from './agent/loop.js'
+export { chatCompletions, openRouter, OPENROUTER_URL, type Complete, type FunctionTool, type Message, type ToolCall } from './agent/complete.js'

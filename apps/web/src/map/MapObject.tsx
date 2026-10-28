@@ -28,6 +28,7 @@ import { countryName } from '@ttx/plugins/monty/countries'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/api'
+import { monty } from '../events/monty'
 import { tools } from '../tools/registry'
 import { ADMIN_AREAS, classify, codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
 import { basemapStyle } from './basemaps'
@@ -241,10 +242,10 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
     if (area) layerOp('map.addLayer', { layer, area })
   }
 
-  /** A notebook's GeoJSON file, for everyone; this person's view fits it once it loads. */
-  const addNotebookResult = (runId: string, name: string, title: string) => {
+  /** A layer for everyone; this person's view fits it once it loads. */
+  const addAndFit = (op: string, args: Record<string, unknown>) => {
     const before = new Set(layers.map((l) => l.id))
-    layerOp('map.addNotebookResult', { runId, name, title })
+    layerOp(op, args)
     const added = (runtime.board.get(o.id) as MapBoardObject | undefined)?.layers?.find((l) => !before.has(l.id))
     if (added) fitMapToLayer(runtime, o.id, added)
   }
@@ -269,8 +270,9 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
           board={runtime.board as Board}
           onAdd={addDataLayer}
           onAddBoundaries={(level) => layerOp('map.addBoundaries', { level })}
+          onAddEvent={(eventId, title) => addAndFit('map.addEventLayer', { eventId, title })}
           onAddChoropleth={addChoropleth}
-          onAddNotebookResult={addNotebookResult}
+          onAddNotebookResult={(runId, name, title) => addAndFit('map.addNotebookResult', { runId, name, title })}
         />
         <select
           aria-label="Basemap"
@@ -318,15 +320,16 @@ interface AddLayerMenuProps {
   board: Board
   onAdd(layer: DataLayerKey): void
   onAddBoundaries(level: AdminLevel): void
+  onAddEvent(eventId: string, title: string): void
   onAddChoropleth(country: string, indicator: Indicator, level: AdminLevel, sector?: string): void
   onAddNotebookResult(runId: string, name: string, title: string): void
 }
 
 /**
- * "Add layer": data for the area this person is looking at, admin boundaries, the HDX HAPI figures of the country
- * widgets on the board by area, and the GeoJSON results of notebooks on the board.
+ * "Add layer": data for the area this person is looking at, admin boundaries, the events on the board, the HDX HAPI
+ * figures of the country widgets on the board by area, and the GeoJSON results of notebooks on the board.
  */
-function AddLayerMenu({ board, onAdd, onAddBoundaries, onAddChoropleth, onAddNotebookResult }: AddLayerMenuProps) {
+function AddLayerMenu({ board, onAdd, onAddBoundaries, onAddEvent, onAddChoropleth, onAddNotebookResult }: AddLayerMenuProps) {
   const [open, setOpen] = useState(false)
   return (
     <div className="ttx-addlayer" onPointerDown={(e) => e.stopPropagation()}>
@@ -363,6 +366,13 @@ function AddLayerMenu({ board, onAdd, onAddBoundaries, onAddChoropleth, onAddNot
               {ADMIN_LEVEL_NAME[level].many} (COD-AB)
             </button>
           ))}
+          <BoardEvents
+            board={board}
+            onPick={(eventId, title) => {
+              onAddEvent(eventId, title)
+              setOpen(false)
+            }}
+          />
           <CountryData
             board={board}
             onPick={(...args) => {
@@ -382,6 +392,44 @@ function AddLayerMenu({ board, onAdd, onAddBoundaries, onAddChoropleth, onAddNot
     </div>
   )
 }
+
+/** The events picked on this board, by name, to show where they happened. Names come from the event cache the event cards fill. */
+function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, title: string): void }) {
+  const objects = useObjects(board)
+  const eventIds = [...new Set(objects.flatMap((o) => (o.type === 'event' && o.eventId ? [o.eventId] : [])))]
+  const key = eventIds.join(',')
+  const [names, setNames] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let current = true
+    for (const id of eventIds)
+      monty.getEvent(id).then(
+        (e) => current && setNames((n) => ({ ...n, [id]: e.name })),
+        () => {}, // listed by id
+      )
+    return () => {
+      current = false
+    }
+    // `key` stands for eventIds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+
+  return (
+    <>
+      <div className="ttx-addlayer__label">Events on this board</div>
+      {!eventIds.length ? (
+        <div className="ttx-addlayer__note">Pick an event on the board to show where it happened</div>
+      ) : (
+        eventIds.map((id) => (
+          <button key={id} type="button" role="menuitem" title={id} onClick={() => onPick(id, names[id] ?? id)}>
+            {names[id] ?? id} <span className="ttx-addlayer__sub">· footprint</span>
+          </button>
+        ))
+      )}
+    </>
+  )
+}
+
 
 /**
  * The HDX HAPI figures of the who's where and conflict widgets on this board, as choropleths by province or district.

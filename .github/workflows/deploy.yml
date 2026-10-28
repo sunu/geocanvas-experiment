@@ -40,6 +40,9 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENCAGE_API_KEY: ${{ secrets.OPENCAGE_API_KEY }}
           HAPI_APP_IDENTIFIER: ${{ secrets.HAPI_APP_IDENTIFIER }}
+        # An explicit bash runs with pipefail (the default shell does not), so a failed deploy fails this
+        # step even though its output goes through tee.
+        shell: bash
         run: |
           name=$(../../.github/scripts/worker-name.sh "$BRANCH")
           # Secrets belong to one Worker, and each branch is its own Worker, so upload the API keys with
