@@ -33,7 +33,7 @@ export const sticky: ObjectTypeDef<'sticky'> = {
 function StickyView({ board, object: o, editing }: ObjectViewProps<'sticky'>) {
   const color = PALETTE[o.color ?? DEFAULT_COLOR]
   return (
-    <div className="ttx-sticky" style={{ background: color.fill, borderColor: color.stroke, fontSize: o.fontSize ?? DEFAULT_FONT_SIZE, color: INK }}>
+    <div className="ttx-sticky" style={{ background: `color-mix(in srgb, ${color.fill} 60%, ${color.stroke})`, fontSize: o.fontSize ?? DEFAULT_FONT_SIZE, color: INK }}>
       {editing ? (
         <textarea
           className="ttx-sticky__text ttx-sticky__text--edit"
