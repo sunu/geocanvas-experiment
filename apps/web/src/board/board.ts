@@ -1,5 +1,5 @@
 import type { Board as CoreBoard, BoxObject, StickyObject, TextObject } from '@ttx/core'
-import type { EventBoardObject, MapBoardObject, NotebookBoardObject } from '@ttx/plugins'
+import type { EventBoardObject, MapBoardObject, NotebookBoardObject, ReliefWebBoardObject } from '@ttx/plugins'
 
 /**
  * The objects of this app's plugins (plugins.ts), for typed reads in the UI. The board itself and
@@ -7,7 +7,7 @@ import type { EventBoardObject, MapBoardObject, NotebookBoardObject } from '@ttx
  *
  * Map views (center, zoom) are not on the board on purpose: each person pans their own maps.
  */
-export type BoardObject = BoxObject | TextObject | StickyObject | MapBoardObject | EventBoardObject | NotebookBoardObject
+export type BoardObject = BoxObject | TextObject | StickyObject | MapBoardObject | EventBoardObject | NotebookBoardObject | ReliefWebBoardObject
 
 export type ObjectType = BoardObject['type']
 

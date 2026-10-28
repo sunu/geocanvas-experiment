@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { HurricaneIcon, PulseIcon, SunIcon, WarningIcon, WavesIcon, type Icon } from '@phosphor-icons/react'
+import { HurricaneIcon, NewspaperIcon, PulseIcon, SunIcon, WarningIcon, WavesIcon, type Icon } from '@phosphor-icons/react'
 import type { ObjectViewProps } from '../canvas/registry'
 import { countryName } from '@ttx/plugins/monty/countries'
 import { createLiveSearch, type LiveState } from './liveSearch'
 import { monty } from './monty'
 import { overviewOf } from '@ttx/plugins/monty/search'
 import { sourceLabel } from '@ttx/plugins/monty/sources'
-import type { EventBoardObject } from '@ttx/plugins'
+import { glidesOf, type EventBoardObject } from '@ttx/plugins'
 import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from '@ttx/plugins/monty/types'
 
 /** Phosphor has no earthquake symbol; a seismograph pulse stands in (see AGENTS.md on hazard icons). */
 const TYPE_ICON: Record<DisasterType, Icon> = { cyclone: HurricaneIcon, flood: WavesIcon, earthquake: PulseIcon, drought: SunIcon }
 /** Results shown in the picker. */
 const LIMIT = 60
+/** Gap between an event and a feed made from it (canvas units). */
+const GAP = 24
 
 /**
  * A disaster event from Montandon. Double-click to search for one (editing); picking an event ends editing.
@@ -37,6 +39,12 @@ export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewP
     onDone()
   }
 
+  /** A ReliefWeb feed to the right of the event, for its GLIDE numbers, for everyone. */
+  const addFeed = (event: DisasterEvent) => {
+    runtime.beginGesture()
+    runtime.dispatch('reliefweb.add', { kind: 'canvas' }, { x: o.x + o.w + GAP, y: o.y, glides: glidesOf(event), title: event.name })
+  }
+
   return (
     <div className="ttx-event">
       <div className="ttx-event__header">
@@ -47,7 +55,7 @@ export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewP
         {editing ? (
           <EventPicker selected={o.eventId} onPick={pick} />
         ) : o.eventId ? (
-          <EventDetails eventId={o.eventId} />
+          <EventDetails eventId={o.eventId} onAddFeed={addFeed} />
         ) : (
           <div className="ttx-event__empty">Double-click to search for an event</div>
         )}
@@ -119,7 +127,7 @@ export function EventPicker({ selected, onPick }: { selected?: string; onPick(id
   )
 }
 
-function EventDetails({ eventId }: { eventId: string }) {
+function EventDetails({ eventId, onAddFeed }: { eventId: string; onAddFeed(event: DisasterEvent): void }) {
   const { event, error } = useEvent(eventId)
   if (error !== undefined) return <div className="ttx-event__empty">Could not load the event: {errorText(error)}</div>
   if (!event) return <div className="ttx-event__empty">Loading…</div>
@@ -138,6 +146,26 @@ function EventDetails({ eventId }: { eventId: string }) {
       {event.hazard && <div className="ttx-event__hazard">{event.hazard.label}</div>}
       <Impacts impacts={event.impacts} />
       <Sources sources={event.sources} />
+      <FeedButton event={event} onAddFeed={onAddFeed} />
+    </div>
+  )
+}
+
+/** "ReliefWeb updates": ReliefWeb files disasters by GLIDE number, so an event without one has no feed. */
+function FeedButton({ event, onAddFeed }: { event: DisasterEvent; onAddFeed(event: DisasterEvent): void }) {
+  const glides = glidesOf(event)
+  return (
+    <div className="ttx-event__actions" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        disabled={!glides.length}
+        title={glides.length ? `Add a feed of ReliefWeb updates for GLIDE ${glides.join(', ')}` : 'No GLIDE number was found for this event, so ReliefWeb cannot be searched'}
+        onClick={() => onAddFeed(event)}
+      >
+        <NewspaperIcon size={13} aria-hidden />
+        ReliefWeb updates
+      </button>
+      {!glides.length && <span className="ttx-event__note">No GLIDE number for this event</span>}
     </div>
   )
 }
