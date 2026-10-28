@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { AnyObject } from '../doc/board.js'
 import type { BoardTx } from '../doc/tx.js'
 import { defineOp, type OpContext, type TargetRef } from '../ops/types.js'
-import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, stepFontSize, type ColorName } from '../style.js'
+import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STICKY_COLOR, DEFAULT_TEXT_COLOR, stepFontSize, type ColorName } from '../style.js'
 import { definePlugin, type ObjectTypeDef } from './types.js'
 
 /**
@@ -40,8 +40,25 @@ export const textType: ObjectTypeDef = {
   summarize: (o) => JSON.stringify((o as TextObject).text.slice(0, 200)),
 }
 
+export const stickyType: ObjectTypeDef = {
+  type: 'sticky',
+  title: 'Sticky note',
+  description: 'A colored square note with text. Its size is set by hand; text that does not fit is cut off.',
+  fields: z.object({
+    text: z.string().default('').describe('The text'),
+    color: colorField,
+    fontSize: z.number().positive().optional(),
+  }),
+  defaultSize: { w: 200, h: 200 },
+  layer: 'top',
+  defaultColor: DEFAULT_STICKY_COLOR,
+  textSize: true,
+  summarize: (o) => JSON.stringify((o as StickyObject).text.slice(0, 200)),
+}
+
 export type BoxObject = AnyObject & { type: 'box'; color?: ColorName }
 export type TextObject = AnyObject & { type: 'text'; text: string; color?: ColorName; fontSize?: number }
+export type StickyObject = AnyObject & { type: 'sticky'; text: string; color?: ColorName; fontSize?: number }
 
 const idsOf = (target: TargetRef) => (target.kind === 'objects' ? target.ids : [])
 const rect = z.object({ x: z.number(), y: z.number(), w: z.number().positive(), h: z.number().positive() }).partial()
@@ -152,12 +169,15 @@ const setColor = defineOp({
 const textTarget = { kind: 'objects', types: ['text'] } as const
 const sizedTarget = { kind: 'objects' } as const
 
-/** Typing in a text. One op log entry per editing gesture. */
+/**
+ * Typing in a text or a sticky note. One op log entry per editing gesture. The id says text because op ids are
+ * stored in the op log: it stays as it was when only texts had text.
+ */
 const setText = defineOp({
   id: 'text.setText',
   title: 'Set text',
-  description: 'Replace the content of a text.',
-  target: { ...textTarget, max: 1 },
+  description: 'Replace the content of a text or a sticky note.',
+  target: { kind: 'objects', types: ['text', 'sticky'], max: 1 },
   hidden: true,
   gesture: true,
   args: z.object({ text: z.string() }),
@@ -224,6 +244,6 @@ const viewOps = [
 export const corePlugin = definePlugin({
   id: 'core',
   title: 'Core',
-  objectTypes: [boxType, textType],
+  objectTypes: [boxType, textType, stickyType],
   ops: [setRect, move, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), ...viewOps],
 })

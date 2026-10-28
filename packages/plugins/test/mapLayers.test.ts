@@ -40,6 +40,12 @@ describe('map layers', () => {
     expect(layersOf()[1]!.input.area).toEqual(area)
   })
 
+  it('adds health facilities for an area', () => {
+    const { rt, target, layersOf } = setup()
+    rt.dispatch('map.addLayer', target, { layer: 'health-facilities', area: beira })
+    expect(layersOf()[0]).toMatchObject({ tool: 'data.healthFacilities', input: { area: [34.8, -19.9, 34.9, -19.8] }, title: 'Health facilities (OpenStreetMap)' })
+  })
+
   it('fails without an area when nobody has looked at the map', () => {
     const { rt, target, layersOf } = setup()
     expect(rt.dispatch('map.addLayer', target, { layer: 'countries' })).toMatchObject({ status: 'failed', error: expect.stringMatching(/area/) })

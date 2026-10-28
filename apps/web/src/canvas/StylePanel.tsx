@@ -2,6 +2,7 @@ import { MinusIcon, PlusIcon, TextAaIcon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
 import type { BoardObject } from '../board/board'
 import { requestFit } from './coreUI'
+import { objectUI } from './registry'
 import { ICON } from './Toolbar'
 import { COLORS, DEFAULT_FONT_SIZE, PALETTE, type ColorName } from './style'
 
@@ -26,7 +27,8 @@ export function StylePanel({ runtime, selected }: { runtime: Runtime; selected: 
   }
   const stepSize = (dir: 1 | -1) => {
     runtime.beginGesture()
-    for (const o of sized) requestFit(o.id)
+    // Only types whose height follows their content (texts) refit; a sticky note keeps its size.
+    for (const o of sized) if (objectUI(o.type)?.widthOnly) requestFit(o.id)
     runtime.dispatch(dir === 1 ? 'text.larger' : 'text.smaller', { kind: 'objects', ids: sized.map((o) => o.id) }, {})
   }
 

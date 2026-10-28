@@ -81,8 +81,12 @@ export function deckLayers(states: LayerState[]): Layer[] {
           id: `layer-${s.id}`,
           data: s.value as GeoJSON.FeatureCollection,
           pointType: 'circle',
-          pointRadiusUnits: 'pixels',
-          getPointRadius: 6,
+          // Sized in meters, kept between 2.5 and 6 px: thousands of points (health facilities in a
+          // country) stay apart when zoomed out, and a single pin stays visible.
+          pointRadiusUnits: 'meters',
+          getPointRadius: 150,
+          pointRadiusMinPixels: 2.5,
+          pointRadiusMaxPixels: 6,
           getFillColor: (f: GeoJSON.Feature) => [...ACCENT, isArea(f) ? 30 : 140],
           getLineColor: [...ACCENT, 230],
           lineWidthUnits: 'pixels',

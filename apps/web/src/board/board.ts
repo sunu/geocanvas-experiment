@@ -1,4 +1,4 @@
-import type { Board as CoreBoard, BoxObject, TextObject } from '@ttx/core'
+import type { Board as CoreBoard, BoxObject, StickyObject, TextObject } from '@ttx/core'
 import type { EventBoardObject, MapBoardObject } from '@ttx/plugins'
 
 /**
@@ -7,7 +7,7 @@ import type { EventBoardObject, MapBoardObject } from '@ttx/plugins'
  *
  * Map views (center, zoom) are not on the board on purpose: each person pans their own maps.
  */
-export type BoardObject = BoxObject | TextObject | MapBoardObject | EventBoardObject
+export type BoardObject = BoxObject | TextObject | StickyObject | MapBoardObject | EventBoardObject
 
 export type ObjectType = BoardObject['type']
 

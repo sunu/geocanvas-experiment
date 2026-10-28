@@ -33,6 +33,12 @@ export const DATA_LAYERS = {
   },
   countries: { label: 'Countries (World Bank)', title: 'Countries (World Bank)', tool: 'data.adminBoundaries', input: { level: 0 } },
   buildings: { label: 'Buildings (Overture), zoomed in', title: 'Overture buildings', tool: 'data.overture', input: { type: 'buildings' } },
+  'health-facilities': {
+    label: 'Health facilities (OpenStreetMap)',
+    title: 'Health facilities (OpenStreetMap)',
+    tool: 'data.healthFacilities',
+    input: {},
+  },
 } as const satisfies Record<string, { label: string; title: string; tool: string; input: Record<string, unknown> }>
 
 export type DataLayerKey = keyof typeof DATA_LAYERS

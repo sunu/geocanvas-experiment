@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from 'react'
-import { RectangleIcon, TextTIcon } from '@phosphor-icons/react'
-import type { TextObject } from '@ttx/core'
+import { NoteIcon, RectangleIcon, TextTIcon } from '@phosphor-icons/react'
+import type { StickyObject, TextObject } from '@ttx/core'
 import { registerObjectUI, registerWidget, type ObjectViewProps } from './registry'
-import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE } from './style'
+import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STICKY_COLOR, DEFAULT_TEXT_COLOR, PALETTE } from './style'
 
 /**
  * Texts whose height should be fitted to their content after the next render. Only the person
@@ -27,6 +27,14 @@ registerObjectUI('text', {
   editOnCreate: true,
   widthOnly: true,
   isEmpty: (o) => !o.text.trim(),
+})
+
+// No isEmpty: an empty note is still a visible note on the board, unlike an empty text.
+registerObjectUI('sticky', {
+  View: StickyView,
+  tool: { key: 'S', label: 'Sticky note', Icon: NoteIcon },
+  editable: true,
+  editOnCreate: true,
 })
 
 /** A color in a form: the same swatches as the style panel. */
@@ -76,6 +84,33 @@ function TextView({ runtime, object: o, editing }: ObjectViewProps<TextObject>) 
             runtime.dispatch('text.setText', { kind: 'objects', ids: [o.id] }, { text: e.target.value })
           }}
         />
+      )}
+    </div>
+  )
+}
+
+/** The note's text: dark on every fill, so it stays readable whatever the note's color. */
+const STICKY_INK = PALETTE.ink.ink
+
+/** A colored square with text. Its size is set by hand; text that does not fit is cut off at the bottom. */
+function StickyView({ runtime, object: o, editing }: ObjectViewProps<StickyObject>) {
+  const color = PALETTE[o.color ?? DEFAULT_STICKY_COLOR]
+  return (
+    <div
+      className="ttx-sticky"
+      style={{ background: `color-mix(in srgb, ${color.fill} 60%, ${color.stroke})`, fontSize: o.fontSize ?? DEFAULT_FONT_SIZE, color: STICKY_INK }}
+    >
+      {editing ? (
+        <textarea
+          className="ttx-sticky__text ttx-sticky__text--edit"
+          autoFocus
+          aria-label="Sticky note text"
+          value={o.text}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => runtime.dispatch('text.setText', { kind: 'objects', ids: [o.id] }, { text: e.target.value })}
+        />
+      ) : (
+        <div className="ttx-sticky__text">{o.text}</div>
       )}
     </div>
   )

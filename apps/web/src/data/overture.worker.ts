@@ -19,13 +19,13 @@ import {
   latestRelease,
   OVERTURE_BUILDING_COLUMNS,
   OVERTURE_STAC_CATALOG,
-  rowGroupsInBbox,
   type BuildingFeature,
   type OvertureBuildingRow,
   type OvertureType,
   type ParquetAsset,
   type StacFile,
 } from './overture'
+import { rowGroupsInBbox } from './wkb'
 import type { Bbox } from '@ttx/plugins'
 
 export type OvertureRequest =

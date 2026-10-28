@@ -1,5 +1,5 @@
 /**
- * Color names and text sizes for boxes and text. Objects store a color by name, so the web palette
+ * Color names and text sizes for boxes, texts and sticky notes. Objects store a color by name, so the web palette
  * (apps/web/src/canvas/style.ts) can be retuned without touching boards. They are here because the
  * object schemas and ops need them.
  */
@@ -9,6 +9,7 @@ export type ColorName = (typeof COLORS)[number]
 
 export const DEFAULT_BOX_COLOR: ColorName = 'blue'
 export const DEFAULT_TEXT_COLOR: ColorName = 'ink'
+export const DEFAULT_STICKY_COLOR: ColorName = 'yellow'
 
 export const FONT_SIZES = [12, 14, 16, 20, 24, 32, 40, 48, 64, 80, 96] as const
 export const DEFAULT_FONT_SIZE = 20

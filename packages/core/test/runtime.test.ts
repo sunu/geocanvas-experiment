@@ -154,6 +154,21 @@ describe('dispatch', () => {
     expect(rt.board.get(id)).toMatchObject({ fontSize: 24 })
   })
 
+  it('makes sticky notes: an empty yellow square on top, with text, color and text size like a text', () => {
+    const rt = runtime()
+    const box = rt.dispatch('box.add', canvas, {}).created![0]!
+    const note = rt.dispatch('sticky.add', canvas, { x: 0, y: 0 }).created![0]!
+    expect(rt.board.get(note)).toMatchObject({ type: 'sticky', text: '', w: 200, h: 200 })
+    expect(rt.board.list().map((o) => o.id)).toEqual([box, note])
+    expect(rt.defaultsFor('core.object.setColor', objects(note))).toEqual({ color: 'yellow' })
+    expect(rt.dispatch('text.setText', objects(note), { text: 'Check hospitals' }).status).toBe('applied')
+    rt.dispatch('core.object.setColor', objects(note), { color: 'green' })
+    rt.dispatch('text.larger', objects(note), {})
+    expect(rt.board.get(note)).toMatchObject({ text: 'Check hospitals', color: 'green', fontSize: 24, h: 200 })
+    expect(rt.registry.objectTypes().filter((t) => t.defaultColor).map((t) => t.type)).toEqual(['box', 'text', 'sticky'])
+    expect(rt.registry.objectTypes().filter((t) => t.textSize).map((t) => t.type)).toEqual(['text', 'sticky'])
+  })
+
   it("colors and sizes only objects whose type has a color or text size, with the type's default color", () => {
     const rt = runtime()
     const text = addText(rt)

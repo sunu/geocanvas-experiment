@@ -4,7 +4,7 @@
  */
 import type { ColorName } from '@ttx/core'
 
-export { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, FONT_SIZES, stepFontSize, type ColorName } from '@ttx/core'
+export { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STICKY_COLOR, DEFAULT_TEXT_COLOR, FONT_SIZES, stepFontSize, type ColorName } from '@ttx/core'
 
 /** ink: text and swatch color; fill and stroke: a box's background and border. */
 export const PALETTE: Record<ColorName, { ink: string; fill: string; stroke: string }> = {

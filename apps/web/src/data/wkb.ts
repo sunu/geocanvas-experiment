@@ -1,6 +1,6 @@
 import type { Bbox } from '@ttx/plugins'
 
-/** Pure GeoParquet helpers shared by the World Bank and Overture readers. */
+/** Pure GeoParquet helpers shared by the World Bank, Overture and Layercake readers. */
 
 export type PolygonGeometry = GeoJSON.Polygon | GeoJSON.MultiPolygon
 
@@ -51,4 +51,46 @@ export function wkbToGeometry(bytes: Uint8Array): PolygonGeometry {
     return { type: 'MultiPolygon', coordinates }
   }
   throw new Error(`Unsupported WKB geometry type ${type} (only Polygon and MultiPolygon)`)
+}
+
+// ---------- Row groups ----------
+
+/** The part of Parquet footer metadata that row-group selection reads (hyparquet's shape). */
+export interface RowGroupMeta {
+  num_rows: bigint | number
+  columns: {
+    meta_data?: {
+      path_in_schema: string[]
+      statistics?: { min_value?: unknown; max_value?: unknown }
+    }
+  }[]
+}
+
+export interface RowRange {
+  rowStart: number
+  rowEnd: number
+}
+
+/**
+ * Row ranges of the row groups whose `bbox` column statistics intersect the query bbox. A row group
+ * without usable statistics is kept (it may match).
+ */
+export function rowGroupsInBbox(rowGroups: RowGroupMeta[], bbox: Bbox): RowRange[] {
+  const out: RowRange[] = []
+  let rowStart = 0
+  for (const rg of rowGroups) {
+    const rowEnd = rowStart + Number(rg.num_rows)
+    const stat = (path: string, key: 'min_value' | 'max_value') => {
+      const v = rg.columns.find((c) => c.meta_data?.path_in_schema.join('.') === path)?.meta_data?.statistics?.[key]
+      return typeof v === 'number' ? v : undefined
+    }
+    // A row overlaps when xmin <= east, xmax >= west, ymin <= north, ymax >= south.
+    const xmin = stat('bbox.xmin', 'min_value') ?? -Infinity
+    const xmax = stat('bbox.xmax', 'max_value') ?? Infinity
+    const ymin = stat('bbox.ymin', 'min_value') ?? -Infinity
+    const ymax = stat('bbox.ymax', 'max_value') ?? Infinity
+    if (rowEnd > rowStart && bboxesIntersect([xmin, ymin, xmax, ymax], bbox)) out.push({ rowStart, rowEnd })
+    rowStart = rowEnd
+  }
+  return out
 }
