@@ -1,26 +1,8 @@
 /**
- * A country's humanitarian context from HDX HAPI (https://hapi.humdata.org), read through the Worker, which adds
- * the app identifier (apps/worker/src/hapi.ts). Each endpoint gives rows tagged by country and reference period;
- * the functions below pick the figures a context card shows. HAPI answers an unknown code with no rows, not an error.
+ * A country's humanitarian context from HDX HAPI (api.ts): the figures a country context card shows, picked from
+ * the rows of several endpoints.
  */
-
-/** A HAPI row: the fields read here, by endpoint. */
-type Row = Record<string, any>
-
-export async function hapi(endpoint: string, params: Record<string, string | number>, signal?: AbortSignal): Promise<Row[]> {
-  const res = await fetch(`/hapi/${endpoint}?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}`, { signal })
-  if (!res.ok) throw new Error(`HDX HAPI ${endpoint} failed (${res.status})`)
-  return ((await res.json()) as { data: Row[] }).data
-}
-
-export interface Country {
-  code: string
-  name: string
-  /** It has a humanitarian response plan. */
-  hasHrp: boolean
-  /** It is in the Global Humanitarian Overview. */
-  inGho: boolean
-}
+import { countryOf, hapi, sourceOf, type Country, type Row, type Source } from './api'
 
 export interface Risk {
   /** INFORM risk class, 1 (very low) to 5 (very high). */
@@ -76,12 +58,6 @@ export interface Appeal {
   source: string
 }
 
-export interface Source {
-  title: string
-  provider: string
-  link: string
-}
-
 export interface CountryContext {
   country: Country
   risk?: Risk
@@ -98,8 +74,6 @@ export interface CountryContext {
 
 const year = (r: Row) => String(r.reference_period_start).slice(0, 4)
 const newestFirst = (a: Row, b: Row) => String(b.reference_period_start).localeCompare(String(a.reference_period_start))
-
-export const countryOf = (r: Row): Country => ({ code: r.code, name: r.name, hasHrp: !!r.has_hrp, inGho: !!r.in_gho })
 
 export function riskOf(rows: Row[]): Risk | undefined {
   const r = [...rows].sort(newestFirst)[0]
@@ -176,33 +150,6 @@ export function appealsOf(rows: Row[], limit = 3): Appeal[] {
       year: year(r),
       source: r.resource_hdx_id,
     }))
-}
-
-let countries: Promise<Country[]> | undefined
-
-/** The countries HAPI has data for, by name. Asked once. */
-export function loadCountries(): Promise<Country[]> {
-  countries ??= hapi('metadata/location', { limit: 1000 }).then((rows) => rows.map(countryOf).sort((a, b) => a.name.localeCompare(b.name)))
-  countries.catch(() => (countries = undefined))
-  return countries
-}
-
-const sources = new Map<string, Promise<Source | undefined>>()
-
-/** Where a figure comes from: its HDX dataset and provider. Datasets are shared by countries, so asked once each. */
-function sourceOf(resourceId: string): Promise<Source | undefined> {
-  let pending = sources.get(resourceId)
-  if (!pending) {
-    pending = hapi('metadata/resource', { resource_hdx_id: resourceId }).then(
-      ([r]) => r && { title: r.dataset_hdx_title, provider: r.dataset_hdx_provider_name, link: r.dataset_hdx_link },
-      () => {
-        sources.delete(resourceId)
-        return undefined
-      },
-    )
-    sources.set(resourceId, pending)
-  }
-  return pending
 }
 
 const contexts = new Map<string, Promise<CountryContext>>()
