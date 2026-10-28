@@ -370,11 +370,11 @@ body,
   isolation: isolate;
 }
 
+/* Bottom left: the layer list is top left, MapLibre's attribution bottom right. */
 .ttx-map__hint {
   position: absolute;
-  left: 50%;
-  top: 8px;
-  transform: translateX(-50%);
+  left: 8px;
+  bottom: 8px;
   padding: 2px 8px;
   border-radius: 4px;
   background: rgb(0 0 0 / 0.6);
@@ -602,10 +602,11 @@ body,
   font-size: 11px;
 }
 
+/* Top left: the bottom corners hold MapLibre's attribution, which must stay readable. */
 .ttx-layers {
   position: absolute;
   left: 8px;
-  bottom: 8px;
+  top: 8px;
   max-width: calc(100% - 16px);
   display: flex;
   flex-direction: column;

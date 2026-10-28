@@ -12,6 +12,7 @@ import {
   deckLayers,
   hasArea,
   newLayerId,
+  truncationOf,
   useLayerStates,
   viewArea,
   type LayerState,
@@ -207,7 +208,7 @@ function LayerList({ layers, states, onUseMyView, onRemove }: LayerListProps) {
   return (
     <div className="ttx-layers" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
       {states.map((s, i) => {
-        const note = s.error ?? (s.loading ? 'Loading…' : attributionOf(s.value))
+        const note = s.error ?? (s.loading ? 'Loading…' : [truncationOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
         return (
           <div key={s.id} className={`ttx-layers__item ${s.error ? 'is-error' : ''}`}>
             <div className="ttx-layers__text">

@@ -35,6 +35,8 @@ export const newLayerId = () => `${Date.now().toString(36)}${Math.random().toStr
 export const AREA_LAYERS: { label: string; tool: string; input: Record<string, unknown>; title: string }[] = [
   { label: 'Population 2020 (constrained)', tool: 'data.population', input: { variant: 'constrained' }, title: 'Population 2020 (constrained)' },
   { label: 'Population 2020 (unconstrained)', tool: 'data.population', input: { variant: 'unconstrained' }, title: 'Population 2020 (unconstrained)' },
+  { label: 'Countries (World Bank)', tool: 'data.adminBoundaries', input: { level: 0 }, title: 'Countries (World Bank)' },
+  { label: 'Buildings (Overture), zoomed in', tool: 'data.overture', input: { type: 'buildings' }, title: 'Overture buildings' },
 ]
 
 /** True when a layer works on an area, which can be reset to someone's view. */
@@ -92,6 +94,8 @@ export function useLayerStates(layers: MapLayer[]): LayerState[] {
 /** Accent color of data layers, [r, g, b]. */
 const ACCENT = [37, 99, 235] as const
 
+const isArea = (f: GeoJSON.Feature) => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon'
+
 /** deck.gl layers for the layers that have a result, by kind of result. Rasters draw below features. */
 export function deckLayers(states: LayerState[]): Layer[] {
   const rasters = states.filter((s) => s.output === 'geo.raster')
@@ -100,6 +104,7 @@ export function deckLayers(states: LayerState[]): Layer[] {
     if (s.value === undefined) return []
     if (s.output === 'geo.raster') return rasterLayers(s.value, { id: `layer-${s.id}` })
     if (s.output === 'geo.features') {
+      // Points: solid dots. Polygons (countries, buildings): a light fill and an outline, so the basemap stays readable.
       return [
         new GeoJsonLayer({
           id: `layer-${s.id}`,
@@ -107,10 +112,10 @@ export function deckLayers(states: LayerState[]): Layer[] {
           pointType: 'circle',
           pointRadiusUnits: 'pixels',
           getPointRadius: 6,
-          getFillColor: [...ACCENT, 140],
-          getLineColor: [...ACCENT, 255],
+          getFillColor: (f: GeoJSON.Feature) => [...ACCENT, isArea(f) ? 30 : 140],
+          getLineColor: [...ACCENT, 230],
           lineWidthUnits: 'pixels',
-          getLineWidth: 1.5,
+          getLineWidth: (f: GeoJSON.Feature) => (isArea(f) ? 1 : 1.5),
           stroked: true,
           filled: true,
         }),
@@ -124,4 +129,10 @@ export function deckLayers(states: LayerState[]): Layer[] {
 export function attributionOf(value: unknown): string | undefined {
   const a = (value as { attribution?: unknown } | undefined)?.attribution
   return typeof a === 'string' ? a : undefined
+}
+
+/** "Showing the first N features only" when a tool stopped at its cap (Overture buildings). */
+export function truncationOf(value: unknown): string | undefined {
+  const fc = value as { truncated?: unknown; features?: unknown[] } | undefined
+  return fc?.truncated === true ? `Showing the first ${(fc.features?.length ?? 0).toLocaleString('en')} features only` : undefined
 }
