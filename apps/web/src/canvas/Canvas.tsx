@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import type { Runtime, TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
-import type { WebsocketProvider } from 'y-websocket'
 import { useObjects, type ConnectionStatus } from '../board/connect'
-import { cursorSender, usePeers } from '../board/presence'
-import { objectType, objectTypes } from '../objects/registry'
-import { requestFit } from '../objects/text'
-import { intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
+import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
+import { Palette } from '../palette/Palette'
+import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
+import { requestFit } from './coreUI'
 import { ObjectView } from './ObjectView'
 import { Peers } from './Peers'
+import { objectUI } from './registry'
 import { StylePanel } from './StylePanel'
-import { Toolbar, type Tool } from './Toolbar'
+import { tools, Toolbar, type Tool } from './Toolbar'
 
 const MIN_SIZE = 16
 /** Pointer travel (screen px) before a press becomes a drag. */
 const DRAG_THRESHOLD = 3
 const HANDLES = ['nw', 'ne', 'sw', 'se'] as const
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', ...Object.fromEntries(objectTypes.map((d) => [d.key, d.type])) }
 const GRID = 24
+
+const objectsTarget = (ids: Iterable<string>): TargetRef => ({ kind: 'objects', ids: [...ids] })
 
 /** Follow a press until release. onMove gets the screen distance from the press once it passes the threshold. */
 function trackDrag(
@@ -41,15 +43,14 @@ function trackDrag(
   window.addEventListener('pointerup', up)
 }
 
-interface Props {
-  board: Board
-  status: ConnectionStatus
-  /** Presence: who else is here, their cursors and selections (board/presence.ts). */
-  awareness: WebsocketProvider['awareness']
-}
-
-export function Canvas({ board, status, awareness }: Props) {
+/**
+ * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
+ * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
+ */
+export function Canvas({ runtime, status, awareness }: { runtime: Runtime; status: ConnectionStatus; awareness: Awareness }) {
+  const board = runtime.board as Board
   const objects = useObjects(board)
+  const peers = usePeers(awareness)
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, z: 1 })
   const [tool, setTool] = useState<Tool>('select')
   const [selection, setSelection] = useState<Set<string>>(() => new Set())
@@ -57,6 +58,7 @@ export function Canvas({ board, status, awareness }: Props) {
   const [marquee, setMarquee] = useState<Rect | null>(null) // screen
   const [draft, setDraft] = useState<Rect | null>(null) // world, while drawing a new object
   const [spaceHeld, setSpaceHeld] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const cameraRef = useRef(camera)
   cameraRef.current = camera
@@ -66,21 +68,41 @@ export function Canvas({ board, status, awareness }: Props) {
   const selected = useMemo(() => new Set([...selection].filter((id) => byId.has(id))), [selection, byId])
   const editingId = editing && byId.has(editing) ? editing : null
 
-  const peers = usePeers(awareness)
-  const sendCursor = useMemo(() => cursorSender(awareness), [awareness])
-  // Share what this person has selected. Keyed by the ids, so other board changes send nothing.
+  // Others see what this person selected, and the agent chat sends it with each message. Keyed by
+  // the ids, so other board changes send nothing.
   const selectionKey = [...selected].sort().join(',')
-  useEffect(() => {
-    awareness.setLocalStateField('selection', selectionKey ? selectionKey.split(',') : [])
-  }, [awareness, selectionKey])
+  useEffect(() => publishSelection(awareness, selectionKey ? selectionKey.split(',') : []), [awareness, selectionKey])
+  const sendCursor = useMemo(() => cursorSender(awareness), [awareness])
 
   // An object left empty when editing ends (e.g. a text with nothing typed) is removed.
   const lastEditing = useRef<string | null>(null)
   useEffect(() => {
     const prev = lastEditing.current && board.get(lastEditing.current)
-    if (prev && prev.id !== editingId && objectType(prev.type)?.isEmpty?.(prev)) board.remove([prev.id])
+    if (prev && prev.id !== editingId && objectUI(prev.type)?.isEmpty?.(prev)) {
+      runtime.dispatch('core.object.delete', objectsTarget([prev.id]), {})
+    }
     lastEditing.current = editingId
-  }, [board, editingId])
+  }, [board, runtime, editingId])
+
+  // This person's camera, for view ops (zoom to fit, zoom to selection) from the palette or tools.
+  useEffect(() => {
+    const show = (r: Rect | undefined) => {
+      const el = rootRef.current
+      if (r && el) setCamera(fitRect(r, el.clientWidth, el.clientHeight))
+    }
+    runtime.view = {
+      fitAll: () => show(bounds(board.list())),
+      zoomTo: (ids) => show(bounds(ids.map((id) => board.get(id)).filter((o) => !!o))),
+      resetZoom: () => {
+        const el = rootRef.current
+        if (el) setCamera((c) => zoomAt(c, 1 / c.z, el.clientWidth / 2, el.clientHeight / 2))
+      },
+      center: () => viewCenter(),
+    }
+    return () => {
+      runtime.view = undefined
+    }
+  }, [board, runtime])
 
   const screenPoint = (e: { clientX: number; clientY: number }) => {
     const r = rootRef.current!.getBoundingClientRect()
@@ -93,7 +115,7 @@ export function Canvas({ board, status, awareness }: Props) {
     const id = target.closest<HTMLElement>('[data-id]')?.dataset.id
     if (editingId && id === editingId) return // the text box or live map has the pointer
     if (editingId) setEditing(null)
-    board.undo.stopCapturing()
+    runtime.beginGesture()
 
     if (e.button === 1 || spaceHeld) {
       const start = cameraRef.current
@@ -102,7 +124,7 @@ export function Canvas({ board, status, awareness }: Props) {
     }
 
     if (tool !== 'select') {
-      const def = objectType(tool)!
+      const type = tool
       const p = screenPoint(e)
       const p0 = toWorld(cameraRef.current, p.x, p.y)
       let drawn: Rect | null = null
@@ -115,13 +137,14 @@ export function Canvas({ board, status, awareness }: Props) {
         },
         () => {
           setDraft(null)
-          const d = def.size
+          const d = runtime.registry.objectType(type)!.defaultSize
           const r = drawn && drawn.w >= MIN_SIZE && drawn.h >= MIN_SIZE ? drawn : { x: p0.x - d.w / 2, y: p0.y - d.h / 2, ...d }
-          const newId = board.add(def.create(r), def.layer)
+          const newId = runtime.dispatch(`${type}.add`, { kind: 'canvas' }, r).created?.[0]
           setTool('select')
+          if (!newId) return
           setSelection(new Set([newId]))
           // E.g. a new text opens for typing; a new event opens its search.
-          if (def.editOnCreate) setEditing(newId)
+          if (objectUI(type)?.editOnCreate) setEditing(newId)
         },
       )
       return
@@ -131,14 +154,15 @@ export function Canvas({ board, status, awareness }: Props) {
     if (handle && selected.size === 1) {
       const o = byId.get([...selected][0]!)!
       trackDrag(e, (dx, dy) => {
+        if (!board.get(o.id)) return // someone else deleted it
         const z = cameraRef.current.z
         const r = resized(o, handle, dx / z, dy / z)
-        if (objectType(o.type)?.widthOnly) {
+        if (objectUI(o.type)?.widthOnly) {
           // Its height follows its content (a text): resizing changes only its width.
           requestFit(o.id)
-          board.update({ [o.id]: { x: r.x, w: r.w } })
+          runtime.dispatch('core.object.setRect', objectsTarget([o.id]), { rects: { [o.id]: { x: r.x, w: r.w } } })
         } else {
-          board.update({ [o.id]: r })
+          runtime.dispatch('core.object.setRect', objectsTarget([o.id]), { rects: { [o.id]: r } })
         }
       })
       return
@@ -160,7 +184,10 @@ export function Canvas({ board, status, awareness }: Props) {
       const starts = objects.filter((o) => moving.has(o.id))
       trackDrag(e, (dx, dy) => {
         const z = cameraRef.current.z
-        board.update(Object.fromEntries(starts.map((o) => [o.id, { x: o.x + dx / z, y: o.y + dy / z }])))
+        const alive = starts.filter((o) => board.get(o.id)) // someone else may delete one mid-drag
+        if (!alive.length) return
+        const rects = Object.fromEntries(alive.map((o) => [o.id, { x: o.x + dx / z, y: o.y + dy / z }]))
+        runtime.dispatch('core.object.setRect', objectsTarget(Object.keys(rects)), { rects })
       })
       return
     }
@@ -193,7 +220,7 @@ export function Canvas({ board, status, awareness }: Props) {
   function onDoubleClick(e: ReactMouseEvent) {
     const id = (e.target as HTMLElement).closest<HTMLElement>('[data-id]')?.dataset.id
     const o = id && byId.get(id)
-    if (!o || !objectType(o.type)?.editable) return
+    if (!o || !objectUI(o.type)?.editable) return
     setSelection(new Set([o.id]))
     setEditing(o.id)
   }
@@ -216,6 +243,17 @@ export function Canvas({ board, status, awareness }: Props) {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen((open) => !open)
+        return
+      }
+      if (paletteOpen) {
+        // The palette has the keyboard; Escape closes it even when focus is outside it.
+        if (e.key === 'Escape') setPaletteOpen(false)
+        return
+      }
       if (e.key === 'Escape') {
         if (editingId) setEditing(null)
         else {
@@ -225,28 +263,27 @@ export function Canvas({ board, status, awareness }: Props) {
         return
       }
       if ((e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')) return
-      const mod = e.metaKey || e.ctrlKey
       if (e.code === 'Space') {
         e.preventDefault()
         setSpaceHeld(true)
       } else if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
-        if (e.shiftKey) board.undo.redo()
-        else board.undo.undo()
+        if (e.shiftKey) runtime.redo()
+        else runtime.undo()
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.size) {
         e.preventDefault()
-        board.undo.stopCapturing()
-        board.remove(selected)
+        runtime.beginGesture()
+        runtime.dispatch('core.object.delete', objectsTarget(selected), {})
       } else if ((e.code === 'BracketRight' || e.code === 'BracketLeft') && selected.size) {
         // ] / [ = to front / to back; with ⌘ or Ctrl, one step.
         e.preventDefault()
-        board.undo.stopCapturing()
+        runtime.beginGesture()
         const up = e.code === 'BracketRight'
-        if (mod) board.step(selected, up ? 1 : -1)
-        else if (up) board.bringToFront(selected)
-        else board.sendToBack(selected)
-      } else if (!mod && !e.altKey && TOOL_KEYS[e.key.toLowerCase()]) {
-        setTool(TOOL_KEYS[e.key.toLowerCase()]!)
+        const opId = mod ? (up ? 'core.object.bringForward' : 'core.object.sendBackward') : up ? 'core.object.bringToFront' : 'core.object.sendToBack'
+        runtime.dispatch(opId, objectsTarget(selected), {})
+      } else if (!mod && !e.altKey) {
+        const t = tools().find((t) => t.key.toLowerCase() === e.key.toLowerCase())
+        if (t) setTool(t.tool)
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
@@ -258,7 +295,24 @@ export function Canvas({ board, status, awareness }: Props) {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [board, editingId, selected])
+  }, [runtime, editingId, selected, paletteOpen])
+
+  /** Run an op from the palette as its own undo step, then show what it added. */
+  async function runFromPalette(opId: string, target: TargetRef, args: unknown) {
+    // Ops on texts can change their size or content: their height follows.
+    if (target.kind === 'objects') for (const id of target.ids) requestFit(id)
+    const r = await runtime.invoke(opId, target, args)
+    if (r.status !== 'applied') return r
+    setPaletteOpen(false)
+    for (const id of r.created ?? []) requestFit(id)
+    if (r.created?.length) setSelection(new Set(r.created))
+    return r
+  }
+
+  const viewCenter = () => {
+    const el = rootRef.current!
+    return toWorld(cameraRef.current, el.clientWidth / 2, el.clientHeight / 2)
+  }
 
   const single = selected.size === 1 && !editingId ? byId.get([...selected][0]!) : undefined
   const grid = GRID * camera.z
@@ -278,7 +332,7 @@ export function Canvas({ board, status, awareness }: Props) {
     >
       <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})` }}>
         {objects.map((o, i) => (
-          <ObjectView key={o.id} board={board} object={o} layer={i} editing={o.id === editingId} onDone={() => setEditing(null)} />
+          <ObjectView key={o.id} runtime={runtime} object={o} layer={i} editing={o.id === editingId} onDone={() => setEditing(null)} />
         ))}
         {draft && <div className="ttx-draft" style={{ left: draft.x, top: draft.y, width: draft.w, height: draft.h }} />}
       </div>
@@ -300,10 +354,10 @@ export function Canvas({ board, status, awareness }: Props) {
         {marquee && <div className="ttx-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
       </div>
 
-      <StylePanel board={board} selected={objects.filter((o) => selected.has(o.id))} />
+      <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} />
 
       <Toolbar
-        board={board}
+        runtime={runtime}
         tool={tool}
         onTool={setTool}
         selection={selected}
@@ -313,7 +367,12 @@ export function Canvas({ board, status, awareness }: Props) {
           setCamera((c) => zoomAt(c, 1 / c.z, r.width / 2, r.height / 2))
         }}
         status={status}
+        onPalette={() => setPaletteOpen(true)}
       />
+
+      {paletteOpen && (
+        <Palette runtime={runtime} selection={[...selected]} center={viewCenter} run={runFromPalette} onClose={() => setPaletteOpen(false)} />
+      )}
     </div>
   )
 }

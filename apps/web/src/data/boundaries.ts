@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { defineTool } from '../tools/tool'
+import { defineTool } from '@ttx/core'
 import { areaSchema } from './area'
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 import { WORLD_BANK_ATTRIBUTION } from './worldBank'
 import type { Admin0Request, Admin0Response } from './worldBankAdmin0.worker'
 

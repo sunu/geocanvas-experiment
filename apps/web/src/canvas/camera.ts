@@ -41,3 +41,17 @@ export function rectFrom(a: { x: number; y: number }, b: { x: number; y: number 
 export function intersects(a: Rect, b: Rect) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
 }
+
+/** The smallest rectangle around all of `rects`; undefined for none. */
+export function bounds(rects: Rect[]): Rect | undefined {
+  if (!rects.length) return undefined
+  const x = Math.min(...rects.map((r) => r.x))
+  const y = Math.min(...rects.map((r) => r.y))
+  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y }
+}
+
+/** The camera that centers world rectangle `r` in a w × h viewport with a margin, zoomed in no further than 100%. */
+export function fitRect(r: Rect, w: number, h: number, margin = 48): Camera {
+  const z = Math.min(1, Math.max(MIN_ZOOM, Math.min((w - 2 * margin) / Math.max(r.w, 1), (h - 2 * margin) / Math.max(r.h, 1))))
+  return { x: w / 2 - (r.x + r.w / 2) * z, y: h / 2 - (r.y + r.h / 2) * z, z }
+}

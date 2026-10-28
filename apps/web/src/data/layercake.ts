@@ -1,4 +1,4 @@
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 import { bboxesIntersect } from './wkb'
 
 /**

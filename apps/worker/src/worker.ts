@@ -4,8 +4,12 @@ import * as syncProtocol from 'y-protocols/sync'
 import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
+import { Agent, AGENT } from './agent/agent'
+import { openRouter } from './agent/openrouter'
 import { geocode } from './geocode'
-import { montySearch } from './monty'
+import { montySearch, stacSearch } from './monty'
+import { eventsSearch, geocodeTools, OpenCageGeocoder, OPENCAGE_URL } from '@ttx/plugins'
+import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
 
 /**
@@ -14,11 +18,12 @@ import { UpdateLog } from './updateLog'
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
  * /monty/search proxies Montandon STAC searches with the token added (monty.ts), and
  * /tools/geocode proxies OpenCage with the key added (geocode.ts).
+ * Each room also runs the board's agent (agent/agent.ts), which answers the board's chat.
  */
 
 const MESSAGE_SYNC = 0
 const MESSAGE_AWARENESS = 1
-/** Merge the stored updates into one row when there are more than this. */
+/** Merge the stored updates into one row when there are more than this: on load, and while the room runs. */
 const COMPACT_AFTER = 500
 
 /**
@@ -34,6 +39,8 @@ const COMPACT_AFTER = 500
 export class Room extends DurableObject<Env> {
   private doc = new Y.Doc()
   private log: UpdateLog
+  /** Updates in the log since it was last compacted. */
+  private logged = 0
   private awareness = new awarenessProtocol.Awareness(this.doc)
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -45,15 +52,21 @@ export class Room extends DurableObject<Env> {
     this.log = new UpdateLog(ctx.storage)
     const updates = this.log.readAll()
     for (const update of updates) Y.applyUpdate(this.doc, update, this)
-    if (updates.length > COMPACT_AFTER) this.log.replaceAll(Y.encodeStateAsUpdate(this.doc))
+    this.logged = updates.length
+    if (this.logged > COMPACT_AFTER) this.compact()
 
     this.doc.on('update', (update: Uint8Array, origin: unknown) => {
-      if (origin !== this) this.log.append(update)
+      if (origin !== this) {
+        this.log.append(update)
+        // A busy room may stay in memory for long (map pans, the agent), so do not wait for a load to compact.
+        if (++this.logged > COMPACT_AFTER) this.compact()
+      }
       this.broadcast(syncMessage((enc) => syncProtocol.writeUpdate(enc, update)))
     })
-    this.awareness.on('update', ({ added, updated, removed }: AwarenessChange, socket: WebSocket | null) => {
+    this.awareness.on('update', ({ added, updated, removed }: AwarenessChange, socket: unknown) => {
       // Which presence ids a socket controls is kept on the socket, so it survives hibernation.
-      if (socket) {
+      // The origin is the socket for a browser's update, and 'local' for the agent's own presence.
+      if (socket instanceof WebSocket) {
         const ids = new Set(presenceIds(socket))
         for (const id of added) ids.add(id)
         for (const id of removed) ids.delete(id)
@@ -62,6 +75,24 @@ export class Room extends DurableObject<Env> {
       const changed = [...added, ...updated, ...removed]
       this.broadcast(awarenessMessage(awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed)))
     })
+
+    // After the listeners above, so the agent's writes are stored and sent like anyone's.
+    new Agent({
+      doc: this.doc,
+      complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
+      tools: [
+        ...(env.OPENCAGE_API_KEY ? geocodeTools(new OpenCageGeocoder({ url: OPENCAGE_URL, key: env.OPENCAGE_API_KEY })) : []),
+        ...(env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : []),
+      ],
+      // The agent's presence: people see "Agent is thinking…" while it works.
+      onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
+      keepAlive: (work) => ctx.waitUntil(work),
+    })
+  }
+
+  private compact() {
+    this.log.replaceAll(Y.encodeStateAsUpdate(this.doc))
+    this.logged = 1
   }
 
   override async fetch(): Promise<Response> {

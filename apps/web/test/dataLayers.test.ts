@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { adminBoundariesTool, type BoundarySource } from '../src/data/boundaries'
 import { overtureTool, type OvertureSource } from '../src/data/buildings'
 import { truncationOf } from '../src/map/layers'
-import { ToolRunner } from '../src/tools/runner'
+import { ToolRunner } from '@ttx/core'
 
 const square = (w: number, s: number, e: number, n: number): GeoJSON.Polygon => ({
   type: 'Polygon',

@@ -1,36 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CURSOR_INTERVAL, cursorSender, loadUser, peersFrom } from '../src/board/presence'
-
-describe('loadUser', () => {
-  const store = new Map<string, string>()
-  beforeEach(() => {
-    store.clear()
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => store.set(k, v),
-    })
-  })
-  afterEach(() => vi.unstubAllGlobals())
-
-  it('picks a name and color once, then keeps them', () => {
-    const first = loadUser(() => 0)
-    expect(first.name).toMatch(/^[A-Z][a-z]+$/)
-    expect(first.color).toMatch(/^#[0-9a-f]{6}$/)
-    expect(loadUser(() => 0.99)).toEqual(first)
-  })
-
-  it('still works when storage is unavailable', () => {
-    vi.stubGlobal('localStorage', {
-      getItem: () => {
-        throw new Error('blocked')
-      },
-      setItem: () => {
-        throw new Error('blocked')
-      },
-    })
-    expect(loadUser(() => 0)).toMatchObject({ name: expect.any(String), color: expect.any(String) })
-  })
-})
+import { CURSOR_INTERVAL, cursorSender, peersFrom } from '../src/board/presence'
 
 describe('peersFrom', () => {
   const user = { name: 'Heron', color: '#2f9e44' }
@@ -46,6 +15,12 @@ describe('peersFrom', () => {
       { clientId: 2, user, cursor: { x: 10, y: 20 }, selection: ['a', 'b'] },
       { clientId: 3, user: { name: 'Wren', color: '#e03131' }, selection: [] },
     ])
+  })
+
+  it("keeps the agent's status", () => {
+    const agent = { kind: 'agent', id: 'agent', name: 'Agent', color: '#7c3aed' }
+    const states = new Map<number, Record<string, unknown>>([[5, { user: agent, status: 'thinking' }]])
+    expect(peersFrom(states, 1)).toEqual([{ clientId: 5, user: agent, selection: [], status: 'thinking' }])
   })
 })
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 
 /**
  * The place an area-based tool works on: a bbox [west, south, east, north]. A map layer stores it

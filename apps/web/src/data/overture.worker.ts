@@ -26,7 +26,7 @@ import {
   type StacFile,
 } from './overture'
 import { rowGroupsInBbox } from './wkb'
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 
 export type OvertureRequest =
   | { kind: 'query'; id: number; type: OvertureType; bbox: Bbox; limit: number }

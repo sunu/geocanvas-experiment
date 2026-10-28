@@ -7,7 +7,7 @@
 import { parquetMetadataAsync, parquetReadObjects, type AsyncBuffer, type FileMetaData } from 'hyparquet'
 import { compressors } from 'hyparquet-compressors'
 import { appendHealthFacilities, HEALTH_COLUMNS, LAYERCAKE_POIS_URL, MAX_ROW_GROUPS, type HealthFeature, type PoiRow } from './layercake'
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 import { rowGroupsInBbox } from './wkb'
 
 export type LayercakeRequest = { kind: 'query'; id: number; bbox: Bbox } | { kind: 'abort'; id: number }

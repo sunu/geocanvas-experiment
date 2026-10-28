@@ -2,20 +2,11 @@ import { useEffect, useState } from 'react'
 import type { Layer } from '@deck.gl/core'
 import { GeoJsonLayer } from '@deck.gl/layers'
 import { tools } from '../tools/registry'
-import { stableJson } from '../tools/runner'
+import { stableJson } from '@ttx/core'
 import { rasterLayers } from './raster'
+import { bboxOf, type Bbox, type MapLayer } from '@ttx/plugins'
 
-/**
- * A data layer of a map: the recipe (tool id and input), not the data. The board stores the recipe;
- * each person's browser runs the tool. An area-based tool gets its area at add time, from the view of
- * the person who added it, so everyone sees the same data although map views are per person.
- */
-export interface MapLayer {
-  id: string
-  tool: string
-  input: Record<string, unknown>
-  title: string
-}
+export type { MapLayer } from '@ttx/plugins'
 
 /** A layer as this browser has it: loading, its result, or why it failed. */
 export interface LayerState {
@@ -28,30 +19,9 @@ export interface LayerState {
   error?: string
 }
 
-/** Id of a new layer. Unique within one map is enough. */
-export const newLayerId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
-
-/** Layers a person can add from a map's menu. Each gets `area` from the adder's view. */
-export const AREA_LAYERS: { label: string; tool: string; input: Record<string, unknown>; title: string }[] = [
-  { label: 'Population 2020 (constrained)', tool: 'data.population', input: { variant: 'constrained' }, title: 'Population 2020 (constrained)' },
-  { label: 'Population 2020 (unconstrained)', tool: 'data.population', input: { variant: 'unconstrained' }, title: 'Population 2020 (unconstrained)' },
-  { label: 'Countries (World Bank)', tool: 'data.adminBoundaries', input: { level: 0 }, title: 'Countries (World Bank)' },
-  { label: 'Buildings (Overture), zoomed in', tool: 'data.overture', input: { type: 'buildings' }, title: 'Overture buildings' },
-  { label: 'Health facilities (OpenStreetMap)', tool: 'data.healthFacilities', input: {}, title: 'Health facilities (OpenStreetMap)' },
-]
-
-/** True when a layer works on an area, which can be reset to someone's view. */
-export const hasArea = (l: MapLayer) => Array.isArray(l.input.area)
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
-const round4 = (v: number) => Math.round(v * 1e4) / 1e4
-
-/**
- * A map view's bounds as an area: [west, south, east, north], kept on the globe (a zoomed-out view can
- * span more than 360 degrees) and rounded, so small pans do not change it more than needed.
- */
-export function viewArea([[w, s], [e, n]]: [[number, number], [number, number]]): [number, number, number, number] {
-  return [round4(clamp(w, -180, 180)), round4(clamp(s, -90, 90)), round4(clamp(e, -180, 180)), round4(clamp(n, -90, 90))]
+/** A map view's bounds ([[west, south], [east, north]]) as a layer's area. */
+export function viewArea([[west, south], [east, north]]: [[number, number], [number, number]]): Bbox {
+  return bboxOf({ west, south, east, north })
 }
 
 const recipeKey = (l: MapLayer) => stableJson([l.tool, l.input])

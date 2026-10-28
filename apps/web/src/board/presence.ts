@@ -1,56 +1,39 @@
 import { useSyncExternalStore } from 'react'
 import type { WebsocketProvider } from 'y-websocket'
+import type { Actor } from '@ttx/core'
 
-type Awareness = WebsocketProvider['awareness']
+export type Awareness = WebsocketProvider['awareness']
 
 /**
  * Presence: who is on the board, where their pointer is and what they have selected. It travels
- * over Yjs awareness (relayed by the room, never stored), so it disappears when someone leaves.
- * Cursors are in world coordinates, so they land in the right place whatever each person's camera.
+ * over Yjs awareness (relayed by the room, never stored), so it disappears when someone leaves;
+ * browsers re-send theirs every 15 s. Cursors are in world coordinates, so they land in the right
+ * place whatever each person's camera. The room's agent is a peer too: it sets `status` while it
+ * works (apps/worker/src/agent/), with no cursor or selection.
  */
 
-export interface User {
-  name: string
-  color: string
-}
-
-/** One person's shared state, as this browser receives it. */
+/** One person's (or the agent's) shared state, as this browser receives it. */
 export interface Peer {
   clientId: number
-  user: User
+  /** The person (connect.ts) or the agent, with a name and color. */
+  user: Actor & { name: string; color: string }
   /** World point, or absent when their pointer is off the canvas. */
   cursor?: { x: number; y: number }
   /** Ids of the objects they have selected. */
   selection: string[]
-}
-
-const NAMES = ['Otter', 'Heron', 'Lynx', 'Ibis', 'Marten', 'Gecko', 'Puffin', 'Tapir', 'Kestrel', 'Badger', 'Wren', 'Ocelot']
-/** Readable on the light canvas, and apart from the selection blue. */
-const COLORS = ['#e03131', '#2f9e44', '#e8590c', '#9c36b5', '#0c8599', '#c2255c', '#5f3dc4', '#a07800']
-const USER_KEY = 'ttx:user'
-
-/** This browser's name and color: picked at random once, then kept so it stays the same across boards. */
-export function loadUser(random: () => number = Math.random): User {
-  try {
-    const saved = JSON.parse(localStorage.getItem(USER_KEY) ?? 'null') as User | null
-    if (saved?.name && saved.color) return saved
-  } catch {}
-  const user = { name: NAMES[Math.floor(random() * NAMES.length)]!, color: COLORS[Math.floor(random() * COLORS.length)]! }
-  try {
-    localStorage.setItem(USER_KEY, JSON.stringify(user))
-  } catch {}
-  return user
+  status?: 'thinking'
 }
 
 /** Everyone else with a user, from awareness states (clientId -> state). */
 export function peersFrom(states: Map<number, Record<string, unknown>>, selfId: number): Peer[] {
   const peers: Peer[] = []
   for (const [clientId, state] of states) {
-    const user = state.user as User | undefined
+    const user = state.user as Peer['user'] | undefined
     if (clientId === selfId || !user?.name || !user.color) continue
     const cursor = state.cursor as Peer['cursor'] | null | undefined
     const selection = Array.isArray(state.selection) ? (state.selection as string[]) : []
-    peers.push({ clientId, user, ...(cursor && { cursor }), selection })
+    const status = state.status === 'thinking' ? ('thinking' as const) : undefined
+    peers.push({ clientId, user, ...(cursor && { cursor }), selection, ...(status && { status }) })
   }
   return peers
 }
@@ -58,7 +41,7 @@ export function peersFrom(states: Map<number, Record<string, unknown>>, selfId: 
 /** The peers list of each awareness, kept until the next change (React needs the same array until then). */
 const peersCache = new WeakMap<Awareness, Peer[]>()
 
-/** Others on the board; re-renders when anyone's presence changes. */
+/** Others on the board: other people and the agent. Re-renders when anyone's presence changes. */
 export function usePeers(awareness: Awareness): Peer[] {
   return useSyncExternalStore(
     (onChange) => {
@@ -78,6 +61,23 @@ export function usePeers(awareness: Awareness): Peer[] {
       return peers
     },
   )
+}
+
+const NO_SELECTION: string[] = []
+
+/** What this tab has selected, as it last published it. */
+export function useOwnSelection(awareness: Awareness): string[] {
+  return useSyncExternalStore(
+    (onChange) => {
+      awareness.on('change', onChange)
+      return () => awareness.off('change', onChange)
+    },
+    () => ((awareness.getLocalState() as { selection?: string[] } | null)?.selection ?? NO_SELECTION),
+  )
+}
+
+export function publishSelection(awareness: Awareness, ids: Iterable<string>) {
+  awareness.setLocalStateField('selection', [...ids])
 }
 
 /** Pointer moves are sent at most this often (ms). Each one wakes the room for a moment. */

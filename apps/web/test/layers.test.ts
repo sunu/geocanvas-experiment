@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { attributionOf, deckLayers, hasArea, viewArea, type LayerState } from '../src/map/layers'
+import { hasArea } from '@ttx/plugins'
+import { attributionOf, deckLayers, viewArea, type LayerState } from '../src/map/layers'
 import type { Raster } from '../src/map/raster'
 
 const points: GeoJSON.FeatureCollection = {

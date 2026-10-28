@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { defineTool } from '../tools/tool'
+import { defineTool } from '@ttx/core'
 import { areaSchema } from './area'
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 import { bboxAreaDeg2, OVERTURE_ATTRIBUTION, OVERTURE_LIMITS, type OvertureType } from './overture'
 import type { OvertureRequest, OvertureResponse } from './overture.worker'
 

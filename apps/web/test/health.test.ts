@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { healthFacilitiesTool, type HealthSource } from '../src/data/health'
 import { appendHealthFacilities, isHealthFacility, type HealthFeature, type PoiRow } from '../src/data/layercake'
-import { ToolRunner } from '../src/tools/runner'
+import { ToolRunner } from '@ttx/core'
 
 const BEIRA: [number, number, number, number] = [34.8, -19.9, 34.95, -19.7]
 
