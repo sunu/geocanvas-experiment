@@ -1,18 +1,4 @@
-import { corePlugin } from '@ttx/core'
-import { agentPlugin } from './agent.js'
-import { eventsPlugin } from './events.js'
-import { hapiPlugin } from './hapi.js'
-import { imagesPlugin } from './images.js'
-import { mapPlugin } from './map.js'
-import { notebooksPlugin } from './notebooks.js'
-import { reliefwebPlugin } from './reliefweb.js'
-
-/**
- * The headless plugins: object types and ops, with no UI. The web app adds their UI
- * (apps/web/src/plugins.ts); the room Durable Object runs the agent on them.
- */
-export const plugins = [corePlugin, mapPlugin, eventsPlugin, notebooksPlugin, reliefwebPlugin, hapiPlugin, imagesPlugin, agentPlugin]
-
+export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
 export { boardGet, eventsSearch } from './agentTools.js'
 export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
@@ -24,3 +10,6 @@ export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } 
 export { geocodeTools, OpenCageGeocoder, OPENCAGE_URL, parseOpenCage, type Geocoder, type Place, type PlaceFeatures } from './geocode.js'
 export { bboxOf, DATA_LAYERS, hasArea, mapLayer, newLayerId, type Bbox, type DataLayerKey, type MapLayer } from './mapLayers.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
+export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
+export { agentTools, GAP, HISTORY_ENTRIES, HISTORY_MS, MAX_SIZE_FACTOR, MAX_STEPS, runTurn } from './agent/loop.js'
+export { chatCompletions, openRouter, OPENROUTER_URL, type Complete, type FunctionTool, type Message, type ToolCall } from './agent/complete.js'

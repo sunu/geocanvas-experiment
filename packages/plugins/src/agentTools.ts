@@ -3,7 +3,7 @@ import { defineTool, summarizeBoard, type Runtime } from '@ttx/core'
 import type { MontyClient } from './monty/client.js'
 
 /**
- * Read-only tools (ToolDef) of the board's agent, beside the ops (apps/worker/src/agent/). Geocoding is the
+ * Read-only tools (ToolDef) of the board's agent, beside the ops (src/agent/). Geocoding is the
  * same tool as the browser's (geocodeTools), on OpenCage with the key.
  */
 
