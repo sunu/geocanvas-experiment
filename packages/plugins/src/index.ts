@@ -14,7 +14,7 @@ export const plugins = [corePlugin, mapPlugin, eventsPlugin, notebooksPlugin, im
 export { agentPlugin } from './agent.js'
 export { boardGet, eventsSearch } from './agentTools.js'
 export { eventsPlugin, type EventBoardObject } from './events.js'
-export { imagesPlugin, imageUrl, IMAGE_ID, MAX_IMAGE_BYTES, type ImageBoardObject } from './images.js'
+export { imagesPlugin, type ImageBoardObject } from './images.js'
 export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
 export { geocodeTools, OpenCageGeocoder, OPENCAGE_URL, parseOpenCage, type Geocoder, type Place, type PlaceFeatures } from './geocode.js'

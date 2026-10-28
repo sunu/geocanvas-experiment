@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
-import { Chat, Runtime, type Actor } from '@ttx/core'
+import { Chat, Runtime, Uploads, type Actor } from '@ttx/core'
 import { plugins } from '../plugins'
 import type { Board, BoardObject } from './board'
 
@@ -14,7 +14,7 @@ export function connect(room: string) {
   provider.awareness.setLocalStateField('user', runtime.actor)
   // Merged gesture entries wait for the gesture to end; write them before the tab goes.
   addEventListener('pagehide', () => runtime.flush())
-  return { board: runtime.board as Board, runtime, provider, chat: new Chat(doc) }
+  return { board: runtime.board as Board, runtime, provider, chat: new Chat(doc), uploads: new Uploads(doc) }
 }
 
 const ANIMALS = ['Otter', 'Heron', 'Lynx', 'Ibex', 'Gecko', 'Puffin', 'Marten', 'Kestrel', 'Tapir', 'Wombat', 'Oryx', 'Quokka']
