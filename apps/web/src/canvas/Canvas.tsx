@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import type { Runtime, TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects, type ConnectionStatus } from '../board/connect'
+import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
 import { ObjectView } from './ObjectView'
@@ -54,6 +55,7 @@ export function Canvas({ runtime, status }: { runtime: Runtime; status: Connecti
   const [marquee, setMarquee] = useState<Rect | null>(null) // screen
   const [draft, setDraft] = useState<Rect | null>(null) // world, while drawing a new object
   const [spaceHeld, setSpaceHeld] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const cameraRef = useRef(camera)
   cameraRef.current = camera
@@ -228,6 +230,17 @@ export function Canvas({ runtime, status }: { runtime: Runtime; status: Connecti
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen((open) => !open)
+        return
+      }
+      if (paletteOpen) {
+        // The palette has the keyboard; Escape closes it even when focus is outside it.
+        if (e.key === 'Escape') setPaletteOpen(false)
+        return
+      }
       if (e.key === 'Escape') {
         if (editingId) setEditing(null)
         else {
@@ -237,7 +250,6 @@ export function Canvas({ runtime, status }: { runtime: Runtime; status: Connecti
         return
       }
       if ((e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')) return
-      const mod = e.metaKey || e.ctrlKey
       if (e.code === 'Space') {
         e.preventDefault()
         setSpaceHeld(true)
@@ -270,7 +282,24 @@ export function Canvas({ runtime, status }: { runtime: Runtime; status: Connecti
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [runtime, editingId, selected])
+  }, [runtime, editingId, selected, paletteOpen])
+
+  /** Run an op from the palette as its own undo step, then show what it added. */
+  async function runFromPalette(opId: string, target: TargetRef, args: unknown) {
+    // Ops on texts can change their size or content: their height follows.
+    if (target.kind === 'objects') for (const id of target.ids) requestFit(id)
+    const r = await runtime.invoke(opId, target, args)
+    if (r.status !== 'applied') return r
+    setPaletteOpen(false)
+    for (const id of r.created ?? []) requestFit(id)
+    if (r.created?.length) setSelection(new Set(r.created))
+    return r
+  }
+
+  const viewCenter = () => {
+    const el = rootRef.current!
+    return toWorld(cameraRef.current, el.clientWidth / 2, el.clientHeight / 2)
+  }
 
   const single = selected.size === 1 && !editingId ? byId.get([...selected][0]!) : undefined
   const grid = GRID * camera.z
@@ -319,7 +348,12 @@ export function Canvas({ runtime, status }: { runtime: Runtime; status: Connecti
           setCamera((c) => zoomAt(c, 1 / c.z, r.width / 2, r.height / 2))
         }}
         status={status}
+        onPalette={() => setPaletteOpen(true)}
       />
+
+      {paletteOpen && (
+        <Palette runtime={runtime} selection={[...selected]} center={viewCenter} run={runFromPalette} onClose={() => setPaletteOpen(false)} />
+      )}
     </div>
   )
 }

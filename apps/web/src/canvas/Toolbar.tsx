@@ -5,6 +5,7 @@ import {
   ArrowLineDownIcon,
   ArrowLineUpIcon,
   ArrowUpIcon,
+  CommandIcon,
   CursorIcon,
   TrashIcon,
   type Icon,
@@ -35,9 +36,10 @@ interface Props {
   zoom: number
   onResetZoom(): void
   status: ConnectionStatus
+  onPalette(): void
 }
 
-export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, status }: Props) {
+export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, status, onPalette }: Props) {
   const none = selection.size === 0
   // Each button press is its own undo step.
   const act = (opId: string) => () => {
@@ -80,6 +82,10 @@ export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, s
       </button>
       <button disabled={none} title="Delete (⌫)" aria-label="Delete" onClick={act('core.object.delete')}>
         <TrashIcon size={ICON} />
+      </button>
+      <span className="ttx-toolbar__sep" />
+      <button title={`Commands (${MOD}K)`} aria-label="Commands" onClick={onPalette}>
+        <CommandIcon size={ICON} />
       </button>
       <span className="ttx-toolbar__sep" />
       <button title="Reset zoom to 100%" onClick={onResetZoom}>{Math.round(zoom * 100)}%</button>

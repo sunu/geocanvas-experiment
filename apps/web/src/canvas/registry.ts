@@ -35,3 +35,19 @@ export const objectUI = (type: string): ObjectUI | undefined => uis.get(type)
 
 /** Types with a tool, in the order they registered. */
 export const toolTypes = () => [...uis].filter(([, ui]) => ui.tool).map(([type, ui]) => ({ type, ...ui.tool! }))
+
+export interface WidgetProps {
+  value: unknown
+  onChange(value: unknown): void
+  /** The field's JSON Schema, from zod. */
+  schema: Record<string, unknown>
+}
+
+const widgets = new Map<string, ComponentType<WidgetProps>>()
+
+/** A form field for args marked with zod `.meta({ widget: name })`, e.g. a color or an event. */
+export function registerWidget(name: string, widget: ComponentType<WidgetProps>) {
+  widgets.set(name, widget)
+}
+
+export const widget = (name: string) => widgets.get(name)

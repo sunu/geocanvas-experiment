@@ -57,7 +57,7 @@ export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewP
 }
 
 /** Search as you type, e.g. "nepal floods 2023". Without text, the most recent events. */
-function EventPicker({ selected, onPick }: { selected?: string; onPick(id: string): void }) {
+export function EventPicker({ selected, onPick }: { selected?: string; onPick(id: string): void }) {
   const [recent, setRecent] = useState<LiveState<EventSummary[]>>({ loading: true })
   const [q, setQ] = useState('')
   const [found, setFound] = useState<LiveState<EventSummary[]>>({ loading: false })

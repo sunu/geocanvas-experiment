@@ -1,4 +1,5 @@
 import * as Y from 'yjs'
+import { z } from 'zod'
 import { Board } from '../doc/board.js'
 import { BoardTx } from '../doc/tx.js'
 import { Registry } from '../plugins/registry.js'
@@ -284,5 +285,5 @@ export function matchTarget(spec: TargetSpec, target: TargetRef, board: Board): 
 
 function fail(record: InvocationRecord, err: unknown) {
   record.status = 'failed'
-  record.error = String((err as Error)?.message ?? err)
+  record.error = err instanceof z.ZodError ? z.prettifyError(err) : String((err as Error)?.message ?? err)
 }

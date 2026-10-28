@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from 'react'
 import { RectangleIcon, TextTIcon } from '@phosphor-icons/react'
 import type { TextObject } from '@ttx/core'
-import { registerObjectUI, type ObjectViewProps } from './registry'
-import { DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE } from './style'
+import { registerObjectUI, registerWidget, type ObjectViewProps } from './registry'
+import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE } from './style'
 
 /**
  * Texts whose height should be fitted to their content after the next render. Only the person
@@ -26,6 +26,24 @@ registerObjectUI('text', {
   editable: true,
   editOnCreate: true,
 })
+
+/** A color in a form: the same swatches as the style panel. */
+registerWidget('color', ({ value, onChange }) => (
+  <div className="ttx-field__swatches">
+    {COLORS.map((c) => (
+      <button
+        key={c}
+        type="button"
+        className={`ttx-swatch ${value === c ? 'is-on' : ''}`}
+        style={{ background: PALETTE[c].ink }}
+        title={c}
+        aria-label={`Color ${c}`}
+        aria-pressed={value === c}
+        onClick={() => onChange(c)}
+      />
+    ))}
+  </div>
+))
 
 function TextView({ runtime, object: o, editing }: ObjectViewProps<TextObject>) {
   const measureRef = useRef<HTMLDivElement>(null)
