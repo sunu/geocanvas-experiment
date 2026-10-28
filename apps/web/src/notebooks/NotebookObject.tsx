@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowSquareOutIcon, FileTextIcon, NotebookIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, FileTextIcon, MapTrifoldIcon, NotebookIcon } from '@phosphor-icons/react'
+import { notebookLayer } from '../map/layers'
+import { fitMapToLayer } from '../map/MapObject'
+import { map } from '../objects/map'
 import type { ObjectViewProps } from '../objects/types'
-import { notebookFactory, type NotebookRun, type NotebookTemplate } from './api'
+import { isGeoJson, notebookFactory, type NotebookRun, type NotebookTemplate } from './api'
+
+/** Gap between a notebook and a map made from its results (world units). */
+const GAP = 24
 
 /** Wait after typing before searching. */
 const SEARCH_DELAY_MS = 250
@@ -37,6 +43,13 @@ export function NotebookObject({ board, object: o, editing, onDone }: ObjectView
   const setView = (next: 'card' | 'notebook') => {
     board.undo.stopCapturing()
     board.update({ [o.id]: { view: next } })
+  }
+  /** A new map to the right of the notebook, with the file as its layer, for everyone; this person's view fits the data. */
+  const showOnNewMap = (r: NotebookRun, fileName: string) => {
+    const layer = notebookLayer(r.id, fileName, r.title)
+    board.undo.stopCapturing()
+    const mapId = board.add({ ...map.create({ x: o.x + o.w + GAP, y: o.y, ...map.size }), layers: [layer] }, map.layer)
+    fitMapToLayer(mapId, layer)
   }
 
   return (
@@ -86,7 +99,7 @@ export function NotebookObject({ board, object: o, editing, onDone }: ObjectView
             {!editing && <div className="ttx-notebook__hint">Double-click to scroll and use the notebook</div>}
           </>
         ) : (
-          <RunCard run={run.value} />
+          <RunCard run={run.value} onShowOnNewMap={(name) => showOnNewMap(run.value!, name)} />
         )}
       </div>
     </div>
@@ -110,7 +123,7 @@ function useRun(runId: string | undefined): { value?: NotebookRun; error?: unkno
   return runId && state?.runId === runId ? state : {}
 }
 
-function RunCard({ run }: { run: NotebookRun }) {
+function RunCard({ run, onShowOnNewMap }: { run: NotebookRun; onShowOnNewMap(fileName: string): void }) {
   const place = run.area ? [run.area.name, run.area.level > 0 ? run.area.country_name : undefined].filter(Boolean).join(', ') : undefined
   const files = Object.entries(run.artifacts ?? {})
   const text = run.summary || run.description
@@ -126,10 +139,18 @@ function RunCard({ run }: { run: NotebookRun }) {
           <div className="ttx-notebook__label">Files</div>
           {/* Links, not fetches: a download needs no CORS. */}
           {files.map(([name, url]) => (
-            <a key={name} href={url} target="_blank" rel="noopener noreferrer" onPointerDown={(e) => e.stopPropagation()}>
-              <FileTextIcon size={14} aria-hidden />
-              {name}
-            </a>
+            <div key={name} className="ttx-notebook__file" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                <FileTextIcon size={14} aria-hidden />
+                {name}
+              </a>
+              {isGeoJson(name) && (
+                <button type="button" title="Show on a new map next to this notebook" onClick={() => onShowOnNewMap(name)}>
+                  <MapTrifoldIcon size={12} aria-hidden />
+                  Show on a new map
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

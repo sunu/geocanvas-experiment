@@ -40,6 +40,31 @@ export const AREA_LAYERS: { label: string; tool: string; input: Record<string, u
   { label: 'Health facilities (OpenStreetMap)', tool: 'data.healthFacilities', input: {}, title: 'Health facilities (OpenStreetMap)' },
 ]
 
+/** A layer for a GeoJSON file of a Notebook Factory run (notebooks/artifact.ts), from a map's menu or a notebook's card. */
+export function notebookLayer(runId: string, fileName: string, runTitle: string): MapLayer {
+  return { id: newLayerId(), tool: 'notebooks.artifact', input: { runId, name: fileName }, title: `${fileName.replace(/\.geojson$/i, '')} · ${runTitle}` }
+}
+
+/** The bbox [west, south, east, north] of a feature collection's coordinates, or undefined when it has none. */
+export function boundsOf(fc: GeoJSON.FeatureCollection): [number, number, number, number] | undefined {
+  let w = Infinity
+  let s = Infinity
+  let e = -Infinity
+  let n = -Infinity
+  const walk = (c: unknown): void => {
+    if (!Array.isArray(c)) return
+    if (typeof c[0] === 'number') {
+      const [x, y] = c as number[]
+      if (x! < w) w = x!
+      if (x! > e) e = x!
+      if (y! < s) s = y!
+      if (y! > n) n = y!
+    } else for (const part of c) walk(part)
+  }
+  for (const f of fc.features) if (f.geometry && 'coordinates' in f.geometry) walk(f.geometry.coordinates)
+  return w <= e ? [w, s, e, n] : undefined
+}
+
 /** True when a layer works on an area, which can be reset to someone's view. */
 export const hasArea = (l: MapLayer) => Array.isArray(l.input.area)
 

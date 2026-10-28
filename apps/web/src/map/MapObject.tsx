@@ -4,14 +4,19 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { CrosshairSimpleIcon, StackPlusIcon, XIcon } from '@phosphor-icons/react'
 import type { Board, BoardObject } from '../board/board'
-import type { Place } from '../data/geocode'
+import { useObjects } from '../board/connect'
+import type { Bbox, Place } from '../data/geocode'
+import { isGeoJson, notebookFactory } from '../notebooks/api'
+import { tools } from '../tools/registry'
 import { BASEMAPS, basemapStyle, type Basemap } from './basemaps'
 import {
   AREA_LAYERS,
   attributionOf,
+  boundsOf,
   deckLayers,
   hasArea,
   newLayerId,
+  notebookLayer,
   truncationOf,
   useLayerStates,
   viewArea,
@@ -26,6 +31,31 @@ type MapBoardObject = Extract<BoardObject, { type: 'map' }>
 /** Zoom for a place without a bbox. */
 const POINT_ZOOM = 10
 const NO_LAYERS: MapLayer[] = []
+
+/** Maps on screen in this browser, and fits asked for before a map was on screen. */
+const liveMaps = new Map<string, MapLibreMap>()
+const pendingFits = new Map<string, Bbox>()
+
+/**
+ * Fit this person's view of a map to a bbox, e.g. to a layer just added. A map that is not on screen
+ * yet (just created) fits when it appears. Views are per person, so nobody else's map moves.
+ */
+export function fitMapTo(mapId: string, bbox: Bbox) {
+  const map = liveMaps.get(mapId)
+  if (map) map.fitBounds(bbox, { padding: 24, maxZoom: 14 })
+  else pendingFits.set(mapId, bbox)
+}
+
+/** Fit a map to a layer's data once it has loaded (from the tool cache when the map already ran it). */
+export function fitMapToLayer(mapId: string, layer: MapLayer) {
+  tools.run<GeoJSON.FeatureCollection>(layer.tool, layer.input).then(
+    (fc) => {
+      const b = boundsOf(fc)
+      if (b) fitMapTo(mapId, b)
+    },
+    () => {}, // the layer list shows the error
+  )
+}
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
 // build the worker (?worker&url) and point MapLibre at it. MapLibre 6 also draws right-to-left
@@ -66,7 +96,14 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
     })
     mapRef.current = map
     overlayRef.current = overlay
+    liveMaps.set(o.id, map)
+    const fit = pendingFits.get(o.id)
+    if (fit) {
+      pendingFits.delete(o.id)
+      map.fitBounds(fit, { padding: 24, maxZoom: 14, animate: false })
+    }
     return () => {
+      liveMaps.delete(o.id)
       map.remove()
       mapRef.current = null
       overlayRef.current = null
@@ -129,6 +166,12 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
     setLayers([...layers, { id: newLayerId(), tool: choice.tool, input: { ...choice.input, area }, title: choice.title }])
   }
 
+  /** A notebook's GeoJSON file, for everyone; this person's view fits it once it loads. */
+  const addNotebookLayer = (layer: MapLayer) => {
+    setLayers([...layers, layer])
+    fitMapToLayer(o.id, layer)
+  }
+
   const useMyView = (id: string) => {
     const area = myArea()
     if (area) setLayers(layers.map((l) => (l.id === id ? { ...l, input: { ...l.input, area } } : l)))
@@ -139,7 +182,7 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
       <div className="ttx-map__header">
         <span className="ttx-map__title">Map</span>
         <PlaceSearch onGo={goTo} onPin={pin} />
-        <AddLayerMenu onAdd={addAreaLayer} />
+        <AddLayerMenu board={board} onAdd={addAreaLayer} onAddNotebook={addNotebookLayer} />
         <select
           aria-label="Basemap"
           value={o.basemap}
@@ -165,16 +208,23 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
   )
 }
 
-/** "Add layer": data for the area this person is looking at. */
-function AddLayerMenu({ onAdd }: { onAdd(choice: (typeof AREA_LAYERS)[number]): void }) {
+interface AddLayerMenuProps {
+  board: Board
+  onAdd(choice: (typeof AREA_LAYERS)[number]): void
+  onAddNotebook(layer: MapLayer): void
+}
+
+/** "Add layer": data for the area this person is looking at, and the GeoJSON results of notebooks on the board. */
+function AddLayerMenu({ board, onAdd, onAddNotebook }: AddLayerMenuProps) {
   const [open, setOpen] = useState(false)
   return (
     <div className="ttx-addlayer" onPointerDown={(e) => e.stopPropagation()}>
-      <button type="button" title="Add a data layer for your current view" aria-label="Add layer" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" title="Add a data layer" aria-label="Add layer" aria-expanded={open} onClick={() => setOpen(!open)}>
         <StackPlusIcon size={16} />
       </button>
       {open && (
         <div className="ttx-addlayer__menu" role="menu">
+          <div className="ttx-addlayer__label">For your current view</div>
           {AREA_LAYERS.map((c) => (
             <button
               key={c.label}
@@ -188,9 +238,56 @@ function AddLayerMenu({ onAdd }: { onAdd(choice: (typeof AREA_LAYERS)[number]): 
               {c.label}
             </button>
           ))}
+          <NotebookResults
+            board={board}
+            onPick={(layer) => {
+              onAddNotebook(layer)
+              setOpen(false)
+            }}
+          />
         </div>
       )}
     </div>
+  )
+}
+
+/** The GeoJSON files of the notebook runs on this board. Asked for only while the menu is open. */
+function NotebookResults({ board, onPick }: { board: Board; onPick(layer: MapLayer): void }) {
+  const objects = useObjects(board)
+  const runIds = [...new Set(objects.flatMap((o) => (o.type === 'notebook' && o.runId ? [o.runId] : [])))]
+  const key = runIds.join(',')
+  const [files, setFiles] = useState<{ runId: string; runTitle: string; name: string }[]>()
+
+  useEffect(() => {
+    let current = true
+    Promise.all(runIds.map((id) => notebookFactory.getRun(id).catch(() => undefined))).then((runs) => {
+      if (!current) return
+      setFiles(runs.flatMap((r) => (r ? Object.keys(r.artifacts ?? {}).filter(isGeoJson).map((name) => ({ runId: r.id, runTitle: r.title, name })) : [])))
+    })
+    return () => {
+      current = false
+    }
+    // `key` stands for runIds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+
+  return (
+    <>
+      <div className="ttx-addlayer__label">Notebook results</div>
+      {!runIds.length ? (
+        <div className="ttx-addlayer__note">Add a notebook to the board to show its results here</div>
+      ) : !files ? (
+        <div className="ttx-addlayer__note">Loading…</div>
+      ) : !files.length ? (
+        <div className="ttx-addlayer__note">The notebooks on this board have no GeoJSON results</div>
+      ) : (
+        files.map((f) => (
+          <button key={`${f.runId}/${f.name}`} type="button" role="menuitem" title={f.runTitle} onClick={() => onPick(notebookLayer(f.runId, f.name, f.runTitle))}>
+            {f.name} <span className="ttx-addlayer__sub">· {f.runTitle}</span>
+          </button>
+        ))
+      )}
+    </>
   )
 }
 

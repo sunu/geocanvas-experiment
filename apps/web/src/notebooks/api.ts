@@ -90,3 +90,15 @@ export class NotebookFactory {
 
 /** The one client for the app, so its caches are shared by every notebook on the board. */
 export const notebookFactory = new NotebookFactory()
+
+export const isGeoJson = (fileName: string) => /\.geojson$/i.test(fileName)
+
+/**
+ * Where the browser reads a published run file: through the Worker, which forwards only a run's
+ * published outputs (apps/worker/src/notebooks.ts). Throws for any other url.
+ */
+export function artifactPath(url: string): string {
+  const path = new URL(url).pathname
+  if (!/^\/published\/runs\/[\w-]+\/outputs\/[\w.-]+$/.test(path)) throw new Error(`Not a published run file: ${url}`)
+  return `/notebooks${path}`
+}

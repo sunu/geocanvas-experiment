@@ -794,6 +794,48 @@ body,
   background: rgb(0 0 0 / 0.06);
 }
 
+.ttx-addlayer__label {
+  padding: 6px 6px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ttx-muted);
+}
+
+.ttx-addlayer__note {
+  max-width: 260px;
+  padding: 2px 6px 4px;
+  color: var(--ttx-muted);
+}
+
+.ttx-addlayer__sub {
+  color: var(--ttx-muted);
+}
+
+.ttx-notebook__file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ttx-notebook__file button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ttx-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ttx-notebook__file button:hover {
+  color: var(--ttx-ink);
+  background: rgb(0 0 0 / 0.04);
+}
+
 /* --- Notebook (a Notebook Factory run) ----------------------------------- */
 
 .ttx-notebook {
