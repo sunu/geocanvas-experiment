@@ -1,0 +1,11 @@
+{
+  "name": "@ttx/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "yjs": "^13.6.33",
+    "zod": "^4.6.7"
+  }
+}
