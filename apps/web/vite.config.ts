@@ -12,6 +12,7 @@ export default defineConfig({
       '/tools': 'http://localhost:8787',
       '/notebooks': 'http://localhost:8787',
       '/reliefweb': 'http://localhost:8787',
+      '/hapi': 'http://localhost:8787',
       '/uploads': 'http://localhost:8787',
     },
   },

@@ -15,7 +15,21 @@ export type StacSearch = (body: Record<string, unknown>) => Promise<{ features: 
 interface StacItem {
   id: string
   collection: string
+  geometry?: FootprintFeature['geometry'] | null
   properties: Record<string, any>
+}
+
+/** A GeoJSON feature of an event's footprint: an event's point or a hazard's area or track. */
+export interface FootprintFeature {
+  type: 'Feature'
+  geometry: { type: string; coordinates: unknown }
+  properties: { id: string; kind: 'event' | 'hazard'; source: string; title?: string }
+}
+
+/** Where an event happened, as every source that reports it draws it (GeoJSON). */
+export interface EventFootprint {
+  type: 'FeatureCollection'
+  features: FootprintFeature[]
 }
 
 /** The picker lists these sources unless a search names another. GDACS is near-real-time; EM-DAT is the historical archive. */
@@ -116,6 +130,7 @@ const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 export class MontyClient {
   private cache = new Map<string, DisasterEvent>()
   private enriched = new Map<string, Promise<DisasterEvent>>()
+  private footprints = new Map<string, Promise<EventFootprint>>()
   private search: StacSearch
 
   constructor(search: StacSearch) {
@@ -173,6 +188,45 @@ export class MontyClient {
       this.enriched.set(id, pending)
     }
     return pending
+  }
+
+  /**
+   * Where the event happened, for a map: the hazard items of every source that reports it (a flood's extent, a
+   * cyclone's track, an earthquake's area) above their event items (points). Impact items are left out: they
+   * sit on the event's point. Asked once per event.
+   */
+  getFootprint(id: string): Promise<EventFootprint> {
+    let pending = this.footprints.get(id)
+    if (!pending) {
+      pending = this.loadFootprint(id)
+      pending.catch(() => this.footprints.delete(id))
+      this.footprints.set(id, pending)
+    }
+    return pending
+  }
+
+  private async loadFootprint(id: string): Promise<EventFootprint> {
+    const event = await this.getEvent(id)
+    const ids = event.sources?.flatMap((s) => s.eventIds) ?? []
+    if (!ids.includes(id)) ids.unshift(id)
+    const events = await this.search({ collections: [...new Set(ids.map(collectionOf))], ids, limit: ids.length })
+    const corrIds = [...new Set(events.features.flatMap((f) => (f.properties['monty:corr_id'] ? [f.properties['monty:corr_id'] as string] : [])))]
+    const hazards = corrIds.length
+      ? await this.search({
+          collections: HAZARD_COLLECTIONS,
+          limit: 100,
+          'filter-lang': 'cql2-json',
+          filter: { op: 'in', args: [{ property: 'monty:corr_id' }, corrIds] },
+        })
+      : { features: [] }
+    const feature = (kind: 'event' | 'hazard') => (f: StacItem): FootprintFeature[] =>
+      f.geometry?.coordinates
+        ? [{ type: 'Feature', geometry: f.geometry, properties: { id: f.id, kind, source: sourceOf(f.collection), title: f.properties.title } }]
+        : []
+    return {
+      type: 'FeatureCollection',
+      features: [...latestEpisodes(hazards.features).flatMap(feature('hazard')), ...latestEpisodes(events.features).flatMap(feature('event'))],
+    }
   }
 
   private async loadEvent(id: string): Promise<DisasterEvent> {
