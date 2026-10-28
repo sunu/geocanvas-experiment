@@ -5,10 +5,23 @@ export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject }
 export { imagesPlugin, type ImageBoardObject } from './images.js'
 export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
-export { hapiPlugin, type ConflictBoardObject, type CountryBoardObject, type PresenceBoardObject } from './hapi.js'
+export { CHOROPLETH_TOOL, choroplethLayer, hapiPlugin, INDICATORS, type Indicator, type ConflictBoardObject, type CountryBoardObject, type PresenceBoardObject } from './hapi.js'
 export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } from './reliefweb.js'
 export { geocodeTools, OpenCageGeocoder, OPENCAGE_URL, parseOpenCage, type Geocoder, type Place, type PlaceFeatures } from './geocode.js'
-export { bboxOf, DATA_LAYERS, hasArea, mapLayer, newLayerId, type Bbox, type DataLayerKey, type MapLayer } from './mapLayers.js'
+export {
+  ADMIN_LEVEL_NAME,
+  ADMIN_LEVELS,
+  BOUNDARIES_TOOL,
+  bboxOf,
+  DATA_LAYERS,
+  hasArea,
+  mapLayer,
+  newLayerId,
+  type AdminLevel,
+  type Bbox,
+  type DataLayerKey,
+  type MapLayer,
+} from './mapLayers.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
 export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
 export { agentTools, GAP, HISTORY_ENTRIES, HISTORY_MS, MAX_SIZE_FACTOR, MAX_STEPS, runTurn } from './agent/loop.js'

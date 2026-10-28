@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Views, type Runtime } from '@ttx/core'
-import { BASEMAPS, DATA_LAYERS, type DataLayerKey, type MapBoardObject, type MapLayer, type Place } from '@ttx/plugins'
+import {
+  ADMIN_LEVEL_NAME,
+  ADMIN_LEVELS,
+  BASEMAPS,
+  DATA_LAYERS,
+  INDICATORS,
+  type AdminLevel,
+  type DataLayerKey,
+  type Indicator,
+  type MapBoardObject,
+  type MapLayer,
+  type Place,
+} from '@ttx/plugins'
+import { countryName } from '@ttx/plugins/monty/countries'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import type { ObjectViewProps } from '../canvas/registry'
@@ -9,7 +22,7 @@ import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/ap
 import { LayerList } from './LayerList'
 import { useLayerStates } from './layers'
 import { areaOf, goTo, liveMap } from './live'
-import { fitMapToLayer } from './MapObject'
+import { fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
 
 /** A map op as its own undo step. In focus, `runtime` is the draft: others see it once shared. */
@@ -22,7 +35,7 @@ const NO_LAYERS: MapLayer[] = []
 
 /**
  * The map's contextual tools in focus mode: go to a place, its data layers, add data for the area in view,
- * the events and notebook results on the board, basemap.
+ * admin boundaries, and the events, country figures and notebook results on the board, basemap.
  */
 export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObject>) {
   const map = () => liveMap(o.id)
@@ -48,6 +61,12 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
     mapOp(runtime, o.id, op, args)
     const added = (runtime.board.get(o.id) as MapBoardObject | undefined)?.layers?.find((l) => !before.has(l.id))
     if (added) fitMapToLayer(runtime, o.id, added)
+  }
+
+  /** A HAPI figure by province or district, for everyone; this person's view fits the country. */
+  const addChoropleth = (country: string, indicator: Indicator, level: AdminLevel, sector?: string) => {
+    mapOp(runtime, o.id, 'map.addChoropleth', { country, indicator, level, ...(sector && { sector }) })
+    fitMapToCountry(runtime, o.id, country)
   }
 
   /** Fetch a layer's data again, for the area this person sees. */
@@ -82,7 +101,18 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
           ))}
         </div>
       </section>
+      <section className="ttx-options__section">
+        <h3>Boundaries</h3>
+        <div className="ttx-options__list">
+          {ADMIN_LEVELS.map((level) => (
+            <button key={level} type="button" onClick={() => mapOp(runtime, o.id, 'map.addBoundaries', { level })}>
+              {ADMIN_LEVEL_NAME[level].many} <span className="ttx-options__sub">· COD-AB</span>
+            </button>
+          ))}
+        </div>
+      </section>
       <BoardEvents board={runtime.board as Board} onPick={(eventId, title) => addAndFit('map.addEventLayer', { eventId, title })} />
+      <CountryData board={runtime.board as Board} onPick={addChoropleth} />
       <NotebookResults board={runtime.board as Board} onPick={(runId, name, title) => addAndFit('map.addNotebookResult', { runId, name, title })} />
       <section className="ttx-options__section">
         <h3>Basemap</h3>
@@ -131,6 +161,38 @@ function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, 
               {names[id] ?? id} <span className="ttx-options__sub">· footprint</span>
             </button>
           ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * The HDX HAPI figures of the who's where and conflict widgets on this board, as choropleths by province or district.
+ * Who's where gives its sector filter to the layer.
+ */
+function CountryData({ board, onPick }: { board: Board; onPick(country: string, indicator: Indicator, level: AdminLevel, sector?: string): void }) {
+  const objects = useObjects(board)
+  const items = new Map<string, { country: string; indicator: Indicator; sector?: string }>()
+  for (const o of objects) {
+    if (o.type === 'presence' && o.country) items.set(`${o.country}:organizations:${o.sector}`, { country: o.country, indicator: 'organizations', sector: o.sector || undefined })
+    if (o.type === 'conflict' && o.country) items.set(`${o.country}:conflictEvents`, { country: o.country, indicator: 'conflictEvents' })
+  }
+  return (
+    <section className="ttx-options__section">
+      <h3>Country data on this board</h3>
+      {!items.size ? (
+        <p className="ttx-options__empty">Add a who's where or conflict widget to color a country's areas by its data</p>
+      ) : (
+        <div className="ttx-options__list">
+          {[...items].flatMap(([key, { country, indicator, sector }]) =>
+            ADMIN_LEVELS.map((level) => (
+              <button key={`${key}:${level}`} type="button" onClick={() => onPick(country, indicator, level, sector)}>
+                {INDICATORS[indicator].name}
+                {sector ? ` (${sector})` : ''} by {ADMIN_LEVEL_NAME[level].one} <span className="ttx-options__sub">· {countryName(country) ?? country}</span>
+              </button>
+            )),
+          )}
         </div>
       )}
     </section>

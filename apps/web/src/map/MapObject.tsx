@@ -1,12 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { Views, type Runtime, type SavedView } from '@ttx/core'
-import { MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type MapBoardObject, type MapLayer } from '@ttx/plugins'
+import { MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type MapBoardObject, type MapLayer, type PlaceFeatures } from '@ttx/plugins'
+import { countryName } from '@ttx/plugins/monty/countries'
 import { tools } from '../tools/registry'
+import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
 import { basemapStyle } from './basemaps'
 import { attributionOf, boundsOf, deckLayers, useLayerStates } from './layers'
 import { registerLiveMap } from './live'
@@ -35,6 +37,17 @@ export function fitMapTo(runtime: Runtime, mapId: string, [west, south, east, no
   if (!map) return
   const { center, zoom } = viewOfArea({ west, south, east, north }, map.w, map.h - MAP_HEADER_PX)
   new Views(runtime.board.doc).set(runtime.actor.id, mapId, { center, zoom: Math.min(zoom, FIT_MAX_ZOOM), bearing: 0 })
+}
+
+/** Fit a map to a country, found by name with the geocoder. Without a geocoder (no key), the view stays. */
+export function fitMapToCountry(runtime: Runtime, mapId: string, iso3: string) {
+  tools.run<PlaceFeatures>('data.geocode', { query: countryName(iso3) ?? iso3, limit: 1 }).then(
+    (fc) => {
+      const bbox = fc.features[0]?.properties.bbox
+      if (bbox) fitMapTo(runtime, mapId, bbox)
+    },
+    () => {},
+  )
 }
 
 /** Fit a map to a layer's data once it has loaded (from the tool cache when the map already ran it). */
@@ -71,6 +84,12 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
   const credits = [...new Set(states.map((st) => attributionOf(st.value)).filter((a) => !!a))].join(' · ')
+  /** The latest states, for map events. */
+  const statesRef = useRef(states)
+  /** MapLibre layers can be added: the style has loaded, and no basemap change is under way. */
+  const styleReadyRef = useRef(false)
+  /** The value under the pointer on a choropleth, while editing. */
+  const [hover, setHover] = useState<{ text: string; x: number; y: number }>()
 
   useEffect(() => {
     const views = new Views(runtimeRef.current.board.doc)
@@ -96,6 +115,21 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     const resize = new ResizeObserver(() => map.resize())
     resize.observe(glRef.current!)
     const forget = registerLiveMap(o.id, map)
+    // COD-AB boundaries and choropleths are MapLibre layers (adminAreas.ts): a basemap change drops them.
+    map.on('style.load', () => {
+      styleReadyRef.current = true
+      syncAdminLayers(map, statesRef.current)
+    })
+    map.on('mousemove', (e) => {
+      const ids = fillLayerIds(map)
+      const f = ids.length ? map.queryRenderedFeatures(e.point, { layers: ids })[0] : undefined
+      const a = f && (statesRef.current.find((s) => s.id === dataLayerOf(f.layer.id))?.value as AdminAreas | undefined)
+      if (!f || !a?.values) return setHover(undefined)
+      const t = codab(a.level)
+      const v = a.values[f.properties[t.pcode]]
+      setHover({ text: `${f.properties[t.name]}: ${v === undefined ? 'no data' : `${v.toLocaleString('en-US')} ${a.unit ?? ''}`}`, x: e.point.x, y: e.point.y })
+    })
+    map.on('mouseout', () => setHover(undefined))
     mapRef.current = map
     overlayRef.current = overlay
     return () => {
@@ -104,6 +138,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       map.remove()
       mapRef.current = null
       overlayRef.current = null
+      styleReadyRef.current = false
     }
   }, [o.id])
 
@@ -168,12 +203,16 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Layers whose result arrived or changed. deck.gl diffs by layer id and data, so unchanged layers are cheap.
   useEffect(() => {
     overlayRef.current?.setProps({ layers: deckLayers(states) })
+    statesRef.current = states
+    if (mapRef.current && styleReadyRef.current) syncAdminLayers(mapRef.current, states)
   })
 
   useEffect(() => {
     if (styleRef.current === o.basemap) return
     styleRef.current = o.basemap
-    mapRef.current?.setStyle(basemapStyle(o.basemap))
+    // A full reload, so 'style.load' fires and the COD-AB layers are added again.
+    styleReadyRef.current = false
+    mapRef.current?.setStyle(basemapStyle(o.basemap), { diff: false })
   }, [o.basemap])
 
   // While editing, the wheel belongs to the map, not the canvas camera. The canvas listens
@@ -195,6 +234,11 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {!editing && <div className="ttx-map__hint">Double-click to pan and zoom</div>}
+        {editing && hover && (
+          <div className="ttx-map__hover" style={{ left: hover.x + 12, top: hover.y + 12 }}>
+            {hover.text}
+          </div>
+        )}
       </div>
     </div>
   )

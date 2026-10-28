@@ -1,5 +1,6 @@
 import { CrosshairSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { hasArea, type MapLayer } from '@ttx/plugins'
+import { ADMIN_AREAS, classify, type AdminAreas } from './adminAreas'
 import { attributionOf, truncationOf, type LayerState } from './layers'
 
 interface Props {
@@ -21,6 +22,7 @@ export function LayerList({ layers, states, onUseMyView, onRemove }: Props) {
           <div key={s.id} className={`ttx-layers__item ${s.error ? 'is-error' : ''}`}>
             <div className="ttx-layers__text">
               <div className="ttx-layers__title">{s.title}</div>
+              {s.output === ADMIN_AREAS && s.value !== undefined && <AdminLegend areas={s.value as AdminAreas} />}
               {note && <div className="ttx-layers__note">{note}</div>}
             </div>
             {layers[i] && hasArea(layers[i]) && (
@@ -34,6 +36,28 @@ export function LayerList({ layers, states, onUseMyView, onRemove }: Props) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** A choropleth's classes, and the areas left out because HAPI could not place them. */
+function AdminLegend({ areas }: { areas: AdminAreas }) {
+  if (!areas.values) return null
+  const { legend } = classify(areas.values)
+  return (
+    <div className="ttx-layers__legend">
+      {legend.classes.map((c) => (
+        <span key={c.label}>
+          <i style={{ background: c.color }} />
+          {c.label}
+        </span>
+      ))}
+      {areas.unit && <span className="ttx-layers__note">{areas.unit}</span>}
+      {!!areas.unmatched && (
+        <div className="ttx-layers__note">
+          Left out: {areas.unmatched.toLocaleString('en-US')} {areas.unit} in areas HDX HAPI could not place
+        </div>
+      )}
     </div>
   )
 }
