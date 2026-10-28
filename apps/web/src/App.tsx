@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PlusIcon, RobotIcon } from '@phosphor-icons/react'
+import { startBrowserAgent } from './agent/browserAgent'
 import { ChatPanel } from './agent/ChatPanel'
 import { connect, useConnectionStatus } from './board/connect'
 import { newRoomId, roomFromHash, roomHash } from './board/room'
@@ -15,6 +16,8 @@ if (!room) {
 addEventListener('hashchange', () => location.reload())
 
 const { board, runtime, provider, chat } = connect(room)
+// Answers only the messages this tab sends on the person's own key; idle otherwise.
+startBrowserAgent(provider.doc, provider.awareness)
 // In dev, run ops and tools from the console, e.g. runtime.callTool('box__add', { args: { x: 0, y: 0 } }).
 if (import.meta.env.DEV) Object.assign(window, { board, runtime, provider, chat })
 

@@ -1,11 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { Chat, Runtime, ToolRunner, Views, type Actor, type AgentReply, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
-import { boardGet, eventsSearch, geocodeTools, plugins, type Geocoder } from '@ttx/plugins'
-import { Agent, TURNS_PER_HOUR } from '../src/agent/agent'
-import { HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn } from '../src/agent/loop'
-import type { Complete, Message } from '../src/agent/openrouter'
-import type { MontyClient } from '@ttx/plugins/monty/client'
+import {
+  Agent,
+  boardGet,
+  chatCompletions,
+  eventsSearch,
+  geocodeTools,
+  HISTORY_ENTRIES,
+  HISTORY_MS,
+  MAX_STEPS,
+  plugins,
+  runTurn,
+  TURNS_PER_HOUR,
+  type Complete,
+  type Geocoder,
+  type Message,
+} from '../src/index'
+import type { MontyClient } from '../src/monty/client'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
 const ben: Actor = { kind: 'user', id: 'ben', name: 'Ben' }
@@ -262,10 +274,93 @@ describe('Agent', () => {
   it(`answers at most ${TURNS_PER_HOUR} requests an hour`, async () => {
     const { doc, chat } = board()
     let calls = 0
-    new Agent({ doc, complete: async () => (calls++, { role: 'assistant', content: 'ok' }) })
+    new Agent({ doc, complete: async () => (calls++, { role: 'assistant', content: 'ok' }), turnsPerHour: TURNS_PER_HOUR })
     for (let i = 0; i <= TURNS_PER_HOUR; i++) chat.send({ actor: ada, text: `${i}`, selection: [] })
     for (let i = 0; i < 50; i++) await settle()
     expect(calls).toBe(TURNS_PER_HOUR)
     expect(replies(chat).at(-1)!.text).toMatch(/this hour/)
+  })
+
+  it('has no turn limit without turnsPerHour (a person\'s own key)', async () => {
+    const { doc, chat } = board()
+    let calls = 0
+    new Agent({ doc, complete: async () => (calls++, { role: 'assistant', content: 'ok' }) })
+    for (let i = 0; i <= TURNS_PER_HOUR; i++) chat.send({ actor: ada, text: `${i}`, selection: [] })
+    for (let i = 0; i < 60; i++) await settle()
+    expect(calls).toBe(TURNS_PER_HOUR + 1)
+  })
+
+  it('answers only the messages it accepts: the room its own, each browser tab its own', async () => {
+    const { doc, chat } = board()
+    const answer = (who: string): Complete => async () => ({ role: 'assistant', content: who })
+    new Agent({ doc, complete: answer('room') })
+    new Agent({ doc, complete: answer('tab 1'), accepts: (m) => m.browserTab === 'tab-1' })
+    const forRoom = chat.send({ actor: ada, text: 'a', selection: [] })
+    const forTab1 = chat.send({ actor: ben, text: 'b', selection: [], browserTab: 'tab-1' })
+    const forTab2 = chat.send({ actor: ben, text: 'c', selection: [], browserTab: 'tab-2' })
+    for (let i = 0; i < 20; i++) await settle()
+    const byMessage = Object.fromEntries(replies(chat).map((r) => [r.replyTo, r.text]))
+    expect(byMessage).toEqual({ [forRoom.id]: 'room', [forTab1.id]: 'tab 1' })
+    expect(chat.pending().map((m) => m.id)).toEqual([forTab2.id])
+  })
+
+  it('does not call a message of a browser tab interrupted when the room starts', () => {
+    const { doc, chat } = board()
+    const tab = chat.send({ actor: ada, text: 'hi', selection: [], browserTab: 'tab-1' })
+    new Agent({ doc, complete: async () => ({ role: 'assistant', content: 'no' }) })
+    expect(chat.pending().map((m) => m.id)).toEqual([tab.id])
+  })
+})
+
+describe('chatCompletions', () => {
+  function capture() {
+    const sent: { url: string; headers: Record<string, string> }[] = []
+    const original = globalThis.fetch
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      sent.push({ url, headers: init.headers as Record<string, string> })
+      return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'hi' } }] }))
+    }) as typeof fetch
+    return { sent, restore: () => (globalThis.fetch = original) }
+  }
+
+  it('sends the key and x-title to OpenRouter', async () => {
+    const { sent, restore } = capture()
+    try {
+      await chatCompletions({ url: 'https://openrouter.ai/api/v1/', apiKey: 'sk-1', model: 'm' })([], [])
+    } finally {
+      restore()
+    }
+    expect(sent[0]!.url).toBe('https://openrouter.ai/api/v1/chat/completions')
+    expect(sent[0]!.headers).toMatchObject({ authorization: 'Bearer sk-1', 'x-title': 'humanitarian-ttx' })
+  })
+
+  it('sends no x-title to other servers, and no authorization without a key', async () => {
+    const { sent, restore } = capture()
+    try {
+      await chatCompletions({ url: 'http://localhost:11434/v1', model: 'm' })([], [])
+    } finally {
+      restore()
+    }
+    expect(sent[0]!.url).toBe('http://localhost:11434/v1/chat/completions')
+    expect(Object.keys(sent[0]!.headers)).toEqual(['content-type'])
+  })
+})
+
+describe('a browser agent on its own key', () => {
+  it('keeps the key out of the board doc', async () => {
+    const { doc, chat, a } = board()
+    const key = 'sk-or-secret-123'
+    const answers = [tools(call('core__object__delete', { ids: [a], args: {} })), { role: 'assistant', content: 'Deleted.' }]
+    const original = globalThis.fetch
+    globalThis.fetch = (async () => new Response(JSON.stringify({ choices: [{ message: answers.shift() }] }))) as typeof fetch
+    try {
+      new Agent({ doc, complete: chatCompletions({ url: 'https://openrouter.ai/api/v1', apiKey: key, model: 'm' }), accepts: (m) => m.browserTab === 'tab-1' })
+      chat.send({ actor: ada, text: 'delete this', selection: [a], browserTab: 'tab-1' })
+      for (let i = 0; i < 20; i++) await new Promise((resolve) => setTimeout(resolve, 0))
+    } finally {
+      globalThis.fetch = original
+    }
+    expect(chat.list().at(-1)).toMatchObject({ kind: 'agent', text: 'Deleted.' })
+    expect(new TextDecoder().decode(Y.encodeStateAsUpdate(doc))).not.toContain(key)
   })
 })

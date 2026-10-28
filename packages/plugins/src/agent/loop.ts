@@ -14,8 +14,8 @@ import {
   type ToolRunner,
   type UserMessage,
 } from '@ttx/core'
-import { areaOfView, MAP_HEADER_PX } from '@ttx/plugins'
-import type { Complete, FunctionTool, Message } from './openrouter'
+import { areaOfView, MAP_HEADER_PX } from '../mapView.js'
+import type { Complete, FunctionTool, Message } from './complete.js'
 
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
 export const MAX_STEPS = 8
