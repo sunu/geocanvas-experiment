@@ -117,7 +117,7 @@ A panel on the right, opened from the board bar. It shows the messages, the sele
 
 - The Montandon client and the files that it imports are in `packages/plugins/src/monty/`. `MontyClient` takes a search function. The browser gives the `/monty/search` function. The Durable Object gives a function that calls Montandon with the token.
 - The read tool `events__search { text, limit }` returns short summaries. The agent then calls `event__add`.
-- Each user message also stores the center of the sender's view, so that the agent can put new objects where the person looks.
+- Each user message also stores the center of the sender's view. When the agent adds an object without `x` and `y`, the loop puts it in the middle of that view, as the palette does. Each further object that the same turn adds goes to the right of the last one, with a gap of 24 units. The model gives `x` and `y` only to put an object at a given place.
 
 ### 3.7 Geocoding
 

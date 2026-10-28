@@ -9,13 +9,16 @@ export const MAX_STEPS = 8
 /** The agent may add objects up to this many times their type's default size. People may draw any size. */
 export const MAX_SIZE_FACTOR = 4
 
+/** Space between objects that one turn adds side by side, in canvas units. */
+export const GAP = 24
+
 const SYSTEM = `You are the agent on a shared whiteboard for a humanitarian table-top exercise. People ask you to change the board, and you change it with the tools.
 
 Rules:
 - "This", "these", "it" and "the selected ..." mean the objects under "Selected" in the request, and only those. Act only on those ids.
 - If the request needs objects and nothing is selected, or you are not sure which objects the person means, do not guess: ask.
-- When you add an object, leave out w and h unless the person asks for a size: each type has a good default size.
-- Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner. Put new objects near the person's "View center", next to what is there, not on top of it.
+- When you add an object, leave out x, y, w and h: it goes in the middle of the person's view, at its type's default size, and each further object you add goes to the right of the last one. Give x and y only to put it at a given place (e.g. next to an object), and w and h only when the person asks for a size.
+- Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner.
 - To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
 - Each person has their own view of each map. To show a place on a map, find its area with geocode__search first, then call map__showArea with "for" set to [the asker's person id]. Use "for": "everyone" only when they ask to show it to everyone. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
@@ -117,6 +120,7 @@ export async function runTurn(
       calls.push({ tool: opIdOf(name), status: 'failed', error: tooBig })
       return JSON.stringify({ status: 'failed', error: tooBig })
     }
+    place(name, input.args)
     const ids = Array.isArray(input.ids) ? input.ids : undefined
     // Keep each object as it was before this turn first changed it; objects this turn added need no copy.
     for (const id of ids ?? []) {
@@ -127,6 +131,22 @@ export async function runTurn(
     if (record.created) created.push(...record.created)
     calls.push({ tool: record.opId, ...(ids && { ids }), status: record.status, ...(record.error && { error: record.error }) })
     return JSON.stringify({ status: record.status, error: record.error, created: record.created })
+  }
+
+  /**
+   * An add without x or y, as the palette does it: the first in the middle of the person's view, each next one
+   * to the right of the last object this turn added.
+   */
+  function place(name: string, args: unknown) {
+    const op = opIdOf(name)
+    const def = op.endsWith('.add') ? runtime.registry.objectType(op.slice(0, -'.add'.length))?.defaultSize : undefined
+    if (!def || !message.center || !args || typeof args !== 'object') return
+    const a = args as { x?: unknown; y?: unknown; w?: unknown; h?: unknown }
+    const w = typeof a.w === 'number' ? a.w : def.w
+    const h = typeof a.h === 'number' ? a.h : def.h
+    const last = created.flatMap((id) => runtime.board.get(id) ?? []).at(-1)
+    a.x ??= Math.round(last ? last.x + last.w + GAP : message.center.x - w / 2)
+    a.y ??= Math.round(message.center.y - h / 2)
   }
 
   /**

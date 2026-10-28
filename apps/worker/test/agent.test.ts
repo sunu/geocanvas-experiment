@@ -133,6 +133,20 @@ describe('runTurn', () => {
     expect(views.of(map).map((v) => v.person)).toEqual([ada.id])
   })
 
+  it('puts adds without x and y in the middle of the view, and the next ones to the right', async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'add a map and a box', selection: [], center: { x: 1000, y: 500 } })
+    const model = scripted(tools(call('map__add', { args: {} }), call('box__add', { args: {} })), tools(call('text__add', { args: { x: 5, y: 6, text: 'here' } })))
+    await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
+    const board_ = new Runtime({ doc, plugins, actor: ada }).board
+    const map = board_.list().find((o) => o.type === 'map')!
+    const box = board_.list().find((o) => o.type === 'box' && o.x > 900)!
+    expect([map.x + map.w / 2, map.y + map.h / 2]).toEqual([1000, 500])
+    expect([box.x, box.y + box.h / 2]).toEqual([map.x + map.w + 24, 500])
+    // Given x and y stay.
+    expect(board_.list().find((o) => o.type === 'text')).toMatchObject({ x: 5, y: 6 })
+  })
+
   it('refuses an add with a size far over its default, and lets the model try again', async () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'add a map', selection: [] })
