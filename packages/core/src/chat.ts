@@ -72,14 +72,20 @@ export class Chat {
 
   send(message: Omit<UserMessage, 'kind' | 'id' | 'at'>): UserMessage {
     const entry: UserMessage = { kind: 'user', id: crypto.randomUUID(), at: Date.now(), ...message }
-    this.entries.push([entry])
+    this.push(entry)
     return entry
   }
 
   reply(reply: Omit<AgentReply, 'kind' | 'id' | 'at'>): AgentReply {
     const entry: AgentReply = { kind: 'agent', id: crypto.randomUUID(), at: Date.now(), ...reply }
-    this.entries.push([entry])
+    this.push(entry)
     return entry
+  }
+
+  private push(entry: ChatEntry) {
+    this.entries.push([entry])
+    // Inside another observer, Yjs calls ours only after that one returns: list() must see this entry now.
+    this.cached = null
   }
 
   /** User messages that have no reply yet, oldest first. */

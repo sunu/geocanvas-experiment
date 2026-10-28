@@ -30,6 +30,18 @@ describe('chat', () => {
     expect(changes).toBe(3)
   })
 
+  it('lists a reply written from inside its own observer', () => {
+    const { chat } = setup()
+    const seen: number[] = []
+    chat.subscribe(() => {
+      const m = chat.pending()[0]
+      if (m) chat.reply({ replyTo: m.id, text: 'ok', calls: [] })
+      seen.push(chat.pending().length)
+    })
+    chat.send({ actor: user, text: 'hi', selection: [] })
+    expect(seen[0]).toBe(0)
+  })
+
   it('syncs between two docs, as between a browser and the room', () => {
     const a = setup()
     const b = new Y.Doc()

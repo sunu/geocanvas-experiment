@@ -11,8 +11,13 @@
   },
   // Montandon STAC API, the database agent-docs/features.md scopes us to. The token is a secret:
   // apps/worker/.dev.vars locally, `wrangler secret` (or the deploy workflow) when deployed.
-  "vars": { "MONTANDON_BASE_URL": "https://montandon-eoapi-stage.ifrc.org/stac" },
-  "secrets": { "required": ["MONTANDON_TOKEN"] },
+  "vars": {
+    "MONTANDON_BASE_URL": "https://montandon-eoapi-stage.ifrc.org/stac",
+    // The board agent's model on OpenRouter: a low-cost model that can call tools (plans/plan-008.md).
+    "AGENT_MODEL": "qwen/qwen3.7-flash"
+  },
+  // OPENROUTER_API_KEY: without it, the agent answers that it is not configured.
+  "secrets": { "required": ["MONTANDON_TOKEN", "OPENROUTER_API_KEY"] },
   // One Durable Object per board (room), with its own SQLite storage.
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "Room" }]

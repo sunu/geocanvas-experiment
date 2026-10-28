@@ -9,6 +9,8 @@
     "types": "wrangler types"
   },
   "dependencies": {
+    "@ttx/core": "*",
+    "@ttx/plugins": "*",
     "lib0": "^0.2.119",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33"

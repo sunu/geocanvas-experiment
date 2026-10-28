@@ -4,6 +4,8 @@ import * as syncProtocol from 'y-protocols/sync'
 import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
+import { Agent, AGENT } from './agent/agent'
+import { openRouter } from './agent/openrouter'
 import { montySearch } from './monty'
 import { UpdateLog } from './updateLog'
 
@@ -12,6 +14,7 @@ import { UpdateLog } from './updateLog'
  * /connect/<room> to that room's Durable Object, which speaks the standard y-websocket
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
  * /monty/search proxies Montandon STAC searches with the token added (monty.ts).
+ * Each room also runs the board's agent (agent/agent.ts), which answers the board's chat.
  */
 
 const MESSAGE_SYNC = 0
@@ -59,6 +62,15 @@ export class Room extends DurableObject<Env> {
       }
       const changed = [...added, ...updated, ...removed]
       this.broadcast(awarenessMessage(awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed)))
+    })
+
+    // After the listeners above, so the agent's writes are stored and sent like anyone's.
+    new Agent({
+      doc: this.doc,
+      complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
+      // The agent's presence: people see "Agent is thinking…" while it works.
+      onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
+      keepAlive: (work) => ctx.waitUntil(work),
     })
   }
 

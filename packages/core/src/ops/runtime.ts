@@ -80,7 +80,8 @@ export class Runtime {
 
   /** Write pending gesture entries to the op log now. */
   flush() {
-    clearTimeout(this.idle)
+    // Guarded: the Workers types (the room's agent runs this runtime) take no undefined here.
+    if (this.idle !== undefined) clearTimeout(this.idle)
     if (!this.pending.size) return
     const entries = [...this.pending.values()].map((r): OplogEntry => ({ kind: 'invocation', ...r }))
     this.pending.clear()
@@ -256,7 +257,7 @@ export class Runtime {
     const prev = this.pending.get(key)
     // Keep the first id: the undo step carries it.
     this.pending.set(key, prev ? { ...record, id: prev.id, at: prev.at } : record)
-    clearTimeout(this.idle)
+    if (this.idle !== undefined) clearTimeout(this.idle)
     this.idle = setTimeout(() => this.flush(), GESTURE_IDLE_MS)
   }
 

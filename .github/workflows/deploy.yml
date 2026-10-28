@@ -37,13 +37,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BRANCH: ${{ github.ref_name }}
           MONTANDON_TOKEN: ${{ secrets.MONTANDON_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           name=$(../../.github/scripts/worker-name.sh "$BRANCH")
-          # Secrets belong to one Worker, and each branch is its own Worker, so upload the Montandon token
-          # with every deploy. Without the repository secret, the Worker answers /monty/search with a 503.
+          # Secrets belong to one Worker, and each branch is its own Worker, so upload them with every
+          # deploy. Without MONTANDON_TOKEN the Worker answers /monty/search with a 503; without
+          # OPENROUTER_API_KEY the board agent answers that it is not configured.
           secrets=()
-          if [ -n "$MONTANDON_TOKEN" ]; then
-            (umask 077 && jq -n '{MONTANDON_TOKEN: env.MONTANDON_TOKEN}' > "$RUNNER_TEMP/secrets.json")
+          if [ -n "$MONTANDON_TOKEN$OPENROUTER_API_KEY" ]; then
+            (umask 077 && jq -n 'env | {MONTANDON_TOKEN, OPENROUTER_API_KEY} | with_entries(select(.value != null and .value != ""))' > "$RUNNER_TEMP/secrets.json")
             secrets=(--secrets-file "$RUNNER_TEMP/secrets.json")
           fi
           npx wrangler deploy --name "$name" "${secrets[@]}" | tee deploy.log
