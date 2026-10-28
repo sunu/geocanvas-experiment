@@ -13,7 +13,7 @@ export const plugins = [corePlugin, mapPlugin, eventsPlugin, notebooksPlugin, re
 
 export { agentPlugin } from './agent.js'
 export { boardGet, eventsSearch } from './agentTools.js'
-export { eventsPlugin, type EventBoardObject } from './events.js'
+export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
 export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
 export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } from './reliefweb.js'
