@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Layer } from '@deck.gl/core'
 import { GeoJsonLayer } from '@deck.gl/layers'
 import { tools } from '../tools/registry'
@@ -67,19 +67,28 @@ export function useLayerStates(layers: MapLayer[]): LayerState[] {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
-  return layers.map((l) => {
-    const r = results[l.id]
-    const fresh = r?.key === recipeKey(l)
-    const output = tools.tool(l.tool)?.output
-    return {
-      id: l.id,
-      title: l.title,
-      ...(output && { output }),
-      loading: !fresh,
-      ...(fresh && r.value !== undefined && { value: r.value }),
-      ...(fresh && r.error !== undefined && { error: r.error }),
-    }
-  })
+  // The same array until a layer or a result changes. Every board change and every canvas camera move re-renders
+  // a map with a new `layers` array, and a new array of states would make deck.gl redraw all its data each time.
+  const shown = stableJson(layers.map((l) => [l.id, l.title, recipeKey(l)]))
+  return useMemo(
+    () =>
+      layers.map((l) => {
+        const r = results[l.id]
+        const fresh = r?.key === recipeKey(l)
+        const output = tools.tool(l.tool)?.output
+        return {
+          id: l.id,
+          title: l.title,
+          ...(output && { output }),
+          loading: !fresh,
+          ...(fresh && r.value !== undefined && { value: r.value }),
+          ...(fresh && r.error !== undefined && { error: r.error }),
+        }
+      }),
+    // `shown` covers every field of `layers` read here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shown, results],
+  )
 }
 
 /** Accent color of data layers, [r, g, b]. */
