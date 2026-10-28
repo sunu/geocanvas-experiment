@@ -79,7 +79,7 @@ GitHub Actions deploy every push to Cloudflare (`.github/workflows/deploy.yml`),
 - `main` deploys to the `humanitarian-ttx` Worker.
 - Every other branch deploys to its own Worker, `humanitarian-ttx-<branch>` (naming rule in `.github/scripts/worker-name.sh`), with its own rooms. A branch that changes the board format cannot break `main`'s boards.
 - Deleting a branch deletes its Worker and its rooms (`delete-branch-worker.yml`).
-- The deployed URL is in each run's summary.
+- The deployed URL is in each run's summary, and on the branch's pull request as one comment that each deploy updates (`.github/scripts/pr-preview-comment.sh`). A pull request opened after the branch deployed gets the link from `pr-preview-link.yml`.
 
 Repository secrets: `CLOUDFLARE_API_TOKEN` (a token limited to editing Workers), `CLOUDFLARE_ACCOUNT_ID`, and `MONTANDON_TOKEN`. Cloudflare keeps secrets per Worker and each branch is its own Worker, so the workflow uploads `MONTANDON_TOKEN` with every deploy (`--secrets-file`). Without it, deploys still pass and event search answers 503.
 
