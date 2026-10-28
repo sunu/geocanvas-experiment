@@ -8,7 +8,7 @@ const rect = { x: 1, y: 2, w: 30, h: 40 }
 
 describe('object type registry', () => {
   it('lists every type once, in toolbar order', () => {
-    expect(objectTypes.map((d) => d.type)).toEqual(['box', 'text', 'map', 'event'])
+    expect(objectTypes.map((d) => d.type)).toEqual(['box', 'text', 'sticky', 'map', 'event'])
   })
 
   it('gives each type its own one-letter tool key, apart from the select tool (v)', () => {
@@ -25,7 +25,7 @@ describe('object type registry', () => {
     }
   })
 
-  it('puts new texts and events on top, and new boxes and maps at the bottom', () => {
+  it('puts new texts, sticky notes and events on top, and new boxes and maps at the bottom', () => {
     const board = new Board(new Y.Doc())
     const add = (type: BoardObject['type'], x: number) => {
       const def = objectType(type)!
@@ -35,13 +35,22 @@ describe('object type registry', () => {
     add('box', 1)
     add('map', 2)
     add('event', 3)
-    expect(board.list().map((o) => o.x)).toEqual([2, 1, 0, 3])
+    add('sticky', 4)
+    expect(board.list().map((o) => o.x)).toEqual([2, 1, 0, 3, 4])
   })
 
   it('knows which types the side panel can color and size, with a default color from the palette', () => {
-    expect(objectTypes.filter((d) => d.defaultColor).map((d) => d.type)).toEqual(['box', 'text'])
-    expect(objectTypes.filter((d) => d.textSize).map((d) => d.type)).toEqual(['text'])
+    expect(objectTypes.filter((d) => d.defaultColor).map((d) => d.type)).toEqual(['box', 'text', 'sticky'])
+    expect(objectTypes.filter((d) => d.textSize).map((d) => d.type)).toEqual(['text', 'sticky'])
     for (const d of objectTypes) if (d.defaultColor) expect(PALETTE[d.defaultColor]).toBeDefined()
+  })
+
+  it('makes a sticky note: an empty yellow square that opens for typing, resizable in both directions, kept when empty', () => {
+    const sticky = objectType('sticky')!
+    expect(sticky.create(rect)).toEqual({ type: 'sticky', ...rect, text: '' })
+    expect(sticky).toMatchObject({ key: 's', size: { w: 200, h: 200 }, editable: true, editOnCreate: true, defaultColor: 'yellow' })
+    expect(sticky.widthOnly).toBeFalsy()
+    expect(sticky.isEmpty).toBeUndefined()
   })
 
   it('removes a text left empty, and only that', () => {

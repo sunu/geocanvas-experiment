@@ -2,6 +2,7 @@ import type { ObjectType } from '../board/board'
 import { box } from './box'
 import { event } from './event'
 import { map } from './map'
+import { sticky } from './sticky'
 import { text } from './text'
 import type { ObjectTypeDef } from './types'
 
@@ -9,7 +10,7 @@ import type { ObjectTypeDef } from './types'
  * Every object type, in toolbar order. Keyed by every type in ObjectFields, so a type with
  * fields but no definition here does not compile.
  */
-const OBJECT_TYPES: { [T in ObjectType]: ObjectTypeDef<T> } = { box, text, map, event }
+const OBJECT_TYPES: { [T in ObjectType]: ObjectTypeDef<T> } = { box, text, sticky, map, event }
 
 /** All object types, in toolbar order. */
 export const objectTypes = Object.values(OBJECT_TYPES) as ObjectTypeDef[]

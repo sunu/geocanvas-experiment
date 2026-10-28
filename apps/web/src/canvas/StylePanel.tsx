@@ -26,7 +26,8 @@ export function StylePanel({ board, selected }: { board: Board; selected: BoardO
   }
   const stepSize = (dir: 1 | -1) => {
     board.undo.stopCapturing()
-    for (const o of sized) requestFit(o.id)
+    // Only types whose height follows their content (texts) refit; a sticky note keeps its size.
+    for (const o of sized) if (objectType(o.type)?.widthOnly) requestFit(o.id)
     board.update(Object.fromEntries(sized.map((o) => [o.id, { fontSize: stepFontSize(sizeOf(o), dir) }])))
   }
 
