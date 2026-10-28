@@ -1,6 +1,6 @@
 import { exportTools, opIdOf, summarizeBoard, type AgentReply, type AnyObject, type Runtime, type ToolCallRecord, type UserMessage } from '@ttx/core'
 import type { Complete, FunctionTool, Message } from './openrouter'
-import { boardGet, type ReadTool } from './tools'
+import { boardGet, geocodeSearch, type ReadTool } from './tools'
 
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
 export const MAX_STEPS = 8
@@ -12,6 +12,7 @@ Rules:
 - If the request needs objects and nothing is selected, or you are not sure which objects the person means, do not guess: ask.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner. Put new objects near the person's "View center", next to what is there, not on top of it.
 - To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
+- To show a place on a map, find its area with geocode__search first, then give it as the focus of map__add, or call map__focus on an existing map. Never guess coordinates.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
 /** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read tools. */
@@ -47,7 +48,7 @@ export async function runTurn(
   complete: Complete,
   extraTools: ReadTool[] = [],
 ): Promise<Omit<AgentReply, 'kind' | 'id' | 'at'>> {
-  const readTools = [boardGet, ...extraTools]
+  const readTools = [boardGet, geocodeSearch, ...extraTools]
   const tools = agentTools(runtime, readTools)
   const messages: Message[] = [
     { role: 'system', content: `${SYSTEM}\n\nThe board now, bottom to top:\n${summarizeBoard(runtime.board, runtime.registry) || '(empty)'}` },

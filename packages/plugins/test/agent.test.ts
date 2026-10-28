@@ -78,3 +78,25 @@ describe('agent.undoTurn', () => {
     expect((await bot.callTool('agent__undoTurn', { args: { replyId: reply.id } })).error).toMatch(/not a tool/)
   })
 })
+
+describe('map focus', () => {
+  const india = { west: 67.9, south: 6.6, east: 97.4, north: 35.7 }
+
+  it('adds a map that shows an area, and moves maps to an area again even when it is the same', async () => {
+    const { people } = setup()
+    const map = people.dispatch('map.add', canvas, { x: 0, y: 0, focus: india }).created![0]!
+    expect(people.board.get(map)).toMatchObject({ focus: india })
+    const first = await people.invoke('map.focus', { kind: 'objects', ids: [map] }, india)
+    expect(first.status).toBe('applied')
+    const at = (people.board.get(map) as unknown as { focus: { at: number } }).focus.at
+    await new Promise((resolve) => setTimeout(resolve, 2))
+    await people.invoke('map.focus', { kind: 'objects', ids: [map] }, india)
+    expect((people.board.get(map) as unknown as { focus: { at: number } }).focus.at).toBeGreaterThan(at)
+  })
+
+  it('refuses an area outside the globe', async () => {
+    const { people } = setup()
+    const map = people.dispatch('map.add', canvas, { x: 0, y: 0 }).created![0]!
+    expect((await people.invoke('map.focus', { kind: 'objects', ids: [map] }, { ...india, north: 120 })).status).toBe('failed')
+  })
+})

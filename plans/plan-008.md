@@ -118,6 +118,13 @@ A panel on the right, opened from the board bar. It shows the messages, the sele
 - The read tool `events__search { text, limit }` returns short summaries. The agent then calls `event__add`.
 - Each user message also stores the center of the sender's view, so that the agent can put new objects where the person looks.
 
+### 3.7 Geocoding and map focus
+
+- The read tool `geocode__search { text, limit }` finds places with Photon (photon.komoot.io): OpenStreetMap data, no key. It returns each place's area (west, south, east, north). A place without an extent (a point) gets a small area around it.
+- Map views stay per person. A map has an optional shared `focus` area. When it changes, every view moves to it once (`localView.ts` keeps the last focus that the view moved to). After that, each person pans freely again.
+- The op `map.focus` sets it, with the time in `at`, so the same area again is a change. `map.add` takes `focus` too.
+- The search text goes to the public Photon server. Use a self-hosted Photon or another geocoder if that is a problem.
+
 ## 4. Configuration
 
 | Name | Kind | Where |

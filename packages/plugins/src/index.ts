@@ -11,4 +11,4 @@ export const plugins = [corePlugin, mapPlugin, eventsPlugin, agentPlugin]
 
 export { agentPlugin } from './agent.js'
 export { eventsPlugin, type EventBoardObject } from './events.js'
-export { mapPlugin, BASEMAPS, type Basemap, type MapBoardObject } from './map.js'
+export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'

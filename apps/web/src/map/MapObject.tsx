@@ -14,16 +14,21 @@ setWorkerUrl(workerUrl)
 
 /**
  * A live MapLibre map on the canvas. Double-click to pan and zoom it (editing); Esc or a
- * click outside gives the pointer back to the canvas. The basemap is shared; the view is not.
+ * click outside gives the pointer back to the canvas. The basemap is shared; the view is not,
+ * except that every view moves once to each new `focus` (op map.focus).
  */
 export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBoardObject>) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const glRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap>(null)
   const styleRef = useRef<Basemap>(o.basemap)
+  const focusKey = o.focus && JSON.stringify(o.focus)
+  /** The focus this view last moved to, saved with the view. */
+  const shownFocusRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     const view = loadView(o.id)
+    shownFocusRef.current = view.focus
     const map = new MapLibreMap({
       container: glRef.current!,
       style: basemapStyle(styleRef.current),
@@ -38,7 +43,7 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
     map.addControl(new MapboxOverlay({ interleaved: false, layers: [] }) as unknown as IControl)
     map.on('moveend', () => {
       const c = map.getCenter()
-      saveView(o.id, { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing() })
+      saveView(o.id, { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), focus: shownFocusRef.current })
     })
     mapRef.current = map
     return () => {
@@ -46,6 +51,15 @@ export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBo
       mapRef.current = null
     }
   }, [o.id])
+
+  // A new focus (from anyone, or set while this map was not on screen) moves this view once.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !o.focus || focusKey === shownFocusRef.current) return
+    shownFocusRef.current = focusKey
+    const { west, south, east, north } = o.focus
+    map.fitBounds([west, south, east, north], { padding: 24, duration: 800 })
+  }, [focusKey])
 
   useEffect(() => {
     if (styleRef.current === o.basemap) return
