@@ -6,14 +6,13 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { BoardError, Boards, boardOf, isLocalOrigin, type Manifest, type Tab } from './boards.ts'
 import { mcpServer, type Companion } from './mcp.ts'
+import { DEFAULT_PORT } from './pairing.ts'
 
 /**
  * The local MCP companion (plans/plan-010.md): one process on 127.0.0.1 that MCP clients (Claude, Codex) talk to
  * at /mcp, and that paired browser tabs of the local app connect to at /bridge. It routes each tool call to the
  * tab that shows the board; the tab runs it (apps/web/src/mcp/). It runs no model and holds no board.
  */
-
-export const DEFAULT_PORT = 8790
 
 /** A request a tab has not answered after this long fails. Data tools can take ~10 s on a first load. */
 const REQUEST_TIMEOUT_MS = 120_000
@@ -27,12 +26,16 @@ export interface CompanionOptions {
   port?: number
   /** Where new boards open when no tab is paired yet. */
   appUrl?: string
-  /** The pairing secret; new for each run by default. */
+  /** The pairing secret; new for each run by default. The entry points pass the saved one (pairing.ts). */
   token?: string
 }
 
+/** What a tab accepts in a pairing link (apps/web/src/mcp/bridge.ts). 16 characters is the least it takes; ask for more. */
+const TOKEN = /^[\w-]{32,128}$/
+
 export async function startCompanion(opts: CompanionOptions = {}) {
   const token = opts.token ?? randomBytes(24).toString('base64url')
+  if (!TOKEN.test(token)) throw new Error('The pairing token (~/.config/ttx-mcp/token) must be 32 to 128 letters, digits, "_" or "-": delete the file for a new one')
   const boards = new Boards()
   const pending = new Map<string, { connection: string; resolve: (v: unknown) => void; reject: (e: Error) => void; write: boolean; timer: NodeJS.Timeout }>()
   const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: Server }>()

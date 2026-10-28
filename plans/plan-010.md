@@ -242,7 +242,8 @@ Built on `feat/local-mcp`, from `main` after plan 009. The MCP SDK (`@modelconte
 
 ### Pairing and security
 
-- The companion makes a random token for each run. Links from `ttx_open_board` and `ttx_new_board` carry it: `#room=<id>&mcp=<port>:<token>`. Opening one pairs the browser: the tab removes the token from the URL and keeps it in localStorage, so the person's other local tabs connect too. A restarted companion has a new token; tabs with the old one get 401, forget it, and stop.
+- The companion makes a random token on its first run and keeps it in `~/.config/ttx-mcp/token` (mode 600, `apps/mcp/src/pairing.ts`), so paired tabs reconnect after a restart. Deleting the file unpairs every browser: tabs with the old token get 401, forget it, and stop. Links from `ttx_open_board` and `ttx_new_board` carry it: `#room=<id>&mcp=<port>:<token>`. Opening one pairs the browser: the tab removes the token from the URL and keeps it in localStorage, so the person's other local tabs connect too.
+- Under `npm run dev` no link is needed: the dev server answers `GET /__ttx-mcp` with the port and saved token (`apps/web/vite.config.ts`), and a tab asks for it on load. It answers only requests with `Sec-Fetch-Site: same-origin`, which the browser sets and a page cannot, so another site on localhost cannot read the token. A tab opened before the companion's first run pairs on reload. The built app (`npm run sync`, port 8787) still needs a link.
 - Every request must have a local `Host` (DNS rebinding). Any `Origin` must be local. `/bridge` needs a local `Origin` and the token. The bridge runs only on a local hostname, so deployed boards never connect.
 
 ### Tools

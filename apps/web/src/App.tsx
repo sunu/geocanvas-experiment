@@ -25,7 +25,7 @@ const { board, runtime, provider, chat } = connect(room)
 // Answers only the messages this tab sends on the person's own key; idle otherwise.
 startBrowserAgent(provider.doc, provider.awareness)
 // On a local app paired with the MCP companion (apps/mcp): an external agent works on this board through this tab.
-startBridge(
+void startBridge(
   () =>
     new Executor({
       doc: provider.doc,

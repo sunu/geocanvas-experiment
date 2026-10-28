@@ -189,4 +189,12 @@ describe('the MCP companion', () => {
     const res = await fetch(companion.url, { method: 'POST', headers: { origin: 'https://evil.example', 'content-type': 'application/json' }, body: '{}' })
     expect(res.status).toBe(403)
   })
+
+  it('keeps a token it is given, so paired tabs reconnect after a restart', async () => {
+    const token = 'a-fixed-token-of-32-characters__'
+    const fixed = await startCompanion({ port: 0, token })
+    await fixed.close()
+    expect(fixed.token).toBe(token)
+    await expect(startCompanion({ port: 0, token: 'short' })).rejects.toThrow(/pairing token/)
+  })
 })

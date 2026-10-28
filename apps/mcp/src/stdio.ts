@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { DEFAULT_PORT, log, startCompanion } from './companion.ts'
+import { log, startCompanion } from './companion.ts'
+import { DEFAULT_PORT, savedToken } from './pairing.ts'
 
 /**
  * For MCP clients that start a command (Claude Desktop, or any client set up with stdio): forwards the client's
@@ -10,7 +11,7 @@ import { DEFAULT_PORT, log, startCompanion } from './companion.ts'
  */
 const port = Number(process.env.TTX_MCP_PORT ?? DEFAULT_PORT)
 try {
-  await startCompanion({ port, appUrl: process.env.TTX_APP_URL })
+  await startCompanion({ port, appUrl: process.env.TTX_APP_URL, token: savedToken() })
   log(`started the companion on port ${port}`)
 } catch (err) {
   // ponytail: when this process started it and exits, other clients lose it; run `npm run mcp` to keep one up.

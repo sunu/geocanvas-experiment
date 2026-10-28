@@ -4,8 +4,9 @@ import type { Executor } from './executor'
 /**
  * This tab's link to the local MCP companion (apps/mcp, plans/plan-010.md), which an external agent (Claude,
  * Codex) talks to. Only on a local app, and only after the person opened a link the companion gave:
- * #room=<id>&mcp=<port>:<token>. The token pairs this browser with that run of the companion; it is kept in
- * localStorage, so the person's other local tabs connect too, until the companion restarts.
+ * #room=<id>&mcp=<port>:<token>. The token pairs this browser with the companion; it is kept in localStorage, so the
+ * person's other local tabs connect too. Under `npm run dev` no link is needed: the dev server hands the app's own
+ * pages the companion's saved token (apps/web/vite.config.ts).
  *
  * One streaming POST carries the companion's requests to the tab, one JSON line each; the tab answers each with
  * a POST. The companion never writes the board: it asks the tab, whose executor writes through ops.
@@ -22,8 +23,8 @@ type Request = { id: string; method: 'snapshot' | 'call' | 'undo'; params: Recor
 
 const isLocal = (host: string) => ['localhost', '127.0.0.1', '[::1]'].includes(host) || host.endsWith('.localhost')
 
-/** The pairing in the URL (then removed from it, so the link to share has no token), or the one kept. */
-function pairing(): Pairing | undefined {
+/** The pairing in the URL (then removed from it, so the link to share has no token), the dev server's, or the one kept. */
+async function pairing(): Promise<Pairing | undefined> {
   const m = PAIRING.exec(location.hash)
   try {
     if (m) {
@@ -31,6 +32,11 @@ function pairing(): Pairing | undefined {
       const p = { port: Number(m[1]), token: m[2]! }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(p))
       return p
+    }
+    if (import.meta.env.DEV) {
+      // 404 until the companion has run once.
+      const res = await fetch('/__ttx-mcp')
+      if (res.ok) return (await res.json()) as Pairing
     }
     return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') ?? undefined
   } catch {
@@ -64,8 +70,8 @@ export function useBridgeStatus(): BridgeStatus {
 }
 
 /** Connect this tab when it is paired; reconnect when the companion restarts or the connection drops. */
-export function startBridge(executor: () => Executor, board: { room: string; person: { id: string; name?: string } }) {
-  const pair = isLocal(location.hostname) ? pairing() : undefined
+export async function startBridge(executor: () => Executor, board: { room: string; person: { id: string; name?: string } }) {
+  const pair = isLocal(location.hostname) ? await pairing() : undefined
   if (!pair) return
   const run = executor()
   const base = `http://127.0.0.1:${pair.port}/bridge`
@@ -123,7 +129,7 @@ export function startBridge(executor: () => Executor, board: { room: string; per
       setStatus('connecting')
       try {
         if (!(await connectOnce())) {
-          // Another run of the companion: this pairing is over. A new link from the agent pairs again.
+          // The companion has another token (its token file was deleted): this pairing is over. A new link pairs again.
           localStorage.removeItem(STORAGE_KEY)
           return setStatus('off')
         }
