@@ -53,9 +53,24 @@ body,
 }
 
 /* Fill and border color come from the object's color (canvas/style.ts). */
-.ttx-obj--box {
+.ttx-box {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   border: 2px solid;
   border-radius: 6px;
+}
+
+/* An object type this build does not know (made by a newer version of the app). */
+.ttx-unknown {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  border: 1px dashed var(--ttx-border);
+  border-radius: 6px;
+  color: var(--ttx-muted);
+  font-size: 12px;
 }
 
 /* Font size and color come from the object. The plain div sets the height; the editor sits over it. */
@@ -143,6 +158,38 @@ body,
 .ttx-handle--ne,
 .ttx-handle--sw {
   cursor: nesw-resize;
+}
+
+/* Other people: their cursors and selections, in their color (canvas/Peers.tsx). */
+.ttx-peer-selection {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px dashed;
+  border-radius: 2px;
+}
+
+.ttx-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: transform 100ms linear;
+}
+
+.ttx-cursor svg {
+  display: block;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+}
+
+.ttx-cursor__name {
+  position: absolute;
+  left: 12px;
+  top: 16px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 
 /* --- Toolbar ------------------------------------------------------------ */

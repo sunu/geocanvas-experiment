@@ -6,6 +6,7 @@ import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { geocode } from './geocode'
 import { montySearch } from './monty'
+import { UpdateLog } from './updateLog'
 
 /**
  * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
@@ -20,31 +21,43 @@ const MESSAGE_AWARENESS = 1
 /** Merge the stored updates into one row when there are more than this. */
 const COMPACT_AFTER = 500
 
-/** One board. Its Yjs updates are appended to the Durable Object's SQLite as they arrive. */
+/**
+ * One board. Its Yjs updates are appended to the Durable Object's SQLite as they arrive (updateLog.ts).
+ *
+ * Websockets use the Hibernation API: Cloudflare holds the connections, and the room can leave
+ * memory between messages, so an open but idle tab costs no duration. (With socket.accept() the
+ * room is billed for as long as any tab is connected, which used up the free plan's daily
+ * allowance.) After a wake the constructor runs again and rebuilds the doc from storage. Presence
+ * (awareness) is kept in memory only: it starts empty after a wake, and browsers re-send theirs
+ * every 15 s.
+ */
 export class Room extends DurableObject<Env> {
   private doc = new Y.Doc()
+  private log: UpdateLog
   private awareness = new awarenessProtocol.Awareness(this.doc)
-  /** Open sockets, with the awareness client ids each one controls. */
-  private sockets = new Map<WebSocket, Set<number>>()
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
     this.awareness.setLocalState(null)
-    const sql = ctx.storage.sql
-    sql.exec('CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY AUTOINCREMENT, data BLOB NOT NULL)')
-    const rows = sql.exec<{ data: ArrayBuffer }>('SELECT data FROM updates ORDER BY id').toArray()
-    for (const row of rows) Y.applyUpdate(this.doc, new Uint8Array(row.data), this)
-    if (rows.length > COMPACT_AFTER) this.compact()
+    // Its timer expires stale presence; a pending timer would keep the room awake. Presence is
+    // removed when a socket closes instead.
+    clearInterval(this.awareness._checkInterval)
+    this.log = new UpdateLog(ctx.storage)
+    const updates = this.log.readAll()
+    for (const update of updates) Y.applyUpdate(this.doc, update, this)
+    if (updates.length > COMPACT_AFTER) this.log.replaceAll(Y.encodeStateAsUpdate(this.doc))
 
     this.doc.on('update', (update: Uint8Array, origin: unknown) => {
-      if (origin !== this) sql.exec('INSERT INTO updates (data) VALUES (?)', toArrayBuffer(update))
+      if (origin !== this) this.log.append(update)
       this.broadcast(syncMessage((enc) => syncProtocol.writeUpdate(enc, update)))
     })
     this.awareness.on('update', ({ added, updated, removed }: AwarenessChange, socket: WebSocket | null) => {
-      const ids = socket && this.sockets.get(socket)
-      if (ids) {
+      // Which presence ids a socket controls is kept on the socket, so it survives hibernation.
+      if (socket) {
+        const ids = new Set(presenceIds(socket))
         for (const id of added) ids.add(id)
         for (const id of removed) ids.delete(id)
+        socket.serializeAttachment({ presenceIds: [...ids] } satisfies SocketAttachment)
       }
       const changed = [...added, ...updated, ...removed]
       this.broadcast(awarenessMessage(awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed)))
@@ -53,22 +66,27 @@ export class Room extends DurableObject<Env> {
 
   override async fetch(): Promise<Response> {
     const { 0: client, 1: socket } = new WebSocketPair()
-    // Binary frames as ArrayBuffers; the runtime's default is Blob, which cannot be read synchronously.
-    socket.binaryType = 'arraybuffer'
-    socket.accept()
-    this.sockets.set(socket, new Set())
-    socket.addEventListener('message', (e) => {
-      // The y-websocket protocol is binary only.
-      if (e.data instanceof ArrayBuffer) this.receive(socket, new Uint8Array(e.data))
-    })
-    socket.addEventListener('close', () => this.disconnect(socket))
-    socket.addEventListener('error', () => this.disconnect(socket))
+    this.ctx.acceptWebSocket(socket)
+    socket.serializeAttachment({ presenceIds: [] } satisfies SocketAttachment)
 
     // Start the sync handshake, and send who else is here.
     socket.send(syncMessage((enc) => syncProtocol.writeSyncStep1(enc, this.doc)))
     const states = [...this.awareness.getStates().keys()]
     if (states.length) socket.send(awarenessMessage(awarenessProtocol.encodeAwarenessUpdate(this.awareness, states)))
     return new Response(null, { status: 101, webSocket: client })
+  }
+
+  override webSocketMessage(socket: WebSocket, message: string | ArrayBuffer) {
+    // The y-websocket protocol is binary only.
+    if (typeof message !== 'string') this.receive(socket, new Uint8Array(message))
+  }
+
+  override webSocketClose(socket: WebSocket) {
+    this.disconnect(socket)
+  }
+
+  override webSocketError(socket: WebSocket) {
+    this.disconnect(socket)
   }
 
   private receive(socket: WebSocket, data: Uint8Array) {
@@ -86,31 +104,23 @@ export class Room extends DurableObject<Env> {
   }
 
   private disconnect(socket: WebSocket) {
-    const ids = this.sockets.get(socket)
-    if (!ids) return
-    this.sockets.delete(socket)
-    awarenessProtocol.removeAwarenessStates(this.awareness, [...ids], null)
+    const ids = presenceIds(socket)
+    if (ids.length) awarenessProtocol.removeAwarenessStates(this.awareness, ids, null)
   }
 
   private broadcast(message: Uint8Array) {
-    for (const socket of this.sockets.keys()) {
+    for (const socket of this.ctx.getWebSockets()) {
       if (socket.readyState === WebSocket.OPEN) socket.send(message)
     }
   }
-
-  private compact() {
-    const state = Y.encodeStateAsUpdate(this.doc)
-    this.ctx.storage.transactionSync(() => {
-      this.ctx.storage.sql.exec('DELETE FROM updates')
-      this.ctx.storage.sql.exec('INSERT INTO updates (data) VALUES (?)', toArrayBuffer(state))
-    })
-  }
 }
 
-/** SQLite blobs must be ArrayBuffers; a Uint8Array would not be stored as bytes. */
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.slice().buffer
+/** Kept on each socket with serializeAttachment, so it survives hibernation. */
+interface SocketAttachment {
+  presenceIds: number[]
 }
+
+const presenceIds = (socket: WebSocket): number[] => (socket.deserializeAttachment() as SocketAttachment | null)?.presenceIds ?? []
 
 interface AwarenessChange {
   added: number[]

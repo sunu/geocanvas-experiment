@@ -1,0 +1,42 @@
+# When a pull request is opened, link its branch's preview, if the branch has deployed already.
+# deploy.yml links it after every deploy; this covers a pull request opened after the last one.
+name: Link PR preview
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  link:
+    # Branches from forks have no preview: they are not deployed, and get no secrets.
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Link the preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          COMMIT: ${{ github.event.pull_request.head.sha }}
+        run: |
+          name=$(.github/scripts/worker-name.sh "$BRANCH")
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          # No Worker yet: the branch's first deploy is still running, and will link the preview itself.
+          status=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth" "$api/workers/scripts/$name/settings")
+          if [ "$status" = 404 ]; then
+            echo "No Worker named $name yet; its deploy will link the preview." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          subdomain=$(curl -s -H "$auth" "$api/workers/subdomain" | jq -r '.result.subdomain // empty')
+          if [ -z "$subdomain" ]; then
+            echo "Could not read the account's workers.dev subdomain" >&2
+            exit 1
+          fi
+          .github/scripts/pr-preview-comment.sh "$BRANCH" "https://$name.$subdomain.workers.dev" "${COMMIT::7}"

@@ -10,6 +10,11 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
+# pull-requests: write, to post the preview link on the branch's pull request.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,6 +30,7 @@ jobs:
       - name: Build web app
         run: npm run build -w apps/web
       - name: Deploy Worker
+        id: deploy
         working-directory: apps/worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -45,3 +51,11 @@ jobs:
           npx wrangler deploy --name "$name" "${secrets[@]}" | tee deploy.log
           url=$(grep -oE 'https://[^ ]+\.workers\.dev' deploy.log | head -1)
           echo "Deployed \`$BRANCH\` to $url" >> "$GITHUB_STEP_SUMMARY"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Link the preview on the branch's pull request
+        if: github.ref_name != 'main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          URL: ${{ steps.deploy.outputs.url }}
+        run: .github/scripts/pr-preview-comment.sh "$BRANCH" "$URL" "${GITHUB_SHA::7}"
