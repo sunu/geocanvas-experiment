@@ -179,6 +179,12 @@ function KeySettings({ onSave, onForget }: { onSave: (config: KeyConfig) => void
 }
 
 function AgentEntry({ reply, runtime, undone }: { reply: AgentReply; runtime: Runtime; undone: boolean }) {
+  // Undo refuses when someone changed the turn's objects since (agent.undoTurn); say why.
+  const [undoError, setUndoError] = useState<string>()
+  const undo = async () => {
+    const record = await runtime.invoke('agent.undoTurn', { kind: 'canvas' }, { replyId: reply.id })
+    setUndoError(record.error)
+  }
   return (
     <div className="ttx-chat__entry ttx-chat__entry--agent">
       <div className="ttx-chat__who">Agent</div>
@@ -198,11 +204,12 @@ function AgentEntry({ reply, runtime, undone }: { reply: AgentReply; runtime: Ru
         (undone ? (
           <div className="ttx-chat__undone">Undone</div>
         ) : (
-          <button className="ttx-chat__undo" onClick={() => void runtime.invoke('agent.undoTurn', { kind: 'canvas' }, { replyId: reply.id })}>
+          <button className="ttx-chat__undo" onClick={() => void undo()}>
             <ArrowCounterClockwiseIcon size={14} />
             Undo
           </button>
         ))}
+      {undoError && !undone && <div className="ttx-chat__undo-error">{undoError}</div>}
     </div>
   )
 }
