@@ -37,6 +37,7 @@ export const AREA_LAYERS: { label: string; tool: string; input: Record<string, u
   { label: 'Population 2020 (unconstrained)', tool: 'data.population', input: { variant: 'unconstrained' }, title: 'Population 2020 (unconstrained)' },
   { label: 'Countries (World Bank)', tool: 'data.adminBoundaries', input: { level: 0 }, title: 'Countries (World Bank)' },
   { label: 'Buildings (Overture), zoomed in', tool: 'data.overture', input: { type: 'buildings' }, title: 'Overture buildings' },
+  { label: 'Health facilities (OpenStreetMap)', tool: 'data.healthFacilities', input: {}, title: 'Health facilities (OpenStreetMap)' },
 ]
 
 /** True when a layer works on an area, which can be reset to someone's view. */
@@ -110,8 +111,12 @@ export function deckLayers(states: LayerState[]): Layer[] {
           id: `layer-${s.id}`,
           data: s.value as GeoJSON.FeatureCollection,
           pointType: 'circle',
-          pointRadiusUnits: 'pixels',
-          getPointRadius: 6,
+          // Sized in meters, kept between 2.5 and 6 px: thousands of points (health facilities in a
+          // country) stay apart when zoomed out, and a single pin stays visible.
+          pointRadiusUnits: 'meters',
+          getPointRadius: 150,
+          pointRadiusMinPixels: 2.5,
+          pointRadiusMaxPixels: 6,
           getFillColor: (f: GeoJSON.Feature) => [...ACCENT, isArea(f) ? 30 : 140],
           getLineColor: [...ACCENT, 230],
           lineWidthUnits: 'pixels',

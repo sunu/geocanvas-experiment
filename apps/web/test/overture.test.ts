@@ -7,11 +7,10 @@ import {
   filesInBbox,
   itemAsset,
   latestRelease,
-  rowGroupsInBbox,
   type BuildingFeature,
   type OvertureBuildingRow,
-  type RowGroupMeta,
 } from '../src/data/overture'
+import { rowGroupsInBbox, type RowGroupMeta } from '../src/data/wkb'
 import { box, wkb } from './wkbWriter'
 
 const BEIRA: [number, number, number, number] = [34.82, -19.86, 34.88, -19.8]

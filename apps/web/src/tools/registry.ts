@@ -1,6 +1,7 @@
 import { adminBoundariesTool, WorldBankBoundaries } from '../data/boundaries'
 import { OvertureParquet, overtureTool } from '../data/buildings'
 import { geocodeTools, OpenCageGeocoder } from '../data/geocode'
+import { healthFacilitiesTool, LayercakeHealth } from '../data/health'
 import { populationTool, SourceCoopPopulation } from '../data/population'
 import { ToolRunner } from './runner'
 
@@ -10,4 +11,5 @@ export const tools = new ToolRunner([
   populationTool(new SourceCoopPopulation()),
   adminBoundariesTool(new WorldBankBoundaries()),
   overtureTool(new OvertureParquet()),
+  healthFacilitiesTool(new LayercakeHealth()),
 ])
