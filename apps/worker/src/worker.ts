@@ -7,6 +7,7 @@ import * as decoding from 'lib0/decoding'
 import { Agent, AGENT } from './agent/agent'
 import { openRouter } from './agent/openrouter'
 import { geocode } from './geocode'
+import { images } from './images'
 import { montySearch, stacSearch } from './monty'
 import { notebooksProxy } from './notebooks'
 import { eventsSearch, geocodeTools, OpenCageGeocoder, OPENCAGE_URL } from '@ttx/plugins'
@@ -19,7 +20,8 @@ import { UpdateLog } from './updateLog'
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
  * /monty/search proxies Montandon STAC searches with the token added (monty.ts),
  * /tools/geocode proxies OpenCage with the key added (geocode.ts), and /notebooks/* reads
- * Notebook Factory, which sends no CORS headers (notebooks.ts).
+ * Notebook Factory, which sends no CORS headers (notebooks.ts). /images stores and serves uploaded
+ * images in R2 (images.ts).
  * Each room also runs the board's agent (agent/agent.ts), which answers the board's chat.
  */
 
@@ -181,6 +183,7 @@ export default {
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
     if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
     if (path.startsWith('/notebooks/')) return notebooksProxy(request, env.NOTEBOOK_FACTORY_URL)
+    if (path === '/images' || path.startsWith('/images/')) return images(request, env.IMAGES)
     const roomId = /^\/connect\/([\w-]{1,64})$/.exec(path)?.[1]
     if (!roomId) return new Response('Not found', { status: 404 })
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a websocket', { status: 426 })
