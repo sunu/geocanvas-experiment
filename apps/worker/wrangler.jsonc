@@ -14,7 +14,7 @@
   "vars": {
     "MONTANDON_BASE_URL": "https://montandon-eoapi-stage.ifrc.org/stac",
     // The board agent's model on OpenRouter: a low-cost model that can call tools (plans/plan-008.md).
-    "AGENT_MODEL": "qwen/qwen3.7-flash"
+    "AGENT_MODEL": "z-ai/glm-5.3-flash"
   },
   // OPENROUTER_API_KEY: without it, the agent answers that it is not configured.
   "secrets": { "required": ["MONTANDON_TOKEN", "OPENROUTER_API_KEY"] },
