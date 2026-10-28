@@ -10,7 +10,7 @@ import { countryName } from '@ttx/plugins/monty/countries'
 import { tools } from '../tools/registry'
 import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
 import { basemapStyle } from './basemaps'
-import { attributionOf, boundsOf, deckLayers, useLayerStates } from './layers'
+import { attributionOf, boundsOf, captionOf, deckLayers, useLayerStates } from './layers'
 import { registerLiveMap } from './live'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
@@ -83,7 +83,8 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   runtimeRef.current = runtime
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
-  const credits = [...new Set(states.map((st) => attributionOf(st.value)).filter((a) => !!a))].join(' · ')
+  // A forecast's caption (model, run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
+  const credits = [...new Set(states.flatMap((st) => [attributionOf(st.value), captionOf(st.value)]).filter((a) => !!a))].join(' · ')
   /** The latest states, for map events. */
   const statesRef = useRef(states)
   /** MapLibre layers can be added: the style has loaded, and no basemap change is under way. */

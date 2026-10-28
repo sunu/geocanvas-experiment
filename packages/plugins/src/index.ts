@@ -22,6 +22,31 @@ export {
   type DataLayerKey,
   type MapLayer,
 } from './mapLayers.js'
+export {
+  checkArea,
+  FORECAST_TOOL,
+  FORECAST_VARIABLES,
+  forecastInput,
+  forecastLayer,
+  forecastTool,
+  GRID_OUTPUT,
+  gfs,
+  HORIZONS,
+  IcechunkGfs,
+  latestRun,
+  leadCount,
+  MAX_SPAN,
+  peakWind,
+  totalRain,
+  utc,
+  windowOf,
+  type ForecastAxes,
+  type ForecastGrid,
+  type ForecastSource,
+  type ForecastVariable,
+  type GridWindow,
+  type Horizon,
+} from './weather.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
 export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
 export { agentTools, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn } from './agent/loop.js'

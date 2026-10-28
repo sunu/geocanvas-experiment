@@ -2301,3 +2301,24 @@ body:has(.ttx-canvas.is-focus) .ttx-boardbar {
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
 }
+
+/* A forecast's color ramp in the map's layer list. */
+.ttx-layers__ramp {
+  width: 100%;
+  height: 8px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+.ttx-layers__ramp-labels {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 11px;
+  color: var(--ttx-muted);
+}
+
+.ttx-options__error {
+  margin: 4px 0 0;
+  color: #dc2626;
+}

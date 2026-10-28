@@ -1,7 +1,8 @@
 import { CrosshairSimpleIcon, XIcon } from '@phosphor-icons/react'
-import { hasArea, type MapLayer } from '@ttx/plugins'
+import { GRID_OUTPUT, hasArea, type ForecastGrid, type MapLayer } from '@ttx/plugins'
 import { ADMIN_AREAS, classify, type AdminAreas } from './adminAreas'
-import { attributionOf, truncationOf, type LayerState } from './layers'
+import { gridColor } from './grid'
+import { attributionOf, captionOf, truncationOf, type LayerState } from './layers'
 
 interface Props {
   /** The recipes, in the same order as `states`. */
@@ -17,12 +18,13 @@ export function LayerList({ layers, states, onUseMyView, onRemove }: Props) {
   return (
     <div className="ttx-layers">
       {states.map((s, i) => {
-        const note = s.error ?? (s.loading ? 'Loading…' : [truncationOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
+        const note = s.error ?? (s.loading ? 'Loading…' : [truncationOf(s.value), captionOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
         return (
           <div key={s.id} className={`ttx-layers__item ${s.error ? 'is-error' : ''}`}>
             <div className="ttx-layers__text">
               <div className="ttx-layers__title">{s.title}</div>
               {s.output === ADMIN_AREAS && s.value !== undefined && <AdminLegend areas={s.value as AdminAreas} />}
+              {s.output === GRID_OUTPUT && s.value !== undefined && <GridLegend grid={s.value as ForecastGrid} />}
               {note && <div className="ttx-layers__note">{note}</div>}
             </div>
             {layers[i] && hasArea(layers[i]) && (
@@ -58,6 +60,26 @@ function AdminLegend({ areas }: { areas: AdminAreas }) {
           Left out: {areas.unmatched.toLocaleString('en-US')} {areas.unit} in areas HDX HAPI could not place
         </div>
       )}
+    </div>
+  )
+}
+
+/** A forecast grid's color ramp, with its unit: the ramp follows the square root of the value, so the middle label is not the midpoint. */
+function GridLegend({ grid }: { grid: ForecastGrid }) {
+  const [min, max] = grid.rescale
+  const at = (t: number) => min + (max - min) * t * t
+  const stops = [0, 0.25, 0.5, 0.75, 1]
+  return (
+    <div className="ttx-layers__legend">
+      <div className="ttx-layers__ramp" style={{ background: `linear-gradient(to right, ${stops.map((t) => `${gridColor(grid, at(t) + 1e-6)} ${t * 100}%`).join(', ')})` }} />
+      <div className="ttx-layers__ramp-labels">
+        <span>
+          &gt;{min} {grid.unit}
+        </span>
+        <span>
+          {max}+ {grid.unit}
+        </span>
+      </div>
     </div>
   )
 }

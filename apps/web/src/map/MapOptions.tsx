@@ -5,9 +5,13 @@ import {
   ADMIN_LEVELS,
   BASEMAPS,
   DATA_LAYERS,
+  FORECAST_VARIABLES,
+  HORIZONS,
   INDICATORS,
   type AdminLevel,
   type DataLayerKey,
+  type ForecastVariable,
+  type Horizon,
   type Indicator,
   type MapBoardObject,
   type MapLayer,
@@ -42,6 +46,8 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
   const layers = o.layers ?? NO_LAYERS
   // The map runs the same tools; the tool runner shares the runs and caches the results.
   const states = useLayerStates(layers)
+  const [forecast, setForecast] = useState<{ busy?: boolean; error?: string }>({})
+  const [hours, setHours] = useState<Horizon>(72)
 
   /** Mark a place for everyone: a layer that geocodes the place's name again, so it stays a tool recipe. */
   const pin = (place: Place) => {
@@ -53,6 +59,18 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
   const addDataLayer = (layer: DataLayerKey) => {
     const m = map()
     if (m) mapOp(runtime, o.id, 'map.addLayer', { layer, area: areaOf(m) })
+  }
+
+  /**
+   * A forecast for the area in view. The op looks up the latest complete run over the network (a few seconds) and
+   * stores it in the layer, so it is async; a failure (no complete run, area too large, provider down) is shown here.
+   */
+  const addForecast = async (variable: ForecastVariable, hours: Horizon) => {
+    const m = map()
+    if (!m) return
+    setForecast({ busy: true })
+    const r = await runtime.invoke('map.addForecast', { kind: 'objects', ids: [o.id] }, { variable, hours, area: areaOf(m) })
+    setForecast(r.status === 'failed' ? { error: r.error ?? 'Could not add the forecast' } : {})
   }
 
   /** A layer for everyone; this person's view fits it once it loads. */
@@ -100,6 +118,30 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
             </button>
           ))}
         </div>
+      </section>
+      <section className="ttx-options__section">
+        <h3>Weather forecast</h3>
+        <div className="ttx-options__list">
+          {(Object.keys(FORECAST_VARIABLES) as ForecastVariable[]).map((v) => (
+            <button key={v} type="button" disabled={forecast.busy} onClick={() => void addForecast(v, hours)}>
+              {FORECAST_VARIABLES[v].label} <span className="ttx-options__sub">· NOAA GFS</span>
+            </button>
+          ))}
+        </div>
+        <select aria-label="Hours ahead" value={hours} onChange={(e) => setHours(Number(e.target.value) as Horizon)}>
+          {HORIZONS.map((h) => (
+            <option key={h} value={h}>
+              next {h} h
+            </option>
+          ))}
+        </select>
+        {forecast.busy && <p className="ttx-options__empty">Finding the latest forecast run…</p>}
+        {forecast.error && (
+          <p className="ttx-options__error" role="alert">
+            {forecast.error}
+          </p>
+        )}
+        <p className="ttx-options__empty">For the area in view, at most 30° wide. Forecast context, not an official warning.</p>
       </section>
       <section className="ttx-options__section">
         <h3>Boundaries</h3>

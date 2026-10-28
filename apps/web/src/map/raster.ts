@@ -34,14 +34,14 @@ export interface Raster {
  */
 
 /** 17 evenly spaced stops sampled from the matplotlib colormaps. */
-const COLORMAPS: Record<RasterColormap, string[]> = {
+export const COLORMAPS: Record<RasterColormap, string[]> = {
   magma: ['#000003', '#0a0722', '#1c1046', '#350f6a', '#50127b', '#691c80', '#822581', '#9c2e7f', '#b63679', '#ce4070', '#e55063', '#f4685b', '#fb8660', '#fda470', '#fec286', '#fddfa1', '#fbfcbf'],
   viridis: ['#440154', '#47186a', '#472c7b', '#424085', '#3a528b', '#32628d', '#2c728e', '#26818e', '#20908c', '#1e9e88', '#27ad80', '#3dbb74', '#5bc862', '#81d34c', '#aadb32', '#d4e11a', '#fde724'],
   ylorrd: ['#ffffcc', '#fff5b5', '#feec9f', '#fee28a', '#fed875', '#fec560', '#fdb14b', '#fd9e43', '#fc8c3b', '#fc6e33', '#fc4e2a', '#ef3423', '#e31a1c', '#d00d20', '#bd0025', '#9e0026', '#800026'],
 }
 
 /** A 256×1 RGBA ramp, linearly interpolated between the stops. */
-function rampPixels(stops: string[]): Uint8Array {
+export function rampPixels(stops: string[]): Uint8Array {
   const rgb = stops.map((s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)))
   const out = new Uint8Array(256 * 4)
   for (let x = 0; x < 256; x++) {
