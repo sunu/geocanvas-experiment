@@ -1,4 +1,4 @@
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 
 /** Pure GeoParquet helpers shared by the World Bank, Overture and Layercake readers. */
 

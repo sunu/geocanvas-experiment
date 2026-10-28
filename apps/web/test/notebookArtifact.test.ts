@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { artifactPath, isGeoJson, type NotebookRun } from '../src/notebooks/api'
+import { ToolRunner } from '@ttx/core'
+import { notebookResultLayer } from '@ttx/plugins'
+import { artifactPath, isGeoJson, notebookResultTitle, type NotebookRun } from '../src/notebooks/api'
 import { notebookArtifactTool } from '../src/notebooks/artifact'
-import { boundsOf, notebookLayer } from '../src/map/layers'
-import { ToolRunner } from '../src/tools/runner'
+import { boundsOf } from '../src/map/layers'
 
 const BASE = 'https://nbf.example/published/runs/694fd49d'
 const run = {
@@ -80,7 +81,7 @@ describe('notebook files', () => {
   })
 
   it('makes a layer recipe that names the run and the file, without the url', () => {
-    const layer = notebookLayer(run.id, 'exposure_by_subdivision.geojson', run.title)
+    const layer = notebookResultLayer(run.id, 'exposure_by_subdivision.geojson', notebookResultTitle('exposure_by_subdivision.geojson', run.title))
     expect(layer).toMatchObject({
       tool: 'notebooks.artifact',
       input: { runId: '694fd49d', name: 'exposure_by_subdivision.geojson' },

@@ -14,9 +14,12 @@
   // (or the deploy workflow) when deployed.
   "vars": {
     "MONTANDON_BASE_URL": "https://montandon-eoapi-stage.ifrc.org/stac",
-    "NOTEBOOK_FACTORY_URL": "https://notebook-factory-staging.montandondata.org"
+    "NOTEBOOK_FACTORY_URL": "https://notebook-factory-staging.montandondata.org",
+    // The board agent's model on OpenRouter: a low-cost model that can call tools (plans/plan-008.md).
+    "AGENT_MODEL": "z-ai/glm-5.3-flash"
   },
-  "secrets": { "required": ["MONTANDON_TOKEN", "OPENCAGE_API_KEY"] },
+  // OPENROUTER_API_KEY: without it, the agent answers that it is not configured.
+  "secrets": { "required": ["MONTANDON_TOKEN", "OPENROUTER_API_KEY", "OPENCAGE_API_KEY"] },
   // One Durable Object per board (room), with its own SQLite storage.
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "Room" }]

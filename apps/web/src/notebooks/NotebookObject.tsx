@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowSquareOutIcon, FileTextIcon, MapTrifoldIcon, NotebookIcon } from '@phosphor-icons/react'
-import { notebookLayer } from '../map/layers'
-import { fitMapToLayer } from '../map/MapObject'
-import { map } from '../objects/map'
-import type { ObjectViewProps } from '../objects/types'
-import { isGeoJson, notebookFactory, type NotebookRun, type NotebookTemplate } from './api'
+import { notebookResultLayer, type NotebookBoardObject } from '@ttx/plugins'
+import type { ObjectViewProps } from '../canvas/registry'
+import { boundsOf } from '../map/layers'
+import { fitMapTo } from '../map/MapObject'
+import { tools } from '../tools/registry'
+import { isGeoJson, notebookFactory, notebookResultTitle, type NotebookRun, type NotebookTemplate } from './api'
 
 /** Gap between a notebook and a map made from its results (world units). */
 const GAP = 24
@@ -20,7 +21,7 @@ const SEARCH_DELAY_MS = 250
  * Double-click: in the card, choose a run; in the notebook view, scroll and use the notebook (Esc gives
  * the pointer back to the canvas). The header's buttons work without double-clicking.
  */
-export function NotebookObject({ board, object: o, editing, onDone }: ObjectViewProps<'notebook'>) {
+export function NotebookObject({ runtime, object: o, editing, onDone }: ObjectViewProps<NotebookBoardObject>) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const view = o.view ?? 'card'
   const run = useRun(o.runId)
@@ -35,21 +36,29 @@ export function NotebookObject({ board, object: o, editing, onDone }: ObjectView
     return () => el.removeEventListener('wheel', stop)
   }, [editing])
 
+  // Every write is an op, as its own undo step.
   const pick = (runId: string) => {
-    board.undo.stopCapturing()
-    board.update({ [o.id]: { runId } })
+    runtime.beginGesture()
+    runtime.dispatch('notebook.setRun', { kind: 'objects', ids: [o.id] }, { runId })
     onDone()
   }
   const setView = (next: 'card' | 'notebook') => {
-    board.undo.stopCapturing()
-    board.update({ [o.id]: { view: next } })
+    runtime.beginGesture()
+    runtime.dispatch('notebook.setView', { kind: 'objects', ids: [o.id] }, { view: next })
   }
-  /** A new map to the right of the notebook, with the file as its layer, for everyone; this person's view fits the data. */
-  const showOnNewMap = (r: NotebookRun, fileName: string) => {
-    const layer = notebookLayer(r.id, fileName, r.title)
-    board.undo.stopCapturing()
-    const mapId = board.add({ ...map.create({ x: o.x + o.w + GAP, y: o.y, ...map.size }), layers: [layer] }, map.layer)
-    fitMapToLayer(mapId, layer)
+  /**
+   * A new map to the right of the notebook, with the file as its layer, for everyone; this person's view fits
+   * the data. The data is read first, so the view can be written before the map appears and the map starts
+   * there (a view written after it appears loses to the map saving its first view).
+   */
+  const showOnNewMap = async (r: NotebookRun, fileName: string) => {
+    const layer = notebookResultLayer(r.id, fileName, notebookResultTitle(fileName, r.title))
+    // A failure here shows in the new map's layer list, from the same cached run.
+    const fc = await tools.run<GeoJSON.FeatureCollection>(layer.tool, layer.input).catch(() => undefined)
+    runtime.beginGesture()
+    const mapId = runtime.dispatch('map.add', { kind: 'canvas' }, { x: o.x + o.w + GAP, y: o.y, layers: [layer] }).created?.[0]
+    const bbox = fc && boundsOf(fc)
+    if (mapId && bbox) fitMapTo(runtime, mapId, bbox)
   }
 
   return (
@@ -159,7 +168,7 @@ function RunCard({ run, onShowOnNewMap }: { run: NotebookRun; onShowOnNewMap(fil
 }
 
 /** Published runs, newest first. Search by text (e.g. a country) and narrow to one notebook template. */
-function RunPicker({ selected, onPick }: { selected?: string; onPick(id: string): void }) {
+export function RunPicker({ selected, onPick }: { selected?: string; onPick(id: string): void }) {
   const [search, setSearch] = useState('')
   const [template, setTemplate] = useState('')
   const [templates, setTemplates] = useState<NotebookTemplate[]>([])

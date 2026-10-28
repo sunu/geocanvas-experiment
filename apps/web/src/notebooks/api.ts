@@ -93,6 +93,9 @@ export const notebookFactory = new NotebookFactory()
 
 export const isGeoJson = (fileName: string) => /\.geojson$/i.test(fileName)
 
+/** A notebook result layer's title in a map's list: the file and the run it comes from. */
+export const notebookResultTitle = (fileName: string, runTitle: string) => `${fileName.replace(/\.geojson$/i, '')} · ${runTitle}`
+
 /**
  * Where the browser reads a published run file: through the Worker, which forwards only a run's
  * published outputs (apps/worker/src/notebooks.ts). Throws for any other url.

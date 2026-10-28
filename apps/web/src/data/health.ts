@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { defineTool } from '../tools/tool'
+import { defineTool } from '@ttx/core'
 import { areaSchema } from './area'
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 import { LAYERCAKE_ATTRIBUTION, MAX_ROW_GROUPS } from './layercake'
 import type { LayercakeRequest, LayercakeResponse } from './layercake.worker'
 

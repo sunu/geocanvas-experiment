@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineTool } from '../tools/tool'
+import { defineTool } from '@ttx/core'
 import { artifactPath, isGeoJson, type NotebookFactory } from './api'
 
 /** CRS names that mean longitude/latitude in degrees, what GeoJSON (RFC 7946) and the map expect. */

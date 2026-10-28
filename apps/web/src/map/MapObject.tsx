@@ -3,70 +3,64 @@ import { Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { CrosshairSimpleIcon, StackPlusIcon, XIcon } from '@phosphor-icons/react'
-import type { Board, BoardObject } from '../board/board'
+import type { ObjectViewProps } from '../canvas/registry'
+import { Views, type Runtime } from '@ttx/core'
+import { BASEMAPS, DATA_LAYERS, hasArea, MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type DataLayerKey, type MapBoardObject, type MapLayer } from '@ttx/plugins'
+import type { Place } from '@ttx/plugins'
+import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
-import type { Bbox, Place } from '../data/geocode'
-import { isGeoJson, notebookFactory } from '../notebooks/api'
+import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/api'
 import { tools } from '../tools/registry'
-import { BASEMAPS, basemapStyle, type Basemap } from './basemaps'
-import {
-  AREA_LAYERS,
-  attributionOf,
-  boundsOf,
-  deckLayers,
-  hasArea,
-  newLayerId,
-  notebookLayer,
-  truncationOf,
-  useLayerStates,
-  viewArea,
-  type LayerState,
-  type MapLayer,
-} from './layers'
-import { loadView, saveView } from './localView'
+import { basemapStyle } from './basemaps'
+import { attributionOf, boundsOf, deckLayers, truncationOf, useLayerStates, viewArea, type LayerState } from './layers'
 import { PlaceSearch } from './PlaceSearch'
-
-type MapBoardObject = Extract<BoardObject, { type: 'map' }>
-
-/** Zoom for a place without a bbox. */
-const POINT_ZOOM = 10
-const NO_LAYERS: MapLayer[] = []
-
-/** Maps on screen in this browser, and fits asked for before a map was on screen. */
-const liveMaps = new Map<string, MapLibreMap>()
-const pendingFits = new Map<string, Bbox>()
-
-/**
- * Fit this person's view of a map to a bbox, e.g. to a layer just added. A map that is not on screen
- * yet (just created) fits when it appears. Views are per person, so nobody else's map moves.
- */
-export function fitMapTo(mapId: string, bbox: Bbox) {
-  const map = liveMaps.get(mapId)
-  if (map) map.fitBounds(bbox, { padding: 24, maxZoom: 14 })
-  else pendingFits.set(mapId, bbox)
-}
-
-/** Fit a map to a layer's data once it has loaded (from the tool cache when the map already ran it). */
-export function fitMapToLayer(mapId: string, layer: MapLayer) {
-  tools.run<GeoJSON.FeatureCollection>(layer.tool, layer.input).then(
-    (fc) => {
-      const b = boundsOf(fc)
-      if (b) fitMapTo(mapId, b)
-    },
-    () => {}, // the layer list shows the error
-  )
-}
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
 // build the worker (?worker&url) and point MapLibre at it. MapLibre 6 also draws right-to-left
 // labels (Arabic, Hebrew) itself, so no RTL plugin is needed.
 setWorkerUrl(workerUrl)
 
+/** Where a map starts for a person who has no view of it and nobody else has one either. */
+const WORLD = { center: [20, 10] as [number, number], zoom: 1, bearing: 0 }
+/** A view is saved this long after the map stops moving, so a series of pans is one write. */
+const SAVE_AFTER_MS = 1000
+/** Zoom for a place without a bbox. */
+const POINT_ZOOM = 10
+const NO_LAYERS: MapLayer[] = []
+
+/** Closest zoom when fitting a view to data, so a single point does not zoom in to the street. */
+const FIT_MAX_ZOOM = 14
+
+/**
+ * Fit this person's view of a map to a bbox, e.g. to a layer they just added. It is written as their view,
+ * as their own pans are (no op log entry, no undo): the map starts there, or flies there if it is on screen.
+ * Nobody else's view moves.
+ */
+export function fitMapTo(runtime: Runtime, mapId: string, [west, south, east, north]: Bbox) {
+  const map = runtime.board.get(mapId)
+  if (!map) return
+  const { center, zoom } = viewOfArea({ west, south, east, north }, map.w, map.h - MAP_HEADER_PX)
+  new Views(runtime.board.doc).set(runtime.actor.id, mapId, { center, zoom: Math.min(zoom, FIT_MAX_ZOOM), bearing: 0 })
+}
+
+/** Fit a map to a layer's data once it has loaded (from the tool cache when the map already ran it). */
+export function fitMapToLayer(runtime: Runtime, mapId: string, layer: MapLayer) {
+  tools.run<GeoJSON.FeatureCollection>(layer.tool, layer.input).then(
+    (fc) => {
+      const b = boundsOf(fc)
+      if (b) fitMapTo(runtime, mapId, b)
+    },
+    () => {}, // the layer list shows the error
+  )
+}
+
 /**
  * A live MapLibre map on the canvas. Double-click to pan and zoom it (editing); Esc or a
- * click outside gives the pointer back to the canvas. The basemap is shared; the view is not.
+ * click outside gives the pointer back to the canvas. The basemap is shared. The view is per
+ * person, kept in the doc (Views in @ttx/core): nobody's pan moves another person's map, but the
+ * agent can move a person's map, and a person who has no view starts at the latest one anyone saved.
  */
-export function MapObject({ board, object: o, editing }: { board: Board; object: MapBoardObject; editing: boolean }) {
+export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBoardObject>) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const glRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap>(null)
@@ -76,13 +70,17 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
   const states = useLayerStates(layers)
 
   useEffect(() => {
-    const view = loadView(o.id)
+    const views = new Views(runtime.board.doc)
+    const me = runtime.actor.id
+    const legacy = views.get(me, o.id) ? undefined : legacyView(o.id)
+    if (legacy) views.set(me, o.id, legacy)
+    const start = views.get(me, o.id) ?? views.latest(o.id)?.view ?? WORLD
     const map = new MapLibreMap({
       container: glRef.current!,
       style: basemapStyle(styleRef.current),
-      center: view.center,
-      zoom: view.zoom,
-      bearing: view.bearing,
+      center: start.center,
+      zoom: start.zoom,
+      bearing: start.bearing,
       attributionControl: { compact: true },
     })
     // deck.gl data layers go here. Overlay mode (its own canvas above the map), not interleaved:
@@ -90,25 +88,44 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
     // WebGL context per map, and deck.gl layers draw above the map's labels.
     const overlay = new MapboxOverlay({ interleaved: false, layers: [] })
     map.addControl(overlay as unknown as IControl)
-    map.on('moveend', () => {
+
+    /** `at` of my view as this map last wrote or showed it: a change with another `at` came from elsewhere. */
+    let shownAt = views.get(me, o.id)?.at
+    /** The map is moving to a view from elsewhere: do not save that move back. */
+    let moving = false
+    let pending: ReturnType<typeof setTimeout> | undefined
+    const save = () => {
+      pending = undefined
       const c = map.getCenter()
-      saveView(o.id, { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing() })
+      const view = { center: [c.lng, c.lat] as [number, number], zoom: map.getZoom(), bearing: map.getBearing(), at: Date.now() }
+      shownAt = view.at
+      views.set(me, o.id, view)
+    }
+    map.on('movestart', () => clearTimeout(pending))
+    map.on('moveend', () => {
+      if (moving) moving = false
+      else pending = setTimeout(save, SAVE_AFTER_MS)
+    })
+    // My view changed elsewhere: the agent moved it, or another tab of mine.
+    const unsubscribe = views.subscribe(() => {
+      const view = views.get(me, o.id)
+      if (!view || view.at === shownAt) return
+      shownAt = view.at
+      clearTimeout(pending)
+      moving = true
+      map.flyTo({ center: view.center, zoom: view.zoom, bearing: view.bearing, duration: 800 })
     })
     mapRef.current = map
     overlayRef.current = overlay
-    liveMaps.set(o.id, map)
-    const fit = pendingFits.get(o.id)
-    if (fit) {
-      pendingFits.delete(o.id)
-      map.fitBounds(fit, { padding: 24, maxZoom: 14, animate: false })
-    }
     return () => {
-      liveMaps.delete(o.id)
+      unsubscribe()
+      // A pan that has not been saved yet.
+      if (pending) save()
       map.remove()
       mapRef.current = null
       overlayRef.current = null
     }
-  }, [o.id])
+  }, [runtime, o.id])
 
   // Layers whose result arrived or changed. deck.gl diffs by layer id and data, so unchanged layers are cheap.
   useEffect(() => {
@@ -135,7 +152,7 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
     return () => el.removeEventListener('wheel', stop)
   }, [editing])
 
-  /** Move this person's view to a place. Other people's views stay where they are. */
+  /** Move this person's view to a place (saved as their view like any pan). Other people's views stay where they are. */
   const goTo = (place: Place) => {
     const map = mapRef.current
     if (!map) return
@@ -143,38 +160,42 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
     else map.flyTo({ center: place.lngLat, zoom: POINT_ZOOM })
   }
 
-  const setLayers = (next: MapLayer[]) => {
-    board.undo.stopCapturing()
-    board.update({ [o.id]: { layers: next } })
+  /** A layer op on this map, as its own undo step. */
+  const layerOp = (op: string, args: Record<string, unknown>) => {
+    runtime.beginGesture()
+    runtime.dispatch(op, { kind: 'objects', ids: [o.id] }, args)
+  }
+
+  /** This person's view as an area, from the live map: the view in the doc is saved only after a pause. */
+  const myArea = () => {
+    const b = mapRef.current?.getBounds()
+    if (!b) return undefined
+    const [west, south, east, north] = viewArea(b.toArray() as [[number, number], [number, number]])
+    return { west, south, east, north }
   }
 
   /** Mark a place for everyone: a layer that geocodes the place's name again, so it stays a tool recipe. */
   const pin = (place: Place) => {
     goTo(place)
-    setLayers([...layers, { id: newLayerId(), tool: 'data.geocode', input: { query: place.name, limit: 1 }, title: place.name }])
+    layerOp('map.pinPlace', { place: place.name })
   }
 
-  /** This person's view as an area. Stored in the layer, so everyone sees the data for the same area. */
-  const myArea = () => {
-    const b = mapRef.current?.getBounds()
-    return b && viewArea(b.toArray() as [[number, number], [number, number]])
-  }
-
-  const addAreaLayer = (choice: (typeof AREA_LAYERS)[number]) => {
+  const addDataLayer = (layer: DataLayerKey) => {
     const area = myArea()
-    if (!area) return
-    setLayers([...layers, { id: newLayerId(), tool: choice.tool, input: { ...choice.input, area }, title: choice.title }])
+    if (area) layerOp('map.addLayer', { layer, area })
   }
 
   /** A notebook's GeoJSON file, for everyone; this person's view fits it once it loads. */
-  const addNotebookLayer = (layer: MapLayer) => {
-    setLayers([...layers, layer])
-    fitMapToLayer(o.id, layer)
+  const addNotebookResult = (runId: string, name: string, title: string) => {
+    const before = new Set(layers.map((l) => l.id))
+    layerOp('map.addNotebookResult', { runId, name, title })
+    const added = (runtime.board.get(o.id) as MapBoardObject | undefined)?.layers?.find((l) => !before.has(l.id))
+    if (added) fitMapToLayer(runtime, o.id, added)
   }
 
-  const useMyView = (id: string) => {
+  const useMyView = (layerId: string) => {
     const area = myArea()
-    if (area) setLayers(layers.map((l) => (l.id === id ? { ...l, input: { ...l.input, area } } : l)))
+    if (area) layerOp('map.setLayerArea', { layerId, area })
   }
 
   return (
@@ -182,14 +203,14 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
       <div className="ttx-map__header">
         <span className="ttx-map__title">Map</span>
         <PlaceSearch onGo={goTo} onPin={pin} />
-        <AddLayerMenu board={board} onAdd={addAreaLayer} onAddNotebook={addNotebookLayer} />
+        <AddLayerMenu board={runtime.board as Board} onAdd={addDataLayer} onAddNotebookResult={addNotebookResult} />
         <select
           aria-label="Basemap"
           value={o.basemap}
           onPointerDown={(e) => e.stopPropagation()}
           onChange={(e) => {
-            board.undo.stopCapturing()
-            board.update({ [o.id]: { basemap: e.target.value as Basemap } })
+            runtime.beginGesture()
+            runtime.dispatch('map.setBasemap', { kind: 'objects', ids: [o.id] }, { basemap: e.target.value })
           }}
         >
           {BASEMAPS.map((b) => (
@@ -202,20 +223,32 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {!editing && <div className="ttx-map__hint">Double-click to pan and zoom</div>}
-        <LayerList layers={layers} states={states} onUseMyView={useMyView} onRemove={(id) => setLayers(layers.filter((l) => l.id !== id))} />
+        <LayerList layers={layers} states={states} onUseMyView={useMyView} onRemove={(layerId) => layerOp('map.removeLayer', { layerId })} />
       </div>
     </div>
   )
 }
 
+/** Views from before they were in the doc, kept in this browser's localStorage. Read once, to move them to the doc. */
+function legacyView(mapId: string): { center: [number, number]; zoom: number; bearing: number } | undefined {
+  try {
+    const key = `ttx:map-view:${mapId}`
+    const saved = localStorage.getItem(key)
+    localStorage.removeItem(key)
+    return saved ? { ...WORLD, ...(JSON.parse(saved) as object) } : undefined
+  } catch {
+    return undefined
+  }
+}
+
 interface AddLayerMenuProps {
   board: Board
-  onAdd(choice: (typeof AREA_LAYERS)[number]): void
-  onAddNotebook(layer: MapLayer): void
+  onAdd(layer: DataLayerKey): void
+  onAddNotebookResult(runId: string, name: string, title: string): void
 }
 
 /** "Add layer": data for the area this person is looking at, and the GeoJSON results of notebooks on the board. */
-function AddLayerMenu({ board, onAdd, onAddNotebook }: AddLayerMenuProps) {
+function AddLayerMenu({ board, onAdd, onAddNotebookResult }: AddLayerMenuProps) {
   const [open, setOpen] = useState(false)
   return (
     <div className="ttx-addlayer" onPointerDown={(e) => e.stopPropagation()}>
@@ -225,23 +258,23 @@ function AddLayerMenu({ board, onAdd, onAddNotebook }: AddLayerMenuProps) {
       {open && (
         <div className="ttx-addlayer__menu" role="menu">
           <div className="ttx-addlayer__label">For your current view</div>
-          {AREA_LAYERS.map((c) => (
+          {(Object.keys(DATA_LAYERS) as DataLayerKey[]).map((k) => (
             <button
-              key={c.label}
+              key={k}
               type="button"
               role="menuitem"
               onClick={() => {
-                onAdd(c)
+                onAdd(k)
                 setOpen(false)
               }}
             >
-              {c.label}
+              {DATA_LAYERS[k].label}
             </button>
           ))}
           <NotebookResults
             board={board}
-            onPick={(layer) => {
-              onAddNotebook(layer)
+            onPick={(runId, name, title) => {
+              onAddNotebookResult(runId, name, title)
               setOpen(false)
             }}
           />
@@ -252,7 +285,7 @@ function AddLayerMenu({ board, onAdd, onAddNotebook }: AddLayerMenuProps) {
 }
 
 /** The GeoJSON files of the notebook runs on this board. Asked for only while the menu is open. */
-function NotebookResults({ board, onPick }: { board: Board; onPick(layer: MapLayer): void }) {
+function NotebookResults({ board, onPick }: { board: Board; onPick(runId: string, name: string, title: string): void }) {
   const objects = useObjects(board)
   const runIds = [...new Set(objects.flatMap((o) => (o.type === 'notebook' && o.runId ? [o.runId] : [])))]
   const key = runIds.join(',')
@@ -282,7 +315,13 @@ function NotebookResults({ board, onPick }: { board: Board; onPick(layer: MapLay
         <div className="ttx-addlayer__note">The notebooks on this board have no GeoJSON results</div>
       ) : (
         files.map((f) => (
-          <button key={`${f.runId}/${f.name}`} type="button" role="menuitem" title={f.runTitle} onClick={() => onPick(notebookLayer(f.runId, f.name, f.runTitle))}>
+          <button
+            key={`${f.runId}/${f.name}`}
+            type="button"
+            role="menuitem"
+            title={f.runTitle}
+            onClick={() => onPick(f.runId, f.name, notebookResultTitle(f.name, f.runTitle))}
+          >
             {f.name} <span className="ttx-addlayer__sub">· {f.runTitle}</span>
           </button>
         ))
