@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { geocodeTools, OpenCageGeocoder, parseOpenCage, type Geocoder, type Place } from '../src/data/geocode'
-import { ToolRunner } from '../src/tools/runner'
+import { geocodeTools, OpenCageGeocoder, OPENCAGE_URL, parseOpenCage, type Geocoder, type Place } from '../src/geocode'
+import { ToolRunner } from '@ttx/core'
 
 // Shape of real OpenCage responses (no_annotations=1), trimmed.
 const forwardResponse = {
@@ -93,22 +93,33 @@ describe('OpenCageGeocoder', () => {
 
   it('calls the Worker for forward and reverse geocoding', async () => {
     const fetch = stubFetch(200, forwardResponse)
-    expect(await new OpenCageGeocoder().forward('Beira', { limit: 2 })).toHaveLength(2)
+    expect(await new OpenCageGeocoder({ url: '/tools/geocode' }).forward('Beira', { limit: 2 })).toHaveLength(2)
     const url = fetch.mock.calls[0]![0]
     expect(url.startsWith('/tools/geocode?')).toBe(true)
     expect(Object.fromEntries(new URLSearchParams(url.split('?')[1]))).toEqual({ q: 'Beira', limit: '2' })
 
     const reverse = stubFetch(200, reverseResponse)
-    expect((await new OpenCageGeocoder().reverse([34.8453, -19.8051]))?.iso3).toBe('MOZ')
+    expect((await new OpenCageGeocoder({ url: '/tools/geocode' }).reverse([34.8453, -19.8051]))?.iso3).toBe('MOZ')
     // OpenCage reverse geocoding is "lat,lng".
     expect(new URLSearchParams(reverse.mock.calls[0]![0].split('?')[1]).get('q')).toBe('-19.8051,34.8453')
   })
 
   it('throws with the service message on errors', async () => {
     stubFetch(401, { status: { code: 401, message: 'invalid API key' }, results: [] })
-    await expect(new OpenCageGeocoder().forward('x', {})).rejects.toThrow('Geocoding failed (401): invalid API key')
+    await expect(new OpenCageGeocoder({ url: '/tools/geocode' }).forward('x', {})).rejects.toThrow('Geocoding failed (401): invalid API key')
     stubFetch(503, { error: 'OPENCAGE_API_KEY is not set' })
-    await expect(new OpenCageGeocoder().forward('x', {})).rejects.toThrow(/OPENCAGE_API_KEY/)
+    await expect(new OpenCageGeocoder({ url: '/tools/geocode' }).forward('x', {})).rejects.toThrow(/OPENCAGE_API_KEY/)
+  })
+
+  it('calls OpenCage directly with a key, as the agent does, and never shows the key', async () => {
+    const fetch = stubFetch(200, forwardResponse)
+    await new OpenCageGeocoder({ url: OPENCAGE_URL, key: 'k-123' }).forward('Beira', { limit: 1 })
+    const url = fetch.mock.calls[0]![0]
+    expect(url.startsWith(`${OPENCAGE_URL}?`)).toBe(true)
+    expect(Object.fromEntries(new URLSearchParams(url.split('?')[1]))).toEqual({ q: 'Beira', limit: '1', no_annotations: '1', key: 'k-123' })
+
+    stubFetch(403, { status: { code: 403, message: 'key k-123 is disabled' }, results: [] })
+    await expect(new OpenCageGeocoder({ url: OPENCAGE_URL, key: 'k-123' }).forward('x', {})).rejects.toThrow('Geocoding failed (403): key *** is disabled')
   })
 })
 

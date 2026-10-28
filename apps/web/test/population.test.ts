@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { geocodeTools, type Geocoder, type Place } from '../src/data/geocode'
+import { geocodeTools, type Geocoder, type Place } from '@ttx/plugins'
 import { populationTool, SourceCoopPopulation, type PopulationSource } from '../src/data/population'
 import type { Raster } from '../src/map/raster'
-import { ToolRunner } from '../src/tools/runner'
+import { ToolRunner } from '@ttx/core'
 
 const beira: Place = { name: 'Beira, Mozambique', lngLat: [34.8389, -19.8436], iso3: 'MOZ', country: 'Mozambique' }
 const MOZ_URL = 'https://example.org/moz_constrained.tif'

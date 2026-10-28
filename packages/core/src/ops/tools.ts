@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { Board } from '../doc/board.js'
 import type { Registry } from '../plugins/registry.js'
+import type { ToolDef } from '../tools/tool.js'
 import type { OpDef } from './types.js'
 
 export interface ToolDefinition {
@@ -38,6 +39,18 @@ export function exportTools(ops: OpDef<any, any>[]): ToolDefinition[] {
       description: `${op.title}. ${op.description}`,
       input_schema: { type: 'object', properties, required, additionalProperties: false },
     }
+  })
+}
+
+/**
+ * Read-only tools (ToolDef) as JSON Schema tool definitions for an LLM, beside the ops. The input is the
+ * tool's own input, with no `ids` or `args`: a tool has no target. `ToolRunner.run` runs such a call.
+ */
+export function exportToolDefs(tools: ToolDef[]): ToolDefinition[] {
+  return tools.map((t) => {
+    const input = z.toJSONSchema(t.input, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>
+    delete input.$schema
+    return { name: toolNameOf(t.id), description: `${t.title}. ${t.description}`, input_schema: input }
   })
 }
 

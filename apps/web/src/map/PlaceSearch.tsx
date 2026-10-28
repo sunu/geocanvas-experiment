@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MagnifyingGlassIcon, MapPinIcon } from '@phosphor-icons/react'
-import type { Place, PlaceFeatures } from '../data/geocode'
+import type { Place, PlaceFeatures } from '@ttx/plugins'
 import { tools } from '../tools/registry'
 
 type State = { status: 'idle' } | { status: 'searching' } | { status: 'done'; places: Place[] } | { status: 'error'; message: string }

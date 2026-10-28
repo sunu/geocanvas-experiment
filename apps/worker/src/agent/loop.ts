@@ -1,7 +1,21 @@
-import { exportTools, opIdOf, summarizeBoard, Views, type AgentReply, type AnyObject, type ChatEntry, type Runtime, type ToolCallRecord, type UserMessage } from '@ttx/core'
+import {
+  exportToolDefs,
+  exportTools,
+  opIdOf,
+  summarizeBoard,
+  toolNameOf,
+  Views,
+  type AgentReply,
+  type AnyObject,
+  type ChatEntry,
+  type Runtime,
+  type ToolCallRecord,
+  type ToolDefinition,
+  type ToolRunner,
+  type UserMessage,
+} from '@ttx/core'
 import { areaOfView, MAP_HEADER_PX } from '@ttx/plugins'
 import type { Complete, FunctionTool, Message } from './openrouter'
-import { boardGet, type ReadTool } from './tools'
 
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
 export const MAX_STEPS = 8
@@ -25,14 +39,20 @@ Rules:
 - When you add an object, leave out x, y, w and h: it goes in the middle of the person's view, at its type's default size, and each further object you add goes to the right of the last one. Give x and y only to put it at a given place (e.g. next to an object), and w and h only when the person asks for a size.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner.
 - To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
-- Each person has their own view of each map. To show a place on a map, find its area with geocode__search first, then call map__showArea without "for": that changes the asker's view. Use "for": "everyone" only when they ask to show it to everyone, and person ids only for other given people. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
+- Each person has their own view of each map. To show a place on a map, find it with data__geocode first; its bbox is [west, south, east, north]. Then call map__showArea with that area and without "for": that changes the asker's view. Use "for": "everyone" only when they ask to show it to everyone, and person ids only for other given people. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
+- To show data on a map (population, countries, buildings), call map__addLayer; without an area it uses the area the asker sees, so show the place first if they name one. To mark a place, call map__pinPlace.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
-/** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read tools. */
-export function agentTools(runtime: Runtime, readTools: ReadTool[]): FunctionTool[] {
+/** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read-only tools. */
+export function agentTools(runtime: Runtime, tools: ToolRunner): FunctionTool[] {
   const ops = runtime.registry.ops().filter((op) => !op.hidden && !op.applyView)
-  const opTools = exportTools(ops).map((t): FunctionTool => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
-  return [...opTools, ...readTools.map((r) => r.tool)]
+  const defs: ToolDefinition[] = [...exportTools(ops), ...exportToolDefs(tools.list())]
+  const names = new Set<string>()
+  for (const d of defs) {
+    if (names.has(d.name)) throw new Error(`Two agent tools are named ${d.name}`)
+    names.add(d.name)
+  }
+  return defs.map((t): FunctionTool => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
 }
 
 /** One line about an object, as in summarizeBoard. */
@@ -92,11 +112,11 @@ export async function runTurn(
   runtime: Runtime,
   message: UserMessage,
   complete: Complete,
-  extraTools: ReadTool[] = [],
+  /** The read-only tools: at least board.get (boardGet in @ttx/plugins). */
+  readTools: ToolRunner,
   /** The chat entries before `message`, oldest first. */
   history: ChatEntry[] = [],
 ): Promise<Omit<AgentReply, 'kind' | 'id' | 'at'>> {
-  const readTools = [boardGet, ...extraTools]
   const tools = agentTools(runtime, readTools)
   const messages: Message[] = [
     { role: 'system', content: `${SYSTEM}\n\nThe board now, bottom to top:\n${summarizeBoard(runtime.board, runtime.registry) || '(empty)'}` },
@@ -135,12 +155,12 @@ export async function runTurn(
       calls.push({ tool: opIdOf(name), status: 'failed', error: 'Arguments are not JSON' })
       return JSON.stringify({ status: 'failed', error: 'Arguments are not JSON' })
     }
-    const read = readTools.find((r) => r.tool.function.name === name)
+    const read = readTools.list().find((t) => toolNameOf(t.id) === name)
     if (read) {
       try {
-        const out = await read.run(input as Record<string, unknown>, runtime)
+        const out = await readTools.run(read.id, input)
         calls.push({ tool: name, title: read.title, status: 'applied' })
-        return out
+        return typeof out === 'string' ? out : JSON.stringify(out)
       } catch (err) {
         const error = String((err as Error)?.message ?? err)
         calls.push({ tool: name, title: read.title, status: 'failed', error })

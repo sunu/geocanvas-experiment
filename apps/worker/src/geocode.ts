@@ -1,4 +1,4 @@
-const OPENCAGE_URL = 'https://api.opencagedata.com/geocode/v1/json'
+import { OPENCAGE_URL } from '@ttx/plugins'
 
 /** Query params the browser may set. Reverse geocoding is `q=lat,lng`. Everything else is dropped. */
 const ALLOWED = ['q', 'limit', 'countrycode', 'bounds', 'language']

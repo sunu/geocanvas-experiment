@@ -6,7 +6,7 @@ import { CrosshairSimpleIcon, StackPlusIcon, XIcon } from '@phosphor-icons/react
 import type { ObjectViewProps } from '../canvas/registry'
 import { Views } from '@ttx/core'
 import { BASEMAPS, DATA_LAYERS, hasArea, type Basemap, type DataLayerKey, type MapBoardObject, type MapLayer } from '@ttx/plugins'
-import type { Place } from '../data/geocode'
+import type { Place } from '@ttx/plugins'
 import { basemapStyle } from './basemaps'
 import { attributionOf, deckLayers, truncationOf, useLayerStates, viewArea, type LayerState } from './layers'
 import { PlaceSearch } from './PlaceSearch'

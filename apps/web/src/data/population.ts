@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import type { Raster } from '../map/raster'
-import { defineTool } from '../tools/tool'
+import { defineTool } from '@ttx/core'
 import { areaCenter, areaSchema } from './area'
-import type { PlaceFeatures } from './geocode'
+import type { PlaceFeatures } from '@ttx/plugins'
 
 export type PopulationVariant = 'constrained' | 'unconstrained'
 

@@ -123,8 +123,7 @@ A panel on the right, opened from the board bar. It shows the messages, the sele
 
 ### 3.7 Geocoding
 
-- The read tool `geocode__search { text, limit }` finds places with Photon (photon.komoot.io): OpenStreetMap data, no key. It returns the area of each place (west, south, east, north). A place without an extent (a point) gets a small area around it.
-- The search text goes to the public Photon server. Use a self-hosted Photon or a different geocoder if that is a problem.
+- Places are found with `data__geocode`, the same OpenCage tool as the map's place search (`geocodeTools` in `@ttx/plugins`), called directly with `OPENCAGE_API_KEY`. Its results have a bbox (west, south, east, north). The first version used the public Photon server (photon.komoot.io, no key); it was replaced so that the browser and the agent use one geocoder, and because OpenCage gives ISO 3 codes, which the population tool needs.
 
 ### 3.8 Per-person map views in the doc
 

@@ -18,7 +18,7 @@ import {
   WORLD_BANK_ADMIN0_URL,
   type WorldBankAdmin0Row,
 } from './worldBank'
-import type { Bbox } from './geocode'
+import type { Bbox } from '@ttx/plugins'
 
 export type Admin0Request = { id: number; bbox: Bbox }
 export type Admin0Response =

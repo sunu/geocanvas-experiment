@@ -6,9 +6,9 @@ import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { Agent, AGENT } from './agent/agent'
 import { openRouter } from './agent/openrouter'
-import { eventsSearch, geocodeSearch } from './agent/tools'
 import { geocode } from './geocode'
 import { montySearch, stacSearch } from './monty'
+import { eventsSearch, geocodeTools, OpenCageGeocoder, OPENCAGE_URL } from '@ttx/plugins'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
 
@@ -81,7 +81,7 @@ export class Room extends DurableObject<Env> {
       doc: this.doc,
       complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
       tools: [
-        geocodeSearch,
+        ...(env.OPENCAGE_API_KEY ? geocodeTools(new OpenCageGeocoder({ url: OPENCAGE_URL, key: env.OPENCAGE_API_KEY })) : []),
         ...(env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : []),
       ],
       // The agent's presence: people see "Agent is thinking…" while it works.

@@ -9,8 +9,10 @@ export interface ToolContext {
 
 /**
  * A typed, read-only, async capability (plans/plan-006.md on feat/tools-registry): find a place,
- * get population for an area. Tools never write the board. People reach them through widgets (a map's
- * place search, its data layers); agents will call the same tools.
+ * get population for an area. Tools never write the board; ops do. People reach them through widgets
+ * (a map's place search, its data layers), and the board's agent calls them (exportToolDefs). Each
+ * environment lists the tools it can run: the browser in apps/web/src/tools/registry.ts, the room's
+ * agent in apps/worker/src/worker.ts (boardGet and eventsSearch are in @ttx/plugins).
  */
 export interface ToolDef<Input = any, Output = any> {
   /** '<area>.<name>', e.g. 'data.geocode'. */

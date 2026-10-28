@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, Runtime, Views, type Actor, type AgentReply, type ChatEntry } from '@ttx/core'
-import { plugins } from '@ttx/plugins'
+import { Chat, Runtime, ToolRunner, Views, type Actor, type AgentReply, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
+import { boardGet, eventsSearch, geocodeTools, plugins, type Geocoder } from '@ttx/plugins'
 import { Agent, TURNS_PER_HOUR } from '../src/agent/agent'
 import { HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn } from '../src/agent/loop'
 import type { Complete, Message } from '../src/agent/openrouter'
-import { eventsSearch, geocodeSearch, type ReadTool } from '../src/agent/tools'
 import type { MontyClient } from '@ttx/plugins/monty/client'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
@@ -34,6 +33,10 @@ function scripted(...answers: (Extract<Message, { role: 'assistant' }> | Error)[
 const call = (name: string, input: unknown, id = name) => ({ id, type: 'function' as const, function: { name, arguments: JSON.stringify(input) } })
 const tools = (...calls: ReturnType<typeof call>[]) => ({ role: 'assistant' as const, content: null, tool_calls: calls })
 
+/** runTurn with board.get and these read-only tools, as the room's Agent gives it. */
+const turn = (runtime: Runtime, message: UserMessage, complete: Complete, extra: ToolDef[] = [], history: ChatEntry[] = []) =>
+  runTurn(runtime, message, complete, new ToolRunner([boardGet(runtime), ...extra]), history)
+
 describe('runTurn', () => {
   it("gives the model the sender's selection snapshot, and deletes only those ids", async () => {
     const { doc, person, chat, a, b, c } = board()
@@ -42,7 +45,7 @@ describe('runTurn', () => {
     const model = scripted(tools(call('core__object__delete', { ids: [a, b], args: {} })), { role: 'assistant', content: 'Deleted 2 boxes.' })
     const agent = new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } })
 
-    const reply = await runTurn(agent, message, model.complete)
+    const reply = await turn(agent, message, model.complete)
 
     const request = model.seen[0]![1]!.content as string
     expect(request).toContain('Ada (person id ada) asks: delete these')
@@ -71,7 +74,7 @@ describe('runTurn', () => {
       }
       return { role: 'assistant', content: 'Done.' }
     }
-    const reply = await runTurn(agent, message, model)
+    const reply = await turn(agent, message, model)
     expect(reply.undo).toEqual({ created: [copy], before: { [a]: expect.objectContaining({ id: a }) } })
   })
 
@@ -79,7 +82,7 @@ describe('runTurn', () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'delete it', selection: [] })
     const model = scripted(tools(call('core__object__delete', { ids: ['nope'], args: {} })))
-    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     expect(reply.calls).toEqual([{ tool: 'core.object.delete', ids: ['nope'], status: 'failed', error: 'Object nope does not exist' }])
     expect(model.seen[1]!.at(-1)).toMatchObject({ role: 'tool', content: expect.stringContaining('does not exist') })
     expect(reply.undo).toBeUndefined()
@@ -96,7 +99,7 @@ describe('runTurn', () => {
       tools(call('event__add', { args: { eventId: found.id, x: 1000, y: 500 } })),
       { role: 'assistant', content: 'Added the Nepal flood.' },
     )
-    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [eventsSearch(monty)])
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [eventsSearch(monty)])
 
     expect(model.seen[0]![1]!.content).toContain('View center: (1000, 500)')
     expect(searches).toEqual(['nepal flood'])
@@ -112,12 +115,15 @@ describe('runTurn', () => {
   it("finds a place, adds a map, and shows the place in the asker's view only", async () => {
     const { doc, chat } = board()
     const india = { west: 67.9, south: 6.6, east: 97.4, north: 35.7 }
-    const geocoder: ReadTool = { title: 'Find place', tool: geocodeSearch.tool, run: async () => JSON.stringify([{ name: 'India', area: india }]) }
+    const geocoder: Geocoder = {
+      forward: async () => [{ name: 'India', lngLat: [78, 21], bbox: [india.west, india.south, india.east, india.north], iso3: 'IND' }],
+      reverse: async () => undefined,
+    }
     const message = chat.send({ actor: ada, text: 'add a map and zoom to India', selection: [] })
     let map = ''
     const model: Complete = async (messages) => {
       const last = messages.at(-1)!
-      if (last.role === 'user') return tools(call('geocode__search', { text: 'India' }))
+      if (last.role === 'user') return tools(call('data__geocode', { query: 'India' }))
       if (last.role === 'tool' && last.content.includes('India')) return tools(call('map__add', { args: { x: 0, y: 0 } }))
       if (!map && last.role === 'tool') {
         map = (JSON.parse(last.content) as { created: string[] }).created[0]!
@@ -127,7 +133,7 @@ describe('runTurn', () => {
       return { role: 'assistant', content: 'Done.' }
     }
     new Views(doc).set('ben', 'nothing-yet', { center: [0, 0], zoom: 1, bearing: 0 })
-    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model, [geocoder])
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model, geocodeTools(geocoder))
     expect(reply.calls.map((c) => c.status)).toEqual(['applied', 'applied', 'applied'])
     const views = new Views(doc)
     expect(views.get(ada.id, map)?.zoom).toBeGreaterThan(2)
@@ -138,7 +144,7 @@ describe('runTurn', () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'add a map and a box', selection: [], center: { x: 1000, y: 500 } })
     const model = scripted(tools(call('map__add', { args: {} }), call('box__add', { args: {} })), tools(call('text__add', { args: { x: 5, y: 6, text: 'here' } })))
-    await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     const board_ = new Runtime({ doc, plugins, actor: ada }).board
     const map = board_.list().find((o) => o.type === 'map')!
     const box = board_.list().find((o) => o.type === 'box' && o.x > 900)!
@@ -152,7 +158,7 @@ describe('runTurn', () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'add a map', selection: [] })
     const model = scripted(tools(call('map__add', { args: { x: 0, y: 0, h: 4000.02 } })), tools(call('map__add', { args: { x: 0, y: 0 } })))
-    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     expect(reply.calls.map((c) => c.status)).toEqual(['failed', 'applied'])
     expect(model.seen[1]!.at(-1)).toMatchObject({ role: 'tool', content: expect.stringContaining('Leave out w and h') })
     expect(new Runtime({ doc, plugins, actor: ada }).board.list().filter((o) => o.type === 'map').map((o) => o.h)).toEqual([360])
@@ -163,7 +169,7 @@ describe('runTurn', () => {
     const monty = { findEvents: async () => Promise.reject(new Error('Montandon search failed (401)')) } as unknown as MontyClient
     const message = chat.send({ actor: ada, text: 'add a flood', selection: [] })
     const model = scripted(tools(call('events__search', { text: 'flood' })))
-    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [eventsSearch(monty)])
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [eventsSearch(monty)])
     expect(reply.calls).toEqual([{ tool: 'events__search', title: 'Search events', status: 'failed', error: 'Montandon search failed (401)' }])
     expect(model.seen[1]!.at(-1)).toMatchObject({ role: 'tool', content: expect.stringContaining('401') })
   })
@@ -174,7 +180,7 @@ describe('runTurn', () => {
     const old: ChatEntry = { kind: 'user', id: 'old', actor: ada, text: 'too old', selection: [], at: message.at - HISTORY_MS }
     const recent = Array.from({ length: HISTORY_ENTRIES + 1 }, (_, i): ChatEntry => ({ kind: 'user', id: `m${i}`, actor: ben, text: `message ${i}`, selection: [], at: message.at - 1000 + i }))
     const model = scripted()
-    await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], [old, ...recent])
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], [old, ...recent])
     const request = model.seen[0]![1]!.content as string
     expect(request).not.toContain('too old')
     expect(request).not.toContain('message 0\n')
@@ -186,7 +192,7 @@ describe('runTurn', () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'loop', selection: [] })
     const model = scripted(...Array.from({ length: 20 }, () => tools(call('board__get', {}))))
-    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     expect(model.seen).toHaveLength(MAX_STEPS)
     expect(reply.text).toMatch(/stopped after/)
   })
@@ -195,7 +201,7 @@ describe('runTurn', () => {
     const { doc, chat, a } = board()
     const message = chat.send({ actor: ada, text: 'delete this', selection: [a] })
     const model = scripted(tools(call('core__object__delete', { ids: [a], args: {} })), new Error('OpenRouter 502'))
-    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     expect(reply.text).toMatch(/OpenRouter 502/)
     expect(Object.keys(reply.undo!.before)).toEqual([a])
   })

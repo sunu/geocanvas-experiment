@@ -10,7 +10,9 @@ import { mapPlugin } from './map.js'
 export const plugins = [corePlugin, mapPlugin, eventsPlugin, agentPlugin]
 
 export { agentPlugin } from './agent.js'
+export { boardGet, eventsSearch } from './agentTools.js'
 export { eventsPlugin, type EventBoardObject } from './events.js'
 export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
+export { geocodeTools, OpenCageGeocoder, OPENCAGE_URL, parseOpenCage, type Geocoder, type Place, type PlaceFeatures } from './geocode.js'
 export { bboxOf, DATA_LAYERS, hasArea, mapLayer, newLayerId, type Bbox, type DataLayerKey, type MapLayer } from './mapLayers.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'

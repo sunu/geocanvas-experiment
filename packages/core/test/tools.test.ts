@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { describe, expect, it } from 'vitest'
-import { defineTool } from '../src/tools/tool'
-import { stableJson, ToolRunner } from '../src/tools/runner'
+import { defineTool } from '../src/tools/tool.js'
+import { stableJson, ToolRunner } from '../src/tools/runner.js'
+import { exportToolDefs } from '../src/ops/tools.js'
 
 /** Fake tools that count their runs. */
 function setup() {
@@ -114,5 +115,18 @@ describe('stableJson', () => {
   it('ignores key order at every depth, and keeps array order', () => {
     expect(stableJson({ b: 1, a: { d: [2, 1], c: 0 } })).toBe(stableJson({ a: { c: 0, d: [2, 1] }, b: 1 }))
     expect(stableJson([1, 2])).not.toBe(stableJson([2, 1]))
+  })
+})
+
+describe('exportToolDefs', () => {
+  it('gives each tool a JSON Schema of its own input, named like ops, for an LLM', () => {
+    const { runner } = setup()
+    const [square] = exportToolDefs(runner.list())
+    expect(square).toEqual({
+      name: 'fake__square',
+      description: 'Square. Squares a number after a delay.',
+      input_schema: expect.objectContaining({ type: 'object', properties: { n: { type: 'number' }, label: { type: 'string', default: 'x' } }, required: ['n'] }),
+    })
+    expect(runner.list().map((t) => t.id)).toEqual(['fake.square', 'fake.fresh', 'fake.squarePlusOne'])
   })
 })

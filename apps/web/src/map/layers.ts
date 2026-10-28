@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Layer } from '@deck.gl/core'
 import { GeoJsonLayer } from '@deck.gl/layers'
 import { tools } from '../tools/registry'
-import { stableJson } from '../tools/runner'
+import { stableJson } from '@ttx/core'
 import { rasterLayers } from './raster'
 import { bboxOf, type Bbox, type MapLayer } from '@ttx/plugins'
 

@@ -1,7 +1,9 @@
 import { z } from 'zod'
-import { defineTool, type ToolDef } from '../tools/tool'
+import { defineTool, type ToolDef } from '@ttx/core'
+import type { Bbox } from './mapLayers.js'
 
-export type Bbox = [west: number, south: number, east: number, north: number]
+/** OpenCage's geocoding API. The browser calls it through the Worker (apps/worker/src/geocode.ts); the room's agent directly. */
+export const OPENCAGE_URL = 'https://api.opencagedata.com/geocode/v1/json'
 
 /** A geocoded place. */
 export interface Place {
@@ -55,10 +57,16 @@ export function parseOpenCage(json: { results?: OpenCageResult[] }): Place[] {
 }
 
 /**
- * Geocoder that calls the Worker, which adds the OpenCage key (apps/worker/src/geocode.ts):
- *   GET /tools/geocode -> https://api.opencagedata.com/geocode/v1/json
+ * Geocoder on OpenCage. In the browser, `url` is the Worker's proxy, which adds the key so the browser never
+ * sees it: GET /tools/geocode -> OPENCAGE_URL. The room's agent calls OPENCAGE_URL with its `key`.
  */
 export class OpenCageGeocoder implements Geocoder {
+  private opts: { url: string; key?: string }
+
+  constructor(opts: { url: string; key?: string }) {
+    this.opts = opts
+  }
+
   forward(query: string, opts: { limit?: number; signal?: AbortSignal } = {}) {
     const params = new URLSearchParams({ q: query })
     if (opts.limit !== undefined) params.set('limit', String(opts.limit))
@@ -71,8 +79,14 @@ export class OpenCageGeocoder implements Geocoder {
   }
 
   private async get(params: URLSearchParams, signal?: AbortSignal): Promise<Place[]> {
-    const res = await fetch(`/tools/geocode?${params}`, signal ? { signal } : {})
-    const text = await res.text()
+    const { url, key } = this.opts
+    if (key) {
+      params.set('no_annotations', '1')
+      params.set('key', key)
+    }
+    const res = await fetch(`${url}?${params}`, signal ? { signal } : {})
+    // The key must not reach an error message, which can end up in the chat.
+    const text = key ? (await res.text()).replaceAll(key, '***') : await res.text()
     let json: any
     try {
       json = JSON.parse(text)
@@ -87,7 +101,11 @@ export class OpenCageGeocoder implements Geocoder {
   }
 }
 
-export type PlaceFeatures = GeoJSON.FeatureCollection<GeoJSON.Point, Place>
+/** A GeoJSON FeatureCollection of points, written out: this package does not load the GeoJSON types. */
+export interface PlaceFeatures {
+  type: 'FeatureCollection'
+  features: { type: 'Feature'; geometry: { type: 'Point'; coordinates: [number, number] }; properties: Place }[]
+}
 
 /** Places as GeoJSON points. The properties are the Place fields. */
 function placeFeatures(places: Place[]): PlaceFeatures {

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ToolContext, ToolDef } from './tool'
+import type { ToolContext, ToolDef } from './tool.js'
 
 export interface ToolRunOptions {
   /** Stops waiting for the result. A shared (cached) run goes on for other callers and the cache. */
@@ -32,6 +32,11 @@ export class ToolRunner {
 
   tool(id: string): ToolDef | undefined {
     return this.tools.get(id)
+  }
+
+  /** Every tool, in the order given. */
+  list(): ToolDef[] {
+    return [...this.tools.values()]
   }
 
   run<O = unknown>(id: string, input: unknown, opts: ToolRunOptions = {}): Promise<O> {
