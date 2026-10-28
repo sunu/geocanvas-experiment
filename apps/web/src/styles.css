@@ -53,9 +53,24 @@ body,
 }
 
 /* Fill and border color come from the object's color (canvas/style.ts). */
-.ttx-obj--box {
+.ttx-box {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   border: 2px solid;
   border-radius: 6px;
+}
+
+/* An object type this build does not know (made by a newer version of the app). */
+.ttx-unknown {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  border: 1px dashed var(--ttx-border);
+  border-radius: 6px;
+  color: var(--ttx-muted);
+  font-size: 12px;
 }
 
 /* Font size and color come from the object. The plain div sets the height; the editor sits over it. */

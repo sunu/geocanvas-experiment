@@ -1,29 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import type { Board, BoardObject, NewObject, ObjectType } from '../board/board'
+import type { Board, BoardObject } from '../board/board'
 import { useObjects, type ConnectionStatus } from '../board/connect'
+import { objectType, objectTypes } from '../objects/registry'
+import { requestFit } from '../objects/text'
 import { intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
-import { ObjectView, requestFit } from './ObjectView'
+import { ObjectView } from './ObjectView'
 import { StylePanel } from './StylePanel'
 import { Toolbar, type Tool } from './Toolbar'
 
-const DEFAULT_SIZE: Record<ObjectType, { w: number; h: number }> = {
-  box: { w: 200, h: 120 },
-  text: { w: 240, h: 40 },
-  map: { w: 520, h: 360 },
-  event: { w: 380, h: 320 },
-}
 const MIN_SIZE = 16
 /** Pointer travel (screen px) before a press becomes a drag. */
 const DRAG_THRESHOLD = 3
 const HANDLES = ['nw', 'ne', 'sw', 'se'] as const
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', r: 'box', t: 'text', m: 'map', e: 'event' }
+const TOOL_KEYS: Record<string, Tool> = { v: 'select', ...Object.fromEntries(objectTypes.map((d) => [d.key, d.type])) }
 const GRID = 24
-
-function newObject(type: ObjectType, r: Rect): NewObject {
-  if (type === 'text') return { type, ...r, text: '' }
-  if (type === 'map') return { type, ...r, basemap: 'light' }
-  return { type, ...r }
-}
 
 /** Follow a press until release. onMove gets the screen distance from the press once it passes the threshold. */
 function trackDrag(
@@ -66,11 +56,11 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
   const selected = useMemo(() => new Set([...selection].filter((id) => byId.has(id))), [selection, byId])
   const editingId = editing && byId.has(editing) ? editing : null
 
-  // A text left empty when editing ends is removed.
+  // An object left empty when editing ends (e.g. a text with nothing typed) is removed.
   const lastEditing = useRef<string | null>(null)
   useEffect(() => {
     const prev = lastEditing.current && board.get(lastEditing.current)
-    if (prev && prev.id !== editingId && prev.type === 'text' && !prev.text.trim()) board.remove([prev.id])
+    if (prev && prev.id !== editingId && objectType(prev.type)?.isEmpty?.(prev)) board.remove([prev.id])
     lastEditing.current = editingId
   }, [board, editingId])
 
@@ -94,7 +84,7 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
     }
 
     if (tool !== 'select') {
-      const type = tool
+      const def = objectType(tool)!
       const p = screenPoint(e)
       const p0 = toWorld(cameraRef.current, p.x, p.y)
       let drawn: Rect | null = null
@@ -107,13 +97,13 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
         },
         () => {
           setDraft(null)
-          const d = DEFAULT_SIZE[type]
+          const d = def.size
           const r = drawn && drawn.w >= MIN_SIZE && drawn.h >= MIN_SIZE ? drawn : { x: p0.x - d.w / 2, y: p0.y - d.h / 2, ...d }
-          const newId = board.add(newObject(type, r))
+          const newId = board.add(def.create(r), def.layer)
           setTool('select')
           setSelection(new Set([newId]))
-          // A new text opens for typing; a new event opens its search.
-          if (type === 'text' || type === 'event') setEditing(newId)
+          // E.g. a new text opens for typing; a new event opens its search.
+          if (def.editOnCreate) setEditing(newId)
         },
       )
       return
@@ -125,8 +115,8 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
       trackDrag(e, (dx, dy) => {
         const z = cameraRef.current.z
         const r = resized(o, handle, dx / z, dy / z)
-        if (o.type === 'text') {
-          // A text's height follows its content: resizing changes only its width.
+        if (objectType(o.type)?.widthOnly) {
+          // Its height follows its content (a text): resizing changes only its width.
           requestFit(o.id)
           board.update({ [o.id]: { x: r.x, w: r.w } })
         } else {
@@ -185,7 +175,7 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
   function onDoubleClick(e: ReactMouseEvent) {
     const id = (e.target as HTMLElement).closest<HTMLElement>('[data-id]')?.dataset.id
     const o = id && byId.get(id)
-    if (!o || o.type === 'box') return
+    if (!o || !objectType(o.type)?.editable) return
     setSelection(new Set([o.id]))
     setEditing(o.id)
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, FONT_SIZES, PALETTE, stepFontSize } from '../src/canvas/style'
+import { COLORS, DEFAULT_FONT_SIZE, FONT_SIZES, PALETTE, stepFontSize } from '../src/canvas/style'
 
 describe('text sizes', () => {
   it('steps through the sizes from the default', () => {
@@ -19,9 +19,7 @@ describe('text sizes', () => {
 })
 
 describe('palette', () => {
-  it('has every color, including the defaults', () => {
+  it('has every color', () => {
     for (const c of COLORS) expect(PALETTE[c]).toMatchObject({ ink: expect.any(String), fill: expect.any(String), stroke: expect.any(String) })
-    expect(COLORS).toContain(DEFAULT_BOX_COLOR)
-    expect(COLORS).toContain(DEFAULT_TEXT_COLOR)
   })
 })

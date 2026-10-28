@@ -1,6 +1,4 @@
 import * as Y from 'yjs'
-import type { Basemap } from '../map/basemaps'
-import type { ColorName } from '../canvas/style'
 
 /**
  * The shared board: one Yjs map of objects, keyed by id. Each object is a Y.Map of plain
@@ -11,6 +9,8 @@ import type { ColorName } from '../canvas/style'
  *
  * Map views (center, zoom) are not here on purpose: each person pans their own maps.
  * An event holds only its Montandon id; each person's browser fetches the event's details.
+ *
+ * Object types are defined in objects/ (one file each, listed in objects/registry.ts).
  */
 
 interface Placed {
@@ -22,22 +22,25 @@ interface Placed {
   z: number
 }
 
-/** color and fontSize are optional: objects made before they existed use the defaults in canvas/style.ts. */
-export type BoardObject =
-  | (Placed & { type: 'box'; color?: ColorName })
-  | (Placed & { type: 'text'; text: string; color?: ColorName; fontSize?: number })
-  | (Placed & { type: 'map'; basemap: Basemap })
-  /** eventId is absent until someone picks an event. */
-  | (Placed & { type: 'event'; eventId?: string })
+/**
+ * The stored fields of each object type, by type name. Each type adds its entry in its own file in
+ * objects/, with `declare module '../board/board'`. A field added after objects of that type
+ * already exist must be optional, with a default where it is read.
+ */
+export interface ObjectFields {}
 
-export type ObjectType = BoardObject['type']
+export type ObjectType = keyof ObjectFields
 
-/** Fields for a new object: everything but id, and z is optional (default: on top). */
+export type BoardObject = { [T in ObjectType]: Placed & { type: T } & ObjectFields[T] }[ObjectType]
+
+/** Fields for a new object: everything but id; z is optional (see add). */
 export type NewObject = DistributiveOmit<BoardObject, 'id' | 'z'> & { z?: number }
 
-export type ObjectPatch = Partial<Omit<Placed, 'id'>> & { text?: string; basemap?: Basemap; color?: ColorName; fontSize?: number; eventId?: string }
+/** A change to any fields of an object. */
+export type ObjectPatch = Partial<Omit<Placed, 'id'>> & Partial<UnionToIntersection<ObjectFields[ObjectType]>>
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+type UnionToIntersection<U> = (U extends unknown ? (u: U) => void : never) extends (i: infer I) => void ? I : never
 
 export class Board {
   readonly doc: Y.Doc
@@ -83,15 +86,14 @@ export class Board {
   }
 
   /**
-   * New texts and events go on top: they are content. New boxes and maps go to the bottom: they are mostly
-   * backgrounds and frames, so drawing one must not cover what is already there.
+   * Add an object. Without a z, it goes on top, or to the bottom with layer 'bottom' (each type
+   * says which in objects/: backgrounds and frames go to the bottom, so they never cover content).
    */
-  add(fields: NewObject): string {
+  add(fields: NewObject, layer: 'top' | 'bottom' = 'top'): string {
     const id = crypto.randomUUID()
     this.doc.transact(() => {
       const m = new Y.Map<unknown>()
-      const onTop = fields.type === 'text' || fields.type === 'event'
-      const z = fields.z ?? (onTop ? this.topZ() + 1 : this.bottomZ() - 1)
+      const z = fields.z ?? (layer === 'top' ? this.topZ() + 1 : this.bottomZ() - 1)
       for (const [k, v] of Object.entries({ ...fields, z })) m.set(k, v)
       this.objects.set(id, m)
     })
