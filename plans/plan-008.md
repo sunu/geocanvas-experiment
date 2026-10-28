@@ -71,6 +71,7 @@ Anyone with the link to a room can use its agent, as anyone can edit its board. 
 - 8 tool steps or fewer in each turn.
 - One turn at a time in each room. Other messages wait.
 - 20 turns or fewer in each hour in each room, counted in the memory of the Durable Object.
+- The agent cannot add an object that is more than 4 times the default size of its type. Low-cost models sometimes send sizes that nobody asked for, with incorrect numbers (`h: 4000`, `h: 3e97`). The tool result tells the model to leave out `w` and `h`. People can draw objects of any size.
 
 ## 3. Design
 

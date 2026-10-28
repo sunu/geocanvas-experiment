@@ -6,11 +6,15 @@ import { boardGet, type ReadTool } from './tools'
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
 export const MAX_STEPS = 8
 
+/** The agent may add objects up to this many times their type's default size. People may draw any size. */
+export const MAX_SIZE_FACTOR = 4
+
 const SYSTEM = `You are the agent on a shared whiteboard for a humanitarian table-top exercise. People ask you to change the board, and you change it with the tools.
 
 Rules:
 - "This", "these", "it" and "the selected ..." mean the objects under "Selected" in the request, and only those. Act only on those ids.
 - If the request needs objects and nothing is selected, or you are not sure which objects the person means, do not guess: ask.
+- When you add an object, leave out w and h unless the person asks for a size: each type has a good default size.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner. Put new objects near the person's "View center", next to what is there, not on top of it.
 - To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
 - Each person has their own view of each map. To show a place on a map, find its area with geocode__search first, then call map__showArea with "for" set to [the asker's person id]. Use "for": "everyone" only when they ask to show it to everyone. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
@@ -108,6 +112,11 @@ export async function runTurn(
         return JSON.stringify({ status: 'failed', error })
       }
     }
+    const tooBig = sizeError(name, input.args)
+    if (tooBig) {
+      calls.push({ tool: opIdOf(name), status: 'failed', error: tooBig })
+      return JSON.stringify({ status: 'failed', error: tooBig })
+    }
     const ids = Array.isArray(input.ids) ? input.ids : undefined
     // Keep each object as it was before this turn first changed it; objects this turn added need no copy.
     for (const id of ids ?? []) {
@@ -118,5 +127,22 @@ export async function runTurn(
     if (record.created) created.push(...record.created)
     calls.push({ tool: record.opId, ...(ids && { ids }), status: record.status, ...(record.error && { error: record.error }) })
     return JSON.stringify({ status: record.status, error: record.error, created: record.created })
+  }
+
+  /**
+   * Low-cost models sometimes give an add a size nobody asked for, with junk numbers (h: 4000, h: 3e97).
+   * Refuse it, and say why, so the model tries again without a size.
+   */
+  function sizeError(name: string, args: unknown): string | undefined {
+    const op = opIdOf(name)
+    if (!op.endsWith('.add') || !args || typeof args !== 'object') return undefined
+    const def = runtime.registry.objectType(op.slice(0, -'.add'.length))?.defaultSize
+    const { w, h } = args as { w?: unknown; h?: unknown }
+    if (!def) return undefined
+    const over = (v: unknown, max: number) => typeof v === 'number' && v > max
+    if (over(w, def.w * MAX_SIZE_FACTOR) || over(h, def.h * MAX_SIZE_FACTOR)) {
+      return `Size too large (default ${def.w}×${def.h}). Leave out w and h unless the person asks for a size.`
+    }
+    return undefined
   }
 }

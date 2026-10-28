@@ -133,6 +133,16 @@ describe('runTurn', () => {
     expect(views.of(map).map((v) => v.person)).toEqual([ada.id])
   })
 
+  it('refuses an add with a size far over its default, and lets the model try again', async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'add a map', selection: [] })
+    const model = scripted(tools(call('map__add', { args: { x: 0, y: 0, h: 4000.02 } })), tools(call('map__add', { args: { x: 0, y: 0 } })))
+    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
+    expect(reply.calls.map((c) => c.status)).toEqual(['failed', 'applied'])
+    expect(model.seen[1]!.at(-1)).toMatchObject({ role: 'tool', content: expect.stringContaining('Leave out w and h') })
+    expect(new Runtime({ doc, plugins, actor: ada }).board.list().filter((o) => o.type === 'map').map((o) => o.h)).toEqual([360])
+  })
+
   it('reports a failed search to the model', async () => {
     const { doc, chat } = board()
     const monty = { findEvents: async () => Promise.reject(new Error('Montandon search failed (401)')) } as unknown as MontyClient
