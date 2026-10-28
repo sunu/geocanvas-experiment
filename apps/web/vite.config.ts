@@ -11,6 +11,7 @@ export default defineConfig({
       '/monty': 'http://localhost:8787',
       '/tools': 'http://localhost:8787',
       '/notebooks': 'http://localhost:8787',
+      '/reliefweb': 'http://localhost:8787',
       '/uploads': 'http://localhost:8787',
     },
   },

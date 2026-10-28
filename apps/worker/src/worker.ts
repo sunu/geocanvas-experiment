@@ -9,6 +9,7 @@ import { openRouter } from './agent/openrouter'
 import { geocode } from './geocode'
 import { montySearch, stacSearch } from './monty'
 import { notebooksProxy } from './notebooks'
+import { reliefwebUpdates } from './reliefweb'
 import { json, serveUpload, storeUpload } from './uploads'
 import { uploadUrl, Uploads } from '@ttx/core'
 import { eventsSearch, geocodeTools, OpenCageGeocoder, OPENCAGE_URL } from '@ttx/plugins'
@@ -20,9 +21,10 @@ import { UpdateLog } from './updateLog'
  * /connect/<room> to that room's Durable Object, which speaks the standard y-websocket
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
  * /monty/search proxies Montandon STAC searches with the token added (monty.ts),
- * /tools/geocode proxies OpenCage with the key added (geocode.ts), and /notebooks/* reads
- * Notebook Factory, which sends no CORS headers (notebooks.ts). POST /uploads goes to the room the file
- * is for, which stores it in R2 and lists it on the board; GET /uploads/<id> serves it (uploads.ts).
+ * /tools/geocode proxies OpenCage with the key added (geocode.ts), and /notebooks/* and
+ * /reliefweb/updates read Notebook Factory and ReliefWeb, which send no CORS headers (notebooks.ts, reliefweb.ts).
+ * POST /uploads goes to the room the file is for, which stores it in R2 and lists it on the board;
+ * GET /uploads/<id> serves it (uploads.ts).
  * Each room also runs the board's agent (agent/agent.ts), which answers the board's chat.
  */
 
@@ -197,6 +199,7 @@ export default {
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
     if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
     if (path.startsWith('/notebooks/')) return notebooksProxy(request, env.NOTEBOOK_FACTORY_URL)
+    if (path === '/reliefweb/updates') return reliefwebUpdates(request)
     if (path === '/uploads') {
       if (request.method !== 'POST') return json(405, { error: 'POST only' })
       const room = new URL(request.url).searchParams.get('room') ?? ''
