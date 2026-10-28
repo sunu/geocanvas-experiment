@@ -551,6 +551,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
           setCamera((c) => zoomAt(c, 1 / c.z, r.width / 2, r.height / 2))
         }}
         status={status}
+        awareness={awareness}
         onPalette={() => setPaletteOpen(true)}
       />}
 
