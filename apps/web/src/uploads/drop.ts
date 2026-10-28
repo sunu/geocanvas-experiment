@@ -2,7 +2,8 @@ import { UPLOAD_TYPES, type Runtime, type UploadKind } from '@ttx/core'
 import { roomFromHash } from '../board/room'
 import { naturalSize } from '../images/ImageObject'
 import { loadPdf } from '../pdfs/pdf'
-import { frameHeight, uploadFile } from './upload'
+import { addPending, removePending, updatePending } from './pending'
+import { frameHeight, refusal, uploadFile } from './upload'
 
 type Size = { w: number; h: number }
 
@@ -10,25 +11,32 @@ type Size = { w: number; h: number }
 const STEP = 32
 
 /**
- * Upload files dropped on the board and place each one where it was dropped (placeUpload). Resolves with
- * the files that could not be added, with why.
+ * Upload files dropped on the board and place each one where it was dropped (placeUpload). Each file
+ * shows as a box with its progress where its object will go (pending.ts), replaced by the object; a file
+ * that cannot be added keeps its box with the reason, until dismissed.
  */
-export async function placeFiles(runtime: Runtime, files: File[], at: { x: number; y: number }): Promise<string[]> {
+export function placeFiles(runtime: Runtime, files: File[], at: { x: number; y: number }) {
+  files.forEach((file, i) => void placeFile(runtime, file, { x: at.x + i * STEP, y: at.y + i * STEP }))
+}
+
+async function placeFile(runtime: Runtime, file: File, at: { x: number; y: number }) {
+  const media = UPLOAD_TYPES[file.type] !== 'document'
+  const size = runtime.registry.objectType(media ? 'image' : 'pdf')!.defaultSize
+  // A picture's shape is known before uploading; a PDF's only once pdf.js has read it.
+  const picture = media ? await naturalSize(file) : undefined
+  const h = picture ? frameHeight(size.w, picture) : size.h
+  const key = addPending({ name: file.name, rect: { x: at.x - size.w / 2, y: at.y - h / 2, w: size.w, h } })
   const room = roomFromHash(location.hash)
-  if (!room) return ['This board has no room to upload to']
-  const failed: string[] = []
-  await Promise.all(
-    files.map(async (file, i) => {
-      try {
-        const id = await uploadFile(file, room, runtime.actor.id)
-        const kind = UPLOAD_TYPES[file.type]!
-        await placeUpload(runtime, { id, kind, name: file.name }, { x: at.x + i * STEP, y: at.y + i * STEP }, kind === 'media' ? await naturalSize(file) : undefined)
-      } catch (err) {
-        failed.push(`${file.name}: ${(err as Error).message}`)
-      }
-    }),
-  )
-  return failed
+  const refused = room ? refusal(file) : 'This board has no room to upload to'
+  if (refused) return updatePending(key, { error: refused })
+  try {
+    const id = await uploadFile(file, room!, runtime.actor.id, (sent) => updatePending(key, { progress: sent }))
+    updatePending(key, { progress: 1 })
+    await placeUpload(runtime, { id, kind: UPLOAD_TYPES[file.type]!, name: file.name }, at, picture)
+    removePending(key)
+  } catch (err) {
+    updatePending(key, { error: (err as Error).message })
+  }
 }
 
 /**
