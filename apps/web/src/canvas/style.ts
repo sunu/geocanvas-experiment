@@ -1,10 +1,10 @@
 /**
- * Colors and text sizes for boxes and text. Objects store a color by name, so the palette can be
- * retuned without touching boards. Objects made before these fields existed get the defaults.
+ * Colors for boxes and text. Objects store a color by name (the names, sizes and defaults are in
+ * @ttx/core, which the object schemas use), so this palette can be retuned without touching boards.
  */
+import type { ColorName } from '@ttx/core'
 
-export const COLORS = ['ink', 'gray', 'red', 'orange', 'yellow', 'green', 'blue', 'purple'] as const
-export type ColorName = (typeof COLORS)[number]
+export { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, FONT_SIZES, stepFontSize, type ColorName } from '@ttx/core'
 
 /** ink: text and swatch color; fill and stroke: a box's background and border. */
 export const PALETTE: Record<ColorName, { ink: string; fill: string; stroke: string }> = {
@@ -16,16 +16,4 @@ export const PALETTE: Record<ColorName, { ink: string; fill: string; stroke: str
   green: { ink: '#16a34a', fill: '#dcfce7', stroke: '#22c55e' },
   blue: { ink: '#2563eb', fill: '#dbeafe', stroke: '#3b82f6' },
   purple: { ink: '#9333ea', fill: '#f3e8ff', stroke: '#a855f7' },
-}
-
-export const DEFAULT_BOX_COLOR: ColorName = 'blue'
-export const DEFAULT_TEXT_COLOR: ColorName = 'ink'
-
-export const FONT_SIZES = [12, 14, 16, 20, 24, 32, 40, 48, 64, 80, 96] as const
-export const DEFAULT_FONT_SIZE = 20
-
-/** The next size up (1) or down (-1) in FONT_SIZES from any size; the same size at either end. */
-export function stepFontSize(size: number, dir: 1 | -1): number {
-  if (dir === 1) return FONT_SIZES.find((s) => s > size) ?? FONT_SIZES[FONT_SIZES.length - 1]!
-  return [...FONT_SIZES].reverse().find((s) => s < size) ?? FONT_SIZES[0]
 }

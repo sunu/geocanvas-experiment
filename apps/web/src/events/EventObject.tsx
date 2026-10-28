@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { HurricaneIcon, PulseIcon, SunIcon, WarningIcon, WavesIcon, type Icon } from '@phosphor-icons/react'
-import type { Board, BoardObject } from '../board/board'
+import type { ObjectViewProps } from '../canvas/registry'
 import { countryName } from './countries'
 import { createLiveSearch, type LiveState } from './liveSearch'
 import { monty } from './monty'
 import { overviewOf } from './search'
 import { sourceLabel } from './sources'
+import type { EventBoardObject } from './plugin'
 import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from './types'
-
-type EventBoardObject = Extract<BoardObject, { type: 'event' }>
 
 /** Phosphor has no earthquake symbol; a seismograph pulse stands in (see AGENTS.md on hazard icons). */
 const TYPE_ICON: Record<DisasterType, Icon> = { cyclone: HurricaneIcon, flood: WavesIcon, earthquake: PulseIcon, drought: SunIcon }
@@ -19,7 +18,7 @@ const LIMIT = 60
  * A disaster event from Montandon. Double-click to search for one (editing); picking an event ends editing.
  * The board stores only the event id, so everyone sees the same event and each browser fetches its details.
  */
-export function EventObject({ board, object: o, editing, onDone }: { board: Board; object: EventBoardObject; editing: boolean; onDone(): void }) {
+export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewProps<EventBoardObject>) {
   const bodyRef = useRef<HTMLDivElement>(null)
 
   // While editing, the wheel scrolls the results, not the canvas camera. The canvas listens natively,
@@ -33,8 +32,8 @@ export function EventObject({ board, object: o, editing, onDone }: { board: Boar
   }, [editing])
 
   const pick = (eventId: string) => {
-    board.undo.stopCapturing()
-    board.update({ [o.id]: { eventId } })
+    runtime.beginGesture()
+    runtime.dispatch('event.setEvent', { kind: 'objects', ids: [o.id] }, { eventId })
     onDone()
   }
 

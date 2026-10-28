@@ -2,11 +2,10 @@ import { useEffect, useRef } from 'react'
 import { Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
-import type { Board, BoardObject } from '../board/board'
+import type { ObjectViewProps } from '../canvas/registry'
 import { BASEMAPS, basemapStyle, type Basemap } from './basemaps'
 import { loadView, saveView } from './localView'
-
-type MapBoardObject = Extract<BoardObject, { type: 'map' }>
+import type { MapBoardObject } from './plugin'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
 // build the worker (?worker&url) and point MapLibre at it. MapLibre 6 also draws right-to-left
@@ -17,7 +16,7 @@ setWorkerUrl(workerUrl)
  * A live MapLibre map on the canvas. Double-click to pan and zoom it (editing); Esc or a
  * click outside gives the pointer back to the canvas. The basemap is shared; the view is not.
  */
-export function MapObject({ board, object: o, editing }: { board: Board; object: MapBoardObject; editing: boolean }) {
+export function MapObject({ runtime, object: o, editing }: ObjectViewProps<MapBoardObject>) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const glRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap>(null)
@@ -77,8 +76,8 @@ export function MapObject({ board, object: o, editing }: { board: Board; object:
           value={o.basemap}
           onPointerDown={(e) => e.stopPropagation()}
           onChange={(e) => {
-            board.undo.stopCapturing()
-            board.update({ [o.id]: { basemap: e.target.value as Basemap } })
+            runtime.beginGesture()
+            runtime.dispatch('map.setBasemap', { kind: 'objects', ids: [o.id] }, { basemap: e.target.value })
           }}
         >
           {BASEMAPS.map((b) => (

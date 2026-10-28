@@ -250,7 +250,8 @@ export class Runtime {
    */
   private log(op: OpDef<any, any> | undefined, record: InvocationRecord) {
     if (op?.applyView) return
-    const key = op?.gesture && record.status === 'applied' ? `${record.opId} ${JSON.stringify(record.target)}` : record.id
+    // Failed gesture dispatches merge too, so a drag that keeps failing is one entry, not one per frame.
+    const key = op?.gesture ? `${record.opId} ${record.status} ${JSON.stringify(record.target)}` : record.id
     const prev = this.pending.get(key)
     // Keep the first id: the undo step carries it.
     this.pending.set(key, prev ? { ...record, id: prev.id, at: prev.at } : record)

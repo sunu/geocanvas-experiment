@@ -1,8 +1,9 @@
 import { MinusIcon, PlusIcon, TextAaIcon } from '@phosphor-icons/react'
-import type { Board, BoardObject } from '../board/board'
-import { requestFit } from './ObjectView'
+import type { Runtime } from '@ttx/core'
+import type { BoardObject } from '../board/board'
+import { requestFit } from './coreUI'
 import { ICON } from './Toolbar'
-import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE, stepFontSize, type ColorName } from './style'
+import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_TEXT_COLOR, PALETTE, type ColorName } from './style'
 
 type Styled = Extract<BoardObject, { type: 'box' | 'text' }>
 type Text = Extract<BoardObject, { type: 'text' }>
@@ -11,7 +12,7 @@ const colorOf = (o: Styled): ColorName => o.color ?? (o.type === 'box' ? DEFAULT
 const sizeOf = (t: Text) => t.fontSize ?? DEFAULT_FONT_SIZE
 
 /** Color and text size for the selected boxes and texts. Hidden when none are selected. */
-export function StylePanel({ board, selected }: { board: Board; selected: BoardObject[] }) {
+export function StylePanel({ runtime, selected }: { runtime: Runtime; selected: BoardObject[] }) {
   const styled = selected.filter((o): o is Styled => o.type === 'box' || o.type === 'text')
   if (!styled.length) return null
   const texts = styled.filter((o): o is Text => o.type === 'text')
@@ -20,13 +21,13 @@ export function StylePanel({ board, selected }: { board: Board; selected: BoardO
 
   // Each press is its own undo step.
   const setColor = (color: ColorName) => {
-    board.undo.stopCapturing()
-    board.update(Object.fromEntries(styled.map((o) => [o.id, { color }])))
+    runtime.beginGesture()
+    runtime.dispatch('core.object.setColor', { kind: 'objects', ids: styled.map((o) => o.id) }, { color })
   }
   const stepSize = (dir: 1 | -1) => {
-    board.undo.stopCapturing()
+    runtime.beginGesture()
     for (const t of texts) requestFit(t.id)
-    board.update(Object.fromEntries(texts.map((t) => [t.id, { fontSize: stepFontSize(sizeOf(t), dir) }])))
+    runtime.dispatch(dir === 1 ? 'text.larger' : 'text.smaller', { kind: 'objects', ids: texts.map((t) => t.id) }, {})
   }
 
   return (

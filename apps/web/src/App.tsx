@@ -12,8 +12,9 @@ if (!room) {
 // Editing the hash to change room does not reload the page by itself.
 addEventListener('hashchange', () => location.reload())
 
-const { board, provider } = connect(room)
-if (import.meta.env.DEV) Object.assign(window, { board, provider })
+const { board, runtime, provider } = connect(room)
+// In dev, run ops and tools from the console, e.g. runtime.callTool('box__add', { args: { x: 0, y: 0 } }).
+if (import.meta.env.DEV) Object.assign(window, { board, runtime, provider })
 
 /** Open a new, empty board (through hashchange, which reloads into it). */
 function newBoard() {
@@ -24,7 +25,7 @@ export function App() {
   const status = useConnectionStatus(provider)
   return (
     <>
-      <Canvas board={board} status={status} />
+      <Canvas runtime={runtime} status={status} />
       <div className="ttx-boardbar">
         <button title="Start a new, empty board with its own link" onClick={newBoard}>
           <PlusIcon size={16} />

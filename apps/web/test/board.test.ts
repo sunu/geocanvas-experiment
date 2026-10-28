@@ -1,110 +1,53 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Board } from '../src/board/board'
+import { corePlugin, Runtime } from '@ttx/core'
+import { eventsPlugin } from '../src/events/plugin'
+import { mapPlugin } from '../src/map/plugin'
 import { newRoomId, roomFromHash, roomHash } from '../src/board/room'
 
-/** Texts stack in the order they are added (new boxes and maps go to the bottom instead). */
-const item = (x = 0) => ({ type: 'text' as const, x, y: 0, w: 10, h: 10, text: '' })
-const order = (b: Board) => b.list().map((o) => o.x)
+// The headless plugins of plugins.ts (that file also loads the React views).
+const runtime = (doc = new Y.Doc()) => new Runtime({ doc, plugins: [corePlugin, mapPlugin, eventsPlugin], actor: { kind: 'user', id: 'a' } })
+const canvas = { kind: 'canvas' } as const
 
-/** A board with texts at x = 0, 1, 2, ... added in that order (so bottom to top). */
-function boardWith(n: number) {
-  const board = new Board(new Y.Doc())
-  const ids = Array.from({ length: n }, (_, i) => board.add(item(i)))
-  return { board, ids }
-}
-
-describe('Board layer order', () => {
-  it('adds new text and events on top, and new boxes and maps at the bottom', () => {
-    const { board } = boardWith(2)
-    board.add({ type: 'box', x: 10, y: 0, w: 10, h: 10 })
-    board.add({ type: 'map', x: 11, y: 0, w: 10, h: 10, basemap: 'light' })
-    board.add(item(12))
-    board.add({ type: 'event', x: 13, y: 0, w: 10, h: 10 })
-    expect(order(board)).toEqual([11, 10, 0, 1, 12, 13])
+describe('the app plugins', () => {
+  it('add new texts and events on top, and new boxes and maps at the bottom', () => {
+    const rt = runtime()
+    for (const [type, x] of [['text', 0], ['text', 1], ['box', 10], ['map', 11], ['text', 12], ['event', 13]] as const) {
+      expect(rt.dispatch(`${type}.add`, canvas, { x, y: 0, w: 10, h: 10 }).status).toBe('applied')
+    }
+    expect(rt.board.list().map((o) => o.x)).toEqual([11, 10, 0, 1, 12, 13])
+    expect(rt.board.list()[0]).toMatchObject({ type: 'map', basemap: 'light' })
   })
 
-  it('brings a selection to the front and sends it to the back, keeping its own order', () => {
-    const { board, ids } = boardWith(4)
-    board.bringToFront(new Set([ids[0]!, ids[1]!]))
-    expect(order(board)).toEqual([2, 3, 0, 1])
-    board.sendToBack(new Set([ids[3]!, ids[1]!]))
-    expect(order(board)).toEqual([3, 1, 2, 0])
+  it('set the basemap and the event through ops, checked against their fields', () => {
+    const rt = runtime()
+    const map = rt.dispatch('map.add', canvas, {}).created![0]!
+    const event = rt.dispatch('event.add', canvas, {}).created![0]!
+    expect(rt.dispatch('map.setBasemap', { kind: 'objects', ids: [map] }, { basemap: 'satellite' }).status).toBe('applied')
+    expect(rt.dispatch('map.setBasemap', { kind: 'objects', ids: [map] }, { basemap: 'moon' }).status).toBe('failed')
+    expect(rt.dispatch('event.setEvent', { kind: 'objects', ids: [event] }, { eventId: 'usgs-123' }).status).toBe('applied')
+    expect(rt.dispatch('event.setEvent', { kind: 'objects', ids: [map] }, { eventId: 'usgs-123' }).status).toBe('failed')
+    expect(rt.board.get(map)).toMatchObject({ basemap: 'satellite' })
+    expect(rt.board.get(event)).toMatchObject({ eventId: 'usgs-123' })
   })
 
-  it('steps one place forward and backward, past unselected neighbours only', () => {
-    const { board, ids } = boardWith(4)
-    board.step(new Set([ids[0]!]), 1)
-    expect(order(board)).toEqual([1, 0, 2, 3])
-    board.step(new Set([ids[0]!, ids[1]!]), 1)
-    expect(order(board)).toEqual([2, 1, 0, 3])
-    board.step(new Set([ids[3]!]), 1) // already on top
-    expect(order(board)).toEqual([2, 1, 0, 3])
-    board.step(new Set([ids[3]!]), -1)
-    expect(order(board)).toEqual([2, 1, 3, 0])
-  })
-
-  it('keeps stepping when floats between two neighbours run out', () => {
-    const { board, ids } = boardWith(3)
-    const renumber = vi.spyOn(board as unknown as { normalizeZ(): void }, 'normalizeZ')
-    for (let i = 0; i < 200; i++) board.step(new Set([ids[i % 2 === 0 ? 2 : 1]!]), -1)
-    expect(renumber).toHaveBeenCalled()
-    expect(new Set(order(board)).size).toBe(3)
-    expect(board.list().every((o) => Number.isFinite(o.z))).toBe(true)
-  })
-})
-
-describe('Board sync and undo', () => {
-  it('merges two people moving different objects', () => {
-    const a = new Board(new Y.Doc())
-    const b = new Board(new Y.Doc())
-    const id = a.add(item())
-    Y.applyUpdate(b.doc, Y.encodeStateAsUpdate(a.doc))
-    a.update({ [id]: { x: 50 } })
-    b.update({ [id]: { w: 99 } })
-    Y.applyUpdate(a.doc, Y.encodeStateAsUpdate(b.doc))
-    Y.applyUpdate(b.doc, Y.encodeStateAsUpdate(a.doc))
-    expect(a.get(id)).toMatchObject({ x: 50, w: 99 })
-    expect(b.get(id)).toEqual(a.get(id))
-  })
-
-  it('undoes only your own edits, one gesture at a time', () => {
-    const a = new Board(new Y.Doc())
-    const b = new Board(new Y.Doc())
-    a.doc.on('update', (u: Uint8Array) => Y.applyUpdate(b.doc, u, 'remote'))
-    b.doc.on('update', (u: Uint8Array, origin: unknown) => origin !== 'remote' && Y.applyUpdate(a.doc, u, 'remote'))
-
-    const id = a.add(item())
-    a.undo.stopCapturing()
-    a.update({ [id]: { x: 10 } })
-    a.update({ [id]: { x: 20 } }) // same gesture (a drag)
-    b.update({ [id]: { y: 5 } }) // someone else
-
-    a.undo.undo()
-    expect(a.get(id)).toMatchObject({ x: 0, y: 5 })
-    a.undo.undo()
-    expect(a.get(id)).toBeUndefined()
-    a.undo.redo()
-    expect(b.get(id)).toMatchObject({ x: 0 })
-  })
-})
-
-describe('Board snapshot', () => {
-  it('reflects changes that arrived before anyone subscribed, and stays the same array until the next change', () => {
-    const a = new Board(new Y.Doc())
-    a.add(item(1))
-    const b = new Board(new Y.Doc())
-    Y.applyUpdate(b.doc, Y.encodeStateAsUpdate(a.doc), 'remote') // e.g. the first sync from the server
-    const first = b.snapshot()
-    expect(first.map((o) => o.x)).toEqual([1])
-    expect(b.snapshot()).toBe(first)
-
-    let calls = 0
-    b.subscribe(() => calls++)
-    b.add(item(2))
-    expect(calls).toBe(1)
-    expect(b.snapshot()).not.toBe(first)
-    expect(b.snapshot().map((o) => o.x)).toEqual([1, 2])
+  it('read and edit boards made before the op runtime', () => {
+    // The board format before ops: flat fields on a Y.Map per object, no color or fontSize yet.
+    const doc = new Y.Doc()
+    const old = (id: string, fields: Record<string, unknown>) => {
+      const m = new Y.Map<unknown>()
+      for (const [k, v] of Object.entries(fields)) m.set(k, v)
+      doc.getMap('objects').set(id, m)
+    }
+    old('t', { type: 'text', x: 0, y: 0, w: 240, h: 40, z: 1, text: 'hello' })
+    old('m', { type: 'map', x: 0, y: 0, w: 520, h: 360, z: 0, basemap: 'dark' })
+    old('e', { type: 'event', x: 0, y: 0, w: 380, h: 320, z: 2 })
+    const rt = runtime(doc)
+    expect(rt.board.list().map((o) => o.id)).toEqual(['m', 't', 'e'])
+    expect(rt.dispatch('core.object.setColor', { kind: 'objects', ids: ['t'] }, { color: 'red' }).status).toBe('applied')
+    expect(rt.dispatch('core.object.setRect', { kind: 'objects', ids: ['m', 'e'] }, { rects: { m: { x: 5 }, e: { x: 6 } } }).status).toBe('applied')
+    expect(rt.board.get('t')).toMatchObject({ text: 'hello', color: 'red' })
+    expect(rt.board.get('e')).toMatchObject({ x: 6 })
   })
 })
 
