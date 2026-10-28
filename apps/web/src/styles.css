@@ -2084,3 +2084,38 @@ body,
   font-size: 10px;
   text-align: center;
 }
+
+/* The value under the pointer on a choropleth, while a map is edited. Above the deck.gl canvas. */
+.ttx-map__hover {
+  position: absolute;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.75);
+  color: #fff;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* A choropleth's classes in the map's layer list. */
+.ttx-layers__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 2px;
+}
+
+.ttx-layers__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ttx-layers__legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
