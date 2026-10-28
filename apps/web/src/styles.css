@@ -160,6 +160,38 @@ body,
   cursor: nesw-resize;
 }
 
+/* Other people: their cursors and selections, in their color (canvas/Peers.tsx). */
+.ttx-peer-selection {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px dashed;
+  border-radius: 2px;
+}
+
+.ttx-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: transform 100ms linear;
+}
+
+.ttx-cursor svg {
+  display: block;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+}
+
+.ttx-cursor__name {
+  position: absolute;
+  left: 12px;
+  top: 16px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
 /* --- Toolbar ------------------------------------------------------------ */
 
 .ttx-toolbar {

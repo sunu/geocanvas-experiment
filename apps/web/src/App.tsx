@@ -1,5 +1,6 @@
 import { PlusIcon } from '@phosphor-icons/react'
 import { connect, useConnectionStatus } from './board/connect'
+import { loadUser } from './board/presence'
 import { newRoomId, roomFromHash, roomHash } from './board/room'
 import { Canvas } from './canvas/Canvas'
 
@@ -13,6 +14,7 @@ if (!room) {
 addEventListener('hashchange', () => location.reload())
 
 const { board, provider } = connect(room)
+provider.awareness.setLocalStateField('user', loadUser())
 if (import.meta.env.DEV) Object.assign(window, { board, provider })
 
 /** Open a new, empty board (through hashchange, which reloads into it). */
@@ -24,7 +26,7 @@ export function App() {
   const status = useConnectionStatus(provider)
   return (
     <>
-      <Canvas board={board} status={status} />
+      <Canvas board={board} status={status} awareness={provider.awareness} />
       <div className="ttx-boardbar">
         <button title="Start a new, empty board with its own link" onClick={newBoard}>
           <PlusIcon size={16} />

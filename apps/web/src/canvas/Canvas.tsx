@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Board, BoardObject } from '../board/board'
+import type { WebsocketProvider } from 'y-websocket'
 import { useObjects, type ConnectionStatus } from '../board/connect'
+import { cursorSender, usePeers } from '../board/presence'
 import { objectType, objectTypes } from '../objects/registry'
 import { requestFit } from '../objects/text'
 import { intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
 import { ObjectView } from './ObjectView'
+import { Peers } from './Peers'
 import { StylePanel } from './StylePanel'
 import { Toolbar, type Tool } from './Toolbar'
 
@@ -38,7 +41,14 @@ function trackDrag(
   window.addEventListener('pointerup', up)
 }
 
-export function Canvas({ board, status }: { board: Board; status: ConnectionStatus }) {
+interface Props {
+  board: Board
+  status: ConnectionStatus
+  /** Presence: who else is here, their cursors and selections (board/presence.ts). */
+  awareness: WebsocketProvider['awareness']
+}
+
+export function Canvas({ board, status, awareness }: Props) {
   const objects = useObjects(board)
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, z: 1 })
   const [tool, setTool] = useState<Tool>('select')
@@ -55,6 +65,14 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
   const byId = useMemo(() => new Map(objects.map((o) => [o.id, o])), [objects])
   const selected = useMemo(() => new Set([...selection].filter((id) => byId.has(id))), [selection, byId])
   const editingId = editing && byId.has(editing) ? editing : null
+
+  const peers = usePeers(awareness)
+  const sendCursor = useMemo(() => cursorSender(awareness), [awareness])
+  // Share what this person has selected. Keyed by the ids, so other board changes send nothing.
+  const selectionKey = [...selected].sort().join(',')
+  useEffect(() => {
+    awareness.setLocalStateField('selection', selectionKey ? selectionKey.split(',') : [])
+  }, [awareness, selectionKey])
 
   // An object left empty when editing ends (e.g. a text with nothing typed) is removed.
   const lastEditing = useRef<string | null>(null)
@@ -252,6 +270,11 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
       style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px` }}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
+      onPointerMove={(e) => {
+        const p = screenPoint(e)
+        sendCursor(toWorld(cameraRef.current, p.x, p.y))
+      }}
+      onPointerLeave={() => sendCursor(null)}
     >
       <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})` }}>
         {objects.map((o, i) => (
@@ -262,6 +285,7 @@ export function Canvas({ board, status }: { board: Board; status: ConnectionStat
 
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
+        <Peers peers={peers} camera={camera} byId={byId} />
         {[...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
