@@ -239,6 +239,14 @@ const viewOps = [
     args: z.object({}),
     applyView: (view) => view.resetZoom(),
   }),
+  defineOp({
+    id: 'core.view.focus',
+    title: 'Focus',
+    description: 'Open one object full screen with its options. Changes made there are seen by others only once shared.',
+    target: { kind: 'objects', min: 1, max: 1 },
+    args: z.object({}),
+    applyView: (view, _args, target) => view.focus(idsOf(target)[0]!),
+  }),
 ]
 
 export const corePlugin = definePlugin({

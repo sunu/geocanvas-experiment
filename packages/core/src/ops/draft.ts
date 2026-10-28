@@ -17,6 +17,7 @@ export class Draft {
   readonly runtime: Runtime
   private readonly main: Runtime
   private unshared = false
+  private listeners = new Set<() => void>()
 
   constructor(main: Runtime) {
     this.main = main
@@ -26,13 +27,21 @@ export class Draft {
     main.board.doc.on('update', this.fromMain)
     // A state vector misses deletions (they add no clock), so track own changes per transaction.
     doc.on('afterTransaction', (tr: Y.Transaction) => {
-      if (tr.origin !== FROM_MAIN && (tr.changed.size > 0 || tr.deleteSet.clients.size > 0)) this.unshared = true
+      if (tr.origin !== FROM_MAIN && (tr.changed.size > 0 || tr.deleteSet.clients.size > 0)) this.setUnshared(true)
     })
   }
 
   /** The draft has changes that the main doc does not have yet. */
   hasUnshared(): boolean {
     return this.unshared
+  }
+
+  /** Call `listener` when hasUnshared() changes. Returns the unsubscribe function. */
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
   }
 
   /** Send the draft's changes to the main doc, as one undo step there. Returns false if there were none. */
@@ -42,7 +51,7 @@ export class Draft {
     // Only what the main doc lacks. Main's own changes are already in it, and so are earlier shares.
     const update = Y.encodeStateAsUpdate(this.runtime.board.doc, Y.encodeStateVector(this.main.board.doc))
     this.main.applyDraft(update)
-    this.unshared = false
+    this.setUnshared(false)
     return true
   }
 
@@ -51,6 +60,12 @@ export class Draft {
     this.main.board.doc.off('update', this.fromMain)
     this.runtime.destroy()
     this.runtime.board.doc.destroy()
+  }
+
+  private setUnshared(value: boolean) {
+    if (this.unshared === value) return
+    this.unshared = value
+    for (const listener of this.listeners) listener()
   }
 
   private fromMain = (update: Uint8Array) => {

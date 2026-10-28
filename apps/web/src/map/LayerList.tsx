@@ -1,0 +1,39 @@
+import { CrosshairSimpleIcon, XIcon } from '@phosphor-icons/react'
+import { hasArea, type MapLayer } from '@ttx/plugins'
+import { attributionOf, truncationOf, type LayerState } from './layers'
+
+interface Props {
+  /** The recipes, in the same order as `states`. */
+  layers: MapLayer[]
+  states: LayerState[]
+  onUseMyView(id: string): void
+  onRemove(id: string): void
+}
+
+/** A map's data layers, in its Options panel: title, status or attribution, and actions. */
+export function LayerList({ layers, states, onUseMyView, onRemove }: Props) {
+  if (!states.length) return <p className="ttx-options__empty">No data layers yet.</p>
+  return (
+    <div className="ttx-layers">
+      {states.map((s, i) => {
+        const note = s.error ?? (s.loading ? 'Loading…' : [truncationOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
+        return (
+          <div key={s.id} className={`ttx-layers__item ${s.error ? 'is-error' : ''}`}>
+            <div className="ttx-layers__text">
+              <div className="ttx-layers__title">{s.title}</div>
+              {note && <div className="ttx-layers__note">{note}</div>}
+            </div>
+            {layers[i] && hasArea(layers[i]) && (
+              <button type="button" title="Show this layer for your current view" aria-label={`Use my view for ${s.title}`} onClick={() => onUseMyView(s.id)}>
+                <CrosshairSimpleIcon size={14} />
+              </button>
+            )}
+            <button type="button" title="Remove layer" aria-label={`Remove layer ${s.title}`} onClick={() => onRemove(s.id)}>
+              <XIcon size={14} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}

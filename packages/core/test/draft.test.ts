@@ -79,6 +79,16 @@ describe('Draft', () => {
     expect(xOf(me, id)).toBe(5)
   })
 
+  it('tells listeners when it gets unshared changes and when they are shared', () => {
+    const { draft, id } = setup()
+    const seen: boolean[] = []
+    draft.subscribe(() => seen.push(draft.hasUnshared()))
+    moveTo(draft.runtime, id, 5)
+    moveTo(draft.runtime, id, 6)
+    draft.share()
+    expect(seen).toEqual([true, false])
+  })
+
   it('has nothing to share when nothing changed', () => {
     const { me, draft } = setup()
     const steps = me.undoManager.undoStack.length
