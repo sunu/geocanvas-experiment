@@ -6,7 +6,7 @@ import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { Agent, AGENT } from './agent/agent'
 import { openRouter } from './agent/openrouter'
-import { eventsSearch } from './agent/tools'
+import { eventsSearch, geocodeSearch } from './agent/tools'
 import { montySearch, stacSearch } from './monty'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
@@ -21,7 +21,7 @@ import { UpdateLog } from './updateLog'
 
 const MESSAGE_SYNC = 0
 const MESSAGE_AWARENESS = 1
-/** Merge the stored updates into one row when there are more than this. */
+/** Merge the stored updates into one row when there are more than this: on load, and while the room runs. */
 const COMPACT_AFTER = 500
 
 /**
@@ -37,6 +37,8 @@ const COMPACT_AFTER = 500
 export class Room extends DurableObject<Env> {
   private doc = new Y.Doc()
   private log: UpdateLog
+  /** Updates in the log since it was last compacted. */
+  private logged = 0
   private awareness = new awarenessProtocol.Awareness(this.doc)
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -48,10 +50,15 @@ export class Room extends DurableObject<Env> {
     this.log = new UpdateLog(ctx.storage)
     const updates = this.log.readAll()
     for (const update of updates) Y.applyUpdate(this.doc, update, this)
-    if (updates.length > COMPACT_AFTER) this.log.replaceAll(Y.encodeStateAsUpdate(this.doc))
+    this.logged = updates.length
+    if (this.logged > COMPACT_AFTER) this.compact()
 
     this.doc.on('update', (update: Uint8Array, origin: unknown) => {
-      if (origin !== this) this.log.append(update)
+      if (origin !== this) {
+        this.log.append(update)
+        // A busy room may stay in memory for long (map pans, the agent), so do not wait for a load to compact.
+        if (++this.logged > COMPACT_AFTER) this.compact()
+      }
       this.broadcast(syncMessage((enc) => syncProtocol.writeUpdate(enc, update)))
     })
     this.awareness.on('update', ({ added, updated, removed }: AwarenessChange, socket: unknown) => {
@@ -71,11 +78,19 @@ export class Room extends DurableObject<Env> {
     new Agent({
       doc: this.doc,
       complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
-      tools: env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : [],
+      tools: [
+        geocodeSearch,
+        ...(env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : []),
+      ],
       // The agent's presence: people see "Agent is thinking…" while it works.
       onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
       keepAlive: (work) => ctx.waitUntil(work),
     })
+  }
+
+  private compact() {
+    this.log.replaceAll(Y.encodeStateAsUpdate(this.doc))
+    this.logged = 1
   }
 
   override async fetch(): Promise<Response> {

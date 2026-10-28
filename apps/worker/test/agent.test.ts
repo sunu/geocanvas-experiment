@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, Runtime, type Actor, type AgentReply } from '@ttx/core'
+import { Chat, Runtime, Views, type Actor, type AgentReply } from '@ttx/core'
 import { plugins } from '@ttx/plugins'
 import { Agent, TURNS_PER_HOUR } from '../src/agent/agent'
 import { MAX_STEPS, runTurn } from '../src/agent/loop'
 import type { Complete, Message } from '../src/agent/openrouter'
-import { eventsSearch } from '../src/agent/tools'
+import { eventsSearch, geocodeSearch, type ReadTool } from '../src/agent/tools'
 import type { MontyClient } from '@ttx/plugins/monty/client'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
@@ -45,7 +45,7 @@ describe('runTurn', () => {
     const reply = await runTurn(agent, message, model.complete)
 
     const request = model.seen[0]![1]!.content as string
-    expect(request).toContain('Ada asks: delete these')
+    expect(request).toContain('Ada (person id ada) asks: delete these')
     expect(request).toContain(`Selected (2):\n- box ${a}`)
     expect(request.split('Selected')[1]).not.toContain(c)
     expect(person.board.list().map((o) => o.id)).toEqual([c])
@@ -107,6 +107,30 @@ describe('runTurn', () => {
       ['event.add', 'applied'],
     ])
     expect(reply.undo!.created).toHaveLength(1)
+  })
+
+  it("finds a place, adds a map, and shows the place in the asker's view only", async () => {
+    const { doc, chat } = board()
+    const india = { west: 67.9, south: 6.6, east: 97.4, north: 35.7 }
+    const geocoder: ReadTool = { title: 'Find place', tool: geocodeSearch.tool, run: async () => JSON.stringify([{ name: 'India', area: india }]) }
+    const message = chat.send({ actor: ada, text: 'add a map and zoom to India', selection: [] })
+    let map = ''
+    const model: Complete = async (messages) => {
+      const last = messages.at(-1)!
+      if (last.role === 'user') return tools(call('geocode__search', { text: 'India' }))
+      if (last.role === 'tool' && last.content.includes('India')) return tools(call('map__add', { args: { x: 0, y: 0 } }))
+      if (!map && last.role === 'tool') {
+        map = (JSON.parse(last.content) as { created: string[] }).created[0]!
+        return tools(call('map__showArea', { ids: [map], args: { ...india, for: [ada.id] } }))
+      }
+      return { role: 'assistant', content: 'Done.' }
+    }
+    new Views(doc).set('ben', 'nothing-yet', { center: [0, 0], zoom: 1, bearing: 0 })
+    const reply = await runTurn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model, [geocoder])
+    expect(reply.calls.map((c) => c.status)).toEqual(['applied', 'applied', 'applied'])
+    const views = new Views(doc)
+    expect(views.get(ada.id, map)?.zoom).toBeGreaterThan(2)
+    expect(views.of(map).map((v) => v.person)).toEqual([ada.id])
   })
 
   it('reports a failed search to the model', async () => {

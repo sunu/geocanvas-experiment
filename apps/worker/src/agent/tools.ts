@@ -74,7 +74,7 @@ export const geocodeSearch: ReadTool = {
     function: {
       name: 'geocode__search',
       description:
-        'Find a place by name (a country, region, city, river, ...) and get its area: west, south, east and north in degrees, for map__focus or for the focus of map__add. Results are best match first.',
+        'Find a place by name (a country, region, city, river, ...) and get its area: west, south, east and north in degrees, for map__showArea. Results are best match first.',
       parameters: {
         type: 'object',
         properties: {

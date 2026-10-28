@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, Runtime, type Actor, type AnyObject } from '@ttx/core'
-import { plugins } from '../src/index'
+import { Chat, Runtime, Views, type Actor, type AnyObject } from '@ttx/core'
+import { areaOfView, plugins, viewOfArea } from '../src/index'
 
 const user: Actor = { kind: 'user', id: 'u1', name: 'Ada' }
 const agent: Actor = { kind: 'agent', id: 'agent', name: 'Agent' }
@@ -79,24 +79,84 @@ describe('agent.undoTurn', () => {
   })
 })
 
-describe('map focus', () => {
-  const india = { west: 67.9, south: 6.6, east: 97.4, north: 35.7 }
+describe('views', () => {
+  const view = { center: [85.3, 27.7] as [number, number], zoom: 6, bearing: 0 }
 
-  it('adds a map that shows an area, and moves maps to an area again even when it is the same', async () => {
-    const { people } = setup()
-    const map = people.dispatch('map.add', canvas, { x: 0, y: 0, focus: india }).created![0]!
-    expect(people.board.get(map)).toMatchObject({ focus: india })
-    const first = await people.invoke('map.focus', { kind: 'objects', ids: [map] }, india)
-    expect(first.status).toBe('applied')
-    const at = (people.board.get(map) as unknown as { focus: { at: number } }).focus.at
-    await new Promise((resolve) => setTimeout(resolve, 2))
-    await people.invoke('map.focus', { kind: 'objects', ids: [map] }, india)
-    expect((people.board.get(map) as unknown as { focus: { at: number } }).focus.at).toBeGreaterThan(at)
+  it("keeps each person's view, finds the latest, and forgets the views of deleted objects", () => {
+    const { doc, people, add } = setup()
+    const map = add('map', { x: 0, y: 0 })
+    const views = new Views(doc)
+    views.set('ada', map, { ...view, at: 1 })
+    views.set('ben', map, { ...view, zoom: 3, at: 2 })
+    expect(views.get('ada', map)?.zoom).toBe(6)
+    expect(views.latest(map)).toMatchObject({ person: 'ben', view: { zoom: 3 } })
+    people.dispatch('core.object.delete', { kind: 'objects', ids: [map] }, {})
+    expect(views.of(map)).toEqual([])
   })
 
-  it('refuses an area outside the globe', async () => {
-    const { people } = setup()
-    const map = people.dispatch('map.add', canvas, { x: 0, y: 0 }).created![0]!
-    expect((await people.invoke('map.focus', { kind: 'objects', ids: [map] }, { ...india, north: 120 })).status).toBe('failed')
+  it('keeps views when an agent turn is undone', async () => {
+    const { doc, people, bot, chat, add } = setup()
+    const map = add('map', { x: 0, y: 0 })
+    new Views(doc).set('ada', map, view)
+    const before = { [map]: people.board.get(map)! }
+    await bot.callTool('map__setBasemap', { ids: [map], args: { basemap: 'dark' } })
+    const reply = chat.reply({ replyTo: 'm', text: '', calls: [], undo: { created: [], before } })
+    await people.invoke('agent.undoTurn', canvas, { replyId: reply.id })
+    expect(people.board.get(map)).toMatchObject({ basemap: 'light' })
+    expect(new Views(doc).get('ada', map)?.zoom).toBe(6)
+  })
+})
+
+describe('map views as areas', () => {
+  const india = { west: 67.9, south: 6.6, east: 97.4, north: 35.7 }
+
+  it('fits an area in a map, and reads it back as an area that contains it', () => {
+    const view = viewOfArea(india, 520, 327)
+    const back = areaOfView(view, 520, 327)
+    expect(back.west).toBeLessThanOrEqual(india.west)
+    expect(back.east).toBeGreaterThanOrEqual(india.east)
+    expect(back.south).toBeLessThanOrEqual(india.south)
+    expect(back.north).toBeGreaterThanOrEqual(india.north)
+    // Not much more than India: the area fills the map, less the padding.
+    expect(back.north - back.south).toBeLessThan((india.north - india.south) * 1.5)
+  })
+
+  it('handles an area across the antimeridian (Fiji)', () => {
+    const view = viewOfArea({ west: 176, south: -21, east: -178, north: -12 }, 520, 327)
+    expect(Math.abs(view.center[0])).toBeGreaterThan(178)
+  })
+})
+
+describe('map.showArea', () => {
+  const india = { west: 67.9, south: 6.6, east: 97.4, north: 35.7 }
+  const zoomOf = (doc: Y.Doc, person: string, map: string) => new Views(doc).get(person, map)?.zoom
+
+  it("changes the runner's view by default, given people's, or everyone's", async () => {
+    const { doc, people, bot, add } = setup()
+    const map = add('map', { x: 0, y: 0 })
+    const views = new Views(doc)
+    views.set('ben', map, { center: [0, 0], zoom: 1, bearing: 0 })
+    const target = { kind: 'objects' as const, ids: [map] }
+
+    expect((await people.invoke('map.showArea', target, india)).status).toBe('applied')
+    expect(zoomOf(doc, user.id, map)).toBeGreaterThan(2)
+    expect(zoomOf(doc, 'ben', map)).toBe(1)
+
+    expect((await bot.callTool('map__showArea', { ids: [map], args: { ...india, for: ['ben'] } })).status).toBe('applied')
+    expect(zoomOf(doc, 'ben', map)).toBeGreaterThan(2)
+
+    const kathmandu = { west: 85.27, south: 27.66, east: 85.37, north: 27.75 }
+    await bot.callTool('map__showArea', { ids: [map], args: { ...kathmandu, for: 'everyone' } })
+    expect(zoomOf(doc, user.id, map)).toBeGreaterThan(9)
+    expect(zoomOf(doc, 'ben', map)).toBeGreaterThan(9)
+    // So people who open the map later start at Kathmandu too.
+    expect(views.latest(map)?.view.zoom).toBeGreaterThan(9)
+  })
+
+  it('asks an agent whose views to change, and refuses an area outside the globe', async () => {
+    const { people, bot, add } = setup()
+    const map = add('map', { x: 0, y: 0 })
+    expect((await bot.callTool('map__showArea', { ids: [map], args: india })).error).toMatch(/Give `for`/)
+    expect((await people.invoke('map.showArea', { kind: 'objects', ids: [map] }, { ...india, north: 120 })).status).toBe('failed')
   })
 })

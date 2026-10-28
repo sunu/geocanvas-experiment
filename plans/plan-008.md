@@ -95,7 +95,7 @@ The `Chat` class has `send`, `reply`, `list`, `subscribe`, and `pending` (user m
 
 ### 3.3 Presence in the browser
 
-Each tab has an actor with a generated name and color, kept in `localStorage`. Awareness is `{ user: { id, name, color }, selection: string[] }`. The canvas draws the selection of each other person as an outline in that person's color.
+Each browser is one person: an id, a generated name and a color, kept in `localStorage`. Awareness is `{ user: { id, name, color }, selection: string[] }`. The canvas draws the selection of each other person as an outline in that person's color.
 
 ### 3.4 The agent: `apps/worker/src/agent/`
 
@@ -118,12 +118,30 @@ A panel on the right, opened from the board bar. It shows the messages, the sele
 - The read tool `events__search { text, limit }` returns short summaries. The agent then calls `event__add`.
 - Each user message also stores the center of the sender's view, so that the agent can put new objects where the person looks.
 
-### 3.7 Geocoding and map focus
+### 3.7 Geocoding
 
-- The read tool `geocode__search { text, limit }` finds places with Photon (photon.komoot.io): OpenStreetMap data, no key. It returns each place's area (west, south, east, north). A place without an extent (a point) gets a small area around it.
-- Map views stay per person. A map has an optional shared `focus` area. When it changes, every view moves to it once (`localView.ts` keeps the last focus that the view moved to). After that, each person pans freely again.
-- The op `map.focus` sets it, with the time in `at`, so the same area again is a change. `map.add` takes `focus` too.
-- The search text goes to the public Photon server. Use a self-hosted Photon or another geocoder if that is a problem.
+- The read tool `geocode__search { text, limit }` finds places with Photon (photon.komoot.io): OpenStreetMap data, no key. It returns the area of each place (west, south, east, north). A place without an extent (a point) gets a small area around it.
+- The search text goes to the public Photon server. Use a self-hosted Photon or a different geocoder if that is a problem.
+
+### 3.8 Per-person map views in the doc
+
+Each person has their own view of each map. The views are in the doc, so that:
+1. the agent can read and change the view of a person ("zoom to India" moves the map of the person who asked), and
+2. a later feature can let one person follow another person.
+
+Design:
+- The `views` map is in the doc, beside `objects`, `oplog` and `chat`: person id → object id → `{ center, zoom, bearing, at }` (`packages/core/src/views.ts`). Each person has a Y.Map, so the writes of two people never change the same key.
+- A person is one browser: the id, name and color are in `localStorage`. Two tabs of one person show the same views. Undo stays per tab, because each tab has its own runtime.
+- The map widget writes the view of its person 1 s after the map stops moving. This write has no op log entry and no undo. When the view of its person changes from a different source (the agent, a different tab), the map flies to it.
+- A person who has no view of a map starts at the latest view (highest `at`) that anyone saved.
+- The op `map.showArea` changes views through `BoardTx.setView`. Its `for` argument is a list of person ids, or `'everyone'`. Without `for`, it changes the view of the person who runs it. The agent must give `for`. The op converts the area to a center and a zoom from the size of the map (`packages/plugins/src/mapView.ts`).
+- The agent gets the person id of the asker, and the area that the asker sees on each map.
+- Deleting an object deletes its views. Undoing an agent turn (`BoardTx.restore`) keeps them, and does not change views back.
+- Views that were in `localStorage` before this change move to the doc when the map opens for the first time.
+
+Follow, later: the follower's map shows `views.get(leader, mapId)` instead of the follower's own view. It changes each time the leader's map stops. For smooth live follow, add the camera to awareness as well. The canvas camera is not in the doc; following it is a different decision.
+
+Size: rewriting a view replaces one key. Yjs collects the old value, so the doc grows by a few bytes for each write. Each update is also a row in the room's SQLite. The room compacts these rows into one row when there are more than 500, both when it loads and while it runs. The `oplog` array is not compacted: it grows by one entry for each op. This is not solved yet.
 
 ## 4. Configuration
 

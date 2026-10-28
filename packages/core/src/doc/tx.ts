@@ -1,5 +1,6 @@
 import * as Y from 'yjs'
 import type { Registry } from '../plugins/registry.js'
+import { Views, type SavedView } from '../views.js'
 import type { AnyObject, Board } from './board.js'
 
 /**
@@ -66,8 +67,23 @@ export class BoardTx {
     }
   }
 
+  /** Also forgets their views (views.ts). */
   remove(ids: Iterable<string>) {
-    for (const id of ids) this.board.objects.delete(id)
+    const gone = [...ids]
+    for (const id of gone) this.board.objects.delete(id)
+    new Views(this.board.doc).removeObjects(gone)
+  }
+
+  /** Put an object back as it was, with its id, replacing it if it exists. Its views stay. For undoing an agent turn. */
+  restore(id: string, type: string, fields: Record<string, unknown>) {
+    this.board.objects.delete(id)
+    this.add(type, fields, id)
+  }
+
+  /** Change a person's view of an object, e.g. the agent moves the map of the person who asked. */
+  setView(person: string, objectId: string, view: Omit<SavedView, 'at'>) {
+    if (!this.board.objects.has(objectId)) throw new Error(`Object ${objectId} does not exist`)
+    new Views(this.board.doc).set(person, objectId, view)
   }
 
   // --- Layer order ---------------------------------------------------------

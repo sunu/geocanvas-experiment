@@ -23,10 +23,7 @@ const undoTurn = defineOp<{ replyId: string }, TurnUndo>({
   apply(tx, { created, before }) {
     tx.remove(created)
     // Replace each object whole, so fields the turn added go too. This overwrites later changes by others.
-    for (const [id, { id: _id, type, ...fields }] of Object.entries(before)) {
-      tx.remove([id])
-      tx.add(type, fields, id)
-    }
+    for (const [id, { id: _id, type, ...fields }] of Object.entries(before)) tx.restore(id, type, fields)
   },
 })
 

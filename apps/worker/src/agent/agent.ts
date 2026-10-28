@@ -28,7 +28,7 @@ export class Agent {
     doc: Y.Doc
     /** The model; undefined when no API key is set. */
     complete: Complete | undefined
-    /** Read tools beside board__get, e.g. Montandon search when the token is set. */
+    /** Read tools beside board__get: geocoding, and Montandon search when the token is set. */
     tools?: ReadTool[]
     /** Called when a turn starts (true) and when the queue is empty (false). */
     onBusy?: (busy: boolean) => void

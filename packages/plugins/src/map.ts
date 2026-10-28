@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { defineOp, definePlugin, type AnyObject } from '@ttx/core'
+import { defineOp, definePlugin, Views, type AnyObject } from '@ttx/core'
+import { MAP_HEADER_PX, viewOfArea } from './mapView.js'
 
 /** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
 
@@ -18,16 +19,13 @@ const area = z.object({
 })
 export type MapArea = z.infer<typeof area>
 
-// `at`: asking for the same area again is a change too, so views that panned away move back.
-const focusField = area.extend({ at: z.number().optional().describe('When it was set') })
+/** Each person's view of a map is not here: it is in the doc's `views` (Views in @ttx/core). */
+export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap }
 
-/**
- * `focus` is the area that everyone's view of the map moves to when it changes (op map.focus). After that,
- * each person pans their own view again (apps/web/src/map/localView.ts).
- */
-export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; focus?: z.infer<typeof focusField> }
-
-const round = (n: number) => Math.round(n * 100) / 100
+const forPeople = z
+  .union([z.literal('everyone'), z.array(z.string()).min(1)])
+  .optional()
+  .describe("Whose views to change: person ids, or 'everyone'. Without it: the person who runs it.")
 
 export const mapPlugin = definePlugin({
   id: 'map',
@@ -37,17 +35,11 @@ export const mapPlugin = definePlugin({
     {
       type: 'map',
       title: 'Map',
-      description: 'A live map. Its basemap is shared; each person pans and zooms their own view. Give `focus` to show an area.',
-      fields: z.object({
-        basemap: basemap.default('light'),
-        focus: focusField.optional().meta({ advanced: true }).describe('Area to show (west, south, east, north in degrees)'),
-      }),
+      description: 'A live map. Its basemap is shared; each person has their own view (use map.showArea to change one).',
+      fields: z.object({ basemap: basemap.default('light') }),
       defaultSize: { w: 520, h: 360 },
       layer: 'bottom',
-      summarize: (o) => {
-        const { basemap, focus: f } = o as MapBoardObject
-        return `basemap ${basemap}${f ? `, showing west ${round(f.west)} south ${round(f.south)} east ${round(f.east)} north ${round(f.north)}` : ''}`
-      },
+      summarize: (o) => `basemap ${(o as MapBoardObject).basemap}`,
     },
   ],
   ops: [
@@ -64,14 +56,27 @@ export const mapPlugin = definePlugin({
       apply: (tx, { basemap }, target) => target.kind === 'objects' && tx.update(Object.fromEntries(target.ids.map((id) => [id, { basemap }]))),
     }),
     defineOp({
-      id: 'map.focus',
+      id: 'map.showArea',
       title: 'Show area',
-      description: 'Pan and zoom the selected maps to an area, for everyone. Each person can pan away again afterwards.',
+      description: "Pan and zoom the selected maps to an area, in some people's views. Each person can pan away again afterwards.",
       target: { kind: 'objects', types: ['map'] },
-      args: area,
+      args: area.extend({ for: forPeople }),
       nl: { aliases: ['zoom to', 'pan to', 'fly to'] },
-      prepare: (_ctx, a) => ({ ...a, at: Date.now() }),
-      apply: (tx, focus, target) => target.kind === 'objects' && tx.update(Object.fromEntries(target.ids.map((id) => [id, { focus }]))),
+      prepare(ctx, { for: who, ...a }) {
+        const views = new Views(ctx.board.doc)
+        if (!who && ctx.actor.kind !== 'user') throw new Error("Give `for`: the ids of the people whose views to change, or 'everyone'")
+        return (ctx.target.kind === 'objects' ? ctx.target.ids : []).flatMap((id) => {
+          const o = ctx.board.get(id)!
+          const { center, zoom } = viewOfArea(a, o.w, o.h - MAP_HEADER_PX)
+          // 'everyone': each person who has a view of it. The runner's view too, so people who open the map
+          // later start here (they start at its latest view).
+          const people = who === 'everyone' ? [...new Set([...views.of(id).map((v) => v.person), ctx.actor.id])] : (who ?? [ctx.actor.id])
+          return people.map((person) => ({ person, id, view: { center, zoom, bearing: 0 } }))
+        })
+      },
+      apply(tx, changes) {
+        for (const { person, id, view } of changes) tx.setView(person, id, view)
+      },
     }),
   ],
 })

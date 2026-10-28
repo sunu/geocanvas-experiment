@@ -8,3 +8,4 @@ export { definePlugin, type ObjectTypeDef, type Plugin } from './plugins/types.j
 export { corePlugin, boxType, textType, type BoxObject, type TextObject } from './plugins/core.js'
 export * from './style.js'
 export { Chat, type AgentReply, type ChatEntry, type ToolCallRecord, type TurnUndo, type UserMessage } from './chat.js'
+export { Views, type SavedView } from './views.js'

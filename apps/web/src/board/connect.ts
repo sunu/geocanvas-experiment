@@ -10,7 +10,7 @@ export function connect(room: string) {
   const doc = new Y.Doc()
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/connect`
   const provider = new WebsocketProvider(url, room, doc)
-  const runtime = new Runtime({ doc, plugins, actor: tabActor() })
+  const runtime = new Runtime({ doc, plugins, actor: personActor() })
   provider.awareness.setLocalStateField('user', runtime.actor)
   // Merged gesture entries wait for the gesture to end; write them before the tab goes.
   addEventListener('pagehide', () => runtime.flush())
@@ -22,25 +22,22 @@ const PEOPLE_COLORS = ['#e11d48', '#ea580c', '#ca8a04', '#16a34a', '#0891b2', '#
 const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]!
 
 /**
- * One user per tab, so two tabs act as two people (their undo stacks are separate too). The name and
- * color are per browser, so a person keeps them across tabs and reloads; there are no accounts yet.
+ * One person per browser: the id, name and color are kept in localStorage, so a person keeps them across tabs
+ * and reloads (there are no accounts yet). Their map views (Views in @ttx/core) are keyed by this id. Undo is
+ * still per tab: each tab has its own runtime, and a runtime undoes only its own writes.
  */
-function tabActor(): Actor {
-  const id = stored(() => sessionStorage, 'ttx-actor', () => crypto.randomUUID())
-  const person = stored(() => localStorage, 'ttx-person', () => JSON.stringify({ name: pick(ANIMALS), color: pick(PEOPLE_COLORS) }))
-  return { kind: 'user', id, ...(JSON.parse(person) as { name: string; color: string }) }
-}
-
-/** A string kept in storage, made once. Storage blocked: a new value each load is fine. */
-function stored(storage: () => Storage, key: string, make: () => string): string {
+function personActor(): Actor {
+  type Person = { id: string; name: string; color: string }
+  const make = (): Person => ({ id: crypto.randomUUID(), name: pick(ANIMALS), color: pick(PEOPLE_COLORS) })
   try {
-    const kept = storage().getItem(key)
-    if (kept) return kept
-    const value = make()
-    storage().setItem(key, value)
-    return value
+    const kept = JSON.parse(localStorage.getItem('ttx-person') ?? 'null') as Partial<Person> | null
+    // Records from before the id moved here have a name and color but no id.
+    const person = { ...make(), ...kept, ...(!kept?.id && { id: crypto.randomUUID() }) }
+    localStorage.setItem('ttx-person', JSON.stringify(person))
+    return { kind: 'user', ...person }
   } catch {
-    return make()
+    // Storage blocked: a new person each load is fine.
+    return { kind: 'user', ...make() }
   }
 }
 

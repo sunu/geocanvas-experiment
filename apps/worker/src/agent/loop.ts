@@ -1,6 +1,7 @@
-import { exportTools, opIdOf, summarizeBoard, type AgentReply, type AnyObject, type Runtime, type ToolCallRecord, type UserMessage } from '@ttx/core'
+import { exportTools, opIdOf, summarizeBoard, Views, type AgentReply, type AnyObject, type Runtime, type ToolCallRecord, type UserMessage } from '@ttx/core'
+import { areaOfView, MAP_HEADER_PX } from '@ttx/plugins'
 import type { Complete, FunctionTool, Message } from './openrouter'
-import { boardGet, geocodeSearch, type ReadTool } from './tools'
+import { boardGet, type ReadTool } from './tools'
 
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
 export const MAX_STEPS = 8
@@ -12,7 +13,7 @@ Rules:
 - If the request needs objects and nothing is selected, or you are not sure which objects the person means, do not guess: ask.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner. Put new objects near the person's "View center", next to what is there, not on top of it.
 - To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
-- To show a place on a map, find its area with geocode__search first, then give it as the focus of map__add, or call map__focus on an existing map. Never guess coordinates.
+- Each person has their own view of each map. To show a place on a map, find its area with geocode__search first, then call map__showArea with "for" set to [the asker's person id]. Use "for": "everyone" only when they ask to show it to everyone. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
 /** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read tools. */
@@ -33,9 +34,17 @@ function request(runtime: Runtime, message: UserMessage): string {
     const o = runtime.board.get(id)
     return o ? [describe(runtime, o)] : []
   })
-  const who = message.actor.name ?? 'Someone'
+  const who = `${message.actor.name ?? 'Someone'} (person id ${message.actor.id})`
+  const views = new Views(runtime.board.doc)
+  const maps = runtime.board.list().flatMap((o) => {
+    const view = o.type === 'map' && views.get(message.actor.id, o.id)
+    if (!view) return []
+    const a = areaOfView(view, o.w, o.h - MAP_HEADER_PX)
+    return [`- map ${o.id}: west ${a.west.toFixed(2)} south ${a.south.toFixed(2)} east ${a.east.toFixed(2)} north ${a.north.toFixed(2)}`]
+  })
+  const mapViews = maps.length ? `\n\nWhat ${message.actor.name ?? 'they'} see on each map:\n${maps.join('\n')}` : ''
   const center = message.center ? `\n\nView center: (${Math.round(message.center.x)}, ${Math.round(message.center.y)})` : ''
-  return `${who} asks: ${message.text}\n\nSelected (${selected.length}):\n${selected.join('\n') || '(nothing)'}${center}`
+  return `${who} asks: ${message.text}\n\nSelected (${selected.length}):\n${selected.join('\n') || '(nothing)'}${mapViews}${center}`
 }
 
 /**
@@ -48,7 +57,7 @@ export async function runTurn(
   complete: Complete,
   extraTools: ReadTool[] = [],
 ): Promise<Omit<AgentReply, 'kind' | 'id' | 'at'>> {
-  const readTools = [boardGet, geocodeSearch, ...extraTools]
+  const readTools = [boardGet, ...extraTools]
   const tools = agentTools(runtime, readTools)
   const messages: Message[] = [
     { role: 'system', content: `${SYSTEM}\n\nThe board now, bottom to top:\n${summarizeBoard(runtime.board, runtime.registry) || '(empty)'}` },
