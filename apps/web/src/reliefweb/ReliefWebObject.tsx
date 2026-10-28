@@ -44,18 +44,18 @@ export function ReliefWebObject({ object: o, editing }: ObjectViewProps<ReliefWe
   const shown = state?.key === key ? state : undefined
   return (
     <div className="ttx-relief">
-      {/* The header's buttons and links work without double-clicking. */}
-      <div className="ttx-relief__header" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+      {/* A press anywhere but on a button or link selects and drags the feed, like any object. */}
+      <div className="ttx-relief__header">
         <NewspaperIcon size={14} aria-hidden />
         <span className="ttx-relief__title" title={o.glides.join(', ')}>
           {o.title ? `ReliefWeb · ${o.title}` : 'ReliefWeb updates'}
         </span>
         {o.glides.length > 0 && (
           <>
-            <button type="button" title="Check for new updates" aria-label="Refresh" disabled={refreshing} onClick={() => load(true)}>
+            <button type="button" title="Check for new updates" aria-label="Refresh" disabled={refreshing} onClick={() => load(true)} {...control}>
               <ArrowClockwiseIcon size={14} />
             </button>
-            <a href={disasterPage(o.glides[0]!)} target="_blank" rel="noopener noreferrer" title="Open the disaster on ReliefWeb" aria-label="Open on ReliefWeb">
+            <a href={disasterPage(o.glides[0]!)} target="_blank" rel="noopener noreferrer" title="Open the disaster on ReliefWeb" aria-label="Open on ReliefWeb" {...control}>
               <ArrowSquareOutIcon size={14} />
             </a>
           </>
@@ -79,17 +79,25 @@ export function ReliefWebObject({ object: o, editing }: ObjectViewProps<ReliefWe
   )
 }
 
+/**
+ * For the feed's buttons and links: a press on one is for it, not a select or drag of the feed. Only these:
+ * stopping presses on the whole header or on each update left almost no part of the feed to drag it by.
+ */
+const control = {
+  onPointerDown: (e: { stopPropagation(): void }) => e.stopPropagation(),
+  onDoubleClick: (e: { stopPropagation(): void }) => e.stopPropagation(),
+}
+
 function Update({ update: u }: { update: ReliefWebUpdate }) {
   return (
-    // Links open without starting a drag of the feed.
-    <article className="ttx-relief__item" onPointerDown={(e) => e.stopPropagation()}>
-      <a className="ttx-relief__name" href={u.link} target="_blank" rel="noopener noreferrer">
+    <article className="ttx-relief__item">
+      <a className="ttx-relief__name" href={u.link} target="_blank" rel="noopener noreferrer" {...control}>
         {u.title}
       </a>
       <div className="ttx-relief__meta">{[u.source, u.format, u.date].filter(Boolean).join(' · ')}</div>
       {u.summary && <div className="ttx-relief__summary">{u.summary}</div>}
       {u.file?.type === 'application/pdf' && (
-        <a className="ttx-relief__file" href={u.file.url} target="_blank" rel="noopener noreferrer">
+        <a className="ttx-relief__file" href={u.file.url} target="_blank" rel="noopener noreferrer" {...control}>
           <FilePdfIcon size={13} aria-hidden />
           PDF
         </a>
