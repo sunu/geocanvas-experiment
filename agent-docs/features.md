@@ -19,10 +19,14 @@ Related to LLM: reference agents.md from experiments branch, but reference only 
 
 Common features for all the widgets are like below
 
+- The widgets will have dark mode, following the users' system settings (or app level setting that can be toggled with UI)
 - All the widgets can be added/removed/edtied by agents
 - All the widgets also can be added/removed/edited manually
 - The new widgets will have full screen view that can be turned on by toggle
-- The new widgets will have Options panel for Contextual tools ("Full screen/in-widget focused experience")
+- The new widgets will have in-focus mode, and in-focus mode will show Options panel for Contextual tools 
+  - in-focus mode will be enabled by a button click, and in-focus mode will zoom the widgets in and make it full-screen in the app.
+  - changes in in-focus mode is not shared to other people unless you quit the focus mode of the app 
+
 
 The specific features for each widgets is 
 
@@ -32,6 +36,7 @@ The specific features for each widgets is
   - Data source selection (can be uploaded, can be called from url, or can be an automatically read from stac backend)
 
 ### Map
+- The component already exists, edit as needed.
 - It takes various geospatial data format (geojson, shp, geoparquet, COG, map tiles) and visualize it on top of the basemap.
 - It shows the snapshot of the current map when zoomed out, but gives you interactive map when fully zoomed in.
 - Shows the legend of the data

@@ -1,2 +1,3 @@
+- The widgets with in-focus mode will use an extended class from the current widget
 - The tabular data, geosptial data will get ingested into duckdb-wasm as fetched/uploaded. And use duckdb tables for filtering and advanced data processing.
 - This will be hosted by Cloudflare Durable Objects, and the artifacts uploade by users will be saved to the space for Cloudflare. (Mimick the behavior locally for development purpose)
