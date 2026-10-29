@@ -773,7 +773,8 @@ body,
 
 /* The same event search as the event object, at a fixed height in the form. */
 .ttx-field__event,
-.ttx-field__country {
+.ttx-field__country,
+.ttx-field__area {
   display: flex;
   height: 280px;
   border: 1px solid var(--ttx-border);

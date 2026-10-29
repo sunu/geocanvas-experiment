@@ -53,6 +53,8 @@ export class Agent {
     this.keepAlive = opts.keepAlive ?? (() => {})
     this.runtime = new Runtime({ doc: opts.doc, plugins, actor: AGENT })
     this.tools = new ToolRunner([boardGet(this.runtime), ...(opts.tools ?? [])])
+    // Templates look things up in prepare (events.get, data.geocode).
+    this.runtime.tools = this.tools
     this.chat = new Chat(opts.doc)
     // The room left memory during these turns; they are lost. Starting them again could repeat writes.
     for (const m of this.pending()) this.chat.reply({ replyTo: m.id, text: 'Interrupted. Please ask again.', calls: [] })

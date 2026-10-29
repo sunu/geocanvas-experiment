@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { eventsSearch } from '@ttx/plugins'
 import { setAgentChat } from './agent/ask'
 import { startBrowserAgent } from './agent/browserAgent'
 import { ChatPanel } from './agent/ChatPanel'
@@ -8,7 +7,6 @@ import { newRoomId, roomFromHash, roomHash } from './board/room'
 import { Canvas } from './canvas/Canvas'
 import { TitleBar } from './chrome/TitleBar'
 import { UserMenu } from './chrome/UserMenu'
-import { monty } from './events/monty'
 import { startBridge, useBridgeStatus } from './mcp/bridge'
 import { Executor } from './mcp/executor'
 import { plugins } from './plugins'
@@ -38,7 +36,7 @@ void startBridge(
       person: runtime.actor,
       view: () => runtime.view,
       selection: () => (provider.awareness.getLocalState() as { selection?: string[] } | null)?.selection ?? [],
-      tools: [...tools.list(), eventsSearch(monty)],
+      tools: tools.list(),
     }),
   { room, person: runtime.actor },
 )
