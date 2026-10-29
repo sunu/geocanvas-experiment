@@ -336,7 +336,7 @@ body,
 }
 
 .ttx-links > path.is-on {
-  stroke: var(--ttx-accent);
+  stroke: var(--canvas-accent); /* the selection outline's color */
   stroke-width: 2;
   opacity: 1;
 }
@@ -347,7 +347,7 @@ body,
 }
 
 .ttx-links .ttx-links__head.is-on path {
-  fill: var(--ttx-accent);
+  fill: var(--canvas-accent);
 }
 
 .ttx-peer-selection {
