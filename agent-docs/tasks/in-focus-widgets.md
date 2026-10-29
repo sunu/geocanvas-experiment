@@ -203,9 +203,13 @@ Each of these is an Options panel tool, written through map ops, so the agent ca
    - Each layer gets an optional `filter` (property, operator, value) and `style` (color, by-property coloring, opacity).
    - Ops `map.setLayerFilter`, `map.setLayerStyle`.
    - Filters run on the loaded features in the browser; DuckDB is not needed for the Map.
-6. **Annotations:**
-   - Draw a marker, polygon or circle in focus.
-   - Stored in the map's `annotations?` field as GeoJSON with a label, through `map.addAnnotation` and `map.removeAnnotation`; drawn as a deck.gl layer above data layers.
+6. **Annotations** (built: sticky notes in PR #45, the drawing box after it):
+   - In focus only, a small **drawing box** at the top right of the map: a sticky note, and the default shapes **arrow, line, rectangle, circle, polygon and pen (freehand)**, with six colors (red by default, apart from the data layers' blue). One tool at a time; it ends after one note or shape, or with Esc. A double-click on the canvas only lets the map pan; it does not show the box.
+   - Drawing: arrow, line, rectangle and circle are dragged (an arrow points to where the drag ends; a circle from its center to its edge); a polygon takes a click per corner and ends with a double-click or Enter; the pen follows the drag. The shape in progress is drawn as the finished one will be.
+   - Stored in the map's `annotations?` field, each with a `kind`: `sticky` (a place and text) or `shape` (the shape, its points in degrees and a color name). Ops `map.addSticky`, `map.setStickyText`, `map.addShape`, `map.moveAnnotation` (a note's place, or a whole shape by its first point) and `map.removeAnnotation`, so the agent can draw too (e.g. an arrow to a bridge) and undo covers them. The map's summary gives the agent each shape's color, kind and place.
+   - Shapes are a deck.gl layer above the data layers, so they are in snapshots too; arrowheads are triangles on the map, a quarter of the arrow long. Sticky notes are DOM markers on a live map, and are not in snapshots.
+   - Removing: the Options panel's "Notes and drawings" lists every note and shape, each with ×; ⌘Z undoes one in focus; Discard on leaving focus drops the unshared ones.
+   - Not built: a label on a shape, selecting a shape on the map to move or delete it, and stroke widths.
 7. **Snapshots and the live-map cap:**
    - A map that is zoomed out on the canvas, too small, off screen, or beyond the cap shows a snapshot image; a focused map is always live.
    - One shared hidden renderer makes the snapshots (`plans/plan-005.md` §2.4 on `experiment`).

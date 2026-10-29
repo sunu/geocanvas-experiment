@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { XIcon } from '@phosphor-icons/react'
 import { Views, type Runtime } from '@ttx/core'
 import {
   ADMIN_LEVEL_NAME,
@@ -11,7 +12,10 @@ import {
   type Indicator,
   type MapBoardObject,
   type MapLayer,
+  type MapAnnotation,
   type Place,
+  type Shape,
+  SHAPE_COLORS,
   URL_FORMATS,
 } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
@@ -108,6 +112,7 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
           onStyle={(layerId, style) => mapOp(runtime, o.id, 'map.setLayerStyle', { layerId, style })}
         />
       </section>
+      <Drawings annotations={o.annotations ?? []} onRemove={(annotationId) => mapOp(runtime, o.id, 'map.removeAnnotation', { annotationId })} />
       <section className="ttx-options__section">
         <h3>Add data for this area</h3>
         <div className="ttx-options__list">
@@ -146,6 +151,39 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
         </select>
       </section>
     </>
+  )
+}
+
+const SHAPE_NAMES: Record<Shape, string> = { arrow: 'Arrow', line: 'Line', rectangle: 'Rectangle', circle: 'Circle', polygon: 'Polygon', freehand: 'Drawing' }
+
+/** The notes and shapes on the map, drawn with its drawing box (or by the agent), each removable. */
+function Drawings({ annotations, onRemove }: { annotations: MapAnnotation[]; onRemove(id: string): void }) {
+  return (
+    <section className="ttx-options__section">
+      <h3>Notes and drawings</h3>
+      {!annotations.length ? (
+        <p className="ttx-options__empty">Draw with the box at the top right of the map.</p>
+      ) : (
+        <div className="ttx-layers">
+          {annotations.map((a) => {
+            const label = a.kind === 'sticky' ? `Note: ${a.text.trim() || '(empty)'}` : SHAPE_NAMES[a.shape]
+            return (
+              <div key={a.id} className="ttx-layers__entry">
+                <div className="ttx-layers__item">
+                  <i className="ttx-drawings__swatch" style={{ background: a.kind === 'shape' ? SHAPE_COLORS[a.color] : '#fde68a' }} />
+                  <div className="ttx-layers__text">
+                    <div className="ttx-layers__title">{label}</div>
+                  </div>
+                  <button type="button" title="Remove" aria-label={`Remove ${label}`} onClick={() => onRemove(a.id)}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 

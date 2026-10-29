@@ -6,8 +6,8 @@ import type { Tiles } from '../data/fromUrl'
 import { tools } from '../tools/registry'
 import { stableJson } from '@ttx/core'
 import { rasterLayers } from './raster'
-import { bboxOf, type Bbox, type LayerFilter, type LayerStyle, type MapLayer } from '@ttx/plugins'
-import { featurePaint, filterFeatures } from './featureStyle'
+import { bboxOf, SHAPE_COLORS, shapeFeatures, type Bbox, type LayerFilter, type LayerStyle, type MapAnnotation, type MapLayer, type ShapePart } from '@ttx/plugins'
+import { featurePaint, filterFeatures, hexToRgb } from './featureStyle'
 
 export type { MapLayer } from '@ttx/plugins'
 
@@ -170,6 +170,32 @@ export function deckLayers(states: LayerState[]): Layer[] {
       ]
     }
     return []
+  })
+}
+
+const FILL_ALPHA = { none: 0, light: 40, solid: 230 } as const
+
+/**
+ * The shapes people drew on a map (map.addShape), above its data layers: lines 3 px wide, areas with a light fill,
+ * arrowheads solid. Undefined when there are none. Sticky notes are not here: they are DOM markers (MapStickies.tsx).
+ */
+export function shapeLayer(annotations: MapAnnotation[]): Layer | undefined {
+  const parts = annotations.flatMap((a) => (a.kind === 'shape' ? shapeFeatures(a.shape, a.points, SHAPE_COLORS[a.color]) : []))
+  if (!parts.length) return undefined
+  return new GeoJsonLayer({
+    id: 'annotations',
+    data: { type: 'FeatureCollection', features: parts } as unknown as GeoJSON.FeatureCollection,
+    stroked: true,
+    filled: true,
+    lineWidthUnits: 'pixels',
+    getLineWidth: 3,
+    lineCapRounded: true,
+    lineJointRounded: true,
+    getLineColor: (f) => [...hexToRgb((f as unknown as ShapePart).properties.color), 255],
+    getFillColor: (f) => {
+      const { color, fill } = (f as unknown as ShapePart).properties
+      return [...hexToRgb(color), FILL_ALPHA[fill]]
+    },
   })
 }
 

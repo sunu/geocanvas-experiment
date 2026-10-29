@@ -2,17 +2,17 @@ import {
   ArrowUpRightIcon,
   CaretDownIcon,
   CircleIcon,
+  DotsThreeIcon,
   CodeIcon,
   CursorIcon,
   FilePdfIcon,
-  FlowArrowIcon,
+  FolderOpenIcon,
   FrameCornersIcon,
   HandIcon,
   ImageIcon,
   LineSegmentIcon,
   MapTrifoldIcon,
   NoteIcon,
-  ScribbleLoopIcon,
   SquareIcon,
   SquaresFourIcon,
   TextTIcon,
@@ -22,7 +22,7 @@ import {
 } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Hint } from '@/components/Hint'
@@ -67,7 +67,7 @@ const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },
   { label: 'Add Jupyter notebook', text: 'Notebook', Icon: CodeIcon, tool: 'notebook', key: 'N' },
 ]
-/** What you draw on the board yourself. Draw and connector are not built yet. */
+/** What you draw on the board yourself. */
 const BOARD_TOOLS: Item[] = [
   { label: 'Add text', text: 'Text', Icon: TextTIcon, tool: 'text', key: 'T' },
   { label: 'Add sticky note', text: 'Sticky', Icon: NoteIcon, tool: 'sticky', key: 'S' },
@@ -81,16 +81,16 @@ const SHAPES: Item[] = [
   { label: 'Add ellipse', text: 'Ellipse', Icon: CircleIcon, tool: 'box:ellipse', key: 'O' },
 ]
 const IMAGE: Item = { label: 'Add image', text: 'Image', Icon: ImageIcon, tool: 'image', key: 'I' }
-const COMING_SOON = [
-  { label: 'Draw', Icon: ScribbleLoopIcon },
-  { label: 'Connector', Icon: FlowArrowIcon },
-]
 
 interface Props {
   tool: Tool
   onTool(tool: Tool): void
   /** PDFs chosen with the PDF button, to put in the middle of the view. */
   onFiles(files: File[]): void
+  /** Open the gallery of what was uploaded to this board before. */
+  onUploads(): void
+  /** Open or close the command palette, as ⌘K does. */
+  onPalette(): void
   /** The Templates button: the palette with templates only. */
   onTemplates(): void
 }
@@ -113,6 +113,11 @@ function Face({ Icon, text }: { Icon: Icon; text: string }) {
     </>
   )
 }
+
+const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
+
+/** The look of a floating bar of the chrome: rounded, bordered, a small shadow. */
+const PANEL = 'rounded-lg border bg-card p-1.5 shadow-[0_2px_2px_rgb(0_0_0/0.1),0_4px_3px_rgb(0_0_0/0.1)]'
 
 const BTN = 'h-12 min-w-12 flex-col gap-0.5 rounded-md px-1.5 has-[>svg]:px-1.5'
 
@@ -176,7 +181,7 @@ function ToolGroup({ name, items, tool, onTool }: GroupProps) {
  * weight and a one-word name under each, the selected tool filled, each with a tooltip for its key. Arrange, delete and the command palette have no
  * button here: they are on the keys (], [, Delete, ⌘K).
  */
-export function Toolbar({ tool, onTool, onFiles, onTemplates }: Props) {
+export function Toolbar({ tool, onTool, onFiles, onUploads, onPalette, onTemplates }: Props) {
   const pdfInput = useRef<HTMLInputElement>(null)
   const separator = <Separator orientation="vertical" className="data-[orientation=vertical]:h-8" />
   const button = ({ label, text, Icon, tool: type, key }: Item) => (
@@ -186,23 +191,14 @@ export function Toolbar({ tool, onTool, onFiles, onTemplates }: Props) {
       </Button>
     </Hint>
   )
-  // A disabled button gets no pointer events, so its tooltip hangs on a wrapper.
-  const comingSoon = (label: string, Icon: Icon) => (
-    <Hint key={label} label={`${label} (coming soon)`}>
-      <span tabIndex={0} className="rounded-md">
-        <Button variant="ghost" size="sm" className={BTN} aria-label={label} disabled>
-          <Face Icon={Icon} text={label} />
-        </Button>
-      </span>
-    </Hint>
-  )
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
       <div
-        className="ttx-ui absolute bottom-2 left-1/2 z-[1000002] flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border bg-card p-1.5 font-sans shadow-[0_2px_2px_rgb(0_0_0/0.1),0_4px_3px_rgb(0_0_0/0.1)]"
+        className="ttx-ui absolute bottom-2 left-1/2 z-[1000002] flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-stretch gap-2 font-sans"
         onPointerDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
+      <div className={`flex items-center gap-1 overflow-x-auto ${PANEL}`}>
         <Section name="Navigate">
           <ToolGroup name="Select and move" items={SELECT} tool={tool} onTool={onTool} />
         </Section>
@@ -222,7 +218,6 @@ export function Toolbar({ tool, onTool, onFiles, onTemplates }: Props) {
         <Section name="Board">
           {BOARD_TOOLS.map(button)}
           <ToolGroup name="Shapes" items={SHAPES} tool={tool} onTool={onTool} />
-          {COMING_SOON.map(({ label, Icon }) => comingSoon(label, Icon))}
         </Section>
         {separator}
         <Section name="Upload">
@@ -244,9 +239,21 @@ export function Toolbar({ tool, onTool, onFiles, onTemplates }: Props) {
                 <FilePdfIcon />
                 PDF
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem title="Files uploaded to this board, to put back or share" onSelect={onUploads}>
+                <FolderOpenIcon />
+                See previous uploads
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </Section>
+        </div>
+      {/* Apart from the tools, as in Figma: the search for everything else, the same as ⌘K. */}
+      <Hint label="Search and commands" keys={`${MOD}K`}>
+        <Button variant="ghost" size="sm" className={`${BTN} h-auto min-w-14 self-stretch bg-card hover:bg-accent ${PANEL}`} aria-label="Search and commands" onClick={onPalette}>
+          <Face Icon={DotsThreeIcon} text="Search" />
+        </Button>
+      </Hint>
         <input
           ref={pdfInput}
           type="file"

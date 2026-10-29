@@ -44,6 +44,8 @@ The specific features for each widgets is
 - It has Options panel, which gets displayed when a map is selected (Contextual tool)
   - Select the datasets
   - Annotate - draw, add marker, polygon/circle
+    - A small drawing box on the map in in-focus mode only: sticky note, and default shapes (arrow, line, rectangle, circle, polygon, freehand pen) in a few colors
+    - Drawn notes and shapes can be removed from the Options panel, or undone
   - Attribute panel to select/reselect data
   - Data filters
   - Legend formatting
