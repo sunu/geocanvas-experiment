@@ -181,12 +181,11 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     }
   }, [o.id, live])
 
-  // Leaving edit mode ends placing and writing.
+  // Leaving edit mode ends writing; leaving focus ends placing, since the note tool is a focus tool.
   useEffect(() => {
-    if (editing) return
-    setPlacing(false)
-    setWriting(undefined)
-  }, [editing])
+    if (!focused) setPlacing(false)
+    if (!editing) setWriting(undefined)
+  }, [editing, focused])
 
   // Writing in a sticky ends with a press on the map outside it. Not on blur: a note's text box loses focus when
   // its marker is put in the page again (React mounts twice in development).
@@ -339,7 +338,8 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
             onWrite={setWriting}
           />
         )}
-        {editing && (
+        {/* Notes are added in focus only; a double-click on the canvas lets the map pan, nothing more. */}
+        {focused && (
           <div className="ttx-map__tools" role="toolbar" aria-label="Annotate">
             <button
               type="button"
