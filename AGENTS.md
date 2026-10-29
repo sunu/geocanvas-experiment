@@ -23,11 +23,12 @@ This file is the source of truth for repository-wide agent guidance. `CLAUDE.md`
 - Contributors may use different editors, agents, and development methods. Agree on behavior, scope, and verification; leave personal workflow choices to the contributor unless the task specifies one.
 - Follow repository configuration and documented decisions, then the conventions in the code being changed. Keep personal preferences out of unrelated code and shared tooling.
 - Read `README.md` for setup and layout, and package scripts for available checks. Consult relevant plans and decisions for the task; distinguish planned work from implemented behavior.
+- Read `agent-docs/prd.md` before feature work: the product requirements, the rules every feature follows, and each feature's status (built, planned, not sequenced, stretch, out). `agent-docs/features.md` is the agreed scope, `agent-docs/architect.md` the architecture decisions, and `agent-docs/tasks/*` how a feature is built. Where those design docs differ from the code, the code and the PRD win.
 - Update this file when a change introduces a shared workflow requirement that cannot be discovered from configuration. Keep machine-specific setup and personal agent instructions out of it.
 
 ## Repository layout
 
-npm workspaces monorepo (TypeScript, ESM). Design docs go in `plans/`.
+npm workspaces monorepo (TypeScript, ESM). Design docs go in `plans/`; product requirements and task specs in `agent-docs/` (start with `agent-docs/prd.md`).
 
 ```
 packages/
@@ -63,6 +64,9 @@ apps/
                  and serves them
   mcp/           local MCP companion (Node 22.18+ runs its TypeScript, no build): lets a person's own Claude or Codex work on boards open in
                  their paired browser tabs; the tab runs each call (apps/web/src/mcp/)
+agent-docs/      product requirements and feature status (prd.md), agreed scope (features.md), architecture
+                 decisions (architect.md), and how each feature is built (tasks/)
+plans/           design docs (plan-NNN.md)
 ```
 
 - **Our own canvas, no tldraw.** tldraw needs a paid license off localhost, and the canvas we need is small. The design follows vsticky: a DOM "world" layer moved by one CSS transform. The camera is local to each person and never synced.
