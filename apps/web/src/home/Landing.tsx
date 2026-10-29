@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { PlusIcon } from '@phosphor-icons/react'
+import { LinkIcon, PlusIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import logo from '../assets/logo.svg'
 import { roomFromLink, roomHash } from '../board/room'
@@ -9,23 +10,47 @@ import { BoardCard } from './BoardCard'
 import { NewBoardDialog } from './NewBoardDialog'
 import { forgetBoard, listBoards, type BoardSort } from './recents'
 
-/** Open a board someone shared, by its link or room id. */
-function OpenLink() {
+/**
+ * Open a board by its ID or URL: for a link held as text, e.g. from a chat, or on another device. A link
+ * opened in the browser needs none of this: the board opens and lists itself.
+ */
+function OpenBoardForm({ autoFocus }: { autoFocus?: boolean }) {
   const [text, setText] = useState('')
   const room = roomFromLink(text)
   return (
     <form
-      className="flex w-full max-w-md gap-2"
+      className="flex w-full max-w-md flex-col gap-1.5 text-left"
       onSubmit={(e) => {
         e.preventDefault()
         if (room) location.hash = roomHash(room)
       }}
     >
-      <Input aria-label="Board link" placeholder="Paste a board link" value={text} onChange={(e) => setText(e.target.value)} />
-      <Button type="submit" variant="outline" disabled={!room}>
-        Open
-      </Button>
+      <div className="flex gap-2">
+        <Input aria-label="Board ID or URL" placeholder="Board ID or URL" autoFocus={autoFocus} value={text} onChange={(e) => setText(e.target.value)} />
+        <Button type="submit" variant="outline" disabled={!room}>
+          Open
+        </Button>
+      </div>
+      {text.trim() && !room && <p className="text-xs text-muted-foreground">Not a board ID or URL</p>}
     </form>
+  )
+}
+
+/** Open board in the heading row, on every landing page: the same form, in a popover. */
+function OpenBoardButton() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline">
+          <LinkIcon />
+          Open board
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-96 flex-col gap-2">
+        <p className="text-sm font-medium">Board ID or URL</p>
+        <OpenBoardForm autoFocus />
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -60,6 +85,7 @@ export function Landing({ startNew }: { startNew: boolean }) {
                 </SelectContent>
               </Select>
             )}
+            <OpenBoardButton />
             <Button onClick={() => setCreating(true)}>
               <PlusIcon />
               New board
@@ -82,12 +108,12 @@ export function Landing({ startNew }: { startNew: boolean }) {
         ) : (
           <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed px-6 py-16 text-center">
             <p className="font-medium">No boards in this browser yet</p>
-            <p className="max-w-md text-sm text-muted-foreground">Start a new board, or open one someone shared with you. Boards you open are listed here.</p>
+            <p className="max-w-md text-sm text-muted-foreground">Start a new board, or open one someone shared with you by its ID or URL. Boards you open are listed here.</p>
             <Button onClick={() => setCreating(true)}>
               <PlusIcon />
               New board
             </Button>
-            <OpenLink />
+            <OpenBoardForm />
           </div>
         )}
       </main>

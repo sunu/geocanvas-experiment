@@ -39,13 +39,13 @@ Agreed with the product owner on 2026-10-29:
 ### 3.2 Landing ("Boards")
 
 - **Header:** the logo and the app name. Help and Login from the wireframe are left out: there are no accounts or help pages yet.
-- **"Boards" heading row:** a **Sort** select (Last opened, Name), shown with two boards or more, and **New board**.
+- **"Boards" heading row:** a **Sort** select (Last opened, Name), shown with two boards or more, **Open board** and **New board**. Open board is always there: a popover with a **Board ID or URL** field, for a link held as text (from a chat, on another device). It takes a full URL or a bare room id (`roomFromLink`), and says "Not a board ID or URL" otherwise. A link opened in the browser needs none of this: the board opens and lists itself.
 - **Grid of board cards:**
   - Each shows the title, the template it was made from, and "Opened Oct 28".
   - A card is a link to its board.
   - The card's menu has **Copy link** and **Remove from this list**. Removing does not delete the board.
   - The preview area shows an icon: there are no thumbnails yet (§6).
-- **Empty state:** "No boards in this browser yet", with **New board** and a field to paste a board link.
+- **Empty state:** "No boards in this browser yet", with **New board** and the same **Board ID or URL** field inline. Both duplicate the heading row's buttons.
 - **Recents** (`home/recents.ts`): localStorage `ttx/boards`, `{ room, title?, template?, openedAt }[]`, at most 200, read and written in try/catch. A board opened from a shared link is recorded too. "Last opened" is what this browser knows; "last edited" would need the server.
 
 ### 3.3 New board dialog, step 1
