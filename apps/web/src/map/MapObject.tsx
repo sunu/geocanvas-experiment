@@ -13,7 +13,9 @@ import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } fr
 import { BASEMAP_CREDITS, basemapStyle } from './basemaps'
 import { DrawingBox, type DrawTool } from './DrawingBox'
 import { drawShape } from './draw'
-import { attributionOf, boundsOf, captionOf, deckLayers, shapeLayer, useLayerStates } from './layers'
+import { boundsOf, deckLayers, shapeLayer, useLayerStates } from './layers'
+import { creditsOf, pictureRequest, WORLD } from './picture'
+import { useViewState } from '../canvas/viewState'
 import { registerLiveMap } from './live'
 import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
@@ -27,7 +29,6 @@ import { ScenarioOnMap, useScenario } from '../routing/ScenarioOnMap'
 setWorkerUrl(workerUrl)
 
 /** Where a map starts for a person who has no view of it and nobody else has one either. */
-const WORLD = { center: [20, 10] as [number, number], zoom: 1, bearing: 0 }
 /**
  * Still where a new map starts. The map saves its first view about a second after it appears (a resize ends a
  * move), so "no view yet" does not last; the zoom does.
@@ -106,8 +107,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const scenario = useScenario(o, layers, states)
   // Routes are found on Overture's roads, whose license asks for attribution like a layer's. A forecast's caption (model,
   // run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
-  const results = [...states.map((st) => st.value), ...scenario.routes.map((r) => r.result)]
-  const credits = [...new Set(results.flatMap((v) => [attributionOf(v), captionOf(v)]).filter((a) => !!a))].join(' · ')
+  const credits = creditsOf(states, scenario.routes)
   /** In focus: Map mode (data, notes, drawings) or Scenario mode (routes, closures); the Options panel's tabs pick it. */
   const mode = useMapMode(o.id)
   /** The latest states, for map events. */
@@ -137,22 +137,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   /** Nobody has moved this map from the whole world, and it has no data or notes yet: a new map, which asks for its location. */
   const unplaced = atStart(latest) && !layers.length && !annotations.length && !o.scenario?.routes.length
   // The pool learns of editing and focus a render later, from the canvas; a map that has the pointer is live now.
-  const live = useLiveMap(o.id) || editing || focused
+  const pooled = useLiveMap(o.id)
+  // Another object is in focus: this map is hidden, so it is paused. No live map (its WebGL contexts are freed) and no
+  // picture; it goes live again when focus ends.
+  const paused = useViewState().focused && !focused
+  const live = !paused && (pooled || editing || focused)
   const view = mine ?? latest ?? WORLD
-  const snapshot = useSnapshot(
-    live
-      ? undefined
-      : {
-          view: { center: view.center, zoom: view.zoom, bearing: view.bearing },
-          width: o.w,
-          height: o.h - MAP_HEADER_PX,
-          basemap: o.basemap,
-          layers,
-          shapes,
-          routes: scenario.routes,
-          closures: scenario.closures,
-        },
-  )
+  const snapshot = useSnapshot(live || paused ? undefined : pictureRequest(o, view, layers, shapes, scenario))
 
   useEffect(() => {
     if (!live) return

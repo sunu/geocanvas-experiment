@@ -3197,3 +3197,51 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   background: rgb(0 0 0 / 0.06);
   color: var(--ttx-ink);
 }
+
+/* An item in full (reports/ReportPages.tsx ItemView): a caption, then the widget as it is. */
+.ttx-report__item {
+  margin: 0;
+}
+
+.ttx-report__caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--ttx-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ttx-report__map {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  background: var(--ttx-bg);
+}
+
+/* One line, as ReportPages' CREDITS_H counts it. */
+.ttx-report__credits.is-line {
+  height: 16px;
+  margin-top: 0;
+  overflow: hidden;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A widget's own view at its board size, scaled to the block. Read-only in a report. */
+.ttx-report__embed {
+  position: relative;
+  overflow: hidden;
+}
+
+.ttx-report__embedded {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  transform-origin: 0 0;
+  overflow: hidden;
+  pointer-events: none;
+}
