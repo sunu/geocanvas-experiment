@@ -194,6 +194,8 @@ Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ but
 
 ### 5.1a Layout: the agent beside the report
 
+Report mode is a document view, not the canvas: the dotted canvas background is off around it (the canvas carries `data-focus` with the type in focus; `styles.css`).
+
 Report mode fills the screen with three parts:
 - **Left: the agent chat,** kept open so people can ask the agent to act on the report ("add the map", "write a summary of the key figures"). The agent's edits appear on the pages as it makes them.
 - **Middle: the pages,** scrolling.

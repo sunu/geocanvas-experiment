@@ -1156,6 +1156,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   display: none;
 }
 
+/* Report mode is a document view, not the canvas: no dots, a plain backdrop around the pages and panels. */
+.ttx-canvas[data-focus='report'] {
+  background-image: none;
+}
+
 /*
  * A type that keeps the chat in focus (a report: canvas/registry.ts keepChat): the agent chat stays on the left, so
  * people can ask the agent to work on it. The title bar above the chat is hidden, so the chat moves up to the top.
