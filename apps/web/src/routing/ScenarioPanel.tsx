@@ -9,8 +9,10 @@ import { cn } from '@/lib/utils'
 import type { Board } from '../board/board'
 import { useLayerStates, type LayerState } from '../map/layers'
 import { useBoardEvents } from '../map/MapOptions'
+import { ExposureSection } from '../exposure/ExposureSection'
 import { importAffectedAreas } from './importArea'
-import { detour, formatDuration, formatKm, signedKm, useClosures, useRoutes, type RouteState } from './useRoutes'
+import { useScenario } from './ScenarioOnMap'
+import { detour, formatDuration, formatKm, signedKm, type RouteState } from './useRoutes'
 
 const PROFILE_LABEL: Record<RouteProfile, string> = { car: 'Car', truck: 'Truck' }
 const NO_LAYERS: MapLayer[] = []
@@ -24,14 +26,14 @@ function op(runtime: Runtime, mapId: string, id: string, args: Record<string, un
 /**
  * A map's Options in Scenario mode: its routes with their times and what the closures add, and what closes roads,
  * from data (layers that block roads: imported files, event footprints, notebook results) and from what-ifs (closures
- * drawn with the scenario toolbar). Each can be switched off and on to compare. In focus all of it is on the draft.
+ * drawn with the scenario toolbar), and the buildings in those areas (exposure). Each can be switched off and on to
+ * compare. In focus all of it is on the draft.
  */
 export function ScenarioPanel({ runtime, object: o }: { runtime: Runtime; object: MapBoardObject }) {
   const layers = o.layers ?? NO_LAYERS
   // The map runs the same tools; the tool runner shares the runs and caches the results.
   const states = useLayerStates(layers)
-  const { all, closures } = useClosures(o.scenario, layers, states)
-  const routes = useRoutes(o.scenario?.routes ?? [], all)
+  const { routes, closures, exposure } = useScenario(o, layers, states)
   const mapOp = (id: string, args: Record<string, unknown>) => op(runtime, o.id, id, args)
 
   return (
@@ -68,6 +70,7 @@ export function ScenarioPanel({ runtime, object: o }: { runtime: Runtime; object
           ))}
         </div>
       </section>
+      <ExposureSection exposure={exposure} onSet={(buildings) => mapOp('map.setExposure', { buildings })} />
     </div>
   )
 }

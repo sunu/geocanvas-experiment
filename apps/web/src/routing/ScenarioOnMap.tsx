@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl'
 import type { Runtime } from '@ttx/core'
 import type { MapBoardObject, MapLayer } from '@ttx/plugins'
+import { exposureLayers, useExposure, type ExposureState } from '../exposure/useExposure'
 import { drawShape } from '../map/draw'
 import type { LayerState } from '../map/layers'
 import { kindOf } from '../uploads/upload'
@@ -22,14 +23,17 @@ const PICK_PX = 15
 const metersPerPixel = (map: MapLibreMap, lat: number) => (40_075_016.7 * Math.cos((lat * Math.PI) / 180)) / (512 * 2 ** map.getZoom())
 
 /**
- * A map's scenario as the map shows it: its routes, found in this browser, and the deck.gl layers that draw them and
- * the closures. Every map runs it, in any mode and on the canvas, so a map shows its scenario's result everywhere.
+ * A map's scenario as the map shows it: its routes and its exposure counts, found in this browser, and the deck.gl
+ * layers that draw them and the closures. Every map runs it, in any mode and on the canvas, so a map shows its
+ * scenario's result everywhere; its Options panel runs it too, and the tool runner shares the runs.
  */
 export function useScenario(o: MapBoardObject, layers: MapLayer[], states: LayerState[]) {
-  const { all, closures } = useClosures(o.scenario, layers, states)
+  const { all, fromLayers, closures } = useClosures(o.scenario, layers, states)
   const routes = useRoutes(o.scenario?.routes ?? [], all)
-  const deck = useMemo(() => routingLayers(routes, closures), [routes, closures])
-  return { routes, closures, deck }
+  const blocking = new Set(layers.flatMap((l) => (l.blocks ? [l.id] : [])))
+  const exposure = useExposure(o.scenario, closures, fromLayers, states.some((s) => blocking.has(s.id) && s.loading))
+  const deck = useMemo(() => [...routingLayers(routes, closures), ...exposureLayers(exposure)], [routes, closures, exposure])
+  return { routes, closures, exposure, deck }
 }
 
 export type Scenario = ReturnType<typeof useScenario>
@@ -43,6 +47,7 @@ export function ScenarioOnMap({
   map,
   mapId,
   routes,
+  exposure,
   active,
 }: {
   runtime: Runtime
@@ -50,6 +55,7 @@ export function ScenarioOnMap({
   map: MapLibreMap | undefined
   mapId: string
   routes: RouteState[]
+  exposure: ExposureState | undefined
   /** Scenario mode: the toolbar and its tools. */
   active: boolean
 }) {
@@ -181,7 +187,7 @@ export function ScenarioOnMap({
       {dropping && <div className="ttx-map__dropnote">Drop a GeoJSON file of affected areas: its features close the roads they cover</div>}
       {map && <RouteMarkers runtime={runtime} map={map} mapId={mapId} routes={routes.map((s) => s.route)} editable={active} />}
       {map && routeStart && <EndMarker map={map} lngLat={routeStart} label="A" color="#71717a" draggable={false} />}
-      <RouteLegend routes={routes} />
+      <RouteLegend routes={routes} exposure={exposure} />
       {active && <ScenarioToolbar tool={tool} onTool={setTool} onImport={importFile} status={routeStart && tool === 'route' ? { text: 'Now click where the route ends · Esc cancels' } : status} />}
     </>
   )

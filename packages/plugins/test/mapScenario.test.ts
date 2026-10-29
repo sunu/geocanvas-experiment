@@ -115,3 +115,21 @@ describe('affected areas from data', () => {
     expect(text).toMatch(/flood.geojson \([^)]*, blocks roads\)/)
   })
 })
+
+describe('exposure in a scenario', () => {
+  it('switches the building count on and off for everyone, keeping routes and closures, as undo steps', () => {
+    const { rt, target, mapOf } = setup()
+    rt.dispatch('map.addRoute', target, { from: PORT, to: HOSPITAL })
+    rt.beginGesture()
+    expect(rt.dispatch('map.setExposure', target, { buildings: true }).status).toBe('applied')
+    expect(mapOf().scenario).toMatchObject({ routes: [expect.any(Object)], closures: [], exposure: { buildings: true } })
+    expect(summarizeBoard(rt.board, rt.registry)).toMatch(/exposure: buildings in flood areas counted/)
+
+    rt.beginGesture()
+    rt.dispatch('map.setExposure', target, { buildings: false })
+    expect(mapOf().scenario).not.toHaveProperty('exposure')
+    expect(mapOf().scenario!.routes).toHaveLength(1)
+    rt.undo()
+    expect(mapOf().scenario!.exposure).toEqual({ buildings: true })
+  })
+})

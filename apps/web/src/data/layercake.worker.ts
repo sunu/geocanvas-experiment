@@ -6,11 +6,13 @@
  */
 import { parquetMetadataAsync, parquetReadObjects, type AsyncBuffer, type FileMetaData } from 'hyparquet'
 import { compressors } from 'hyparquet-compressors'
-import { appendHealthFacilities, HEALTH_COLUMNS, LAYERCAKE_POIS_URL, MAX_ROW_GROUPS, type HealthFeature, type PoiRow } from './layercake'
+import { appendFacilities, appendHealthFacilities, HEALTH_COLUMNS, LAYERCAKE_POIS_URL, MAX_ROW_GROUPS, type FacilityFeature, type HealthFeature, type PoiRow } from './layercake'
 import type { Bbox } from '@ttx/plugins'
 import { rowGroupsInBbox } from './wkb'
 
-export type LayercakeRequest = { kind: 'query'; id: number; bbox: Bbox } | { kind: 'abort'; id: number }
+/** What to pick from the POIs: health facilities (the layer), or health facilities and places of education (exposure). */
+export type PoiPick = 'health' | 'facilities'
+export type LayercakeRequest = { kind: 'query'; id: number; bbox: Bbox; pick?: PoiPick } | { kind: 'abort'; id: number }
 export type LayercakeResponse =
   | { id: number; ok: true; value: GeoJSON.FeatureCollection<GeoJSON.Point> }
   | { id: number; ok: false; error: string }
@@ -47,7 +49,7 @@ async function openTable(): Promise<Table> {
   return { byteLength, metadata }
 }
 
-async function query(bbox: Bbox, signal: AbortSignal): Promise<GeoJSON.FeatureCollection<GeoJSON.Point>> {
+async function query(bbox: Bbox, pick: PoiPick, signal: AbortSignal): Promise<GeoJSON.FeatureCollection<GeoJSON.Point>> {
   table ??= openTable().catch((e) => {
     table = undefined
     throw e
@@ -56,10 +58,14 @@ async function query(bbox: Bbox, signal: AbortSignal): Promise<GeoJSON.FeatureCo
   const groups = rowGroupsInBbox(metadata.row_groups, bbox)
   // Fail before any row group is read: a zoomed-out area would download hundreds of MB.
   if (groups.length > MAX_ROW_GROUPS) {
-    throw new Error(`Area too large for health facilities (${groups.length} parts of the file, at most ${MAX_ROW_GROUPS}): zoom in, then use your view for this layer`)
+    throw new Error(
+      pick === 'health'
+        ? `Area too large for health facilities (${groups.length} parts of the file, at most ${MAX_ROW_GROUPS}): zoom in, then use your view for this layer`
+        : `Area too large for OpenStreetMap facilities (${groups.length} parts of the file, at most ${MAX_ROW_GROUPS})`,
+    )
   }
   const file: AsyncBuffer = { byteLength, slice: (s, e = byteLength) => range(s, e, signal) }
-  const features: HealthFeature[] = []
+  const features: (HealthFeature | FacilityFeature)[] = []
   for (let i = 0; i < groups.length; i += CONCURRENCY) {
     const batch = await Promise.all(
       groups.slice(i, i + CONCURRENCY).map(
@@ -68,7 +74,10 @@ async function query(bbox: Bbox, signal: AbortSignal): Promise<GeoJSON.FeatureCo
       ),
     )
     signal.throwIfAborted()
-    for (const rows of batch) appendHealthFacilities(features, rows, bbox)
+    for (const rows of batch) {
+      if (pick === 'health') appendHealthFacilities(features as HealthFeature[], rows, bbox)
+      else appendFacilities(features as FacilityFeature[], rows, bbox)
+    }
   }
   return { type: 'FeatureCollection', features }
 }
@@ -84,7 +93,7 @@ self.onmessage = async ({ data }: MessageEvent<LayercakeRequest>) => {
   controllers.set(data.id, controller)
   let res: LayercakeResponse
   try {
-    res = { id: data.id, ok: true, value: await query(data.bbox, controller.signal) }
+    res = { id: data.id, ok: true, value: await query(data.bbox, data.pick ?? 'health', controller.signal) }
   } catch (e) {
     res = { id: data.id, ok: false, error: e instanceof Error ? e.message : String(e) }
   } finally {

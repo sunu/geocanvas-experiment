@@ -55,7 +55,16 @@ export const scenarioClosure = z.object({
 })
 export type ScenarioClosure = z.infer<typeof scenarioClosure>
 
-export const mapScenario = z.object({ routes: z.array(scenarioRoute), closures: z.array(scenarioClosure) })
+/**
+ * Which exposure counts the scenario shows: `buildings`, the buildings in its flood areas (the polygons of the closures
+ * that are on and of the layers that block roads), with the health facilities and schools among them. Each browser
+ * counts them (apps/web/src/exposure/); the board stores only that they are on. Optional: scenarios made before it
+ * have none.
+ */
+export const scenarioExposure = z.object({ buildings: z.boolean() })
+export type ScenarioExposure = z.infer<typeof scenarioExposure>
+
+export const mapScenario = z.object({ routes: z.array(scenarioRoute), closures: z.array(scenarioClosure), exposure: scenarioExposure.optional() })
 export type MapScenario = z.infer<typeof mapScenario>
 
 /** The first color no route uses yet, or the least used one. */

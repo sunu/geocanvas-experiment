@@ -5,7 +5,7 @@ houses are in the water, and are there schools or health facilities among them?"
 water), not damage or risk: no depth, no vulnerability. It runs fully in the browser, like routing (plan-012), and
 joins a map's Scenario mode as plan-012 planned: a new optional field of `scenario`, a recipe each browser computes.
 
-Status: spike done (measurements below); nothing built yet.
+Status: built on `feat/flood-exposure` (on `scenario-planning`); the spike's measurements are below, and what changed while building is under Decisions made while building.
 
 ## What it works on
 
@@ -79,7 +79,29 @@ What it shows:
 - **Agent:** `summarize` says exposure is on; browser and MCP agents can run `exposure.buildings`; the room's agent
   cannot see results, as with routes.
 
-## Steps
+## Decisions made while building
+
+- **Country outlines are left out, by name.** A Montandon event footprint is not only flood areas: Nepal's flood
+  (gdacs-event-1104124-1) has 14 polygons, among them EM-DAT's hazard and event areas and IFRC's event area, each the
+  whole of Nepal (80–88° E). One of them made the count refuse (9 files). A single area larger than 4 deg² (about
+  200 × 200 km; `MAX_AREA_DEG2` in `exposure/areas.ts`) is left out, and the panel names it; GDACS's 3.6 deg² area and
+  the CEMS areas still count. Routing still treats those outlines as closures (it closes every road in Nepal): a
+  question for plan-012.
+- **Two columns, not three**: `bbox` and `subtype`. `class` was only for kinds of buildings, which come from
+  OpenStreetMap; one request fewer per row group.
+- **Facilities from the health facilities' Layercake worker** (`LayercakeHealth.facilities`, pick `facilities`):
+  health first, then `amenity` school, kindergarten, college or university. One worker, so the 5 MB footer is read
+  once per page. If they cannot be read (more than 12 row groups), the building count stands and the panel says why.
+- **The flood polygons are indexed** in a 64 × 64 grid over their bounds (`Flood`): an uploaded flood extent can have
+  thousands of polygons.
+- **Facilities are drawn on live maps only**, as rose (health) and teal (education) dots; the legend line is on
+  snapshots too.
+
+Measured end to end (headless Chrome, dev server): the Nepal footprint plus a 0.07° × 0.06° what-if at Bharatpur,
+30 s for the first count: 119,605 buildings, 137 health facilities and 229 schools, of which the what-if adds 42,602
+buildings. Switching the what-if off gave 77,003 (the baseline) at once, from the tool cache.
+
+## Steps (done)
 
 1. Pure code, tested in Node: point in polygon over the polygons (with holes), row groups meeting polygons, counting
    rows, and the POI counts.
@@ -89,6 +111,9 @@ What it shows:
 5. AGENTS.md.
 
 ## Later
+
+- **Choosing areas within a layer**: a footprint's sources (CEMS, GDACS, EM-DAT, landslide areas) are one layer, so
+  people cannot leave out one of them; the size rule covers only the largest.
 
 - **People exposed**: sum WorldPop (already a COG layer, `data.population`) in the polygons, reading pixels rather
   than drawing them.

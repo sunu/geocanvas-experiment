@@ -2465,6 +2465,12 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   height: 10px;
 }
 
+/* The exposure line: the flood areas' blue, not a route's color. */
+.ttx-routelegend__flood {
+  border: 1px solid #2563eb;
+  background: rgb(37 99 235 / 0.25);
+}
+
 .ttx-routelegend__title {
   overflow: hidden;
   text-overflow: ellipsis;
