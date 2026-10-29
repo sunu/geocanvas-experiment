@@ -42,19 +42,8 @@ export function intersects(a: Rect, b: Rect) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
 }
 
-/** True when `inner` lies wholly inside `outer`. */
-export function contains(outer: Rect, inner: Rect) {
-  return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h
-}
-
-/**
- * What a drag moves: the objects in `moving`, and everything wholly inside a frame among them (frames inside
- * it, and their contents, are inside it too). Found by geometry when the drag starts, so frames store no members.
- */
-export function withFramed<O extends Rect & { id: string; type: string }>(objects: O[], moving: Set<string>): O[] {
-  const frames = objects.filter((o) => o.type === 'frame' && moving.has(o.id))
-  return objects.filter((o) => moving.has(o.id) || frames.some((f) => f.id !== o.id && contains(f, o)))
-}
+/** What a frame holds is one rule, shared with reports (@ttx/core frames.ts). */
+export { contains, withFramed } from '@ttx/core'
 
 /** The smallest rectangle around all of `rects`; undefined for none. */
 export function bounds(rects: Rect[]): Rect | undefined {

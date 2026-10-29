@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: planned, not started (design). Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: step 2 built (the headless `reports` plugin); step 1 (PDF spike) waits on approvals; the UI starts with step 3. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -80,14 +80,15 @@ Rules every feature follows (PRD §2): writes are ops, so the agent and the MCP 
 
 A headless plugin, `reports`, in `packages/plugins`, with its UI in `apps/web/src/reports/`.
 
-- **Its name** is the `name` every object has, set with `core.object.rename`, as for frames. The widget, pickers and the PDF show it, and "Untitled report" without one. No `title` field of its own.
+- **Its title** shows at the top of its first page, in pickers and on the widget. It is the `name` every object has (`core.object.rename`), as for frames; else the title of the frame the report was made from (`titleFrom`, below), which stays live; else "Untitled report". `reportTitle` in the plugin is this rule. No `title` field of its own.
 - **Its fields:**
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `paper` | `'a4' \| 'letter'` | Default to decide (§10). |
+| `paper` | `'a4' \| 'letter'` | Default A4 for now; the default is still open (§10). A new report does not ask for it: forms fold the page away (`advanced`), and the Options panel changes it (`report.setPage`). |
 | `orientation` | `'portrait' \| 'landscape'` | Default portrait. |
-| `blocks` | `Block[]` | The report's content, in reading order. |
+| `blocks` | `Block[]` | The report's content, in reading order. A flat list: nothing in a report is a container. |
+| `titleFrom` | object id, optional | The frame the report was made from (§4): its title is the report's title until the report is renamed. |
 
 A **block** is `{ id, kind, span: 1 | 2, … }`:
 
@@ -149,17 +150,19 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   3. Add runs `report.addItems` and puts the dragged objects back where they were. Cancel leaves them where they were dropped, as a normal move.
   4. Either way it is one gesture, so one undo step.
   5. The objects stay on the canvas, and the report's preview updates.
-- **A frame adds a section.** Dropping a frame on a report, or Add to report on a frame, adds:
-  1. a heading item for the frame (its live name or title), then
-  2. an item for each object fully inside the frame, in reading order (top to bottom, then left to right). Frames inside it add their own heading and items after it.
+- **Adding a frame adds what is in it.** Dropping a frame on a report, or Add to report on a frame, adds an item for each object fully inside the frame, in reading order (top to bottom, then left to right). Frames inside it follow, each as a heading and then its own objects. The report stays a flat list of blocks: the frame does not become a container in the report, and each block can be moved, removed or added to on its own.
+  - **Into an empty report, the frame becomes the report** (for example a Situation report template's frame). Its title becomes the report's title, shown at the top of the first page, and kept live (`titleFrom`): when the template's event changes, the report's title changes with the frame's, until someone renames the report. No heading block is added.
+  - **Into a report with content, the frame adds a heading block first:** an item for the frame itself, showing its live title, then its objects. So a second frame (a conflict explorer next to a SitRep) stays readable.
+  - **With objects from outside the frame in the same selection,** the frame is not the whole report, so it gets its heading block too.
 
   Frames keep no list of members, so what is inside is worked out once, when the frame is added, with the same containment rule as a frame drag. Objects moved into the frame later are not added. The containment test moves from `canvas/camera.ts` to a shared place, so the canvas and the op use one rule.
 - **Dragging a frame onto a report** moves its contents with it while dragging, as any frame drag does. On Add, everything goes back to where it was.
 - **Seeing what is in a report:** when a report is selected, its live sources get a light outline on the canvas. There are no permanent arrows: the canvas already draws link arrows, and report arrows would crowd it.
 - **Add to report…** from the right-click menu, the Object panel and ⌘K (`report.addItems`, which acts on the selection):
-  - with one report on the board, it adds directly
-  - with several, a submenu lists the reports by name
-  - with none, "New report with these" makes one
+  - a dropdown lists the board's reports by title, and **New report** (the `report` form widget, `apps/web/src/reports/ui.tsx`)
+  - with one report on the board, it is chosen already; with none or several, New report is
+  - New report makes a report to the right of the objects, top-aligned with them
+  - items always go at the end; move them afterwards in report mode
 
 ## 5. Report mode
 
@@ -200,13 +203,13 @@ All with zod schemas, so they are in ⌘K, are agent tools, and are in the MCP m
 | --- | --- | --- |
 | `report.add` | canvas | the type's fields, as every `<type>.add` |
 | `report.setPage` | one report | `paper`, `orientation` |
-| `report.addItems` | the selection | `reportId`, `mode` (default live). A frame in the selection adds a section (§4). |
-| `report.addBlock` | one report | `kind`, its content, `index` |
+| `report.addItems` | the selection | `reportId`, optional: without it, a new report is made to the right of the objects. Its defaults choose the board's report when there is exactly one. Items go at the end, live; freeze them afterwards with `report.setItemMode`. A frame adds the objects in it; into an empty report, it also titles the report (§4). Objects already in the report, and reports, are skipped. Maps and frames take the full width, other items one column. |
+| `report.addBlock` | one report | `block` (a heading with its level, text as plain `text` or a rich `doc`, an image, or a divider), `index`. Headings and dividers take the full width. |
 | `report.removeBlock` | one report | `blockId` |
 | `report.moveBlock` | one report | `blockId`, `index` |
 | `report.setSpan` | one report | `blockId`, `span` |
-| `report.setItemMode` | one report | `blockId`, `mode`, `frozen` (from the UI) |
-| `report.setText` | one report | `blockId`, the editor's JSON. A gesture op, hidden from tools. |
+| `report.setItemMode` | one report | `blockId`, `mode`, `frozen`. Texts, sticky notes, frames and areas are frozen by the op itself (`freezeText`); a map or a data widget needs `frozen` from the browser. |
+| `report.setText` | one report | `blockId`, and `text` for a heading or `doc` (the editor's JSON) for a text block. A gesture op, hidden from tools. |
 
 ## 7. PDF export
 
@@ -273,7 +276,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
 ## 9. Steps (one PR each)
 
 1. **PDF spike.** Compare the options (§7.4); record the results and the decision here.
-2. **`reports` plugin:** the type, blocks and ops (§3, §6), with `summarize`. Node tests:
+2. **`reports` plugin** (built: `packages/plugins/src/reports.ts`, tests in `packages/plugins/test/reports.test.ts`; the frame containment rule moved to `packages/core/src/frames.ts`): the type, blocks and ops (§3, §6), with `summarize`. Node tests:
    - each op, and one undo step for each
    - `report.addItems` from a selection, for several objects at once
    - a frame adds a heading and the objects inside it, in reading order, with nested frames
@@ -306,7 +309,8 @@ Made (2026-10-29, from the product owner):
 9. **Rich text** in report mode.
 10. **PDF export**, reliable for maps, images, text and layout. Options are compared in a spike before choosing.
 11. A **report URL**, frozen or live, apart from the room.
-12. **Report items reference their source directly** (`sourceId`), not through plan-013's `link` field (§3.3), and **a frame adds a section** (§4). Decided after plan-013 merged (2026-10-29).
+12. **Report items reference their source directly** (`sourceId`), not through plan-013's `link` field (§3.3), and **adding a frame adds the objects in it** (§4). Decided after plan-013 merged (2026-10-29).
+14. **A frame added to an empty report is the report:** its title becomes the report's (live, until renamed) and no heading block is added. Into a report with content, it gets a heading block (2026-10-29).
 13. **A report's name** is the shared `name` field (`core.object.rename`), not a field of its own.
 
 Open:
@@ -318,5 +322,5 @@ Open:
 6. **Browser Rendering:** its cost and limits, before step 8.
 7. **The default paper:** A4, Letter, or by the browser's locale.
 8. **More than two columns:** later, if people ask.
-9. **Templates and reports:** whether a template can also add a report, filled with its frames as sections.
+9. **Templates and reports:** whether a template can also add a report, filled from its frames.
 10. **New dependencies,** each approved in its step: Tiptap, `@cloudflare/puppeteer`, and possibly Paged.js or `@react-pdf/renderer`.

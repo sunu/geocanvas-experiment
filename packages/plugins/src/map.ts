@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineOp, definePlugin, Views, type AnyObject, type BoardTx, type OpContext } from '@ttx/core'
+import { defineOp, definePlugin, UPLOAD_ID, Views, type AnyObject, type BoardTx, type OpContext } from '@ttx/core'
 import {
   ADMIN_LEVEL_NAME,
   ADMIN_LEVELS,
@@ -19,6 +19,7 @@ import {
   type UrlFormat,
 } from './mapLayers.js'
 import { mapAnnotation, SHAPE_COLORS, SHAPE_POINTS, SHAPES, type MapAnnotation, type MapShape, type ShapeColor } from './mapAnnotations.js'
+import { closureGeometry, mapScenario, MAX_ROUTE_KM, nextRouteColor, ROUTE_PROFILES, type ClosureGeometry, type MapScenario } from './mapScenario.js'
 import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
 import { checkArea, FORECAST_VARIABLES, forecastLayer, gfs, HORIZONS, latestRun, type ForecastVariable, type Horizon } from './weather.js'
 
@@ -41,11 +42,11 @@ export type MapArea = z.infer<typeof area>
 
 /**
  * Each person's view of a map is not here: it is in the doc's `views` (Views in @ttx/core).
- * `layers` (mapLayers.ts) and `annotations` (mapAnnotations.ts) are optional: maps made before them have none.
- * Each is replaced as a whole, so two people adding a layer at the same moment keep only one of the two, and two
+ * `layers` (mapLayers.ts), `annotations` (mapAnnotations.ts) and `scenario` (mapScenario.ts) are optional: maps made before
+ * them have none. Each is replaced as a whole, so two people adding a layer at the same moment keep only one of the two, and two
  * people typing in two stickies of one map at the same moment can lose each other's last keystrokes.
  */
-export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[]; annotations?: MapAnnotation[] }
+export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[]; annotations?: MapAnnotation[]; scenario?: MapScenario }
 
 const oneMap = { kind: 'objects', types: ['map'], min: 1, max: 1 } as const
 
@@ -94,9 +95,51 @@ function describePoints({ shape, points }: MapShape) {
   return `of ${points.length} points from ${at(points[0]!)}`
 }
 
+/** The browser tool that reads an uploaded GeoJSON file (apps/web/src/data/fromUrl.ts). */
+export const UPLOAD_FEATURES_TOOL = 'data.uploadFeatures'
+
+const NO_SCENARIO: MapScenario = { routes: [], closures: [] }
+
+/** A scenario write: the map's whole new scenario (see MapBoardObject). */
+const setScenario = (tx: BoardTx, id: string, scenario: MapScenario) => tx.update({ [id]: { scenario } })
+
+/** A list with one item changed or removed (`change` returns undefined), or an error if it has no such item. */
+function changeItem<T extends { id: string }>(items: T[], id: string, what: string, change: (t: T) => T | undefined): T[] {
+  if (!items.some((t) => t.id === id)) throw new Error(`The map has no ${what} ${id}`)
+  return items.flatMap((t) => (t.id === id ? (change(t) ?? []) : [t]))
+}
+
+/** Great-circle distance in km. */
+function kmBetween([lng1, lat1]: [number, number], [lng2, lat2]: [number, number]) {
+  const rad = Math.PI / 180
+  const a = Math.sin(((lat2 - lat1) * rad) / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lng2 - lng1) * rad) / 2) ** 2
+  return 12_742 * Math.asin(Math.sqrt(a))
+}
+
+function checkEnds(from: [number, number], to: [number, number]) {
+  const km = kmBetween(from, to)
+  if (km > MAX_ROUTE_KM) throw new Error(`The ends are ${Math.round(km)} km apart: routing in the browser covers at most ${MAX_ROUTE_KM} km`)
+}
+
+/** A circle of `meters` around a place, as a polygon of 32 sides. */
+function circle(lng: number, lat: number, meters: number): ClosureGeometry {
+  const dLat = meters / 111_195
+  const dLng = dLat / Math.max(0.01, Math.cos((lat * Math.PI) / 180))
+  const ring = Array.from({ length: 33 }, (_, i): [number, number] => {
+    const a = ((i % 32) / 32) * 2 * Math.PI
+    return [Math.round((lng + dLng * Math.cos(a)) * 1e6) / 1e6, Math.round((lat + dLat * Math.sin(a)) * 1e6) / 1e6]
+  })
+  return { type: 'Polygon', coordinates: [ring] }
+}
+
 const lng = z.number().min(-180).max(180).describe('Longitude')
 const lat = z.number().min(-90).max(90).describe('Latitude')
 const annotationId = z.string().describe("The annotation's id, from the map's annotations")
+
+const place = z.object({ lng, lat })
+const routeId = z.string().describe("The route's id, from the map's scenario")
+const closureId = z.string().describe("The closure's id, from the map's scenario")
+const profile = z.enum(ROUTE_PROFILES).describe('car, or truck: slower, and keeps off roads closed to heavy vehicles')
 
 const dataLayer = z.enum(Object.keys(DATA_LAYERS) as [DataLayerKey, ...DataLayerKey[]])
 const layerId = z.string().describe("The layer's id, from the map's layers")
@@ -115,14 +158,34 @@ export const mapPlugin = definePlugin({
       type: 'map',
       title: 'Map',
       description: 'A live map. Its basemap is shared; each person has their own view (use map.showArea to change one).',
-      fields: z.object({ basemap: basemap.default('light'), layers: z.array(mapLayer).optional(), annotations: z.array(mapAnnotation).optional() }),
+      fields: z.object({
+        basemap: basemap.default('light'),
+        layers: z.array(mapLayer).optional(),
+        annotations: z.array(mapAnnotation).optional(),
+        scenario: mapScenario.optional(),
+      }),
       defaultSize: { w: 520, h: 360 },
       layer: 'bottom',
       summarize: (o) => {
-        const { basemap, layers, annotations } = o as MapBoardObject
-        const stickies = annotations?.flatMap((a) => (a.kind === 'sticky' ? [`${JSON.stringify(a.text.slice(0, 100))} at ${a.lngLat.join(', ')} (${a.id})`] : []))
-        const shapes = annotations?.flatMap((a) => (a.kind === 'shape' ? [`${a.color} ${a.shape} ${describePoints(a)} (${a.id})`] : []))
-        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''})`).join(', ')}` : ''}${stickies?.length ? `; sticky notes: ${stickies.join(', ')}` : ''}${shapes?.length ? `; shapes: ${shapes.join(', ')}` : ''}`
+        const { basemap, layers, annotations = [], scenario = NO_SCENARIO } = o as MapBoardObject
+        const layer = (l: MapLayer) =>
+          `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''}${l.blocks ? ', blocks roads' : ''})`
+        const stickies = annotations.flatMap((a) => (a.kind === 'sticky' ? [`${JSON.stringify(a.text.slice(0, 100))} at ${a.lngLat.join(', ')} (${a.id})`] : []))
+        const shapes = annotations.flatMap((a) => (a.kind === 'shape' ? [`${a.color} ${a.shape} ${describePoints(a)} (${a.id})`] : []))
+        const routes = scenario.routes.map((r) => `${JSON.stringify(r.title)}, ${r.profile} from ${r.from.join(', ')} to ${r.to.join(', ')} (${r.id})`)
+        const closures = scenario.closures.map(
+          (c) => `${c.geometry.type.toLowerCase()}${c.note ? ` ${JSON.stringify(c.note.slice(0, 100))}` : ''}${c.off ? ', switched off' : ''} (${c.id})`,
+        )
+        return [
+          `basemap ${basemap}`,
+          layers?.length && `layers: ${layers.map(layer).join(', ')}`,
+          stickies.length && `sticky notes: ${stickies.join(', ')}`,
+          shapes.length && `shapes: ${shapes.join(', ')}`,
+          routes.length && `routes: ${routes.join(', ')}`,
+          closures.length && `road closures: ${closures.join(', ')}`,
+        ]
+          .filter(Boolean)
+          .join('; ')
       },
     },
   ],
@@ -207,6 +270,24 @@ export const mapPlugin = definePlugin({
           ...(attribution && { attribution }),
         }
         const added: MapLayer = { id: newLayerId(), tool: URL_FORMATS[f].tool, input, title: title ?? urlTitle(url, f) }
+        return { id: map.id, layers: [...(map.layers ?? []), added] }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.addUploadLayer',
+      title: 'Add uploaded data',
+      description:
+        "Add a GeoJSON file uploaded to the board to a map as a layer, for everyone. With `blocks`, its features close the roads they cover in the map's scenario (e.g. a flood extent).",
+      target: oneMap,
+      args: z.object({
+        fileId: z.string().regex(UPLOAD_ID).describe('Id of an uploaded GeoJSON file: the <id> in its link /uploads/<id>'),
+        name: z.string().min(1).describe("The layer's title, e.g. the file's name"),
+        blocks: z.boolean().optional(),
+      }),
+      prepare(ctx, { fileId, name, blocks }) {
+        const map = mapOf(ctx)
+        const added: MapLayer = { id: newLayerId(), tool: UPLOAD_FEATURES_TOOL, input: { fileId }, title: name, ...(blocks && { blocks }) }
         return { id: map.id, layers: [...(map.layers ?? []), added] }
       },
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),
@@ -361,6 +442,130 @@ export const mapPlugin = definePlugin({
       args: z.object({ annotationId }),
       prepare: (ctx, { annotationId }) => changeAnnotation(mapOf(ctx), annotationId, () => undefined),
       apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
+    }),
+    defineOp({
+      id: 'map.addRoute',
+      title: 'Add route',
+      description: `Add a route between two places to a map's scenario, for everyone, at most ${MAX_ROUTE_KM} km apart. Each browser finds the fastest way by road (Overture's road network), around the scenario's road closures that are on and the features of the map's layers that block roads, and shows how much longer the closures make it. Find places' coordinates with the geocoder first.`,
+      target: oneMap,
+      args: z.object({
+        from: place.describe('Where it starts'),
+        to: place.describe('Where it ends'),
+        profile: profile.default('car'),
+        title: z.string().min(1).optional().describe('A name, e.g. "Port → Central Hospital"; default "Route N"'),
+      }),
+      prepare(ctx, { from, to, profile, title }) {
+        const map = mapOf(ctx)
+        const scenario = map.scenario ?? NO_SCENARIO
+        checkEnds([from.lng, from.lat], [to.lng, to.lat])
+        const route = {
+          id: newLayerId(),
+          title: title ?? `Route ${scenario.routes.length + 1}`,
+          from: [from.lng, from.lat] as [number, number],
+          to: [to.lng, to.lat] as [number, number],
+          profile,
+          color: nextRouteColor(scenario.routes),
+        }
+        return { id: map.id, scenario: { ...scenario, routes: [...scenario.routes, route] } }
+      },
+      apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
+    }),
+    defineOp({
+      id: 'map.setRoute',
+      title: 'Change route',
+      description: "Rename a route of a map's scenario, move its start or end, or change its vehicle, for everyone.",
+      target: oneMap,
+      args: z.object({ routeId, title: z.string().min(1).optional(), from: place.optional(), to: place.optional(), profile: profile.optional() }),
+      prepare(ctx, { routeId, title, from, to, profile }) {
+        const map = mapOf(ctx)
+        const scenario = map.scenario ?? NO_SCENARIO
+        const routes = changeItem(scenario.routes, routeId, 'route', (r) => {
+          const next = {
+            ...r,
+            ...(title && { title }),
+            ...(from && { from: [from.lng, from.lat] as [number, number] }),
+            ...(to && { to: [to.lng, to.lat] as [number, number] }),
+            ...(profile && { profile }),
+          }
+          checkEnds(next.from, next.to)
+          return next
+        })
+        return { id: map.id, scenario: { ...scenario, routes } }
+      },
+      apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
+    }),
+    defineOp({
+      id: 'map.removeRoute',
+      title: 'Remove route',
+      description: "Remove a route from a map's scenario, for everyone.",
+      target: oneMap,
+      args: z.object({ routeId }),
+      prepare(ctx, { routeId }) {
+        const map = mapOf(ctx)
+        const scenario = map.scenario ?? NO_SCENARIO
+        return { id: map.id, scenario: { ...scenario, routes: changeItem(scenario.routes, routeId, 'route', () => undefined) } }
+      },
+      apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
+    }),
+    defineOp({
+      id: 'map.addClosure',
+      title: 'Close roads',
+      description:
+        "Close roads in a map's scenario, for everyone, so its routes go around them. Give `around` (every road within that many metres of a place, e.g. a flooded town) or `geometry`: a Point closes the roads within 25 m of it (a collapsed bridge), a LineString the roads that run along it (not those that cross it), a Polygon every road inside it.",
+      target: oneMap,
+      args: z.object({
+        around: z.object({ lng, lat, meters: z.number().min(10).max(20_000).describe('Radius in metres') }).optional(),
+        geometry: closureGeometry.optional().describe('GeoJSON geometry, [longitude, latitude] positions'),
+        note: z.string().optional().describe('Why, e.g. "bridge down"'),
+      }),
+      prepare(ctx, { around, geometry, note }) {
+        if (!around === !geometry) throw new Error('Give either `around` or `geometry`')
+        const map = mapOf(ctx)
+        const scenario = map.scenario ?? NO_SCENARIO
+        const closure = { id: newLayerId(), geometry: geometry ?? circle(around!.lng, around!.lat, around!.meters), ...(note && { note }) }
+        return { id: map.id, scenario: { ...scenario, closures: [...scenario.closures, closure] } }
+      },
+      apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
+    }),
+    defineOp({
+      id: 'map.setClosure',
+      title: 'Change road closure',
+      description: "Change the note of a road closure in a map's scenario, or switch it off (routes ignore it) or on again, for everyone.",
+      target: oneMap,
+      args: z.object({ closureId, note: z.string().optional(), off: z.boolean().optional() }),
+      prepare(ctx, { closureId, note, off }) {
+        const map = mapOf(ctx)
+        const scenario = map.scenario ?? NO_SCENARIO
+        const closures = changeItem(scenario.closures, closureId, 'closure', ({ note: oldNote, off: oldOff, ...c }) => {
+          const n = note ?? oldNote
+          const o = off ?? oldOff
+          return { ...c, ...(n && { note: n }), ...(o && { off: true as const }) }
+        })
+        return { id: map.id, scenario: { ...scenario, closures } }
+      },
+      apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
+    }),
+    defineOp({
+      id: 'map.removeClosure',
+      title: 'Open roads again',
+      description: "Remove a road closure from a map's scenario, for everyone.",
+      target: oneMap,
+      args: z.object({ closureId }),
+      prepare(ctx, { closureId }) {
+        const map = mapOf(ctx)
+        const scenario = map.scenario ?? NO_SCENARIO
+        return { id: map.id, scenario: { ...scenario, closures: changeItem(scenario.closures, closureId, 'closure', () => undefined) } }
+      },
+      apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
+    }),
+    defineOp({
+      id: 'map.setLayerBlocks',
+      title: 'Layer blocks roads',
+      description: "Make the features of a map's layer close the roads they cover in its scenario (e.g. a flood extent), or stop them doing so; for everyone.",
+      target: oneMap,
+      args: z.object({ layerId, blocks: z.boolean() }),
+      prepare: (ctx, { layerId, blocks }) => changeLayer(mapOf(ctx), layerId, ({ blocks: _, ...l }) => (blocks ? { ...l, blocks } : l)),
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
     }),
     defineOp({
       id: 'map.removeLayer',

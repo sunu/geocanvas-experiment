@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Map as MapLibreMap, type IControl } from 'maplibre-gl'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { stableJson } from '@ttx/core'
-import type { Basemap, MapAnnotation, MapLayer } from '@ttx/plugins'
+import type { Basemap, MapAnnotation, MapLayer, ScenarioClosure } from '@ttx/plugins'
+import { routingLayers, type RouteState } from '../routing/useRoutes'
 import { syncAdminLayers } from './adminAreas'
 import { basemapStyle } from './basemaps'
 import { deckLayers, loadLayerStates, shapeLayer } from './layers'
@@ -23,6 +24,9 @@ export interface SnapshotRequest {
   layers: MapLayer[]
   /** The shapes drawn on the map. Sticky notes are DOM markers on a live map, and are not in snapshots. */
   shapes: MapAnnotation[]
+  /** The scenario's routes as found so far, and its closures (routing/). The ends' markers are DOM, and not drawn. */
+  routes: RouteState[]
+  closures: ScenarioClosure[]
 }
 
 /** Snapshots kept, as object URLs (each a few hundred KB of PNG). */
@@ -108,7 +112,7 @@ async function draw(req: SnapshotRequest): Promise<string> {
   }
   map.jumpTo(req.view)
   const states = await loadLayerStates(req.layers)
-  overlay.setProps({ layers: [...deckLayers(states), shapeLayer(req.shapes)] })
+  overlay.setProps({ layers: [...deckLayers(states), shapeLayer(req.shapes), ...routingLayers(req.routes, req.closures)] })
   syncAdminLayers(map, states)
   const deadline = performance.now() + TIMEOUT_MS
   await Promise.race([once(map, 'idle'), sleep(TIMEOUT_MS)])

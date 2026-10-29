@@ -14,8 +14,9 @@ import { MAX_UPLOAD_BYTES, UPLOAD_ID, UPLOAD_TYPES, type Upload } from '@ttx/cor
  * accounts; then an account id the Worker checks). Access rules can be added to GET without changing links.
  *
  * The file's type is read from its first bytes, not from the request: media (PNG, JPEG, GIF, WebP, at most
- * 10 MB), documents (PDF, at most 25 MB) and map data (GeoJSON, GeoParquet, a zipped shapefile, at most 50 MB).
- * Never SVG or HTML: served from the board's origin, they could run scripts there.
+ * 10 MB), documents (PDF, at most 25 MB) and map data (GeoJSON, GeoParquet, a zipped shapefile, at most 50 MB,
+ * sandboxed like every type but PDF; GeoJSON served as application/geo+json). Never SVG or HTML: served from the
+ * board's origin, they could run scripts there.
  */
 
 /** The largest file of any kind: a larger request is refused before it is read. */
@@ -78,11 +79,22 @@ function fileType(b: Uint8Array): string | undefined {
   if (starts(ascii('%PDF-'))) return 'application/pdf'
   if (starts(ascii('PAR1'))) return 'application/vnd.apache.parquet'
   if (starts([0x50, 0x4b, 0x03, 0x04])) return 'application/zip'
-  // GeoJSON is a JSON object: its first character, after any byte order mark and white space, is {.
-  const text = b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf ? 3 : 0
-  const first = b.subarray(text, text + 64).findIndex((v) => ![0x20, 0x09, 0x0a, 0x0d].includes(v))
-  if (first >= 0 && b[text + first] === 0x7b) return 'application/geo+json'
+  if (isGeoJson(b)) return 'application/geo+json'
   return undefined
+}
+
+/** The part of a file read to recognize GeoJSON: parsing a whole 20 MB file would cost more CPU than a request has. */
+const GEOJSON_HEAD = 4096
+
+/**
+ * GeoJSON by its start: a JSON object (after a byte order mark and white space) whose first part names a GeoJSON
+ * member. Writers put "type" first or last, so the members that hold the data count too.
+ */
+function isGeoJson(b: Uint8Array): boolean {
+  const head = new TextDecoder().decode(b.subarray(0, GEOJSON_HEAD)).replace(/^\uFEFF/, '').trimStart()
+  if (!head.startsWith('{')) return false
+  return /"type"\s*:\s*"(FeatureCollection|Feature|Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection)"/.test(head) ||
+    /"(features|geometry|coordinates)"\s*:/.test(head)
 }
 
 export function json(status: number, body: unknown): Response {
