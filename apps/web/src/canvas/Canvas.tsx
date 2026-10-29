@@ -124,7 +124,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   const [asking, setAsking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   /** Reports (agent-docs/tasks/reports.md §4): the report under objects being dragged, and a drop waiting for Add or Cancel. */
-  const [dropOn, setDropOn] = useState<string | null>(null)
+  const [dropOn, setDropOn] = useState<{ report: string; dragged: Set<string> } | null>(null)
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const cameraRef = useRef(camera)
@@ -296,7 +296,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
           if (!alive.length) return
           const rects = Object.fromEntries(alive.map((o) => [o.id, { x: o.x + dx / z, y: o.y + dy / z }]))
           runtime.dispatch('core.object.setRect', objectsTarget(Object.keys(rects)), { rects })
-          setDropOn(reportAt(me)?.id ?? null)
+          const over = reportAt(me)
+          setDropOn((d) => (over ? (d?.report === over.id ? d : { report: over.id, dragged }) : null))
         },
         (moved, ue) => {
           setDropOn(null)
@@ -656,7 +657,9 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
               key={o.id}
               runtime={runtime}
               object={o}
-              layer={i}
+              // Dragged over a report: above everything, the report included.
+              layer={dropOn?.dragged.has(o.id) ? objects.length + 1 : i}
+              dropping={!!dropOn?.dragged.has(o.id)}
               editing={o.id === editingId}
               selected={selected.has(o.id)}
               onDone={() => setEditing(null)}
@@ -676,11 +679,13 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
         {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentTouched} />}
-        {!focus && [...selected].map((id) => {
+        {/* Not around objects dragged over a report: they are drawn smaller there (ObjectView `dropping`). */}
+        {!focus && [...selected].filter((id) => !dropOn?.dragged.has(id)).map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
         })}
         {single &&
+          !dropOn &&
           HANDLES.map((h) => {
             const r = toScreen(camera, single)
             const x = h.includes('w') ? r.x : r.x + r.w
@@ -688,7 +693,9 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
             return <div key={h} data-handle={h} className={`ttx-handle ttx-handle--${h}`} style={{ left: x, top: y }} />
           })}
         {marquee && <div className="ttx-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
-        {dropOn && byId.get(dropOn) && <DropZone rect={toScreen(camera, byId.get(dropOn)!)} title={titleOf(board, byId.get(dropOn) as ReportBoardObject)} />}
+        {dropOn && byId.get(dropOn.report) && (
+          <DropZone rect={toScreen(camera, byId.get(dropOn.report)!)} title={titleOf(board, byId.get(dropOn.report) as ReportBoardObject)} />
+        )}
       </div>
       {pendingDrop && (
         <DropConfirm at={pendingDrop.at} question={pendingDrop.question} onAdd={() => addDrop(pendingDrop)} onCancel={() => setPendingDrop(null)} />
