@@ -5,6 +5,7 @@ import { countryName } from '@ttx/plugins/monty/countries'
 import type { ObjectViewProps } from '../canvas/registry'
 import { loadCountries, type Country, type Source } from './api'
 import { ObjectHeader } from '../canvas/ObjectHeader'
+import { useReportLoading } from '../canvas/loading'
 
 /** The board objects that show one country's HAPI data. */
 type CountryWidgetObject = CountryBoardObject | PresenceBoardObject | ConflictBoardObject
@@ -139,7 +140,9 @@ export function useCountryData<T>(iso3: string, load: (iso3: string) => Promise<
       current = false
     }
   }, [iso3, load])
-  return state?.iso3 === iso3 ? state : {}
+  const result: { data?: T; error?: unknown } = state?.iso3 === iso3 ? state : {}
+  useReportLoading(result.data === undefined && result.error === undefined)
+  return result
 }
 
 export const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })

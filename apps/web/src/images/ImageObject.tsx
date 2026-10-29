@@ -7,6 +7,7 @@ import type { ObjectViewProps } from '../canvas/registry'
 import { CopyLinkButton } from '../uploads/CopyLinkButton'
 import { fileLink, frameHeight, kindOf, maxMb, typesOf, uploadFile } from '../uploads/upload'
 import { ObjectHeader } from '../canvas/ObjectHeader'
+import { useReportLoading } from '../canvas/loading'
 
 /**
  * An uploaded picture. The board stores the upload's id; the file is served by the Worker at its link,
@@ -17,6 +18,9 @@ export function ImageObject({ runtime, object: o, editing, onDone }: ObjectViewP
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string>()
+  /** The picture the browser has drawn (or failed to): until then, it is loading. */
+  const [loaded, setLoaded] = useState<string>()
+  useReportLoading(uploading || (!!o.imageId && loaded !== o.imageId))
 
   // Editing means choosing a file: the click that drew the image, or the double-click, lets the chooser open.
   // Closing the chooser ends editing (React has no onCancel for inputs).
@@ -73,7 +77,7 @@ export function ImageObject({ runtime, object: o, editing, onDone }: ObjectViewP
       </ObjectHeader>
       <div className="ttx-image__body">
         {o.imageId && !uploading ? (
-          <img className="ttx-image__img" src={uploadUrl(o.imageId)} alt={o.name ?? ''} draggable={false} />
+          <img className="ttx-image__img" src={uploadUrl(o.imageId)} alt={o.name ?? ''} draggable={false} onLoad={() => setLoaded(o.imageId)} onError={() => setLoaded(o.imageId)} />
         ) : (
           <div className="ttx-image__empty">
             {uploading ? (

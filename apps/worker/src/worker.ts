@@ -118,6 +118,8 @@ export class Room extends DurableObject<Env> {
       ],
       // The agent's presence: people see "Agent is thinking…" while it works.
       onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
+      // What it does now, and for whom, so browsers show it on its cursor: one presence update per step, during a turn.
+      onActivity: (a) => a && this.awareness.setLocalState({ user: AGENT, status: 'thinking', activity: a.title, for: a.for }),
       keepAlive: (work) => ctx.waitUntil(work),
     })
     this.runtime = agent.runtime

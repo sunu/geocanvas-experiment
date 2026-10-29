@@ -8,6 +8,7 @@ import { fitMapTo } from '../map/MapObject'
 import { tools } from '../tools/registry'
 import { isGeoJson, notebookFactory, notebookResultTitle, type NotebookRun, type NotebookTemplate } from './api'
 import { ObjectHeader } from '../canvas/ObjectHeader'
+import { useReportLoading } from '../canvas/loading'
 
 /** Gap between a notebook and a map made from its results (world units). */
 const GAP = 24
@@ -142,7 +143,9 @@ export function useRun(runId: string | undefined): { value?: NotebookRun; error?
       current = false
     }
   }, [runId])
-  return runId && state?.runId === runId ? state : {}
+  const result: { value?: NotebookRun; error?: unknown } = runId && state?.runId === runId ? state : {}
+  useReportLoading(!!runId && result.value === undefined && result.error === undefined)
+  return result
 }
 
 function RunCard({ run, onShowOnNewMap }: { run: NotebookRun; onShowOnNewMap?(fileName: string): void }) {

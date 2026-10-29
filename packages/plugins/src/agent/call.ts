@@ -89,9 +89,19 @@ function place(runtime: Runtime, opId: string, args: unknown, center: { x: numbe
     a.y ??= Math.round(center.y - h / 2)
   }
   if (typeof a.x !== 'number' || typeof a.y !== 'number') return
-  // Frames are not in the way, as things are meant to go inside them; but a frame does not go on another.
-  const others = runtime.board.list().filter((o) => o.type !== 'frame' || opId === 'frame.add')
-  Object.assign(a, freeSpot({ x: a.x, y: a.y, w, h }, others))
+  Object.assign(a, freeSpot({ x: a.x, y: a.y, w, h }, inTheWay(runtime.board.list(), opId)))
+}
+
+/** What an add of `opId` keeps off. Frames are not in the way, as things are meant to go inside them; but a frame does not go on another. */
+const inTheWay = (objects: AnyObject[], opId: string) => objects.filter((o) => o.type !== 'frame' || opId === 'frame.add')
+
+/**
+ * Where a turn's first add without x and y lands, for an object of `size`: around the middle of the asker's view,
+ * off what is there, as place() puts it. Browsers show a placeholder there while the agent thinks.
+ */
+export function firstAddSpot(objects: AnyObject[], center: { x: number; y: number }, size: { w: number; h: number }): Rect {
+  const spot = freeSpot({ x: Math.round(center.x - size.w / 2), y: Math.round(center.y - size.h / 2), ...size }, inTheWay(objects, ''))
+  return { ...spot, ...size }
 }
 
 type Rect = { x: number; y: number; w: number; h: number }
