@@ -15,6 +15,7 @@ import {
   type UserMessage,
 } from '@ttx/core'
 import { areaOfView, MAP_HEADER_PX } from '../mapView.js'
+import { SKILLS, type Skill } from '../skills/index.js'
 import { callOp, TurnLog } from './call.js'
 import type { Complete, FunctionTool, Message } from './complete.js'
 
@@ -33,10 +34,6 @@ Rules:
 - If the request needs objects and nothing is selected or named, or you are not sure which objects the person means, do not guess: ask.
 - When you add an object, leave out x, y, w and h: it goes in the middle of the person's view, at its type's default size, and each further object you add goes to the right of the last one. An object that would cover others is moved to the nearest free spot. Give x and y only to put it at a given place (e.g. next to an object), and w and h only when the person asks for a size.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner.
-- To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
-- Each person has their own view of each map. To show a place on a map, find it with data__geocode first; its bbox is [west, south, east, north]. Then call map__showArea with that area and without "for": that changes the asker's view. Use "for": "everyone" only when they ask to show it to everyone, and person ids only for other given people. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
-- To show data on a map (population, countries, buildings), call map__addLayer; without an area it uses the area the asker sees, so show the place first if they name one. To mark a place, call map__pinPlace.
-- For satellite imagery layers (an index such as NDVI, true colour, before/after change) on a map: call openeo__collections, then openeo__coverage for the area and dates, and only where it has scenes call openeo__proposeGraph (when you have openeo__preview, call it first with the same area and graph and fix what it reports; openeo__proposeSarChange is the shortcut for a Sentinel-1 before/after change; check both of its date windows with openeo__coverage first). If openeo__proposeGraph fails, read the reason, fix the graph and call it again. These only create a proposal: tell the user to review it and click “Approve & run”; never claim the analysis started before that approval.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
 /** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read-only tools. */
@@ -50,6 +47,12 @@ export function agentTools(runtime: Runtime, tools: ToolRunner): FunctionTool[] 
   }
   return defs.map((t): FunctionTool => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
 }
+
+/** The skills whose required tools are all among these tool names. */
+export const availableSkills = (names: Set<string>): Skill[] => SKILLS.filter((s) => s.requires.every((id) => names.has(toolNameOf(id))))
+
+const fn = (name: string, description: string, parameters: Record<string, unknown>): FunctionTool => ({ type: 'function', function: { name, description, parameters } })
+const SKILLS_READ = 'skills__read'
 
 /** One line about an object, as in summarizeBoard. */
 function describe(runtime: Runtime, o: AnyObject): string {
@@ -114,8 +117,22 @@ export async function runTurn(
   history: ChatEntry[] = [],
 ): Promise<Omit<AgentReply, 'kind' | 'id' | 'at'>> {
   const tools = agentTools(runtime, readTools)
+  const all = new Set(tools.map((t) => t.function.name))
+  const skills = availableSkills(all)
+  const meta = skills.length
+    ? [
+        fn(SKILLS_READ, "Read a skill. Gives the skill's steps.", {
+          type: 'object',
+          properties: { name: { type: 'string', enum: skills.map((s) => s.name) } },
+          required: ['name'],
+        }),
+      ]
+    : []
+  const skillList = skills.length
+    ? `\n\nSkills (workflows): call ${SKILLS_READ} only when a skill's "use when" matches the request, usually one skill, before you use its tools.\n${skills.map((s) => `- ${s.name}: ${s.description} (use when: ${s.whenToUse})`).join('\n')}`
+    : ''
   const messages: Message[] = [
-    { role: 'system', content: `${SYSTEM}\n\nThe board now, bottom to top:\n${summarizeBoard(runtime.board, runtime.registry) || '(empty)'}` },
+    { role: 'system', content: `${SYSTEM}${skillList}\n\nThe board now, bottom to top:\n${summarizeBoard(runtime.board, runtime.registry) || '(empty)'}` },
     { role: 'user', content: request(runtime, message, history) },
   ]
   const calls: ToolCallRecord[] = []
@@ -127,7 +144,7 @@ export async function runTurn(
 
   try {
     for (let step = 0; step < MAX_STEPS; step++) {
-      const answer = await complete(messages, tools)
+      const answer = await complete(messages, [...meta, ...tools])
       messages.push({ role: 'assistant', content: answer.content ?? null, ...(answer.tool_calls?.length && { tool_calls: answer.tool_calls }) })
       if (!answer.tool_calls?.length) return result(answer.content?.trim() || 'Done.')
       for (const call of answer.tool_calls) {
@@ -147,6 +164,15 @@ export async function runTurn(
     } catch {
       calls.push({ tool: opIdOf(name), status: 'failed', error: 'Arguments are not JSON' })
       return JSON.stringify({ status: 'failed', error: 'Arguments are not JSON' })
+    }
+    if (name === SKILLS_READ) {
+      const skill = skills.find((s) => s.name === (input as { name?: unknown }).name)
+      if (!skill) {
+        calls.push({ tool: name, title: 'Read a skill', status: 'failed', error: 'No such skill' })
+        return JSON.stringify({ status: 'failed', error: `No such skill. Skills: ${skills.map((s) => s.name).join(', ')}` })
+      }
+      calls.push({ tool: name, title: `Read the ${skill.name} skill`, status: 'applied' })
+      return skill.body
     }
     const read = readTools.list().find((t) => toolNameOf(t.id) === name)
     if (read) {

@@ -15,6 +15,7 @@ import {
   runTurn,
   TURNS_PER_HOUR,
   type Complete,
+  type FunctionTool,
   type Geocoder,
   type Message,
 } from '../src/index'
@@ -502,5 +503,42 @@ describe('undoing an agent turn', () => {
     person.dispatch('core.object.move', { kind: 'objects', ids: [added] }, { dx: 5 })
     expect((await person.invoke('agent.undoTurn', canvas, { replyId: old.id })).status).toBe('applied')
     expect(person.board.get(a)!.x).toBe(0)
+  })
+})
+
+describe('skills', () => {
+  const names = (t: FunctionTool[]) => t.map((x) => x.function.name)
+  /** A model that gives these answers in turn, and records the tools and system prompt of each call. */
+  function recording(...answers: Extract<Message, { role: 'assistant' }>[]) {
+    const sent: string[][] = []
+    const results: string[] = []
+    let system = ''
+    const complete: Complete = async (messages, tools) => {
+      system = messages[0]!.content as string
+      const last = messages.at(-1)!
+      if (last.role === 'tool') results.push(last.content)
+      sent.push(names(tools))
+      return answers.shift() ?? { role: 'assistant', content: 'Done.' }
+    }
+    return { complete, sent, results, system: () => system }
+  }
+  const geocoder: Geocoder = { forward: async () => [], reverse: async () => undefined }
+
+  it('lists only the skills whose tools the agent has', async () => {
+    const { doc, chat } = board()
+    const m = recording()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'hi', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.sent[0]).toContain('skills__read')
+    // Geocoding is there, Montandon search is not.
+    expect(m.system()).toContain('- show-place:')
+    expect(m.system()).not.toContain('add-event')
+  })
+
+  it("gives a skill's steps", async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('skills__read', { name: 'show-place' })))
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'show Beira', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.results[0]).toContain('data__geocode first')
+    expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the show-place skill', status: 'applied' }])
   })
 })
