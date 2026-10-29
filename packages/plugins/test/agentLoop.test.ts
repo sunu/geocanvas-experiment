@@ -46,6 +46,9 @@ const call = (name: string, input: unknown, id = name) => ({ id, type: 'function
 const tools = (...calls: ReturnType<typeof call>[]) => ({ role: 'assistant' as const, content: null, tool_calls: calls })
 
 /** runTurn with board.get and these read-only tools, as the room's Agent gives it. */
+/** Another runtime on the doc, to read it as someone else does. */
+const person = (doc: Y.Doc) => new Runtime({ doc, plugins, actor: ben })
+
 const turn = (runtime: Runtime, message: UserMessage, complete: Complete, extra: ToolDef[] = [], history: ChatEntry[] = []) =>
   runTurn(runtime, message, complete, new ToolRunner([boardGet(runtime), ...extra]), history)
 
@@ -87,7 +90,12 @@ describe('runTurn', () => {
       return { role: 'assistant', content: 'Done.' }
     }
     const reply = await turn(agent, message, model)
-    expect(reply.undo).toEqual({ created: [copy], before: { [a]: expect.objectContaining({ id: a }) } })
+    expect(reply.undo).toEqual({
+      created: [copy],
+      before: { [a]: expect.objectContaining({ id: a }) },
+      // As the turn left them.
+      after: { [copy]: person(doc).board.get(copy), [a]: person(doc).board.get(a) },
+    })
   })
 
   it('reports failed tool calls back to the model', async () => {
@@ -363,5 +371,44 @@ describe('a browser agent on its own key', () => {
     }
     expect(chat.list().at(-1)).toMatchObject({ kind: 'agent', text: 'Deleted.' })
     expect(new TextDecoder().decode(Y.encodeStateAsUpdate(doc))).not.toContain(key)
+  })
+})
+
+describe('undoing an agent turn', () => {
+  /** A turn that moved a and added a box, stored as the agent's reply. */
+  async function moved() {
+    const b = board()
+    const message = b.chat.send({ actor: ada, text: 'move this and add a box', selection: [b.a] })
+    const model = scripted(tools(call('core__object__move', { ids: [b.a], args: { dx: 50 } }), call('box__add', { args: { x: 0, y: 500 } })))
+    const reply = b.chat.reply(await turn(new Runtime({ doc: b.doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete))
+    const added = reply.undo!.created[0]!
+    return { ...b, reply, added }
+  }
+
+  it('puts back what the turn changed and removes what it added', async () => {
+    const { person, reply, a, added } = await moved()
+    const record = await person.invoke('agent.undoTurn', canvas, { replyId: reply.id })
+    expect(record.status).toBe('applied')
+    expect(person.board.get(a)!.x).toBe(0)
+    expect(person.board.get(added)).toBeUndefined()
+  })
+
+  it('refuses, and changes nothing, when someone edited one of its objects since', async () => {
+    const { person, reply, a, added } = await moved()
+    // Another agent (or a person) moves the box the turn added.
+    person.dispatch('core.object.move', { kind: 'objects', ids: [added] }, { dx: 5 })
+    const record = await person.invoke('agent.undoTurn', canvas, { replyId: reply.id })
+    expect(record).toMatchObject({ status: 'failed', error: expect.stringContaining(`box ${added}`) })
+    expect(person.board.get(a)!.x).toBe(50)
+    expect(person.board.get(added)).toBeDefined()
+  })
+
+  it('still undoes replies stored before `after` was kept', async () => {
+    const { person, chat, a, added } = await moved()
+    const { undo } = chat.list().at(-1) as AgentReply
+    const old = chat.reply({ replyTo: 'x', text: 'old', calls: [], undo: { created: undo!.created, before: undo!.before } })
+    person.dispatch('core.object.move', { kind: 'objects', ids: [added] }, { dx: 5 })
+    expect((await person.invoke('agent.undoTurn', canvas, { replyId: old.id })).status).toBe('applied')
+    expect(person.board.get(a)!.x).toBe(0)
   })
 })

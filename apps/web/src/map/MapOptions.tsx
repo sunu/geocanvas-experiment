@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { XIcon } from '@phosphor-icons/react'
 import { Views, type Runtime } from '@ttx/core'
 import {
   ADMIN_LEVEL_NAME,
@@ -11,7 +12,11 @@ import {
   type Indicator,
   type MapBoardObject,
   type MapLayer,
+  type MapAnnotation,
   type Place,
+  type Shape,
+  SHAPE_COLORS,
+  URL_FORMATS,
 } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import type { Board } from '../board/board'
@@ -22,8 +27,10 @@ import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/ap
 import { LayerList } from './LayerList'
 import { useLayerStates } from './layers'
 import { areaOf, goTo, liveMap } from './live'
+import { LocationPicker } from './LocationPicker'
 import { fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
+import { UrlLayerForm, type UrlLayerArgs } from './UrlLayerForm'
 
 /** A map op as its own undo step. In focus, `runtime` is the draft: others see it once shared. */
 function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, unknown>) {
@@ -34,7 +41,7 @@ function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, un
 const NO_LAYERS: MapLayer[] = []
 
 /**
- * The map's contextual tools in focus mode: go to a place, its data layers, add data for the area in view,
+ * The map's contextual tools in focus mode: where everyone looks, go to a place, its data layers, add data for the area in view,
  * admin boundaries, and the events, country figures and notebook results on the board, basemap.
  */
 export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObject>) {
@@ -63,6 +70,12 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
     if (added) fitMapToLayer(runtime, o.id, added)
   }
 
+  /** A layer from a URL, for everyone; features also fit this person's view once read. */
+  const addUrlLayer = (args: UrlLayerArgs) => {
+    if (URL_FORMATS[args.format].tool === 'data.urlFeatures') addAndFit('map.addUrlLayer', { ...args })
+    else mapOp(runtime, o.id, 'map.addUrlLayer', { ...args })
+  }
+
   /** A HAPI figure by province or district, for everyone; this person's view fits the country. */
   const addChoropleth = (country: string, indicator: Indicator, level: AdminLevel, sector?: string) => {
     mapOp(runtime, o.id, 'map.addChoropleth', { country, indicator, level, ...(sector && { sector }) })
@@ -77,6 +90,7 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
 
   return (
     <>
+      <LocationPicker runtime={runtime} mapId={o.id} />
       <section className="ttx-options__section">
         <h3>openEO prototype</h3>
         <p className="ttx-options__empty">Propose a Sentinel-1 VV before/after change layer for the area shown. It will not run until approved.</p>
@@ -102,8 +116,16 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
       </section>
       <section className="ttx-options__section">
         <h3>Layers</h3>
-        <LayerList layers={layers} states={states} onUseMyView={useMyView} onRemove={(layerId) => mapOp(runtime, o.id, 'map.removeLayer', { layerId })} />
+        <LayerList
+          layers={layers}
+          states={states}
+          onUseMyView={useMyView}
+          onRemove={(layerId) => mapOp(runtime, o.id, 'map.removeLayer', { layerId })}
+          onFilter={(layerId, filter) => mapOp(runtime, o.id, 'map.setLayerFilter', { layerId, ...(filter && { filter }) })}
+          onStyle={(layerId, style) => mapOp(runtime, o.id, 'map.setLayerStyle', { layerId, style })}
+        />
       </section>
+      <Drawings annotations={o.annotations ?? []} onRemove={(annotationId) => mapOp(runtime, o.id, 'map.removeAnnotation', { annotationId })} />
       <section className="ttx-options__section">
         <h3>Add data for this area</h3>
         <div className="ttx-options__list">
@@ -113,6 +135,10 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
             </button>
           ))}
         </div>
+      </section>
+      <section className="ttx-options__section">
+        <h3>Add from a URL</h3>
+        <UrlLayerForm onAdd={addUrlLayer} />
       </section>
       <section className="ttx-options__section">
         <h3>Boundaries</h3>
@@ -138,6 +164,39 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
         </select>
       </section>
     </>
+  )
+}
+
+const SHAPE_NAMES: Record<Shape, string> = { arrow: 'Arrow', line: 'Line', rectangle: 'Rectangle', circle: 'Circle', polygon: 'Polygon', freehand: 'Drawing' }
+
+/** The notes and shapes on the map, drawn with its drawing box (or by the agent), each removable. */
+function Drawings({ annotations, onRemove }: { annotations: MapAnnotation[]; onRemove(id: string): void }) {
+  return (
+    <section className="ttx-options__section">
+      <h3>Notes and drawings</h3>
+      {!annotations.length ? (
+        <p className="ttx-options__empty">Draw with the box at the top right of the map.</p>
+      ) : (
+        <div className="ttx-layers">
+          {annotations.map((a) => {
+            const label = a.kind === 'sticky' ? `Note: ${a.text.trim() || '(empty)'}` : SHAPE_NAMES[a.shape]
+            return (
+              <div key={a.id} className="ttx-layers__entry">
+                <div className="ttx-layers__item">
+                  <i className="ttx-drawings__swatch" style={{ background: a.kind === 'shape' ? SHAPE_COLORS[a.color] : '#fde68a' }} />
+                  <div className="ttx-layers__text">
+                    <div className="ttx-layers__title">{label}</div>
+                  </div>
+                  <button type="button" title="Remove" aria-label={`Remove ${label}`} onClick={() => onRemove(a.id)}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 

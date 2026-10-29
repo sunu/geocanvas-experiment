@@ -15,16 +15,11 @@ import {
   type UserMessage,
 } from '@ttx/core'
 import { areaOfView, MAP_HEADER_PX } from '../mapView.js'
+import { callOp, TurnLog } from './call.js'
 import type { Complete, FunctionTool, Message } from './complete.js'
 
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
 export const MAX_STEPS = 8
-
-/** The agent may add objects up to this many times their type's default size. People may draw any size. */
-export const MAX_SIZE_FACTOR = 4
-
-/** Space between objects that one turn adds side by side, in canvas units. */
-export const GAP = 24
 
 /** The request shows at most this many earlier chat entries, from at most this long before it, so the model knows what "the copy" is. */
 export const HISTORY_ENTRIES = 10
@@ -124,14 +119,11 @@ export async function runTurn(
     { role: 'user', content: request(runtime, message, history) },
   ]
   const calls: ToolCallRecord[] = []
-  const created: string[] = []
-  const before: Record<string, AnyObject> = {}
-  const result = (text: string) => ({
-    replyTo: message.id,
-    text,
-    calls,
-    ...((created.length || Object.keys(before).length) && { undo: { created, before } }),
-  })
+  const turn = new TurnLog()
+  const result = (text: string) => {
+    const undo = turn.undo(runtime)
+    return { replyTo: message.id, text, calls, ...(undo && { undo }) }
+  }
 
   try {
     for (let step = 0; step < MAX_STEPS; step++) {
@@ -168,55 +160,10 @@ export async function runTurn(
         return JSON.stringify({ status: 'failed', error })
       }
     }
-    const tooBig = sizeError(name, input.args)
-    if (tooBig) {
-      calls.push({ tool: opIdOf(name), status: 'failed', error: tooBig })
-      return JSON.stringify({ status: 'failed', error: tooBig })
-    }
-    place(name, input.args)
     const ids = Array.isArray(input.ids) ? input.ids : undefined
-    // Keep each object as it was before this turn first changed it; objects this turn added need no copy.
-    for (const id of ids ?? []) {
-      const o = runtime.board.get(id)
-      if (o && !(id in before) && !created.includes(id)) before[id] = o
-    }
     // As the agent, for the person who asked: ops that act on "my" things (map.showArea) act on theirs.
-    const record = await runtime.callTool(name, input, { ...runtime.actor, onBehalfOf: message.actor.id })
-    if (record.created) created.push(...record.created)
+    const record = await callOp(runtime, name, input, { actor: { ...runtime.actor, onBehalfOf: message.actor.id }, turn, center: message.center })
     calls.push({ tool: record.opId, ...(ids && { ids }), status: record.status, ...(record.error && { error: record.error }) })
-    return JSON.stringify({ status: record.status, error: record.error, created: record.created })
-  }
-
-  /**
-   * An add without x or y, as the palette does it: the first in the middle of the person's view, each next one
-   * to the right of the last object this turn added.
-   */
-  function place(name: string, args: unknown) {
-    const op = opIdOf(name)
-    const def = op.endsWith('.add') ? runtime.registry.objectType(op.slice(0, -'.add'.length))?.defaultSize : undefined
-    if (!def || !message.center || !args || typeof args !== 'object') return
-    const a = args as { x?: unknown; y?: unknown; w?: unknown; h?: unknown }
-    const w = typeof a.w === 'number' ? a.w : def.w
-    const h = typeof a.h === 'number' ? a.h : def.h
-    const last = created.flatMap((id) => runtime.board.get(id) ?? []).at(-1)
-    a.x ??= Math.round(last ? last.x + last.w + GAP : message.center.x - w / 2)
-    a.y ??= Math.round(message.center.y - h / 2)
-  }
-
-  /**
-   * Low-cost models sometimes give an add a size nobody asked for, with junk numbers (h: 4000, h: 3e97).
-   * Refuse it, and say why, so the model tries again without a size.
-   */
-  function sizeError(name: string, args: unknown): string | undefined {
-    const op = opIdOf(name)
-    if (!op.endsWith('.add') || !args || typeof args !== 'object') return undefined
-    const def = runtime.registry.objectType(op.slice(0, -'.add'.length))?.defaultSize
-    const { w, h } = args as { w?: unknown; h?: unknown }
-    if (!def) return undefined
-    const over = (v: unknown, max: number) => typeof v === 'number' && v > max
-    if (over(w, def.w * MAX_SIZE_FACTOR) || over(h, def.h * MAX_SIZE_FACTOR)) {
-      return `Size too large (default ${def.w}×${def.h}). Leave out w and h unless the person asks for a size.`
-    }
-    return undefined
+    return JSON.stringify({ status: record.status, error: record.error, created: record.created, summary: record.summary })
   }
 }

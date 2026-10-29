@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { Runtime, type Actor } from '@ttx/core'
-import { plugins, type MapBoardObject, type OpenEOAnalysisObject } from '../src/index.js'
+import { openEOTilesTool, plugins, type MapBoardObject, type OpenEOAnalysisObject } from '../src/index.js'
 import type { ProcessGraph } from '../src/openeoGraph.js'
 
 const user: Actor = { kind: 'user', id: 'analyst', name: 'Analyst' }
@@ -126,5 +126,17 @@ describe('openeo.proposeGraph', () => {
     const summary = runtime.registry.objectType('openeo')!.summarize!(runtime.board.get(id)!)
     expect(summary).toContain('proposed: Rome NDVI')
     expect(summary).toContain('sentinel-2-l2a')
+  })
+})
+
+describe('openeo.tiles', () => {
+  const ctx = {} as never
+  // The map draws every geo.tiles result the same way (a {z}/{x}/{y} template as `url`), from any tool.
+  it('gives the map the service as a tile template, and nothing to draw before there is one', async () => {
+    const ready = await openEOTilesTool.run({ analysisId: 'a', tiles: 'https://eopf.example/tiles/{z}/{x}/{y}' }, ctx)
+    expect(ready).toMatchObject({ status: 'ready', url: 'https://eopf.example/tiles/{z}/{x}/{y}', attribution: 'Copernicus Sentinel data' })
+    const waiting = await openEOTilesTool.run({ analysisId: 'a' }, ctx)
+    expect(waiting).toMatchObject({ status: 'running' })
+    expect(waiting).not.toHaveProperty('url')
   })
 })

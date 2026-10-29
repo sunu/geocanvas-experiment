@@ -40,6 +40,9 @@ const COLORMAPS: Record<RasterColormap, string[]> = {
   ylorrd: ['#ffffcc', '#fff5b5', '#feec9f', '#fee28a', '#fed875', '#fec560', '#fdb14b', '#fd9e43', '#fc8c3b', '#fc6e33', '#fc4e2a', '#ef3423', '#e31a1c', '#d00d20', '#bd0025', '#9e0026', '#800026'],
 }
 
+/** A color ramp as a CSS gradient, left to right, for legends. */
+export const rampGradient = (name: RasterColormap = 'magma') => `linear-gradient(to right, ${(COLORMAPS[name] ?? COLORMAPS.magma).join(', ')})`
+
 /** A 256×1 RGBA ramp, linearly interpolated between the stops. */
 function rampPixels(stops: string[]): Uint8Array {
   const rgb = stops.map((s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)))
@@ -131,7 +134,7 @@ const getTileData: NonNullable<COGLayerProps<TileData>['getTileData']> = async (
   return { width: array.width, height: array.height, byteLength: values.byteLength, texture, nodata: array.nodata, device }
 }
 
-export function rasterLayers(value: unknown, { id }: { id: string }): Layer[] {
+export function rasterLayers(value: unknown, { id, opacity = 1 }: { id: string; opacity?: number }): Layer[] {
   const r = value as Raster
   const colormap: RasterColormap = r.colormap && r.colormap in COLORMAPS ? r.colormap : 'magma'
   const [rescaleMin, rescaleMax] = r.rescale
@@ -139,6 +142,7 @@ export function rasterLayers(value: unknown, { id }: { id: string }): Layer[] {
     new COGLayer<TileData>({
       id: `${id}-raster`,
       geotiff: r.url,
+      opacity,
       getTileData,
       renderTile: (d) => ({
         renderPipeline: [

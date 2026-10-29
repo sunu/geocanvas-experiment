@@ -3,6 +3,7 @@ import { OPENROUTER_URL } from '@ttx/plugins'
 /**
  * The person's own LLM key, for the agent that runs in this browser (browserAgent.ts). It is kept in this
  * browser's localStorage only. It is sent only to `url`, never to our Worker, the board doc or presence.
+ * The chat panel's mode and whether it is collapsed are kept here too.
  */
 export interface KeyConfig {
   provider: 'openrouter' | 'openai-compatible'
@@ -21,6 +22,7 @@ export const DEFAULT_MODEL = 'openai/gpt-6-luna'
 
 const KEY = 'ttx-agent-key'
 const MODE = 'ttx-agent-mode'
+const COLLAPSED = 'ttx-agent-collapsed'
 
 // Storage can be blocked (private windows, site settings): then nothing is kept, and the key is asked again.
 function read<T>(name: string): T | null {
@@ -54,3 +56,6 @@ export function keyIsUsable(config: KeyConfig | null): boolean {
 
 export const loadMode = (): AgentMode => (read<AgentMode>(MODE) === 'own' ? 'own' : 'room')
 export const saveMode = (mode: AgentMode) => write(MODE, mode)
+
+export const loadCollapsed = (): boolean => read<boolean>(COLLAPSED) === true
+export const saveCollapsed = (collapsed: boolean) => write(COLLAPSED, collapsed)

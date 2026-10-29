@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Layer } from '@deck.gl/core'
-import { GeoJsonLayer } from '@deck.gl/layers'
+import { TileLayer } from '@deck.gl/geo-layers'
+import { BitmapLayer, GeoJsonLayer } from '@deck.gl/layers'
+import type { Tiles } from '../data/fromUrl'
 import { tools } from '../tools/registry'
 import { stableJson } from '@ttx/core'
 import { rasterLayers } from './raster'
-import { bboxOf, type Bbox, type MapLayer } from '@ttx/plugins'
+import { bboxOf, SHAPE_COLORS, shapeFeatures, type Bbox, type LayerFilter, type LayerStyle, type MapAnnotation, type MapLayer, type ShapePart } from '@ttx/plugins'
+import { featurePaint, filterFeatures, hexToRgb } from './featureStyle'
 
 export type { MapLayer } from '@ttx/plugins'
 
@@ -17,6 +20,8 @@ export interface LayerState {
   loading: boolean
   value?: unknown
   error?: string
+  filter?: LayerFilter
+  style?: LayerStyle
 }
 
 /** The bbox [west, south, east, north] of a feature collection's coordinates, or undefined when it has none. */
@@ -46,6 +51,32 @@ export function viewArea([[west, south], [east, north]]: [[number, number], [num
 
 const recipeKey = (l: MapLayer) => stableJson([l.tool, l.input])
 
+/** A layer and its tool's result, if there is one yet. */
+function layerState(l: MapLayer, r: { value?: unknown; error?: string } | undefined): LayerState {
+  const output = tools.tool(l.tool)?.output
+  return {
+    id: l.id,
+    title: l.title,
+    ...(output && { output }),
+    loading: !r,
+    ...(r?.value !== undefined && { value: r.value }),
+    ...(r?.error !== undefined && { error: r.error }),
+    ...(l.filter && { filter: l.filter }),
+    ...(l.style && { style: l.style }),
+  }
+}
+
+/** The states of a map's layers once their tools have run (from the cache when a map already ran them), outside React. */
+export const loadLayerStates = (layers: MapLayer[], signal?: AbortSignal): Promise<LayerState[]> =>
+  Promise.all(
+    layers.map((l) =>
+      tools.run(l.tool, l.input, signal ? { signal } : {}).then(
+        (value) => layerState(l, { value }),
+        (err) => layerState(l, { error: String((err as Error)?.message ?? err) }),
+      ),
+    ),
+  )
+
 /** Runs the tools of a map's layers. One failing layer does not stop the others. */
 export function useLayerStates(layers: MapLayer[]): LayerState[] {
   const [results, setResults] = useState<Record<string, { key: string; value?: unknown; error?: string }>>({})
@@ -69,21 +100,12 @@ export function useLayerStates(layers: MapLayer[]): LayerState[] {
 
   // The same array until a layer or a result changes. Every board change and every canvas camera move re-renders
   // a map with a new `layers` array, and a new array of states would make deck.gl redraw all its data each time.
-  const shown = stableJson(layers.map((l) => [l.id, l.title, recipeKey(l)]))
+  const shown = stableJson(layers.map((l) => [l.id, l.title, recipeKey(l), l.filter ?? null, l.style ?? null]))
   return useMemo(
     () =>
       layers.map((l) => {
         const r = results[l.id]
-        const fresh = r?.key === recipeKey(l)
-        const output = tools.tool(l.tool)?.output
-        return {
-          id: l.id,
-          title: l.title,
-          ...(output && { output }),
-          loading: !fresh,
-          ...(fresh && r.value !== undefined && { value: r.value }),
-          ...(fresh && r.error !== undefined && { error: r.error }),
-        }
+        return layerState(l, r?.key === recipeKey(l) ? r : undefined)
       }),
     // `shown` covers every field of `layers` read here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,24 +113,47 @@ export function useLayerStates(layers: MapLayer[]): LayerState[] {
   )
 }
 
-/** Accent color of data layers, [r, g, b]. */
-const ACCENT = [37, 99, 235] as const
+/** The kinds of geometry in a feature collection, for its legend. */
+export function geometryKinds(fc: GeoJSON.FeatureCollection): Set<'point' | 'line' | 'area'> {
+  const kinds = new Set<'point' | 'line' | 'area'>()
+  const add = (g: GeoJSON.Geometry | null): void => {
+    if (!g) return
+    if (g.type === 'GeometryCollection') return g.geometries.forEach(add)
+    kinds.add(g.type.endsWith('Point') ? 'point' : g.type.endsWith('LineString') ? 'line' : 'area')
+  }
+  for (const f of fc.features) {
+    add(f.geometry)
+    if (kinds.size === 3) break
+  }
+  return kinds
+}
 
 const isArea = (f: GeoJSON.Feature) => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon'
 
-/** deck.gl layers for the layers that have a result, by kind of result. Rasters draw below features. */
+/** Drawing order by kind of result: tiles at the bottom, then rasters, then features. */
+const DRAW_ORDER: Record<string, number> = { 'geo.tiles': 0, 'geo.raster': 1 }
+const drawOrder = (s: LayerState) => DRAW_ORDER[s.output ?? ''] ?? 2
+
+/** deck.gl layers for the layers that have a result, by kind of result. Tiles and rasters draw below features. */
 export function deckLayers(states: LayerState[]): Layer[] {
-  const rasters = states.filter((s) => s.output === 'geo.raster')
-  const others = states.filter((s) => s.output !== 'geo.raster' && s.output !== 'geo.tiles')
-  return [...rasters, ...others].flatMap((s): Layer[] => {
+  // A stable sort: within a kind, the list's order.
+  return [...states].sort((a, b) => drawOrder(a) - drawOrder(b)).flatMap((s): Layer[] => {
     if (s.value === undefined) return []
-    if (s.output === 'geo.raster') return rasterLayers(s.value, { id: `layer-${s.id}` })
+    const opacity = s.style?.opacity ?? 1
+    // A tile result without a url is an openEO service that is still being created (openEOTilesTool).
+    if (s.output === 'geo.tiles') return (s.value as Tiles).url ? [tileLayer(s.value as Tiles, `layer-${s.id}`, opacity)] : []
+    if (s.output === 'geo.raster') return rasterLayers(s.value, { id: `layer-${s.id}`, opacity })
     if (s.output === 'geo.features') {
+      const all = s.value as GeoJSON.FeatureCollection
+      const { colorOf } = featurePaint(all, s.style)
+      // Areas colored by a property are a choropleth, so they are filled more than a plain outline's light fill.
+      const areaAlpha = s.style?.byProperty ? 170 : 30
       // Points: solid dots. Polygons (countries, buildings): a light fill and an outline, so the basemap stays readable.
       return [
         new GeoJsonLayer({
           id: `layer-${s.id}`,
-          data: s.value as GeoJSON.FeatureCollection,
+          data: filterFeatures(all, s.filter),
+          opacity,
           pointType: 'circle',
           // Sized in meters, kept between 2.5 and 6 px: thousands of points (health facilities in a
           // country) stay apart when zoomed out, and a single pin stays visible.
@@ -116,8 +161,8 @@ export function deckLayers(states: LayerState[]): Layer[] {
           getPointRadius: 150,
           pointRadiusMinPixels: 2.5,
           pointRadiusMaxPixels: 6,
-          getFillColor: (f: GeoJSON.Feature) => [...ACCENT, isArea(f) ? 30 : 140],
-          getLineColor: [...ACCENT, 230],
+          getFillColor: (f: GeoJSON.Feature) => [...colorOf(f), isArea(f) ? areaAlpha : 140],
+          getLineColor: (f: GeoJSON.Feature) => [...colorOf(f), 230],
           lineWidthUnits: 'pixels',
           getLineWidth: (f: GeoJSON.Feature) => (isArea(f) ? 1 : 1.5),
           stroked: true,
@@ -126,6 +171,48 @@ export function deckLayers(states: LayerState[]): Layer[] {
       ]
     }
     return []
+  })
+}
+
+const FILL_ALPHA = { none: 0, light: 40, solid: 230 } as const
+
+/**
+ * The shapes people drew on a map (map.addShape), above its data layers: lines 3 px wide, areas with a light fill,
+ * arrowheads solid. Undefined when there are none. Sticky notes are not here: they are DOM markers (MapStickies.tsx).
+ */
+export function shapeLayer(annotations: MapAnnotation[]): Layer | undefined {
+  const parts = annotations.flatMap((a) => (a.kind === 'shape' ? shapeFeatures(a.shape, a.points, SHAPE_COLORS[a.color]) : []))
+  if (!parts.length) return undefined
+  return new GeoJsonLayer({
+    id: 'annotations',
+    data: { type: 'FeatureCollection', features: parts } as unknown as GeoJSON.FeatureCollection,
+    stroked: true,
+    filled: true,
+    lineWidthUnits: 'pixels',
+    getLineWidth: 3,
+    lineCapRounded: true,
+    lineJointRounded: true,
+    getLineColor: (f) => [...hexToRgb((f as unknown as ShapePart).properties.color), 255],
+    getFillColor: (f) => {
+      const { color, fill } = (f as unknown as ShapePart).properties
+      return [...hexToRgb(color), FILL_ALPHA[fill]]
+    },
+  })
+}
+
+/** XYZ raster tiles, each drawn as an image over its own bounds. */
+function tileLayer(t: Tiles, id: string, opacity: number): Layer {
+  return new TileLayer({
+    id,
+    opacity,
+    data: t.url,
+    tileSize: 256,
+    minZoom: 0,
+    maxZoom: 19,
+    renderSubLayers: (props) => {
+      const { west, south, east, north } = props.tile.bbox as { west: number; south: number; east: number; north: number }
+      return new BitmapLayer({ ...props, data: undefined, image: props.data, bounds: [west, south, east, north] })
+    },
   })
 }
 

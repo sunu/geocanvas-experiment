@@ -7,6 +7,8 @@ import './reliefweb/ui'
 import './hapi/ui'
 import './images/ui'
 import './openeo/ui'
+import './pdfs/ui'
+import './templates/ui'
 
 /** The plugins every board loads (@ttx/plugins). A new object type or op comes in through a plugin there. */
 export { plugins } from '@ttx/plugins'

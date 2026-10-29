@@ -230,15 +230,13 @@ export const openEOTilesTool = defineTool({
   input: z.object({ analysisId: z.string(), tiles: z.string().optional(), attribution: z.string().optional() }),
   output: 'geo.tiles',
   cache: false,
-  run: ({ analysisId, tiles, attribution }) => {
-    return {
-      status: tiles ? 'ready' as const : 'running' as const,
-      ...(tiles ? { tiles: [tiles] } : {}),
-      attribution: attribution ?? 'Copernicus Sentinel data',
-      opacity: 0.78,
-      analysisId,
-    }
-  },
+  // The map draws a geo.tiles result from its `url`; until the Worker has made the service there is none, and the
+  // layer list says it is waiting.
+  run: ({ tiles, attribution }) => ({
+    status: tiles ? ('ready' as const) : ('running' as const),
+    ...(tiles ? { url: tiles } : {}),
+    attribution: attribution ?? 'Copernicus Sentinel data',
+  }),
 })
 
 export function isActive(analysis: OpenEOAnalysisObject) {

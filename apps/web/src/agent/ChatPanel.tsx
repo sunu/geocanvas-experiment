@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowCounterClockwiseIcon, CheckIcon, GearSixIcon, PaperPlaneRightIcon, RobotIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CheckIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
 import type { AgentReply, Chat, OplogEntry, Runtime, UserMessage } from '@ttx/core'
 import { OPENROUTER_URL } from '@ttx/plugins'
+import { Button } from '@/components/ui/button'
+import { ModelPicker } from './ModelPicker'
+import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
+import { Textarea } from '@/components/ui/textarea'
 import { useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { TAB_ID } from './browserAgent'
-import { DEFAULT_MODEL, forgetKey, keyIsUsable, loadKey, loadMode, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
+import { DEFAULT_MODEL, forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
 
 /** A message for a browser agent with no reply after this long, and nobody thinking: its tab has closed. */
 const LOST_AFTER_MS = 120_000
@@ -12,9 +17,9 @@ const LOST_AFTER_MS = 120_000
 /**
  * The board's chat with its agent (plans/plan-008.md). One shared thread: everyone in the room sees each
  * request and what the agent did. A message carries what its sender had selected; the agent acts on that.
- * The room's agent answers on the server's key; "My key" sends the message to this tab's agent (browserAgent.ts).
+ * Laid out as the Ask Panel of the Figma file. The room's agent answers on the server's key; "My key" sends the message to this tab's agent (browserAgent.ts).
  */
-export function ChatPanel({ runtime, chat, awareness, onClose }: { runtime: Runtime; chat: Chat; awareness: Awareness; onClose: () => void }) {
+export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat: Chat; awareness: Awareness }) {
   const entries = useSyncExternalStore(chat.subscribe, chat.list)
   const selection = useOwnSelection(awareness)
   // The room's agent, or a person whose browser agent works; or this tab's own.
@@ -22,9 +27,12 @@ export function ChatPanel({ runtime, chat, awareness, onClose }: { runtime: Runt
   const thinking = useOwnStatus(awareness) === 'thinking' || peerThinking
   const undone = useUndoneReplies(runtime)
   const [text, setText] = useState('')
+  const dictation = useDictation((spoken) => setText((t) => (t && !/\s$/.test(t) ? `${t} ${spoken}` : t + spoken)))
   const [mode, setMode] = useState<AgentMode>(loadMode)
   const [hasKey, setHasKey] = useState(() => keyIsUsable(loadKey()))
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Collapsed: only the header. The draft, mode and key settings stay in this state.
+  const [collapsed, setCollapsed] = useState(loadCollapsed)
   const pending = new Set(chat.pending().map((m) => m.id))
   const ownWithoutKey = mode === 'own' && !hasKey
 
@@ -35,9 +43,18 @@ export function ChatPanel({ runtime, chat, awareness, onClose }: { runtime: Runt
   }
   const listRef = useRef<HTMLDivElement>(null)
 
+  // On new entries, and on opening the panel: show the latest.
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
-  }, [entries.length, thinking])
+  }, [entries.length, thinking, collapsed])
+
+  function toggle() {
+    const next = !collapsed
+    setCollapsed(next)
+    saveCollapsed(next)
+    // Its button is hidden while collapsed.
+    if (next && dictation.listening) dictation.toggle()
+  }
 
   function send(e?: FormEvent) {
     e?.preventDefault()
@@ -55,58 +72,109 @@ export function ChatPanel({ runtime, chat, awareness, onClose }: { runtime: Runt
   }
 
   return (
-    <aside className="ttx-chat" aria-label="Agent chat">
-      <header className="ttx-chat__head">
-        <RobotIcon size={18} />
-        <span>Agent</span>
-        <div className="ttx-chat__mode" role="group" aria-label="Which agent answers">
-          <button className={mode === 'room' ? 'is-active' : ''} aria-pressed={mode === 'room'} title="The board's agent, on the server's key" onClick={() => chooseMode('room')}>
-            Board agent
+    <aside
+      className="ttx-ui ttx-shell fixed top-[74px] left-2 z-[1000002] flex max-h-[calc(100%-82px)] w-[360px] max-w-[calc(100%-1rem)] flex-col rounded-xl border bg-card font-sans shadow-sm"
+      aria-label="Agent chat"
+    >
+      <header className={cn('flex shrink-0 items-center gap-1 px-4 pt-4', collapsed ? 'pb-4' : 'pb-1.5')}>
+        <h2 className="font-heading text-lg font-[550] tracking-tight text-foreground">
+          <button type="button" className="rounded-md" aria-expanded={!collapsed} onClick={toggle}>
+            Describe
           </button>
-          <button className={mode === 'own' ? 'is-active' : ''} aria-pressed={mode === 'own'} title="An agent in this browser, on your own key" onClick={() => chooseMode('own')}>
-            My key
-          </button>
-        </div>
-        <button className="ttx-chat__close" title="Your own key" aria-label="Your own key" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((o) => !o)}>
-          <GearSixIcon size={16} />
-        </button>
-        <button className="ttx-chat__close" title="Close the agent chat" aria-label="Close the agent chat" onClick={onClose}>
-          <XIcon size={16} />
-        </button>
-      </header>
-      {settingsOpen && (
-        <KeySettings
-          onSave={(config) => {
-            saveKey(config)
-            setHasKey(keyIsUsable(config))
-            setSettingsOpen(false)
-          }}
-          onForget={() => {
-            forgetKey()
-            setHasKey(false)
-          }}
-        />
-      )}
-      <div className="ttx-chat__list" ref={listRef}>
-        {!entries.length && <p className="ttx-chat__empty">Select objects on the board, then ask the agent, e.g. "duplicate these" or "delete this".</p>}
-        {entries.map((e) =>
-          e.kind === 'user' ? (
-            <UserEntry key={e.id} message={e} lost={isLost(e, pending, thinking)} />
-          ) : (
-            <AgentEntry key={e.id} reply={e} runtime={runtime} undone={undone.has(e.id)} />
-          ),
+        </h2>
+        {collapsed && thinking && (
+          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
+            <span className="size-2 rounded-full bg-[var(--agent)]" aria-hidden />
+            Thinking…
+          </span>
         )}
-        {thinking && <p className="ttx-chat__thinking">Agent is thinking…</p>}
-      </div>
-      <form className="ttx-chat__form" onSubmit={send}>
-        <div className="ttx-chat__selection">
-          {ownWithoutKey ? 'Add your key in the settings (gear) first' : selection.length ? `${selection.length} selected` : 'Nothing selected'}
-        </div>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} placeholder="Ask the agent…" rows={2} aria-label="Message to the agent" />
-        <button type="submit" disabled={!text.trim() || ownWithoutKey} title="Send" aria-label="Send">
-          <PaperPlaneRightIcon size={16} />
-        </button>
-      </form>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={cn(!(collapsed && thinking) && 'ml-auto')}
+          title={collapsed ? 'Open chat' : 'Collapse chat'}
+          aria-label={collapsed ? 'Open chat' : 'Collapse chat'}
+          aria-expanded={!collapsed}
+          onClick={toggle}
+        >
+          {collapsed ? <CaretDownIcon className="size-4" /> : <CaretUpIcon className="size-4" />}
+        </Button>
+      </header>
+      {!collapsed && (
+        <>
+          {settingsOpen && (
+            <KeySettings
+              onSave={(config) => {
+                saveKey(config)
+                setHasKey(keyIsUsable(config))
+                setSettingsOpen(false)
+              }}
+              onForget={() => {
+                forgetKey()
+                setHasKey(false)
+              }}
+            />
+          )}
+          {(entries.length > 0 || thinking) && (
+            <div className="ttx-chat__list" ref={listRef}>
+              {entries.map((e) =>
+                e.kind === 'user' ? (
+                  <UserEntry key={e.id} message={e} lost={isLost(e, pending, thinking)} />
+                ) : (
+                  <AgentEntry key={e.id} reply={e} runtime={runtime} undone={undone.has(e.id)} />
+                ),
+              )}
+              {thinking && <p className="ttx-chat__thinking">Agent is thinking…</p>}
+            </div>
+          )}
+          <form className="flex shrink-0 flex-col gap-3 px-4 pt-0 pb-4" onSubmit={send}>
+            <div className="flex h-[184px] flex-col justify-between rounded-lg border border-input bg-background p-4">
+              <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="Describe the disaster, map or chart you want to add to the canvas…"
+                aria-label="Message to the agent"
+                className="min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0 md:text-base"
+              />
+              <div className="flex shrink-0 items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn('size-9', dictation.listening && 'bg-accent')}
+                  disabled={!dictation.supported}
+                  title={dictation.supported ? (dictation.listening ? 'Stop dictating' : 'Dictate') : "This browser can't dictate"}
+                  aria-label="Dictate"
+                  aria-pressed={dictation.listening}
+                  onClick={dictation.toggle}
+                >
+                  <MicrophoneIcon className="size-[18px]" weight={dictation.listening ? 'fill' : 'regular'} />
+                </Button>
+                <Button type="submit" size="icon" className="size-9 rounded-full" disabled={!text.trim() || ownWithoutKey} title="Send" aria-label="Send">
+                  <ArrowUpIcon className="size-[18px]" />
+                </Button>
+              </div>
+            </div>
+            {(ownWithoutKey || selection.length > 0) && (
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                {ownWithoutKey ? (
+                  <span className="text-xs text-muted-foreground">Add your key first: open the model menu below</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2 py-1.5">
+                    <CursorIcon className="size-3.5" />
+                    {selection.length} selected
+                  </span>
+                )}
+              </div>
+            )}
+          </form>
+          <Separator />
+          <footer className="shrink-0 rounded-b-xl bg-panel-footer px-3 py-1">
+            <ModelPicker />
+          </footer>
+        </>
+      )}
     </aside>
   )
 }
@@ -179,9 +247,18 @@ function KeySettings({ onSave, onForget }: { onSave: (config: KeyConfig) => void
 }
 
 function AgentEntry({ reply, runtime, undone }: { reply: AgentReply; runtime: Runtime; undone: boolean }) {
+  // Undo refuses when someone changed the turn's objects since (agent.undoTurn); say why.
+  const [undoError, setUndoError] = useState<string>()
+  const undo = async () => {
+    const record = await runtime.invoke('agent.undoTurn', { kind: 'canvas' }, { replyId: reply.id })
+    setUndoError(record.error)
+  }
   return (
     <div className="ttx-chat__entry ttx-chat__entry--agent">
-      <div className="ttx-chat__who">Agent</div>
+      <div className="ttx-chat__who">
+        <SparkleIcon size={12} weight="fill" />
+        Agent
+      </div>
       <div className="ttx-chat__text">{reply.text}</div>
       {reply.calls.length > 0 && (
         <ul className="ttx-chat__calls">
@@ -198,11 +275,12 @@ function AgentEntry({ reply, runtime, undone }: { reply: AgentReply; runtime: Ru
         (undone ? (
           <div className="ttx-chat__undone">Undone</div>
         ) : (
-          <button className="ttx-chat__undo" onClick={() => void runtime.invoke('agent.undoTurn', { kind: 'canvas' }, { replyId: reply.id })}>
+          <button className="ttx-chat__undo" onClick={() => void undo()}>
             <ArrowCounterClockwiseIcon size={14} />
             Undo
           </button>
         ))}
+      {undoError && !undone && <div className="ttx-chat__undo-error">{undoError}</div>}
     </div>
   )
 }
@@ -234,4 +312,40 @@ function useUndoneReplies(runtime: Runtime): Set<string> {
     }
     return ids
   }, [runtime, length])
+}
+
+/** The browser's speech recognition (Chrome and Safari; Firefox has none), not in TypeScript's DOM types. */
+interface Recognition {
+  lang: string
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  start(): void
+  stop(): void
+}
+const Recognizer = (window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition }).SpeechRecognition ??
+  (window as unknown as { webkitSpeechRecognition?: new () => Recognition }).webkitSpeechRecognition
+
+/** Dictation into the prompt: one phrase per press, passed to `onText` when it is recognized. */
+function useDictation(onText: (spoken: string) => void) {
+  const [listening, setListening] = useState(false)
+  const active = useRef<Recognition>(null)
+  const latest = useRef(onText)
+  latest.current = onText
+  useEffect(() => () => active.current?.stop(), [])
+  function toggle() {
+    if (!Recognizer) return
+    if (active.current) return active.current.stop()
+    const r = new Recognizer()
+    r.lang = navigator.language
+    r.onresult = (e) => latest.current(Array.from(e.results, (alt) => alt[0]?.transcript ?? '').join(' ').trim())
+    r.onend = r.onerror = () => {
+      active.current = null
+      setListening(false)
+    }
+    active.current = r
+    setListening(true)
+    r.start()
+  }
+  return { supported: !!Recognizer, listening, toggle }
 }
