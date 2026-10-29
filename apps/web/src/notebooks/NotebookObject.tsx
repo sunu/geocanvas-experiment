@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowSquareOutIcon, FileTextIcon, MapTrifoldIcon, NotebookIcon } from '@phosphor-icons/react'
 import { notebookResultLayer, type NotebookBoardObject } from '@ttx/plugins'
+import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { boundsOf } from '../map/layers'
 import { fitMapTo } from '../map/MapObject'
@@ -20,8 +21,11 @@ const SEARCH_DELAY_MS = 250
  *
  * Double-click: in the card, choose a run; in the notebook view, scroll and use the notebook (Esc gives
  * the pointer back to the canvas). The header's buttons work without double-clicking.
+ *
+ * Focus (F or the header's button) fills the screen with the view, which then has the pointer; the run,
+ * the view and the files are in its Options panel (NotebookOptions.tsx).
  */
-export function NotebookObject({ runtime, object: o, editing, onDone }: ObjectViewProps<NotebookBoardObject>) {
+export function NotebookObject({ runtime, object: o, editing, onDone, focused, onFocus }: ObjectViewProps<NotebookBoardObject>) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const view = o.view ?? 'card'
   const run = useRun(o.runId)
@@ -69,25 +73,21 @@ export function NotebookObject({ runtime, object: o, editing, onDone }: ObjectVi
         <span className="ttx-notebook__title">{run.value?.title ?? 'Notebook'}</span>
         {run.value && (
           <>
-            <div className="ttx-notebook__views" role="group" aria-label="Show">
-              <button type="button" className={view === 'card' ? 'is-on' : ''} aria-pressed={view === 'card'} onClick={() => setView('card')}>
-                Summary
-              </button>
-              <button type="button" className={view === 'notebook' ? 'is-on' : ''} aria-pressed={view === 'notebook'} onClick={() => setView('notebook')}>
-                Notebook
-              </button>
-            </div>
+            {/* In focus the Options panel switches the view. */}
+            {!focused && <ViewSwitch view={view} onChange={setView} />}
             <a href={run.value.detail_url} target="_blank" rel="noopener noreferrer" title="Open in Notebook Factory" aria-label="Open in Notebook Factory">
               <ArrowSquareOutIcon size={14} />
             </a>
           </>
         )}
+        {!focused && onFocus && <FocusButton onFocus={onFocus} />}
       </div>
       <div ref={bodyRef} className="ttx-notebook__body">
-        {editing && (view === 'card' || !o.runId) ? (
+        {/* A focused notebook is always editing; its run is picked in the Options panel. */}
+        {editing && !focused && (view === 'card' || !o.runId) ? (
           <RunPicker selected={o.runId} onPick={pick} />
         ) : !o.runId ? (
-          <div className="ttx-notebook__empty">Double-click to choose a notebook run</div>
+          <div className="ttx-notebook__empty">{focused ? 'Choose a notebook run in the options' : 'Double-click to choose a notebook run'}</div>
         ) : run.error !== undefined ? (
           <div className="ttx-notebook__empty">Could not load the run: {errorText(run.error)}</div>
         ) : !run.value ? (
@@ -108,15 +108,30 @@ export function NotebookObject({ runtime, object: o, editing, onDone }: ObjectVi
             {!editing && <div className="ttx-notebook__hint">Double-click to scroll and use the notebook</div>}
           </>
         ) : (
-          <RunCard run={run.value} onShowOnNewMap={(name) => showOnNewMap(run.value!, name)} />
+          // Not in focus: the new map would go into the draft, hidden behind the focused notebook until shared.
+          <RunCard run={run.value} onShowOnNewMap={focused ? undefined : (name) => showOnNewMap(run.value!, name)} />
         )}
       </div>
     </div>
   )
 }
 
+/** Summary or Notebook: which view everyone sees. */
+export function ViewSwitch({ view, onChange }: { view: 'card' | 'notebook'; onChange(view: 'card' | 'notebook'): void }) {
+  return (
+    <div className="ttx-notebook__views" role="group" aria-label="Show">
+      <button type="button" className={view === 'card' ? 'is-on' : ''} aria-pressed={view === 'card'} onClick={() => onChange('card')}>
+        Summary
+      </button>
+      <button type="button" className={view === 'notebook' ? 'is-on' : ''} aria-pressed={view === 'notebook'} onClick={() => onChange('notebook')}>
+        Notebook
+      </button>
+    </div>
+  )
+}
+
 /** The run's details for one id. Changing the id drops the old details at once, so they never show under the new id. */
-function useRun(runId: string | undefined): { value?: NotebookRun; error?: unknown } {
+export function useRun(runId: string | undefined): { value?: NotebookRun; error?: unknown } {
   const [state, setState] = useState<{ runId: string; value?: NotebookRun; error?: unknown }>()
   useEffect(() => {
     if (!runId) return
@@ -132,7 +147,7 @@ function useRun(runId: string | undefined): { value?: NotebookRun; error?: unkno
   return runId && state?.runId === runId ? state : {}
 }
 
-function RunCard({ run, onShowOnNewMap }: { run: NotebookRun; onShowOnNewMap(fileName: string): void }) {
+function RunCard({ run, onShowOnNewMap }: { run: NotebookRun; onShowOnNewMap?(fileName: string): void }) {
   const place = run.area ? [run.area.name, run.area.level > 0 ? run.area.country_name : undefined].filter(Boolean).join(', ') : undefined
   const files = Object.entries(run.artifacts ?? {})
   const text = run.summary || run.description
@@ -153,7 +168,7 @@ function RunCard({ run, onShowOnNewMap }: { run: NotebookRun; onShowOnNewMap(fil
                 <FileTextIcon size={14} aria-hidden />
                 {name}
               </a>
-              {isGeoJson(name) && (
+              {onShowOnNewMap && isGeoJson(name) && (
                 <button type="button" title="Show on a new map next to this notebook" onClick={() => onShowOnNewMap(name)}>
                   <MapTrifoldIcon size={12} aria-hidden />
                   Show on a new map

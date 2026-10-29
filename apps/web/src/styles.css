@@ -2114,6 +2114,13 @@ body:has(.ttx-canvas.is-focus) .ttx-boardbar {
   text-align: center;
 }
 
+/* The run picker in a notebook's Options panel, which scrolls: the list scrolls inside a fixed height. */
+.ttx-nbopts__picker {
+  display: flex;
+  height: 360px;
+  margin: 0 -8px;
+}
+
 .ttx-notebookpick {
   display: flex;
   flex-direction: column;
