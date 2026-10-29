@@ -7,6 +7,8 @@ import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
 import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { ObjectMenu } from './ObjectMenu'
 import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { useAgentTouched } from '../board/agentActivity'
@@ -518,9 +520,23 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   const dotRadius = Math.max(0.5, camera.z)
   const dots = Math.min(1, Math.max(0, (camera.z - DOTS_GONE) / (DOTS_FULL - DOTS_GONE)))
 
+  /** A right click on an object opens its menu, on the selection; on anything else the menu stays shut. */
+  function onContextMenuCapture(e: ReactMouseEvent) {
+    const id = (e.target as HTMLElement).closest<HTMLElement>('[data-id]')?.dataset.id
+    if (!id || !byId.has(id) || focus || editingId) {
+      e.preventDefault()
+      e.stopPropagation()
+    } else if (!selected.has(id)) {
+      setSelection(new Set([id]))
+    }
+  }
+
   return (
+    <ContextMenu>
+    <ContextMenuTrigger asChild>
     <div
       ref={rootRef}
+      onContextMenuCapture={onContextMenuCapture}
       className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''}`}
       style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius } as CSSProperties}
       onPointerDown={onPointerDown}
@@ -615,6 +631,9 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         <Palette runtime={runtime} selection={[...selected]} center={viewCenter} run={runFromPalette} onClose={() => setPaletteOpen(false)} />
       )}
     </div>
+    </ContextMenuTrigger>
+    <ObjectMenu runtime={runtime} ids={[...selected]} onSelect={(ids) => setSelection(new Set(ids))} />
+    </ContextMenu>
   )
 }
 
