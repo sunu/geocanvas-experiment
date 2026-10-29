@@ -50,7 +50,7 @@ describe('askStep', () => {
 
   it("puts a placeholder where the agent's first add will land, with the cursor at its corner", () => {
     const placeholder = firstAddSpot(objects, message.center, PLACEHOLDER_SIZE)
-    expect(askStep(message, objects)).toMatchObject({ key: 'agent:p1', placeholder, ids: [] })
+    expect(askStep(message, objects)).toMatchObject({ key: 'agent:p1', placeholder, rect: placeholder, ids: [] })
     expect(askStep(message, objects)!.point.x).toBeGreaterThan(placeholder.x + placeholder.w / 2)
   })
 
@@ -249,6 +249,21 @@ describe('AgentCursors', () => {
     // Forgotten once done: loading later, not caused by the agent, does not show it busy again.
     loading.add('b')
     expect(busyIds(c, bArrives + MIN_BUSY_MS + 1)).toEqual(new Set())
+  })
+})
+
+describe('targetFor', () => {
+  it("gives what the asker's agent works on now, as each move starts, for that person only", () => {
+    const c = new AgentCursors()
+    const first = { x: 0, y: 0, w: 320, h: 200 }
+    const second = { x: 2000, y: 0, w: 520, h: 360 }
+    c.add({ ...step(160, 100), rect: first }, 0)
+    expect(c.targetFor('p1', 999)).toEqual(first)
+    c.add({ ...step(2400, 300, ['m'], ['m']), rect: second }, 1000)
+    expect(c.targetFor('p1', 1000)).toEqual(second)
+    expect(c.targetFor('p2', 1000)).toBeUndefined()
+    // Gone with its cursor.
+    expect(c.targetFor('p1', 1000 + TRAVEL_MS + IDLE_MS)).toBeUndefined()
   })
 })
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { Draft, type Chat, type Runtime, type TargetRef } from '@ttx/core'
+import type * as Y from 'yjs'
+import { Draft, type Chat, type ChatEntry, type Runtime, type TargetRef } from '@ttx/core'
 import type { ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
@@ -31,6 +32,8 @@ import { tools, Toolbar, type Tool } from './Toolbar'
 const MIN_SIZE = 16
 /** Pointer travel (screen px) before a press becomes a drag. */
 const DRAG_THRESHOLD = 3
+/** How far inside the canvas edge (px) what the agent works on must be for the asker's camera to stay where it is. */
+const FOLLOW_MARGIN = 48
 const HANDLES = ['nw', 'ne', 'sw', 'se'] as const
 const GRID = 24
 /** The dots are fully visible from this zoom up, fade out below it, and are gone at DOTS_GONE. */
@@ -111,7 +114,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   const objects = useObjects(board)
   const peers = usePeers(awareness)
   const agentTouched = useAgentTouched(runtime)
-  const agentCursors = useAgentCursors(runtime, chat)
+  const me = (awareness.getLocalState() as { user?: { id?: string } } | null)?.user?.id
+  const agentCursors = useAgentCursors(runtime, chat, me)
   const agentActivities = useAgentActivities(awareness)
   // What an agent added is outlined once its cursor gets there, when the object appears.
   const agentMarked = useMemo(
@@ -227,6 +231,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
 
     if (e.button === 1 || spaceHeld || tool === 'hand') {
       const start = cameraRef.current
+      following.current = false
       trackDrag(e, (dx, dy) => setCamera({ ...start, x: start.x + dx, y: start.y + dy }))
       return
     }
@@ -410,6 +415,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       // In focus the canvas stays still: the focused object scrolls or zooms itself.
       if (focusRef.current) return
       e.preventDefault()
+      following.current = false
       const r = root.getBoundingClientRect()
       if (e.ctrlKey || e.metaKey) {
         setCamera((c) => zoomAt(c, Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top))
@@ -494,6 +500,29 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       window.removeEventListener('keyup', onKeyUp)
     }
   }, [runtime, editingId, selected, paletteOpen, focus])
+
+  // The camera follows the agent working for this person when what it works on goes out of view, at the same zoom,
+  // until they move the view themselves; their next request starts it again. Others' agents never move it.
+  const following = useRef(true)
+  useEffect(() => {
+    if (!me) return
+    const onChat = (event: Y.YArrayEvent<ChatEntry>) => {
+      const asked = event.changes.delta.some((d) => ((d.insert ?? []) as ChatEntry[]).some((e) => e.kind === 'user' && e.actor.id === me))
+      if (asked) following.current = true
+    }
+    chat.entries.observe(onChat)
+    return () => chat.entries.unobserve(onChat)
+  }, [chat, me])
+  useEffect(() => {
+    const r = agentCursors.target
+    const el = rootRef.current
+    if (!r || !el || !following.current || focusRef.current) return
+    const s = toScreen(cameraRef.current, r)
+    const m = FOLLOW_MARGIN
+    if (s.x >= m && s.y >= m && s.x + s.w <= el.clientWidth - m && s.y + s.h <= el.clientHeight - m) return
+    goToPoint({ x: r.x + r.w / 2, y: r.y + r.h / 2 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentCursors.target])
 
   /** Move the camera so world point `p` is in the middle, at the same zoom (an off-screen agent's marker). */
   function goToPoint(p: Point) {

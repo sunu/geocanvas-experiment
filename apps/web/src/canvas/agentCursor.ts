@@ -141,9 +141,9 @@ export function askStep(entry: ChatEntry, objects: readonly AnyObject[]): AgentS
   const step = { key: agentKey(AGENT.id, entry.actor.id), name: AGENT.name ?? 'Agent', color: AGENT.color ?? AGENT_COLOR, created: [], ids: [] }
   // With a selection, the agent most likely changes it: wait there.
   const selected = bounds(objects.filter((o) => entry.selection.includes(o.id)))
-  if (selected) return { ...step, point: corner(selected) }
+  if (selected) return { ...step, point: corner(selected), rect: selected }
   const placeholder = firstAddSpot([...objects], entry.center, PLACEHOLDER_SIZE)
-  return { ...step, point: corner(placeholder), placeholder }
+  return { ...step, point: corner(placeholder), placeholder, rect: placeholder }
 }
 
 interface Placeholder {
@@ -157,6 +157,8 @@ interface Placeholder {
 
 interface Move {
   to: Point
+  /** What the cursor works on there: the objects, the selection or a placeholder. */
+  rect?: Rect
   /** When the step came in: the move never starts before, or the cursor would jump to where it should be by now. */
   queued: number
   created: string[]
@@ -209,7 +211,7 @@ export class AgentCursors {
 
   add(step: AgentStep, now: number) {
     this.advance(now)
-    const move: Move = { to: step.point, queued: now, created: step.created, ids: step.ids, ...(step.label && { label: step.label }) }
+    const move: Move = { to: step.point, queued: now, created: step.created, ids: step.ids, ...(step.label && { label: step.label }), ...(step.rect && { rect: step.rect }) }
     // The first step after a placeholder: an add takes its place, anything else lets it fade.
     const waiting = this.placeholders.get(step.key)
     if (step.placeholder) this.placeholders.set(step.key, { rect: step.placeholder, shown: now })
@@ -328,6 +330,21 @@ export class AgentCursors {
     return shown
   }
 
+  /**
+   * What an agent working for `person` works on at `t` (its current move's rect), for that person's camera to follow.
+   * Of several such agents, the one whose move started last.
+   */
+  targetFor(person: string, t: number): Rect | undefined {
+    this.advance(t)
+    let latest: Started | undefined
+    for (const [key, track] of this.tracks) {
+      const move = track.moves[0]
+      if (!key.endsWith(`:${person}`) || t >= hideAt(track) || !move || !started(move) || move.start > t) continue
+      if (!latest || move.start > latest.start) latest = move
+    }
+    return latest?.rect
+  }
+
   /** Whether any cursor is shown at `t`. */
   active(t: number, working: ReadonlySet<string> | ReadonlyMap<string, unknown> = NONE): boolean {
     return [...this.tracks].some(([key, tr]) => working.has(key) || t < hideAt(tr))
@@ -401,13 +418,19 @@ const NOT_BUSY = new Map<string, string>()
  * log and the chat gain from now on count, never the history they load with. `version` changes with every step, to
  * restart the cursors' animation.
  */
-export function useAgentCursors(runtime: Runtime, chat: Chat): { cursors: AgentCursors; version: number; arriving: Set<string>; busy: Map<string, string> } {
+export function useAgentCursors(
+  runtime: Runtime,
+  chat: Chat,
+  /** This tab's person: `target` is what an agent working for them works on now. */
+  me?: string,
+): { cursors: AgentCursors; version: number; arriving: Set<string>; busy: Map<string, string>; target?: Rect } {
   const [cursors] = useState(
     () => new AgentCursors({ reduced: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches, loading: isLoading }),
   )
   const [version, setVersion] = useState(0)
   const [arriving, setArriving] = useState(NONE)
   const [busy, setBusy] = useState(NOT_BUSY)
+  const [target, setTarget] = useState<Rect>()
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
     // What to hold back and what is busy change only at a few moments, so the canvas renders then, not every frame.
@@ -418,6 +441,8 @@ export function useAgentCursors(runtime: Runtime, chat: Chat): { cursors: AgentC
       const working = cursors.busy(now)
       setArriving((prev) => (sameSet(prev, held) ? prev : held.size ? held : NONE))
       setBusy((prev) => (sameMap(prev, working) ? prev : working.size ? working : NOT_BUSY))
+      const at = me ? cursors.targetFor(me, now) : undefined
+      setTarget((prev) => (prev && at && prev.x === at.x && prev.y === at.y && prev.w === at.w && prev.h === at.h ? prev : at))
       const next = cursors.nextChange(now)
       if (next !== undefined) timer = setTimeout(sync, next - now + 10)
     }
@@ -447,6 +472,6 @@ export function useAgentCursors(runtime: Runtime, chat: Chat): { cursors: AgentC
       stopLoading()
       clearTimeout(timer)
     }
-  }, [runtime, chat, cursors])
-  return { cursors, version, arriving, busy }
+  }, [runtime, chat, cursors, me])
+  return { cursors, version, arriving, busy, ...(target && { target }) }
 }

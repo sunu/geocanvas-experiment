@@ -92,6 +92,8 @@ body,
  * space, placed by its style. */
 .ttx-agent-placeholder {
   inset: auto;
+  /* Under the agent's cursor, which comes after it: a busy card's z-index lifts it over a widget's content only. */
+  z-index: auto;
 }
 
 .ttx-obj__busy-label {
