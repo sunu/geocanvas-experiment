@@ -61,6 +61,7 @@ function PickStep({
   onBrowseTemplates,
   run,
   templates,
+  center,
 }: Props & { onChoose(op: OpDef, target: TargetRef): void; onBrowseTemplates(): void }) {
   const [error, setError] = useState<string>()
   const [search, setSearch] = useState('')
@@ -79,7 +80,7 @@ function PickStep({
   const choose = async (op: OpDef, target: TargetRef) => {
     // Nothing to fill in: run it now.
     if (mainFields(argsSchema(op)).length) return onChoose(op, target)
-    const r = await run(op.id, target, {})
+    const r = await run(op.id, target, startArgs({ runtime, op, target, center, selection }))
     if (r.status === 'failed') setError(r.error)
   }
 
@@ -129,25 +130,31 @@ function OpItem({ op, group, onSelect }: { op: OpDef; group: string; onSelect():
   )
 }
 
+/**
+ * An op's args before anyone fills them in: its defaults, and where a new object goes. Used by the form and by an
+ * op with nothing to fill in, which runs at once.
+ */
+function startArgs({ runtime, op, target, center, selection }: Pick<Props, 'runtime' | 'center' | 'selection'> & { op: OpDef; target: TargetRef }) {
+  const base = runtime.defaultsFor(op.id, target)
+  // '<type>.add': put the new object in the middle of the view.
+  const type = runtime.registry.objectTypes().find((t) => op.id === `${t.type}.add`)
+  if (type) {
+    const c = center()
+    Object.assign(base, { x: Math.round(c.x - type.defaultSize.w / 2), y: Math.round(c.y - type.defaultSize.h / 2) })
+  }
+  // A template: its set goes in the middle of the view, and a selected event is its event seed.
+  if (isTemplate(op)) {
+    const c = center()
+    Object.assign(base, { x: Math.round(c.x), y: Math.round(c.y) })
+    const event = selection.map((id) => runtime.board.get(id)).find((o): o is EventBoardObject => o?.type === 'event' && !!(o as EventBoardObject).eventId)
+    if (event && 'event' in (argsSchema(op).properties ?? {})) base.event = event.eventId
+  }
+  return base
+}
+
 function ArgsStep({ runtime, op, target, center, run, onBack, selection }: Props & { op: OpDef; target: TargetRef; onBack(): void }) {
   const schema = useMemo(() => argsSchema(op), [op])
-  const [args, setArgs] = useState<Record<string, unknown>>(() => {
-    const base = runtime.defaultsFor(op.id, target)
-    // '<type>.add': put the new object in the middle of the view.
-    const type = runtime.registry.objectTypes().find((t) => op.id === `${t.type}.add`)
-    if (type) {
-      const c = center()
-      Object.assign(base, { x: Math.round(c.x - type.defaultSize.w / 2), y: Math.round(c.y - type.defaultSize.h / 2) })
-    }
-    // A template: its set goes in the middle of the view, and a selected event is its event seed.
-    if (isTemplate(op)) {
-      const c = center()
-      Object.assign(base, { x: Math.round(c.x), y: Math.round(c.y) })
-      const event = selection.map((id) => runtime.board.get(id)).find((o): o is EventBoardObject => o?.type === 'event' && !!(o as EventBoardObject).eventId)
-      if (event && 'event' in (schema.properties ?? {})) base.event = event.eventId
-    }
-    return base
-  })
+  const [args, setArgs] = useState<Record<string, unknown>>(() => startArgs({ runtime, op, target, center, selection }))
   const [summary, setSummary] = useState<string>()
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
@@ -195,7 +202,7 @@ function ArgsStep({ runtime, op, target, center, run, onBack, selection }: Props
           <div className="ttx-op__desc">{op.description}</div>
         </div>
       </div>
-      <SchemaForm schema={schema} value={args} onChange={change} />
+      <SchemaForm runtime={runtime} schema={schema} value={args} onChange={change} />
       {summary && <div className="ttx-palette__summary">{summary}</div>}
       {error && <div className="ttx-palette__error">{error}</div>}
       <div className="ttx-palette__foot">

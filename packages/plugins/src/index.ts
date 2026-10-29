@@ -10,6 +10,23 @@ export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
 export { mapPlugin, BASEMAPS, UPLOAD_FEATURES_TOOL, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
 export { CHOROPLETH_TOOL, choroplethLayer, hapiPlugin, INDICATORS, type Indicator, type ConflictBoardObject, type CountryBoardObject, type PresenceBoardObject } from './hapi.js'
+export {
+  docText,
+  freezeText,
+  ORIENTATIONS,
+  PAGE_SIZE,
+  PAPERS,
+  itemsToAdd,
+  reportsPlugin,
+  reportTitle,
+  textDoc,
+  type Block,
+  type Frozen,
+  type Orientation,
+  type Paper,
+  type ReportBoardObject,
+  type RichDoc,
+} from './reports.js'
 export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } from './reliefweb.js'
 export { geocodeTools, OpenCageGeocoder, OPENCAGE_URL, parseOpenCage, type Geocoder, type Place, type PlaceFeatures } from './geocode.js'
 export {
