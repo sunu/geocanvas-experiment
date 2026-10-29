@@ -109,7 +109,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Start a board from an event | Built | New board → Situation report with the event (`agent-docs/tasks/board-templates.md`). Picking an event on an event card also adds its ReliefWeb feed. Related events in its geography are not built. |
 | Templates that prepopulate widgets (SitRep first) | Built (plan-012, plan-013) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives an empty root and blank widgets. Its objects follow the seed's root (the event card, an area input) and sit in a frame: change the root and they update. Historical hazard explorer next. |
-| Create and export reports | Next (step 2 of 10 built) | A report is a widget on the canvas and a mode (focus): a document editor with two columns, A4 or Letter, rich text, items added from the board, live or frozen. PDF export and a report URL. Modeled on OCHA humanitarian snapshots. Spec and steps: `agent-docs/tasks/reports.md`. |
+| Create and export reports | Next (steps 2 and 3 of 10 built) | A report is a widget on the canvas and a mode (focus): a document editor with two columns, A4 or Letter, rich text, items added from the board, live or frozen. PDF export and a report URL. Modeled on OCHA humanitarian snapshots. Spec and steps: `agent-docs/tasks/reports.md`. |
 
 ### 4.7 Non-functional requirements
 

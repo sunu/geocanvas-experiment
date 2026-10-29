@@ -15,6 +15,7 @@ export {
   freezeText,
   ORIENTATIONS,
   PAGE_SIZE,
+  pageSize,
   PAPERS,
   itemsToAdd,
   reportsPlugin,
