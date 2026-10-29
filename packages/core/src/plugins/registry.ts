@@ -3,13 +3,14 @@ import { addOp } from '../ops/addOp.js'
 import type { OpDef } from '../ops/types.js'
 import type { ObjectTypeDef, Plugin } from './types.js'
 
-/** Placement fields that every object has, beside its type's own fields. */
+/** Placement fields that every object has, beside its type's own fields, and its name. */
 const placement = z.object({
   x: z.number(),
   y: z.number(),
   w: z.number().positive(),
   h: z.number().positive(),
   z: z.number(),
+  name: z.string().max(80).optional(),
 })
 
 /**

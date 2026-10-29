@@ -100,6 +100,25 @@ body,
   min-width: 0;
 }
 
+.ttx-obj__name > input {
+  box-sizing: border-box;
+  min-width: 4ch;
+  /* Its width follows the name (canvas/ObjectHeader.tsx). */
+  height: 22px;
+  padding: 0 6px;
+  border: 2px solid var(--canvas-accent);
+  border-radius: 4px;
+  outline: 0;
+  background: #fff;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.ttx-obj__name > input::selection {
+  background: var(--canvas-accent);
+  color: #fff;
+}
+
 .ttx-obj__name > span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1203,6 +1222,33 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* A section that opens and closes (MapOptions' Accordion): its heading is the toggle. */
+.ttx-options__accordion summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 14px 0 6px;
+  color: var(--ttx-muted);
+  list-style: none;
+  cursor: pointer;
+}
+
+.ttx-options__accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.ttx-options__accordion summary h3 {
+  margin: 0;
+}
+
+.ttx-options__accordion summary svg {
+  transition: transform 0.15s;
+}
+
+.ttx-options__accordion[open] summary svg {
+  transform: rotate(90deg);
 }
 
 .ttx-options__section select {

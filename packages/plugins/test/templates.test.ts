@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { z } from 'zod'
-import { defineTool, Runtime, ToolRunner, Views, type Actor, type ToolDef } from '@ttx/core'
+import { defineTool, exportTools, Runtime, ToolRunner, Views, type Actor, type ToolDef } from '@ttx/core'
 import { callOp, plugins, TurnLog, type EventFacts, type MapBoardObject, type PlaceFeatures, type ReliefWebBoardObject } from '../src/index'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
@@ -93,6 +93,23 @@ describe('template.sitrep', () => {
     expect(types(rt, r.created)).toEqual(['box', 'event', 'map', 'sticky', 'sticky', 'sticky', 'text'])
   })
 
+  it('without an event, adds its widgets empty, to pick on the board, and no feed', async () => {
+    const { runner, calls } = fakeTools()
+    const { doc, rt } = setup(runner)
+    const r = await rt.invoke('template.sitrep', canvas, {})
+    expect(r.status, r.error).toBe('applied')
+    expect(types(rt, r.created)).toEqual(['box', 'country', 'event', 'map', 'sticky', 'sticky', 'sticky', 'text'])
+    expect(r.summary).toBe('Situation report for no event yet')
+    expect(calls).toEqual([])
+    const objects = r.created!.map((id) => rt.board.get(id)!)
+    expect(objects.find((o) => o.type === 'event')).not.toHaveProperty('eventId')
+    expect(objects.find((o) => o.type === 'country')).not.toHaveProperty('country')
+    const map = objects.find((o) => o.type === 'map') as MapBoardObject
+    expect(map.layers).toBeUndefined()
+    expect(new Views(doc).get('ada', map.id)).toBeUndefined()
+    expect(objects.find((o) => o.type === 'text')).toMatchObject({ text: 'Situation report' })
+  })
+
   it('fails before any write when nothing matches, or when it cannot search', async () => {
     const { runner } = fakeTools()
     const withTools = setup(runner).rt
@@ -140,6 +157,15 @@ describe('template.conflict', () => {
     expect(r.created!.map((id) => bot.board.get(id)!).find((o) => o.type === 'text')).toMatchObject({ text: 'Conflict: Mozambique' })
   })
 
+  it('without an area, adds its widgets empty', async () => {
+    const { runner } = fakeTools()
+    const { rt } = setup(runner)
+    const r = await rt.invoke('template.conflict', canvas, {})
+    expect(r.status, r.error).toBe('applied')
+    expect(types(rt, r.created)).toEqual(['box', 'conflict', 'country', 'map', 'presence', 'sticky', 'sticky', 'text'])
+    for (const id of r.created!) expect(rt.board.get(id)).not.toHaveProperty('country')
+  })
+
   it('fails on "my view" without any map view', async () => {
     const { runner } = fakeTools()
     const { rt } = setup(runner)
@@ -148,6 +174,15 @@ describe('template.conflict', () => {
 })
 
 describe('templates for agents', () => {
+  it('offer each seed as optional, with its picker widget for forms', () => {
+    const { rt } = setup()
+    const tools = exportTools(rt.availableOps(canvas))
+    const args = (name: string) => (tools.find((t) => t.name === name)!.input_schema as any).properties.args
+    expect(args('template__sitrep').properties.event).toMatchObject({ widget: 'event' })
+    expect(args('template__conflict').properties.area).toMatchObject({ widget: 'area' })
+    expect(args('template__sitrep').required ?? []).not.toContain('event')
+  })
+
   it("go in the middle of the asker's view, and say what they found", async () => {
     const { runner } = fakeTools()
     const { doc } = setup()

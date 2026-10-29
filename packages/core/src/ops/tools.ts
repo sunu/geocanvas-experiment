@@ -54,14 +54,13 @@ export function exportToolDefs(tools: ToolDef[]): ToolDefinition[] {
   })
 }
 
-/** Short text about the board for an LLM: one line per object, bottom to top. */
+/** Short text about the board for an LLM: its title if it has one, then one line per object, bottom to top. */
 export function summarizeBoard(board: Board, registry: Registry): string {
-  return board
-    .list()
-    .map((o) => {
-      const extra = registry.objectType(o.type)?.summarize?.(o)
-      const at = `at (${Math.round(o.x)}, ${Math.round(o.y)}) size ${Math.round(o.w)}×${Math.round(o.h)}`
-      return `- ${o.type} ${o.id} ${at}${extra ? `: ${extra}` : ''}`
-    })
-    .join('\n')
+  const lines = board.list().map((o) => {
+    const extra = registry.objectType(o.type)?.summarize?.(o)
+    const at = `at (${Math.round(o.x)}, ${Math.round(o.y)}) size ${Math.round(o.w)}×${Math.round(o.h)}`
+    return `- ${o.type} ${o.id} ${at}${extra ? `: ${extra}` : ''}`
+  })
+  const title = board.title
+  return (title ? [`Board: ${JSON.stringify(title)}`, ...lines] : lines).join('\n')
 }
