@@ -134,7 +134,7 @@ const getTileData: NonNullable<COGLayerProps<TileData>['getTileData']> = async (
   return { width: array.width, height: array.height, byteLength: values.byteLength, texture, nodata: array.nodata, device }
 }
 
-export function rasterLayers(value: unknown, { id }: { id: string }): Layer[] {
+export function rasterLayers(value: unknown, { id, opacity = 1 }: { id: string; opacity?: number }): Layer[] {
   const r = value as Raster
   const colormap: RasterColormap = r.colormap && r.colormap in COLORMAPS ? r.colormap : 'magma'
   const [rescaleMin, rescaleMax] = r.rescale
@@ -142,6 +142,7 @@ export function rasterLayers(value: unknown, { id }: { id: string }): Layer[] {
     new COGLayer<TileData>({
       id: `${id}-raster`,
       geotiff: r.url,
+      opacity,
       getTileData,
       renderTile: (d) => ({
         renderPipeline: [

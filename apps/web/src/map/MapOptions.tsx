@@ -99,7 +99,14 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
       </section>
       <section className="ttx-options__section">
         <h3>Layers</h3>
-        <LayerList layers={layers} states={states} onUseMyView={useMyView} onRemove={(layerId) => mapOp(runtime, o.id, 'map.removeLayer', { layerId })} />
+        <LayerList
+          layers={layers}
+          states={states}
+          onUseMyView={useMyView}
+          onRemove={(layerId) => mapOp(runtime, o.id, 'map.removeLayer', { layerId })}
+          onFilter={(layerId, filter) => mapOp(runtime, o.id, 'map.setLayerFilter', { layerId, ...(filter && { filter }) })}
+          onStyle={(layerId, style) => mapOp(runtime, o.id, 'map.setLayerStyle', { layerId, style })}
+        />
       </section>
       <section className="ttx-options__section">
         <h3>Add data for this area</h3>

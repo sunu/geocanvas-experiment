@@ -2373,3 +2373,98 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   align-items: center;
   gap: 4px;
 }
+
+/* A layer's attributes, filter and style (map/LayerList.tsx). */
+.ttx-layers__item button.is-active {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-accent);
+}
+
+.ttx-layers__details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 6px 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.03);
+  font-size: 12px;
+}
+
+.ttx-layers__details label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ttx-layers__details select,
+.ttx-layers__details input {
+  min-width: 0;
+  font: inherit;
+}
+
+.ttx-layers__swatches {
+  display: flex;
+  gap: 4px;
+}
+
+.ttx-layers .ttx-layers__swatches button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+.ttx-layers .ttx-layers__swatches button.is-active {
+  box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 4px var(--ttx-ink);
+}
+
+.ttx-layers__filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.ttx-layers__filter input {
+  flex: 1;
+  width: 60px;
+}
+
+.ttx-layers .ttx-layers__filter button {
+  padding: 2px 8px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+}
+
+.ttx-layers .ttx-layers__filter button:disabled {
+  color: var(--ttx-muted);
+}
+
+.ttx-layers__attrs {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ttx-layers__attrs th {
+  color: var(--ttx-muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+.ttx-layers__attrs th:nth-child(2) {
+  width: 52px;
+}
+
+.ttx-layers__attrs td {
+  overflow: hidden;
+  padding: 2px 4px 2px 0;
+  border-top: 1px solid var(--ttx-border);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -15,6 +15,7 @@ export {
   BOUNDARIES_TOOL,
   bboxOf,
   DATA_LAYERS,
+  FILTER_OPS,
   guessFormat,
   hasArea,
   mapLayer,
@@ -24,6 +25,9 @@ export {
   type AdminLevel,
   type Bbox,
   type DataLayerKey,
+  type FilterOp,
+  type LayerFilter,
+  type LayerStyle,
   type MapLayer,
   type UrlFormat,
 } from './mapLayers.js'

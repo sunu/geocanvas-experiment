@@ -122,3 +122,35 @@ describe('map layers from a URL', () => {
     expect(layersOf().map((l) => l.title)).toEqual(['Shelters'])
   })
 })
+
+describe('layer filters and styles', () => {
+  const withLayer = () => {
+    const s = setup()
+    s.rt.dispatch('map.addUrlLayer', s.target, { url: 'https://example.org/shelters.geojson' })
+    return { ...s, layerId: s.layersOf()[0]!.id }
+  }
+
+  it('sets and clears a filter, which the agent reads in the summary', () => {
+    const { rt, target, layersOf, layerId } = withLayer()
+    expect(rt.dispatch('map.setLayerFilter', target, { layerId, filter: { property: 'capacity', op: '>=', value: 100 } }).status).toBe('applied')
+    expect(layersOf()[0]!.filter).toEqual({ property: 'capacity', op: '>=', value: 100 })
+    expect(rt.registry.objectType('map')!.summarize!(rt.board.get(target.ids[0]!)!)).toMatch(/only capacity >= 100/)
+    rt.dispatch('map.setLayerFilter', target, { layerId })
+    expect(layersOf()[0]).not.toHaveProperty('filter')
+  })
+
+  it('replaces the style, and {} goes back to the default', () => {
+    const { rt, target, layersOf, layerId } = withLayer()
+    rt.dispatch('map.setLayerStyle', target, { layerId, style: { color: '#dc2626', opacity: 0.5 } })
+    rt.dispatch('map.setLayerStyle', target, { layerId, style: { byProperty: 'type' } })
+    expect(layersOf()[0]!.style).toEqual({ byProperty: 'type' })
+    rt.dispatch('map.setLayerStyle', target, { layerId, style: {} })
+    expect(layersOf()[0]).not.toHaveProperty('style')
+    expect(rt.dispatch('map.setLayerStyle', target, { layerId, style: { color: 'red' } }).status).toBe('failed')
+  })
+
+  it('refuses a layer the map does not have', () => {
+    const { rt, target } = withLayer()
+    expect(rt.dispatch('map.setLayerFilter', target, { layerId: 'nope', filter: { property: 'a', op: '=', value: 1 } })).toMatchObject({ status: 'failed', error: expect.stringMatching(/no layer nope/) })
+  })
+})

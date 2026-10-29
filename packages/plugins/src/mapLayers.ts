@@ -5,12 +5,38 @@ import { z } from 'zod'
  * each person's browser runs the tool (apps/web/src/map/layers.ts). An area-based tool gets its area
  * when the layer is added, so everyone sees the same data although map views are per person.
  */
+export const FILTER_OPS = ['=', '!=', '>', '>=', '<', '<=', 'contains'] as const
+export type FilterOp = (typeof FILTER_OPS)[number]
+
+/** Which features of a layer are drawn: those whose property compares so to the value. Runs in each browser on the loaded features. */
+export const layerFilter = z.object({
+  property: z.string().min(1).describe("A property of the layer's features"),
+  op: z.enum(FILTER_OPS),
+  value: z.union([z.string(), z.number()]).describe('Numbers compare as numbers; contains ignores case'),
+})
+export type LayerFilter = z.infer<typeof layerFilter>
+
+/** How a layer is drawn. Each part is optional: absent, the default (the accent color, fully opaque). */
+export const layerStyle = z.object({
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .optional()
+    .describe('Color of the features, #rrggbb'),
+  byProperty: z.string().min(1).optional().describe('Color the features by this property instead: classes for numbers, categories for text'),
+  opacity: z.number().min(0.1).max(1).optional().describe('Opacity of the whole layer'),
+})
+export type LayerStyle = z.infer<typeof layerStyle>
+
 export const mapLayer = z.object({
   id: z.string(),
   /** A tool id, e.g. 'data.population' (apps/web/src/tools/registry.ts). */
   tool: z.string(),
   input: z.record(z.string(), z.unknown()),
   title: z.string(),
+  /** Added after layers: absent on older ones. Filter and color apply to features only; opacity to every deck.gl layer. */
+  filter: layerFilter.optional(),
+  style: layerStyle.optional(),
 })
 export type MapLayer = z.infer<typeof mapLayer>
 

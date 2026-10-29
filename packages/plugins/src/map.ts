@@ -7,6 +7,8 @@ import {
   bboxOf,
   DATA_LAYERS,
   guessFormat,
+  layerFilter,
+  layerStyle,
   mapLayer,
   newLayerId,
   URL_FORMATS,
@@ -63,6 +65,13 @@ function areaFor(ctx: OpContext, map: MapBoardObject, given: MapArea | undefined
 /** A layer write: the map's whole new list (see MapBoardObject). */
 const setLayers = (tx: BoardTx, id: string, layers: MapLayer[]) => tx.update({ [id]: { layers } })
 
+/** The map's layers with one of them changed, or an error if it has no such layer. */
+function changeLayer(map: MapBoardObject, layerId: string, change: (l: MapLayer) => MapLayer) {
+  const layers = map.layers ?? []
+  if (!layers.some((l) => l.id === layerId)) throw new Error(`The map has no layer ${layerId}`)
+  return { id: map.id, layers: layers.map((l) => (l.id === layerId ? change(l) : l)) }
+}
+
 const dataLayer = z.enum(Object.keys(DATA_LAYERS) as [DataLayerKey, ...DataLayerKey[]])
 const layerId = z.string().describe("The layer's id, from the map's layers")
 
@@ -85,7 +94,7 @@ export const mapPlugin = definePlugin({
       layer: 'bottom',
       summarize: (o) => {
         const { basemap, layers } = o as MapBoardObject
-        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id})`).join(', ')}` : ''}`
+        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''})`).join(', ')}` : ''}`
       },
     },
   ],
@@ -215,6 +224,25 @@ export const mapPlugin = definePlugin({
         const bbox = areaFor(ctx, map, area)
         return { id: map.id, layers: layers.map((l) => (l.id === layerId ? { ...l, input: { ...l.input, area: bbox } } : l)) }
       },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.setLayerFilter',
+      title: 'Filter layer',
+      description: "Draw only the features of a map's layer whose property matches, for everyone. Without `filter`: draw them all again. Features only, not rasters, tiles or boundaries.",
+      target: oneMap,
+      args: z.object({ layerId, filter: layerFilter.optional() }),
+      prepare: (ctx, { layerId, filter }) => changeLayer(mapOf(ctx), layerId, ({ filter: _, ...l }) => (filter ? { ...l, filter } : l)),
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.setLayerStyle',
+      title: 'Style layer',
+      description: "Set how a map's layer is drawn, for everyone: its color or the property that colors it (features only), and its opacity. Replaces the layer's style; {} goes back to the default.",
+      target: oneMap,
+      args: z.object({ layerId, style: layerStyle }),
+      prepare: (ctx, { layerId, style }) =>
+        changeLayer(mapOf(ctx), layerId, ({ style: _, ...l }) => (Object.values(style).some((v) => v !== undefined) ? { ...l, style } : l)),
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),
     }),
     defineOp({
