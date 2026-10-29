@@ -11,6 +11,8 @@ import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { Peers } from './Peers'
 import { isFocusable, objectUI } from './registry'
+import { placeFiles } from '../uploads/drop'
+import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
@@ -257,6 +259,52 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     )
   }
 
+  /**
+   * Files dragged over the window dim the board, with a drop target, and a drop places them where they land
+   * (uploads/drop.ts). Listened for on the window, so a drop on a panel or the toolbar places the file too,
+   * instead of the browser opening it and leaving the board. An image object takes a picture dropped on
+   * it first (it prevents the default). Enter and leave fire for every element crossed, so they are counted.
+   */
+  const [dragging, setDragging] = useState(false)
+  useEffect(() => {
+    let depth = 0
+    const isFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files') && !focusRef.current
+    const onEnter = (e: DragEvent) => {
+      if (!isFiles(e)) return
+      depth++
+      setDragging(true)
+    }
+    const onLeave = (e: DragEvent) => {
+      if (!isFiles(e) || --depth > 0) return
+      depth = 0
+      setDragging(false)
+    }
+    const onOver = (e: DragEvent) => {
+      if (isFiles(e)) e.preventDefault()
+    }
+    const onDrop = (e: DragEvent) => {
+      depth = 0
+      setDragging(false)
+      const files = [...(e.dataTransfer?.files ?? [])]
+      if (!files.length || !isFiles(e)) return
+      const handled = e.defaultPrevented
+      e.preventDefault()
+      if (handled) return
+      const p = screenPoint(e)
+      placeFiles(runtime, files, toWorld(cameraRef.current, p.x, p.y))
+    }
+    window.addEventListener('dragenter', onEnter)
+    window.addEventListener('dragleave', onLeave)
+    window.addEventListener('dragover', onOver)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragenter', onEnter)
+      window.removeEventListener('dragleave', onLeave)
+      window.removeEventListener('dragover', onOver)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [runtime])
+
   function onDoubleClick(e: ReactMouseEvent) {
     if (focusRef.current) return
     const id = (e.target as HTMLElement).closest<HTMLElement>('[data-id]')?.dataset.id
@@ -501,6 +549,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
           ),
         )}
         {draft && <div className="ttx-draft" style={{ left: draft.x, top: draft.y, width: draft.w, height: draft.h }} />}
+        {!focus && <PendingUploads />}
       </div>
 
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
@@ -532,6 +581,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         />
       )}
       {asking && <ExitDialog onShare={() => leaveFocus(true)} onDiscard={() => leaveFocus(false)} onStay={() => setAsking(false)} />}
+      {dragging && <DropOverlay />}
       {notice && (
         <div className="ttx-notice" role="status">
           {notice}
