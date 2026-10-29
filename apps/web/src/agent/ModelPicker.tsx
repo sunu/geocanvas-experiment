@@ -76,19 +76,19 @@ export function ModelPicker() {
     <div ref={root}>
       <Button
         variant="ghost"
-        className="h-auto gap-1 px-2 py-1.5 text-xs font-normal text-muted-foreground"
+        className="h-auto gap-1 px-1.5 py-1 text-[11px] font-normal text-muted-foreground"
         title="Which model answers"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => (open ? close() : setOpen(true))}
       >
-        <current.Icon className="size-4" />
+        <current.Icon className="size-3.5" />
         <span className="mr-0.5">{label}</span>
-        <CaretDownIcon className="size-3" />
+        <CaretDownIcon className="size-2.5" />
       </Button>
-      {/* Placed with CSS against the panel (the nearest positioned ancestor): beside it, top edges level, since the menu is in the panel's header. */}
+      {/* Placed with CSS against the panel (the nearest positioned ancestor): beside it, bottom edges level. */}
       {open && (
-        <div className="ttx-ui absolute top-0 left-full z-10 ml-3 flex items-start gap-3 font-sans">
+        <div className="ttx-ui absolute bottom-0 left-full z-10 ml-3 flex items-start gap-3 font-sans">
           <Card className="w-[300px] gap-0.5 p-1" role="menu" aria-label="Run the model">
             <p className="px-2 py-1.5 text-xs text-muted-foreground">Run the model</p>
             {OPTIONS.map(({ id, title, hint, Icon }) => (

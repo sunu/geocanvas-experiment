@@ -4,6 +4,7 @@ import type { AgentReply, Chat, OplogEntry, Runtime, UserMessage } from '@ttx/co
 import { OPENROUTER_URL } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
+import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
 import { useOwnSelection, usePeers, type Awareness } from '../board/presence'
@@ -30,7 +31,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   const [mode, setMode] = useState<AgentMode>(loadMode)
   const [hasKey, setHasKey] = useState(() => loadKey() !== null)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Collapsed: only the header, with the model menu. The draft, mode and key settings stay in this state.
+  // Collapsed: only the header. The draft, mode and key settings stay in this state.
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const pending = new Set(chat.pending().map((m) => m.id))
   const ownWithoutKey = mode === 'own' && !hasKey
@@ -81,7 +82,6 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
             Describe
           </button>
         </h2>
-        <ModelPicker />
         {collapsed && thinking && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
             <span className="size-2 rounded-full bg-[var(--agent)]" aria-hidden />
@@ -159,7 +159,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
             {(ownWithoutKey || selection.length > 0) && (
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 {ownWithoutKey ? (
-                  <span className="text-xs text-muted-foreground">Add your key first: open the model menu above</span>
+                  <span className="text-xs text-muted-foreground">Add your key first: open the model menu below</span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2 py-1.5">
                     <CursorIcon className="size-3.5" />
@@ -169,6 +169,10 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
               </div>
             )}
           </form>
+          <Separator />
+          <footer className="shrink-0 rounded-b-xl bg-panel-footer px-3 py-1">
+            <ModelPicker />
+          </footer>
         </>
       )}
     </aside>
