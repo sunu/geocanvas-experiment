@@ -22,7 +22,7 @@ import type { Complete, FunctionTool, Message } from './complete.js'
 export const THINKING = 'Thinking'
 
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
-export const MAX_STEPS = 8
+export const MAX_STEPS = 12
 
 /** The request shows at most this many earlier chat entries, from at most this long before it, so the model knows what "the copy" is. */
 export const HISTORY_ENTRIES = 10
@@ -39,6 +39,7 @@ Rules:
 - To add a disaster event, find it with events__search first, then call event__add with its id. Never make up an event id.
 - Each person has their own view of each map. To show a place on a map, find it with data__geocode first; its bbox is [west, south, east, north]. Then call map__showArea with that area and without "for": that changes the asker's view. Use "for": "everyone" only when they ask to show it to everyone, and person ids only for other given people. To add a map of a place, call map__add, then map__showArea on the new map. Never guess coordinates.
 - To show data on a map (population, countries, buildings), call map__addLayer; without an area it uses the area the asker sees, so show the place first if they name one. To mark a place, call map__pinPlace.
+- For satellite imagery layers (an index such as NDVI, true colour, before/after change) on a map: call openeo__collections, then openeo__coverage for the area and dates, and only where it has scenes call openeo__proposeGraph (when you have openeo__preview, call it first with the same area and graph and fix what it reports; openeo__proposeSarChange is the shortcut for a Sentinel-1 before/after change; check both of its date windows with openeo__coverage first). If openeo__proposeGraph fails, read the reason, fix the graph and call it again. These only create a proposal: tell the user to review it and click “Approve & run”; never claim the analysis started before that approval.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
 /** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read-only tools. */

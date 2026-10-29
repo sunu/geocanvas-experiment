@@ -11,9 +11,13 @@ import { notebooksProxy } from './notebooks'
 import { reliefwebUpdates } from './reliefweb'
 import { json, serveUpload, storeUpload } from './uploads'
 import { uploadUrl, Uploads } from '@ttx/core'
-import { Agent, AGENT, eventsGet, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
+import type { Runtime } from '@ttx/core'
+import { Agent, AGENT, eventsGet, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openeoCollections, openeoCoverage, openeoPreview, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
+import { OpenEOServiceManager } from './openeo'
+import { OpenEOClient, type OpenEOCredentials } from './openeoClient'
+import { previewOpenEOAnalysis } from './openeoPreview'
 
 /**
  * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
@@ -53,6 +57,9 @@ export class Room extends DurableObject<Env> {
   private logged = 0
   private awareness = new awarenessProtocol.Awareness(this.doc)
   private uploads = new Uploads(this.doc)
+  private runtime?: Runtime
+  private openeo?: OpenEOClient
+  private previewRunning = false
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -87,8 +94,13 @@ export class Room extends DurableObject<Env> {
       this.broadcast(awarenessMessage(awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed)))
     })
 
+    // openEO is optional in deployed previews. Local development supplies the user credentials
+    // through npm run sync and apps/worker/.dev.vars; these are never bundled into browser assets.
+    const openeo = new OpenEOClient(env as Env & OpenEOCredentials)
+    this.openeo = openeo
+
     // After the listeners above, so the agent's writes are stored and sent like anyone's.
-    new Agent({
+    const agent = new Agent({
       doc: this.doc,
       complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
       accepts: forRoom,
@@ -96,6 +108,13 @@ export class Room extends DurableObject<Env> {
       tools: [
         ...(env.OPENCAGE_API_KEY ? geocodeTools(new OpenCageGeocoder({ url: OPENCAGE_URL, key: env.OPENCAGE_API_KEY })) : []),
         ...(env.MONTANDON_TOKEN ? montyTools(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN }))) : []),
+        // Anonymous reads of EOPF's catalog, so an agent checks for scenes before it proposes an openEO layer.
+        openeoCollections(env.OPENEO_BASE_URL),
+        openeoCoverage(env.OPENEO_BASE_URL),
+        // A dry run of a graph needs the Worker's Copernicus login, so only the room's agent has it, and only with one.
+        ...(openeo.hasCredentials
+          ? [openeoPreview((graph, signal) => openeo.request('/result', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ process: { process_graph: graph } }), signal }))]
+          : []),
       ],
       // The agent's presence: people see "Agent is thinking…" while it works.
       onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
@@ -103,6 +122,8 @@ export class Room extends DurableObject<Env> {
       onActivity: (a) => a && this.awareness.setLocalState({ user: AGENT, status: 'thinking', activity: a.title, for: a.for }),
       keepAlive: (work) => ctx.waitUntil(work),
     })
+    this.runtime = agent.runtime
+    new OpenEOServiceManager(agent.runtime, openeo, (work) => ctx.waitUntil(work)).start()
   }
 
   private compact() {
@@ -111,7 +132,9 @@ export class Room extends DurableObject<Env> {
   }
 
   override async fetch(request: Request): Promise<Response> {
-    if (new URL(request.url).pathname === '/uploads') return this.upload(request)
+    const path = new URL(request.url).pathname
+    if (path === '/uploads') return this.upload(request)
+    if (path === '/openeo/preview') return this.previewOpenEO(request)
     const { 0: client, 1: socket } = new WebSocketPair()
     this.ctx.acceptWebSocket(socket)
     socket.serializeAttachment({ presenceIds: [] } satisfies SocketAttachment)
@@ -121,6 +144,24 @@ export class Room extends DurableObject<Env> {
     const states = [...this.awareness.getStates().keys()]
     if (states.length) socket.send(awarenessMessage(awarenessProtocol.encodeAwarenessUpdate(this.awareness, states)))
     return new Response(null, { status: 101, webSocket: client })
+  }
+
+  /** Explicit user action: render the board's stored proposal once, without creating an openEO service. */
+  private async previewOpenEO(request: Request): Promise<Response> {
+    if (request.method !== 'POST') return json(405, { error: 'POST only' })
+    if (Number(request.headers.get('content-length')) > 2048) return json(413, { error: 'Request is too large' })
+    const body = await request.json().catch(() => null) as { analysisId?: unknown } | null
+    if (!body || typeof body.analysisId !== 'string' || body.analysisId.length > 128) return json(400, { error: 'Name the proposal to preview' })
+    if (!this.runtime || !this.openeo) return json(503, { error: 'openEO preview is not available on this server.' })
+    if (this.previewRunning) return json(409, { error: 'An openEO preview is already running on this board; try again when it finishes.' })
+
+    this.previewRunning = true
+    try {
+      const result = await previewOpenEOAnalysis(this.runtime, this.openeo, body.analysisId)
+      return json(result.status, result)
+    } finally {
+      this.previewRunning = false
+    }
   }
 
   /** Store a file for this board and add it to the board's uploads list, which syncs like any edit. */
@@ -215,6 +256,12 @@ export default {
       if (request.method !== 'POST') return json(405, { error: 'POST only' })
       const room = new URL(request.url).searchParams.get('room') ?? ''
       if (!ROOM_ID.test(room)) return json(400, { error: 'Name the room the file is for: ?room=<room>' })
+      return env.ROOMS.get(env.ROOMS.idFromName(room)).fetch(request)
+    }
+    if (path === '/openeo/preview') {
+      if (request.method !== 'POST') return json(405, { error: 'POST only' })
+      const room = new URL(request.url).searchParams.get('room') ?? ''
+      if (!ROOM_ID.test(room)) return json(400, { error: 'Name the room the proposal is in: ?room=<room>' })
       return env.ROOMS.get(env.ROOMS.idFromName(room)).fetch(request)
     }
     if (path.startsWith('/uploads/')) return serveUpload(request, env.UPLOADS)

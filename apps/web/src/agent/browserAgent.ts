@@ -5,7 +5,7 @@ import { tools } from '../tools/registry'
 import { loadKey } from './keys'
 
 /** The browser's tools the agent gets: the room agent's. */
-const AGENT_TOOLS = ['data.geocode', 'data.reverseGeocode', 'events.search', 'events.get']
+const AGENT_TOOLS = ['data.geocode', 'data.reverseGeocode', 'events.search', 'events.get', 'openeo.collections', 'openeo.coverage']
 
 /** This page load. A message with this id in `browserTab` is answered here, and nowhere else. */
 export const TAB_ID = crypto.randomUUID()
