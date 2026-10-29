@@ -27,7 +27,8 @@ async function placeFile(runtime: Runtime, file: File, at: { x: number; y: numbe
   const h = picture ? frameHeight(size.w, picture) : size.h
   const key = addPending({ name: file.name, rect: { x: at.x - size.w / 2, y: at.y - h / 2, w: size.w, h } })
   const room = roomFromHash(location.hash)
-  const refused = room ? refusal(file) : 'This board has no room to upload to'
+  // Map data goes on a map, from its Add layer options.
+  const refused = room ? refusal(file, ['media', 'document']) : 'This board has no room to upload to'
   if (refused) return updatePending(key, { error: refused })
   try {
     const id = await uploadFile(file, room!, runtime.actor.id, (sent) => updatePending(key, { progress: sent }))

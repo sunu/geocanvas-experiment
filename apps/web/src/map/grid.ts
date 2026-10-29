@@ -29,14 +29,6 @@ export function colorizeGrid({ values, rescale: [min, max], colormap }: Pick<For
   return out
 }
 
-/** The color a value has on the ramp, as a CSS color, for the legend. */
-export function gridColor(g: Pick<ForecastGrid, 'rescale' | 'colormap'>, value: number): string {
-  const [min, max] = g.rescale
-  const stop = Math.round(Math.sqrt(Math.min(1, Math.max(0, (value - min) / (max - min)))) * 255) * 4
-  const ramp = rampPixels(COLORMAPS[g.colormap])
-  return `rgb(${ramp[stop]} ${ramp[stop + 1]} ${ramp[stop + 2]})`
-}
-
 // One image per result: the layers are made again whenever any layer of the map changes.
 const images = new WeakMap<ForecastGrid, HTMLCanvasElement>()
 

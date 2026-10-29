@@ -1,19 +1,25 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { Draft, type Runtime, type TargetRef } from '@ttx/core'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { Draft, type Chat, type Runtime, type TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
-import { useObjects, type ConnectionStatus } from '../board/connect'
+import { useObjects } from '../board/connect'
 import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
 import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { ObjectMenu } from './ObjectMenu'
+import { ObjectPanel } from './ObjectPanel'
 import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
+import { useAgentTouched } from '../board/agentActivity'
 import { Peers } from './Peers'
 import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
 import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
+import { publishViewState } from './viewState'
+import { publishViewport } from './viewport'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
 const MIN_SIZE = 16
@@ -21,6 +27,9 @@ const MIN_SIZE = 16
 const DRAG_THRESHOLD = 3
 const HANDLES = ['nw', 'ne', 'sw', 'se'] as const
 const GRID = 24
+/** The dots are fully visible from this zoom up, fade out below it, and are gone at DOTS_GONE. */
+const DOTS_FULL = 0.4
+const DOTS_GONE = 0.15
 
 const objectsTarget = (ids: Iterable<string>): TargetRef => ({ kind: 'objects', ids: [...ids] })
 
@@ -70,10 +79,11 @@ function trackDrag(
  * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
  * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
  */
-export function Canvas({ runtime, status, awareness }: { runtime: Runtime; status: ConnectionStatus; awareness: Awareness }) {
+export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runtime; chat: Chat; awareness: Awareness; onUploads(): void }) {
   const board = runtime.board as Board
   const objects = useObjects(board)
   const peers = usePeers(awareness)
+  const agentTouched = useAgentTouched(runtime)
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, z: 1 })
   const [tool, setTool] = useState<Tool>('select')
   const [selection, setSelection] = useState<Set<string>>(() => new Set())
@@ -81,7 +91,8 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   const [marquee, setMarquee] = useState<Rect | null>(null) // screen
   const [draft, setDraft] = useState<Rect | null>(null) // world, while drawing a new object
   const [spaceHeld, setSpaceHeld] = useState(false)
-  const [paletteOpen, setPaletteOpen] = useState(false)
+  /** 'templates': the palette shows only templates (the toolbar's Templates button). */
+  const [paletteOpen, setPaletteOpen] = useState<false | 'all' | 'templates'>(false)
   const [focus, setFocus] = useState<Focus | null>(null)
   /** Leaving focus with unshared changes: the Share / Discard / Keep editing dialog is open. */
   const [asking, setAsking] = useState(false)
@@ -119,6 +130,22 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     }
     lastEditing.current = editingId
   }, [board, runtime, editingId])
+
+  // What this person sees, for views that ration something by it (a live map for only some maps: map/budget.ts).
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = rootRef.current!
+    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  const focusId = focus?.id ?? null
+  useEffect(
+    () => publishViewport({ camera, width: size.w, height: size.h, objects, selected, editing: editingId, focused: focusId }),
+    [camera, size, objects, selected, editingId, focusId],
+  )
 
   // This person's camera, for view ops (zoom to fit, zoom to selection) from the palette or tools.
   useEffect(() => {
@@ -159,14 +186,15 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     if (editingId) setEditing(null)
     runtime.beginGesture()
 
-    if (e.button === 1 || spaceHeld) {
+    if (e.button === 1 || spaceHeld || tool === 'hand') {
       const start = cameraRef.current
       trackDrag(e, (dx, dy) => setCamera({ ...start, x: start.x + dx, y: start.y + dy }))
       return
     }
 
     if (tool !== 'select') {
-      const type = tool
+      // 'box:ellipse' is the box tool drawing an ellipse (canvas/Toolbar.tsx).
+      const [type, shape] = tool.split(':') as [string, string | undefined]
       const p = screenPoint(e)
       const p0 = toWorld(cameraRef.current, p.x, p.y)
       let drawn: Rect | null = null
@@ -181,7 +209,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
           setDraft(null)
           const d = runtime.registry.objectType(type)!.defaultSize
           const r = drawn && drawn.w >= MIN_SIZE && drawn.h >= MIN_SIZE ? drawn : { x: p0.x - d.w / 2, y: p0.y - d.h / 2, ...d }
-          const newId = runtime.dispatch(`${type}.add`, { kind: 'canvas' }, r).created?.[0]
+          const newId = runtime.dispatch(`${type}.add`, { kind: 'canvas' }, shape ? { ...r, shape } : r).created?.[0]
           setTool('select')
           if (!newId) return
           setSelection(new Set([newId]))
@@ -347,7 +375,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       }
       if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setPaletteOpen((open) => !open)
+        setPaletteOpen((open) => (open ? false : 'all'))
         return
       }
       if (paletteOpen) {
@@ -386,7 +414,9 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         const o = byId.get([...selected][0]!)
         if (o && isFocusable(objectUI(o.type))) enterFocus(o.id)
       } else if (!mod && !e.altKey) {
-        const t = tools().find((t) => t.key.toLowerCase() === e.key.toLowerCase())
+        // ⇧ with a key picks the tool listed as '⇧<key>' (the arrow is ⇧L), else the plain one.
+        const k = e.key.toUpperCase()
+        const t = (e.shiftKey && tools().find((t) => t.key === `⇧${k}`)) || tools().find((t) => t.key.toUpperCase() === k)
         if (t) setTool(t.tool)
       }
     }
@@ -508,13 +538,31 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   }
 
   const single = selected.size === 1 && !editingId && !focus ? byId.get([...selected][0]!) : undefined
+  useEffect(() => publishViewState({ zoom: camera.z, focused: !!focus }), [camera.z, focus])
   const grid = GRID * camera.z
+  // The dots' radius follows the zoom like their spacing does, but not below half a pixel, so they stay drawn while they fade.
+  const dotRadius = Math.max(0.5, camera.z)
+  const dots = Math.min(1, Math.max(0, (camera.z - DOTS_GONE) / (DOTS_FULL - DOTS_GONE)))
+
+  /** A right click on an object opens its menu, on the selection; on anything else the menu stays shut. */
+  function onContextMenuCapture(e: ReactMouseEvent) {
+    const id = (e.target as HTMLElement).closest<HTMLElement>('[data-id]')?.dataset.id
+    if (!id || !byId.has(id) || focus || editingId) {
+      e.preventDefault()
+      e.stopPropagation()
+    } else if (!selected.has(id)) {
+      setSelection(new Set([id]))
+    }
+  }
 
   return (
+    <ContextMenu>
+    <ContextMenuTrigger asChild>
     <div
       ref={rootRef}
-      className={`ttx-canvas ${spaceHeld ? 'is-panning' : ''} ${tool !== 'select' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''}`}
-      style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px` }}
+      onContextMenuCapture={onContextMenuCapture}
+      className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''}`}
+      style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius } as CSSProperties}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
       onPointerMove={(e) => {
@@ -523,7 +571,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       }}
       onPointerLeave={() => sendCursor(null)}
     >
-      <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})` }}>
+      <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})`, '--ttx-zoom': camera.z } as CSSProperties}>
         {objects.map((o, i) =>
           o.id === focus?.id ? (
             // Same key and place as when not focused, so the view is not remounted (a map keeps its WebGL contexts).
@@ -543,6 +591,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
               object={o}
               layer={i}
               editing={o.id === editingId}
+              selected={selected.has(o.id)}
               onDone={() => setEditing(null)}
               onFocus={isFocusable(objectUI(o.type)) ? () => enterFocus(o.id) : undefined}
             />
@@ -555,7 +604,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
-        {!focus && <Peers peers={peers} camera={camera} byId={byId} />}
+        {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentTouched} />}
         {!focus && [...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
@@ -588,27 +637,34 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         </div>
       )}
 
-      {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} />}
+      {single && objectUI(single.type)?.panel && (
+        <ObjectPanel runtime={runtime} chat={chat} object={single} info={objectUI(single.type)!.panel!(single)} onOpen={isFocusable(objectUI(single.type)) ? () => enterFocus(single.id) : undefined} />
+      )}
+
+      {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} camera={camera} />}
 
       {!focus && <Toolbar
-        runtime={runtime}
         tool={tool}
         onTool={setTool}
-        selection={selected}
-        zoom={camera.z}
-        onResetZoom={() => {
-          const r = rootRef.current!.getBoundingClientRect()
-          setCamera((c) => zoomAt(c, 1 / c.z, r.width / 2, r.height / 2))
-        }}
-        status={status}
-        awareness={awareness}
-        onPalette={() => setPaletteOpen(true)}
+        onFiles={(files) => placeFiles(runtime, files, viewCenter())}
+        onUploads={onUploads}
+        onTemplates={() => setPaletteOpen('templates')}
       />}
 
       {paletteOpen && (
-        <Palette runtime={runtime} selection={[...selected]} center={viewCenter} run={runFromPalette} onClose={() => setPaletteOpen(false)} />
+        <Palette
+          runtime={runtime}
+          selection={[...selected]}
+          center={viewCenter}
+          run={runFromPalette}
+          onClose={() => setPaletteOpen(false)}
+          templates={paletteOpen === 'templates'}
+        />
       )}
     </div>
+    </ContextMenuTrigger>
+    <ObjectMenu runtime={runtime} ids={[...selected]} onSelect={(ids) => setSelection(new Set(ids))} />
+    </ContextMenu>
   )
 }
 

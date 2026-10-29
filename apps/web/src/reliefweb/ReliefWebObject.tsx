@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowClockwiseIcon, ArrowSquareOutIcon, FilePdfIcon, NewspaperIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArrowSquareOutIcon, FilePdfIcon } from '@phosphor-icons/react'
 import type { ReliefWebBoardObject } from '@ttx/plugins'
 import type { ObjectViewProps } from '../canvas/registry'
 import { disasterPage, loadUpdates, type ReliefWebUpdate } from './feed'
+import { ObjectHeader } from '../canvas/ObjectHeader'
+import { RELIEFWEB_FACE } from '../canvas/widgetFaces'
 
 /**
  * The latest ReliefWeb updates for a disaster (by its GLIDE numbers): situation reports, maps, appeals.
@@ -45,11 +47,7 @@ export function ReliefWebObject({ object: o, editing }: ObjectViewProps<ReliefWe
   return (
     <div className="ttx-relief">
       {/* A press anywhere but on a button or link selects and drags the feed, like any object. */}
-      <div className="ttx-relief__header">
-        <NewspaperIcon size={14} aria-hidden />
-        <span className="ttx-relief__title" title={o.glides.join(', ')}>
-          {o.title ? `ReliefWeb · ${o.title}` : 'ReliefWeb updates'}
-        </span>
+      <ObjectHeader icon={<RELIEFWEB_FACE.Icon size={14} aria-hidden />} title={o.title ? `ReliefWeb · ${o.title}` : RELIEFWEB_FACE.label}>
         {o.glides.length > 0 && (
           <>
             <button type="button" title="Check for new updates" aria-label="Refresh" disabled={refreshing} onClick={() => load(true)} {...control}>
@@ -60,7 +58,7 @@ export function ReliefWebObject({ object: o, editing }: ObjectViewProps<ReliefWe
             </a>
           </>
         )}
-      </div>
+      </ObjectHeader>
       <div ref={listRef} className="ttx-relief__list" style={{ overflowY: editing ? 'auto' : 'hidden' }}>
         {!o.glides.length ? (
           <div className="ttx-relief__note">No disaster yet. Add a feed from an event's card.</div>

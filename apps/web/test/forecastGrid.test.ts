@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ForecastGrid } from '@ttx/plugins'
-import { colorizeGrid, gridColor } from '../src/map/grid'
+import { colorizeGrid } from '../src/map/grid'
+import { COLORMAPS, rampPixels } from '../src/map/raster'
 import { captionOf, deckLayers, type LayerState } from '../src/map/layers'
 
 const grid = (values: number[], over: Partial<ForecastGrid> = {}): ForecastGrid => ({
@@ -34,10 +35,10 @@ describe('colorizeGrid', () => {
   })
 
   it('uses the square root of the value, so light rain is not lost next to heavy rain', () => {
-    // 25% of the range is halfway up the ramp: the same color as the legend gives it.
-    const g = grid([1 + 149 * 0.25])
-    const px = colorizeGrid(g)
-    expect(`rgb(${px[0]} ${px[1]} ${px[2]})`).toBe(gridColor(g, 1 + 149 * 0.25))
+    // A quarter of the range is halfway up the ramp.
+    const px = colorizeGrid(grid([1 + 149 * 0.25]))
+    const ramp = rampPixels(COLORMAPS.viridis)
+    expect(Array.from(px.slice(0, 3))).toEqual(Array.from(ramp.slice(128 * 4, 128 * 4 + 3)))
   })
 })
 

@@ -9,6 +9,7 @@ import { CopyLinkButton } from '../uploads/CopyLinkButton'
 import { fileLink } from '../uploads/upload'
 import { setPageInView } from './live'
 import { loadPdf, renderPage } from './pdf'
+import { ObjectHeader } from '../canvas/ObjectHeader'
 
 /** Pages drawn ahead of the scroll position in focus, as a fraction of the view's height. */
 const AHEAD = '100%'
@@ -24,10 +25,7 @@ export function PdfObject({ object: o, focused, onFocus }: ObjectViewProps<PdfBo
   const page = clampPage(o.page, count)
   return (
     <div className="ttx-pdf">
-      {/* The header takes the pointer without double-clicking: its buttons must not start a drag. */}
-      <div className="ttx-pdf__header" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-        <FilePdfIcon size={14} aria-hidden />
-        <span className="ttx-pdf__title">{o.name ?? 'PDF'}</span>
+      <ObjectHeader icon={<FilePdfIcon size={14} aria-hidden />} title={o.name ?? 'PDF'}>
         {count !== undefined && <span className="ttx-pdf__count">{focused ? `${count} pages` : `${page} / ${count}`}</span>}
         {o.fileId && (
           <>
@@ -38,7 +36,7 @@ export function PdfObject({ object: o, focused, onFocus }: ObjectViewProps<PdfBo
           </>
         )}
         {!focused && onFocus && <FocusButton onFocus={onFocus} />}
-      </div>
+      </ObjectHeader>
       <div className="ttx-pdf__body" onDoubleClick={focused ? undefined : onFocus}>
         {!o.fileId ? (
           <div className="ttx-pdf__empty">No file yet. Drop a PDF on the board to add one.</div>

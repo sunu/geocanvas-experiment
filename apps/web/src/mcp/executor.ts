@@ -73,6 +73,8 @@ export class Executor {
     this.opts = opts
     this.runtime = new Runtime({ doc: opts.doc, plugins: opts.plugins, actor: EXTERNAL_AGENT })
     this.tools = new ToolRunner(opts.tools)
+    // Templates look things up in prepare (events.get, data.geocode).
+    this.runtime.tools = this.tools
     opts.doc.on('update', () => this.revision++)
   }
 
@@ -129,7 +131,7 @@ export class Executor {
     if (undo) this.undos.push(undo)
     const added = record.created?.at(-1)
     if (added) this.lastAdd = { id: added, at: Date.now() }
-    return { status: record.status, ...(record.error && { error: record.error }), ...(record.created && { created: record.created }), revision: this.revision }
+    return { status: record.status, ...(record.error && { error: record.error }), ...(record.created && { created: record.created }), ...(record.summary && { summary: record.summary }), revision: this.revision }
   }
 
   /** Undo the agent's last change in this tab. Refused, and kept, when someone has changed its objects since. */

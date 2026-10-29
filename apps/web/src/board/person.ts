@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react'
 import type { Actor } from '@ttx/core'
+import { isUserColor, USER_COLORS } from './collaborators'
 import type { Awareness } from './presence'
 
 const ANIMALS = ['Otter', 'Heron', 'Lynx', 'Ibex', 'Gecko', 'Puffin', 'Marten', 'Kestrel', 'Tapir', 'Wombat', 'Oryx', 'Quokka']
-const PEOPLE_COLORS = ['#e11d48', '#ea580c', '#ca8a04', '#16a34a', '#0891b2', '#2563eb', '#c026d3', '#9333ea']
 const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]!
 
 const KEY = 'ttx-person'
@@ -19,11 +19,13 @@ export const MAX_NAME = 32
  * own runtime, and a runtime undoes only its own writes.
  */
 export function personActor(): Actor {
-  const make = (): Person => ({ id: crypto.randomUUID(), name: pick(ANIMALS), color: pick(PEOPLE_COLORS) })
+  const make = (): Person => ({ id: crypto.randomUUID(), name: pick(ANIMALS), color: pick(USER_COLORS).color })
   try {
     const kept = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Person> | null
     // Records from before the id moved here have a name and color but no id.
     const person = { ...make(), ...kept, ...(!kept?.id && { id: crypto.randomUUID() }) }
+    // A color from before the palette had roles (cyan is yours alone, violet the agent's): choose a new one.
+    if (!isUserColor(person.color)) person.color = make().color
     localStorage.setItem(KEY, JSON.stringify(person))
     return { kind: 'user', ...person }
   } catch {

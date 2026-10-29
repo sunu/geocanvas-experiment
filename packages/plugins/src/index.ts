@@ -1,7 +1,8 @@
 export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
-export { boardGet, eventsSearch } from './agentTools.js'
-export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
+export { boardGet, bboxOfGeometries, eventsGet, eventsSearch, type EventFacts } from './agentTools.js'
+export { conflict, defineTemplate, MY_VIEW, sitrep, TEMPLATE_OP_PREFIX, templatesPlugin, type Facts, type SeedKind, type TemplateDef, type TemplateNode } from './templates/index.js'
+export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, footprintParts, isWholeFootprint, type EventBoardObject, type FootprintPart } from './events.js'
 export { imagesPlugin, type ImageBoardObject } from './images.js'
 export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
 export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
@@ -15,14 +16,37 @@ export {
   BOUNDARIES_TOOL,
   bboxOf,
   DATA_LAYERS,
+  FILTER_OPS,
+  guessFormat,
   hasArea,
   mapLayer,
   newLayerId,
+  URL_FORMATS,
+  urlTitle,
   type AdminLevel,
   type Bbox,
   type DataLayerKey,
+  type FilterOp,
+  type LayerFilter,
+  type LayerStyle,
   type MapLayer,
+  type UrlFormat,
 } from './mapLayers.js'
+export {
+  mapAnnotation,
+  mapShape,
+  mapSticky,
+  shapeFeatures,
+  SHAPE_COLORS,
+  SHAPE_POINTS,
+  SHAPES,
+  type MapAnnotation,
+  type MapShape,
+  type MapSticky,
+  type Shape,
+  type ShapeColor,
+  type ShapePart,
+} from './mapAnnotations.js'
 export {
   checkArea,
   FORECAST_TOOL,

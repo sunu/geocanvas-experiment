@@ -11,7 +11,7 @@ import { notebooksProxy } from './notebooks'
 import { reliefwebUpdates } from './reliefweb'
 import { json, serveUpload, storeUpload } from './uploads'
 import { uploadUrl, Uploads } from '@ttx/core'
-import { Agent, AGENT, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
+import { Agent, AGENT, eventsGet, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
 
@@ -95,7 +95,7 @@ export class Room extends DurableObject<Env> {
       turnsPerHour: TURNS_PER_HOUR,
       tools: [
         ...(env.OPENCAGE_API_KEY ? geocodeTools(new OpenCageGeocoder({ url: OPENCAGE_URL, key: env.OPENCAGE_API_KEY })) : []),
-        ...(env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : []),
+        ...(env.MONTANDON_TOKEN ? montyTools(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN }))) : []),
       ],
       // The agent's presence: people see "Agent is thinking…" while it works.
       onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
@@ -174,6 +174,9 @@ interface SocketAttachment {
   presenceIds: number[]
 }
 
+/** Montandon search and lookup, on one client so they share its cache. */
+const montyTools = (monty: MontyClient) => [eventsSearch(monty), eventsGet(monty)]
+
 const presenceIds = (socket: WebSocket): number[] => (socket.deserializeAttachment() as SocketAttachment | null)?.presenceIds ?? []
 
 interface AwarenessChange {
@@ -201,6 +204,8 @@ export default {
     const path = new URL(request.url).pathname
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
     if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
+    // What the room's agent can do, so the app offers only what works (e.g. a map's "describe it in words").
+    if (path === '/agent/status') return json(200, { configured: !!env.OPENROUTER_API_KEY, geocode: !!env.OPENCAGE_API_KEY })
     if (path.startsWith('/notebooks/')) return notebooksProxy(request, env.NOTEBOOK_FACTORY_URL)
     if (path === '/reliefweb/updates') return reliefwebUpdates(request)
     if (path.startsWith('/hapi/')) return hapiProxy(request, env.HAPI_APP_IDENTIFIER)

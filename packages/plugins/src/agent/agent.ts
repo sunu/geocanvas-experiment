@@ -5,7 +5,7 @@ import { plugins } from '../plugins.js'
 import { runTurn } from './loop.js'
 import type { Complete } from './complete.js'
 
-export const AGENT: Actor = { kind: 'agent', id: 'agent', name: 'Agent', color: '#7c3aed' }
+export const AGENT: Actor = { kind: 'agent', id: 'agent', name: 'Agent', color: '#8e51ff' }
 
 /** The room agent's turns per room per hour. Counted in memory, so it starts again when the room leaves memory. */
 export const TURNS_PER_HOUR = 20
@@ -53,6 +53,8 @@ export class Agent {
     this.keepAlive = opts.keepAlive ?? (() => {})
     this.runtime = new Runtime({ doc: opts.doc, plugins, actor: AGENT })
     this.tools = new ToolRunner([boardGet(this.runtime), ...(opts.tools ?? [])])
+    // Templates look things up in prepare (events.get, data.geocode).
+    this.runtime.tools = this.tools
     this.chat = new Chat(opts.doc)
     // The room left memory during these turns; they are lost. Starting them again could repeat writes.
     for (const m of this.pending()) this.chat.reply({ replyTo: m.id, text: 'Interrupted. Please ask again.', calls: [] })
