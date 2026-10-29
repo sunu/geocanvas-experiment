@@ -81,6 +81,8 @@ export {
   type ClosureGeometry,
   type MapScenario,
   type ScenarioExposure,
+  RETURN_PERIODS,
+  type ReturnPeriod,
   type RouteColor,
   type RouteProfile,
   type ScenarioClosure,

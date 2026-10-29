@@ -119,7 +119,10 @@ describe('OpenStreetMap facilities', () => {
 })
 
 describe('the exposure tool', () => {
-  const buildings: BuildingSource = { count: async () => ({ buildings: 120, bySubtype: { residential: 4 } }) }
+  const buildings: BuildingSource = {
+    count: async () => ({ buildings: 120, bySubtype: { residential: 4 } }),
+    depths: async (points) => Float32Array.from({ length: points.length / 2 }, (_, i) => (i === 0 ? 1.5 : 0)),
+  }
   const facility = (x: number, category: 'health' | 'education'): GeoJSON.Feature<GeoJSON.Point, FacilityFeature['properties']> => ({
     type: 'Feature',
     geometry: { type: 'Point', coordinates: [x, 0.05] },
@@ -131,6 +134,17 @@ describe('the exposure tool', () => {
     const result = await new ToolRunner([exposureTool(buildings, facilities)]).run('exposure.buildings', { areas: AREAS })
     expect(result).toMatchObject({ buildings: 120, bySubtype: { residential: 4 }, attribution: expect.stringMatching(/Overture.*OpenStreetMap/) })
     expect((result as { facilities: GeoJSON.Feature<GeoJSON.Point>[] }).facilities.map((f) => f.geometry.coordinates[0])).toEqual([0.1, 5.05])
+  })
+
+  it('gives the depth at each facility, and credits GloFAS and JRC, with a return period', async () => {
+    const facilities: FacilitySource = { facilities: async () => ({ type: 'FeatureCollection', features: [facility(0.1, 'health'), facility(5.05, 'education')] }) }
+    const result = (await new ToolRunner([exposureTool(buildings, facilities)]).run('exposure.buildings', { areas: AREAS, returnPeriod: 100 })) as {
+      facilities: { properties: { depth?: number } }[]
+      attribution: string
+    }
+    expect(result.facilities.map((f) => f.properties.depth)).toEqual([1.5, 0])
+    expect(result.attribution).toMatch(/GloFAS.*Huizinga/)
+    await expect(new ToolRunner([exposureTool(buildings, facilities)]).run('exposure.buildings', { areas: AREAS, returnPeriod: 30 })).rejects.toThrow()
   })
 
   it('still counts buildings when the facilities cannot be read', async () => {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl'
 import type { Runtime } from '@ttx/core'
 import type { MapBoardObject, MapLayer } from '@ttx/plugins'
-import { exposureLayers, useExposure, type ExposureState } from '../exposure/useExposure'
+import { exposureLayers, floodedLayers, useExposure, type ExposureState } from '../exposure/useExposure'
 import { drawShape } from '../map/draw'
 import type { LayerState } from '../map/layers'
 import { isGeoJsonFile } from '../uploads/upload'
@@ -32,7 +32,7 @@ export function useScenario(o: MapBoardObject, layers: MapLayer[], states: Layer
   const routes = useRoutes(o.scenario?.routes ?? [], all)
   const blocking = new Set(layers.flatMap((l) => (l.blocks ? [l.id] : [])))
   const exposure = useExposure(o.scenario, closures, fromLayers, states.some((s) => blocking.has(s.id) && s.loading))
-  const deck = useMemo(() => [...routingLayers(routes, closures), ...exposureLayers(exposure)], [routes, closures, exposure])
+  const deck = useMemo(() => [...floodedLayers(exposure), ...routingLayers(routes, closures), ...exposureLayers(exposure)], [routes, closures, exposure])
   return { routes, closures, exposure, deck }
 }
 

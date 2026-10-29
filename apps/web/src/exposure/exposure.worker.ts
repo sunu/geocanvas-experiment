@@ -4,10 +4,20 @@
  * polygons, not only their bbox; each row group's rows are counted and dropped. Measured in plans/plan-015.md.
  */
 import { readOverture } from '../data/overtureRead'
+import { classCode, estimate, type Inundation } from '../inundation/estimate'
+import { GlofasDepth, proxiedFiles } from '../inundation/glofas'
 import { countBuildings, EXPOSURE_COLUMNS, Flood, floodPolygons, noBuildings, rectMeetsFlood, type BuildingCounts, type BuildingRow } from './areas'
 
-export type ExposureRequest = { kind: 'count'; id: number; areas: GeoJSON.Geometry[] } | { kind: 'abort'; id: number }
-export type ExposureResponse = { id: number; ok: true; value: BuildingCounts } | { id: number; ok: false; error: string }
+/** A count, with the depth and damage of a flood of `returnPeriod` years when given; or the depths at some places. */
+export type ExposureRequest =
+  | { kind: 'count'; id: number; areas: GeoJSON.Geometry[]; returnPeriod?: number }
+  | { kind: 'depths'; id: number; points: number[]; returnPeriod: number }
+  | { kind: 'abort'; id: number }
+export type ExposureResult = BuildingCounts & { inundation?: Inundation }
+export type ExposureResponse = { id: number; ok: true; value: ExposureResult | Float32Array } | { id: number; ok: false; error: string }
+
+/** The GloFAS depth maps, read through the Worker's proxy on the page's origin; tiles stay decoded between counts. */
+const glofas = new GlofasDepth(proxiedFiles(self.location.origin))
 
 /**
  * Parts of Overture's buildings one count may read: about 0.45 MB of these columns each, so about 30 MB. Pakistan's
@@ -16,10 +26,19 @@ export type ExposureResponse = { id: number; ok: true; value: BuildingCounts } |
 export const MAX_ROW_GROUPS = 64
 export const MAX_FILES = 8
 
-async function count(areas: GeoJSON.Geometry[], signal: AbortSignal): Promise<BuildingCounts> {
+async function count(areas: GeoJSON.Geometry[], returnPeriod: number | undefined, signal: AbortSignal): Promise<ExposureResult> {
   const flood = new Flood(floodPolygons(areas))
   const counts = noBuildings()
   if (!flood.bounds) return counts
+  // For depth: each exposed building's bbox center and class, kept while the rows are dropped.
+  const points: number[] = []
+  const codes: number[] = []
+  const keep = returnPeriod
+    ? (r: BuildingRow) => {
+        points.push((r.bbox.xmin + r.bbox.xmax) / 2, (r.bbox.ymin + r.bbox.ymax) / 2)
+        codes.push(classCode(r.subtype))
+      }
+    : undefined
   const groups = readOverture<BuildingRow>('buildings', flood.bounds, {
     columns: EXPOSURE_COLUMNS,
     signal,
@@ -27,8 +46,10 @@ async function count(areas: GeoJSON.Geometry[], signal: AbortSignal): Promise<Bu
     maxFiles: MAX_FILES,
     keep: (rect) => rectMeetsFlood(rect, flood.polygons),
   })
-  for await (const rows of groups) countBuildings(counts, rows, flood)
-  return counts
+  for await (const rows of groups) countBuildings(counts, rows, flood, keep)
+  if (!returnPeriod) return counts
+  signal.throwIfAborted()
+  return { ...counts, inundation: estimate(points, codes, await glofas.depths(points, returnPeriod), returnPeriod) }
 }
 
 const controllers = new Map<number, AbortController>()
@@ -42,7 +63,8 @@ self.onmessage = async ({ data }: MessageEvent<ExposureRequest>) => {
   controllers.set(data.id, controller)
   let res: ExposureResponse
   try {
-    res = { id: data.id, ok: true, value: await count(data.areas, controller.signal) }
+    const value = data.kind === 'count' ? await count(data.areas, data.returnPeriod, controller.signal) : await glofas.depths(data.points, data.returnPeriod)
+    res = { id: data.id, ok: true, value }
   } catch (e) {
     res = { id: data.id, ok: false, error: e instanceof Error ? e.message : String(e) }
   } finally {

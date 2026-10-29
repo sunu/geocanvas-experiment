@@ -144,11 +144,12 @@ export interface BuildingCounts {
 
 export const noBuildings = (): BuildingCounts => ({ buildings: 0, bySubtype: {} })
 
-/** Adds the buildings among `rows` whose bbox center is in the flood areas. */
-export function countBuildings(counts: BuildingCounts, rows: BuildingRow[], flood: Flood): void {
+/** Adds the buildings among `rows` whose bbox center is in the flood areas, and hands each to `keep`. */
+export function countBuildings(counts: BuildingCounts, rows: BuildingRow[], flood: Flood, keep?: (r: BuildingRow) => void): void {
   for (const r of rows) {
     const b = r.bbox
     if (!flood.contains((b.xmin + b.xmax) / 2, (b.ymin + b.ymax) / 2)) continue
+    keep?.(r)
     counts.buildings++
     if (r.subtype) counts.bySubtype[r.subtype] = (counts.bySubtype[r.subtype] ?? 0) + 1
   }
