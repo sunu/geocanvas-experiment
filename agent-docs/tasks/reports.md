@@ -167,7 +167,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 - **Add to report…** (`report.addItems`, which acts on the selection), with the board's reports listed by title (`boardReports` in `apps/web/src/reports/reports.ts`) and **New report**:
   - **Right-click menu:** an Add to report submenu after Duplicate; with no report on the board, one item, Add to new report. Not shown when only reports are selected.
   - **Object panel:** an Add to report button beside Open, with the same choices (not for a report itself).
-  - In both, a **check** marks each report that already has everything selected, as an item or as the frame it was made from (`holds` in `reports/reports.ts`). Choosing it again adds only what is missing, or the notice says it is all there.
+  - In both, a **check** marks each report that already has everything selected, as an item or as the frame it was made from (`holds` in `reports/reports.ts`). Choosing it again adds only what is missing, or the notice says it is all there. The menus only add: a checked report does not remove anything (§5.2a).
   - **⌘K:** a dropdown (the `report` form widget, `apps/web/src/reports/ui.tsx`); with one report on the board, it is chosen already; with none or several, New report is.
   - New report makes a report to the right of the objects, top-aligned with them, and the menus select it.
   - The canvas's notice says what happened ("Added 4 items to a new report, titled after the frame"), or why nothing was added.
@@ -209,6 +209,15 @@ Today focus mode hides all the app's panels (`styles.css` hides `.ttx-shell` in 
 - **Items:** each item block, with its source's title, a **Live / Frozen** switch, **Go to source** (leaves focus and selects the object), and **Remove**.
 - **Export PDF** (§7).
 - **Share link** (§8).
+
+### 5.2a Removing from a report
+
+Removing happens **only in report mode**, where people see the whole report and what they take out of it. The canvas's menus (§4) only add.
+- **Each block** (an item, a heading, text, an image, a divider) has a **Remove** action: an × on the block's toolbar while it is hovered or selected, and the Delete key on a selected block.
+- **The Options panel's item list** has Remove on each item too (§5.2).
+- **Removing an item never touches its object** on the board: the object stays, and so do the other reports it is in.
+- A frame's heading item is one block like any other: removing it leaves the frame's objects in the report.
+- Each removal is one undo step (`report.removeBlock`). The agent removes blocks with the same op, for example "take the conflict map out of the report".
 
 ### 5.3 Rich text
 
@@ -342,6 +351,7 @@ Made (2026-10-29, from the product owner):
 
 15. **Report mode keeps the agent chat open** on the left, with the Options panel on the right, and shows every page in a scrolling column (§5.1, §5.1a). 2026-10-29.
 16. **Report mode edits live, without a private draft,** so the agent and people work on the same report (§5.1). 2026-10-29.
+17. **Removing from a report happens only in report mode** (§5.2a). The canvas's Add to report menus only add, and their checks only show what is there. 2026-10-29.
 
 Open:
 1. **The PDF approach:** decided by the spike (§7.4).
