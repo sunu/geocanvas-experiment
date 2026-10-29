@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { PencilSimpleIcon } from '@phosphor-icons/react'
+import { ArrowsOutSimpleIcon } from '@phosphor-icons/react'
 import type { AgentReply, Chat, OplogEntry, Runtime } from '@ttx/core'
 import type { BoardObject } from '../board/board'
 import { Badge } from '@/components/ui/badge'
@@ -33,34 +33,34 @@ function useObjectHistory(runtime: Runtime, chat: Chat, id: string) {
 /**
  * The Object Panel of the Figma file: what is known about the one object selected, in the right column under the user
  * menu. Its type says the title, description and metadata (ObjectUI.panel); the type's name, when it was last changed,
- * the request that made it (if the agent did) and the Edit button are the same for every type.
+ * the request that made it (if the agent did) and the Open button are the same for every type.
  */
 export function ObjectPanel({
   runtime,
   chat,
   object,
   info,
-  onEdit,
+  onOpen,
 }: {
   runtime: Runtime
   chat: Chat
   object: BoardObject
   info: PanelInfo
   /** Open it in focus mode. Absent for a type without one. */
-  onEdit?: () => void
+  onOpen?: () => void
 }) {
   const { updated, prompt } = useObjectHistory(runtime, chat, object.id)
   const rows = [...info.metadata, ...(updated ? ([['Updated', new Date(updated).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })]] as [string, string][]) : [])]
   return (
     <aside
       className="ttx-ui ttx-shell fixed top-[72px] right-2 z-[1000001] flex max-h-[calc(100vh-10rem)] w-[360px] max-w-[calc(100%-1rem)] flex-col overflow-y-auto rounded-xl border bg-card font-sans shadow-sm"
-      aria-label={`${info.title}, properties`}
+      aria-label={`${object.name || info.title}, properties`}
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
       <div className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg leading-7 font-semibold">{info.title}</h2>
+          <h2 className="text-lg leading-7 font-semibold">{object.name || info.title}</h2>
           <Badge variant="secondary" className="font-normal">
             {runtime.registry.objectType(object.type)?.title ?? object.type}
           </Badge>
@@ -88,9 +88,9 @@ export function ObjectPanel({
       )}
       <Separator />
       <div className="p-4">
-        <Button variant="secondary" className="w-full" disabled={!onEdit} onClick={onEdit}>
-          <PencilSimpleIcon />
-          Edit
+        <Button variant="secondary" className="w-full" disabled={!onOpen} onClick={onOpen}>
+          <ArrowsOutSimpleIcon />
+          Open
         </Button>
       </div>
     </aside>

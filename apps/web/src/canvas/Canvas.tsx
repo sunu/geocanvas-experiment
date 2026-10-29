@@ -4,7 +4,7 @@ import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
 import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
-import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
+import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
 import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -13,6 +13,7 @@ import { ObjectPanel } from './ObjectPanel'
 import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { useAgentTouched } from '../board/agentActivity'
+import { Links } from './Links'
 import { Peers } from './Peers'
 import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
@@ -251,7 +252,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       }
       const moving = selected.has(id) ? selected : new Set([id])
       setSelection(moving)
-      const starts = objects.filter((o) => moving.has(o.id))
+      // A frame takes what is inside it along.
+      const starts = withFramed(objects, moving)
       trackDrag(e, (dx, dy) => {
         const z = cameraRef.current.z
         const alive = starts.filter((o) => board.get(o.id)) // someone else may delete one mid-drag
@@ -597,6 +599,10 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
             />
           ),
         )}
+        {/* After the objects, at the top frame's place: above frames, under everything else (-1: under all). */}
+        {!focus && (
+          <Links objects={objects} byId={byId} selected={selected} style={{ zIndex: objects.reduce((top, o, i) => (o.type === 'frame' ? i : top), -1) }} />
+        )}
         {draft && <div className="ttx-draft" style={{ left: draft.x, top: draft.y, width: draft.w, height: draft.h }} />}
         {!focus && <PendingUploads />}
       </div>
@@ -638,7 +644,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       )}
 
       {single && objectUI(single.type)?.panel && (
-        <ObjectPanel runtime={runtime} chat={chat} object={single} info={objectUI(single.type)!.panel!(single)} onEdit={isFocusable(objectUI(single.type)) ? () => enterFocus(single.id) : undefined} />
+        <ObjectPanel runtime={runtime} chat={chat} object={single} info={objectUI(single.type)!.panel!(single)} onOpen={isFocusable(objectUI(single.type)) ? () => enterFocus(single.id) : undefined} />
       )}
 
       {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} camera={camera} />}

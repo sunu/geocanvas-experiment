@@ -12,10 +12,22 @@ const areaOf = (p: Place) => {
 }
 
 /**
- * An area of interest for a template: a place found as you type, or the area you last looked at on a map. Typed
- * text that is not picked is sent as `{ text }`, and the template takes the best match.
+ * An area of interest: a place found as you type, or the area you last looked at on a map. Typed text that is not
+ * picked is `{ text }`, and the op takes the best match. In a form it is sent as you type; with `pickOnly` (an
+ * input node, where each change is an op) only a pick or Enter sends it.
  */
-export function AreaPicker({ value, onChange }: { value: unknown; onChange(v: unknown): void }) {
+export function AreaPicker({
+  value,
+  onChange,
+  pickOnly,
+  myView = true,
+}: {
+  value: unknown
+  onChange(v: unknown): void
+  pickOnly?: boolean
+  /** Offer "Use my map view": not on a board that does not exist yet. */
+  myView?: boolean
+}) {
   const [q, setQ] = useState('')
   const [found, setFound] = useState<LiveState<Place[]>>({ loading: false })
   const live = useRef<ReturnType<typeof createLiveSearch<Place[]>>>(undefined)
@@ -40,7 +52,9 @@ export function AreaPicker({ value, onChange }: { value: unknown; onChange(v: un
           : found.error !== undefined
             ? 'Search failed. The best match is used.'
             : q.trim()
-              ? 'Pick a place, or run: the best match is used'
+              ? pickOnly
+                ? 'Pick a place, or press Enter for the best match'
+                : 'Pick a place, or run: the best match is used'
               : 'Type a place, e.g. Cabo Delgado'
 
   return (
@@ -50,18 +64,24 @@ export function AreaPicker({ value, onChange }: { value: unknown; onChange(v: un
         aria-label="Search places"
         placeholder="Search a place, e.g. Cabo Delgado"
         value={q}
+        autoFocus={pickOnly}
         onChange={(e) => {
           setQ(e.target.value)
           live.current?.update(e.target.value)
-          onChange(e.target.value.trim() ? { text: e.target.value.trim() } : undefined)
+          if (!pickOnly) onChange(e.target.value.trim() ? { text: e.target.value.trim() } : undefined)
+        }}
+        onKeyDown={(e) => {
+          if (pickOnly && e.key === 'Enter' && q.trim()) onChange({ text: q.trim() })
         }}
       />
       <div className="ttx-eventpick__status">{status}</div>
       <div className="ttx-eventpick__list">
-        <button type="button" className={`ttx-eventpick__item ${value === MY_VIEW ? 'is-on' : ''}`} onClick={() => onChange(MY_VIEW)}>
-          <CrosshairIcon size={14} aria-hidden />
-          <span className="ttx-eventpick__name">Use my map view</span>
-        </button>
+        {myView && (
+          <button type="button" className={`ttx-eventpick__item ${value === MY_VIEW ? 'is-on' : ''}`} onClick={() => onChange(MY_VIEW)}>
+            <CrosshairIcon size={14} aria-hidden />
+            <span className="ttx-eventpick__name">Use my map view</span>
+          </button>
+        )}
         {(found.results ?? []).map((p) => (
           <button type="button" key={p.name} className={`ttx-eventpick__item ${picked === p.name ? 'is-on' : ''}`} onClick={() => onChange(areaOf(p))}>
             <MapPinIcon size={14} aria-hidden />

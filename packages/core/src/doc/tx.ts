@@ -67,6 +67,21 @@ export class BoardTx {
     }
   }
 
+  /**
+   * Remove optional fields of an object, e.g. a linked country card's country when the root has none
+   * (update leaves undefined fields as they are). Fails for a field the type requires.
+   */
+  clear(id: string, keys: string[]) {
+    const m = this.board.objects.get(id)
+    if (!m) return
+    const { type } = this.board.get(id)!
+    const shape = this.registry.objectSchema(type).shape
+    for (const k of keys) {
+      if (!(k in shape) || !shape[k]!.safeParse(undefined).success) throw new Error(`${type} cannot clear ${k}`)
+    }
+    for (const k of keys) m.delete(k)
+  }
+
   /** Also forgets their views (views.ts). */
   remove(ids: Iterable<string>) {
     const gone = [...ids]
@@ -78,6 +93,12 @@ export class BoardTx {
   restore(id: string, type: string, fields: Record<string, unknown>) {
     this.board.objects.delete(id)
     this.add(type, fields, id)
+  }
+
+  /** Name the board, for everyone. An empty title removes the name. */
+  setTitle(title: string) {
+    if (title) this.board.meta.set('title', title)
+    else this.board.meta.delete('title')
   }
 
   /** Change a person's view of an object, e.g. the agent moves the map of the person who asked. */

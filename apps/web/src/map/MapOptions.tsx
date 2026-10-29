@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react'
-import { XIcon } from '@phosphor-icons/react'
+import { CaretRightIcon, XIcon } from '@phosphor-icons/react'
 import { Views, type Runtime } from '@ttx/core'
 import {
   ADMIN_LEVEL_NAME,
   ADMIN_LEVELS,
   BASEMAPS,
   DATA_LAYERS,
+  FORECAST_VARIABLES,
+  footprintParts,
+  HORIZONS,
   INDICATORS,
   type AdminLevel,
   type DataLayerKey,
+  type ForecastVariable,
+  type Horizon,
   type Indicator,
   type MapBoardObject,
   type MapLayer,
@@ -19,17 +24,19 @@ import {
   URL_FORMATS,
 } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
+import type { EventFootprint } from '@ttx/plugins/monty/client'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import type { ObjectViewProps } from '../canvas/registry'
 import { monty } from '../events/monty'
 import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/api'
 import { LayerList } from './LayerList'
-import { useLayerStates } from './layers'
+import { boundsOf, useLayerStates } from './layers'
 import { areaOf, goTo, liveMap } from './live'
 import { LocationPicker } from './LocationPicker'
-import { fitMapToCountry, fitMapToLayer } from './MapObject'
+import { fitMapTo, fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
+import { FileLayerButton } from './FileLayerButton'
 import { UrlLayerForm, type UrlLayerArgs } from './UrlLayerForm'
 
 /** A map op as its own undo step. In focus, `runtime` is the draft: others see it once shared. */
@@ -40,6 +47,19 @@ function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, un
 
 const NO_LAYERS: MapLayer[] = []
 
+/** A section of the panel that opens and closes, closed at first. */
+function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details className="ttx-options__section ttx-options__accordion">
+      <summary>
+        <CaretRightIcon size={12} aria-hidden />
+        <h3>{title}</h3>
+      </summary>
+      {children}
+    </details>
+  )
+}
+
 /**
  * The map's contextual tools in focus mode: where everyone looks, go to a place, its data layers, add data for the area in view,
  * admin boundaries, and the events, country figures and notebook results on the board, basemap.
@@ -49,6 +69,8 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
   const layers = o.layers ?? NO_LAYERS
   // The map runs the same tools; the tool runner shares the runs and caches the results.
   const states = useLayerStates(layers)
+  const [forecast, setForecast] = useState<{ busy?: boolean; error?: string }>({})
+  const [hours, setHours] = useState<Horizon>(72)
 
   /** Mark a place for everyone: a layer that geocodes the place's name again, so it stays a tool recipe. */
   const pin = (place: Place) => {
@@ -62,12 +84,46 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
     if (m) mapOp(runtime, o.id, 'map.addLayer', { layer, area: areaOf(m) })
   }
 
+  /**
+   * A forecast for the area in view. The op looks up the latest complete run over the network (a few seconds) and
+   * stores it in the layer, so it is async; a failure (no complete run, area too large, provider down) is shown here.
+   */
+  const addForecast = async (variable: ForecastVariable, hours: Horizon) => {
+    const m = map()
+    if (!m) return
+    setForecast({ busy: true })
+    const r = await runtime.invoke('map.addForecast', { kind: 'objects', ids: [o.id] }, { variable, hours, area: areaOf(m) })
+    setForecast(r.status === 'failed' ? { error: r.error ?? 'Could not add the forecast' } : {})
+  }
+
   /** A layer for everyone; this person's view fits it once it loads. */
   const addAndFit = (op: string, args: Record<string, unknown>) => {
     const before = new Set(layers.map((l) => l.id))
     mapOp(runtime, o.id, op, args)
     const added = (runtime.board.get(o.id) as MapBoardObject | undefined)?.layers?.find((l) => !before.has(l.id))
     if (added) fitMapToLayer(runtime, o.id, added)
+  }
+
+  /**
+   * An event's footprint, for everyone, as a layer per source's area or track and one for its points, named, so each
+   * can be styled, filtered or removed on its own. This person's view fits the hazard areas (not the areas that only
+   * locate the event, often a whole country). Without a footprint, one layer, which says why in the list.
+   */
+  const addFootprint = (eventId: string, title: string) =>
+    monty.getFootprint(eventId).then(
+      (fc) => {
+        mapOp(runtime, o.id, 'map.addEventLayers', { eventId, parts: footprintParts(fc, title) })
+        const hazards = fc.features.filter((f) => f.properties.kind === 'hazard')
+        const bounds = boundsOf({ type: 'FeatureCollection', features: (hazards.length ? hazards : fc.features) as GeoJSON.Feature[] })
+        if (bounds) fitMapTo(runtime, o.id, bounds)
+      },
+      () => addAndFit('map.addEventLayer', { eventId, title }),
+    )
+
+  /** A whole footprint already on the map (the agent's, a template's, an older board's), split in its place. */
+  const splitFootprint = (layerId: string) => {
+    const s = states.find((st) => st.id === layerId)
+    if (s?.value) mapOp(runtime, o.id, 'map.splitEventLayer', { layerId, parts: footprintParts(s.value as EventFootprint, s.title) })
   }
 
   /** A layer from a URL, for everyone; features also fit this person's view once read. */
@@ -123,11 +179,11 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
           onRemove={(layerId) => mapOp(runtime, o.id, 'map.removeLayer', { layerId })}
           onFilter={(layerId, filter) => mapOp(runtime, o.id, 'map.setLayerFilter', { layerId, ...(filter && { filter }) })}
           onStyle={(layerId, style) => mapOp(runtime, o.id, 'map.setLayerStyle', { layerId, style })}
+          onSplit={splitFootprint}
         />
       </section>
       <Drawings annotations={o.annotations ?? []} onRemove={(annotationId) => mapOp(runtime, o.id, 'map.removeAnnotation', { annotationId })} />
-      <section className="ttx-options__section">
-        <h3>Add data for this area</h3>
+      <Accordion title="Add data for this area">
         <div className="ttx-options__list">
           {(Object.keys(DATA_LAYERS) as DataLayerKey[]).map((k) => (
             <button key={k} type="button" onClick={() => addDataLayer(k)}>
@@ -135,13 +191,35 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
             </button>
           ))}
         </div>
-      </section>
-      <section className="ttx-options__section">
-        <h3>Add from a URL</h3>
+      </Accordion>
+      <Accordion title="Weather forecast">
+        <div className="ttx-options__list">
+          {(Object.keys(FORECAST_VARIABLES) as ForecastVariable[]).map((v) => (
+            <button key={v} type="button" disabled={forecast.busy} onClick={() => void addForecast(v, hours)}>
+              {FORECAST_VARIABLES[v].label} <span className="ttx-options__sub">· NOAA GFS</span>
+            </button>
+          ))}
+        </div>
+        <select aria-label="Hours ahead" value={hours} onChange={(e) => setHours(Number(e.target.value) as Horizon)}>
+          {HORIZONS.map((h) => (
+            <option key={h} value={h}>
+              next {h} h
+            </option>
+          ))}
+        </select>
+        {forecast.busy && <p className="ttx-options__empty">Finding the latest forecast run…</p>}
+        {forecast.error && (
+          <p className="ttx-options__error" role="alert">
+            {forecast.error}
+          </p>
+        )}
+        <p className="ttx-options__empty">For the area in view, at most 30° wide. Forecast context, not an official warning.</p>
+      </Accordion>
+      <Accordion title="Add from a URL or a file">
         <UrlLayerForm onAdd={addUrlLayer} />
-      </section>
-      <section className="ttx-options__section">
-        <h3>Boundaries</h3>
+        <FileLayerButton person={runtime.actor.id} onAdd={addUrlLayer} />
+      </Accordion>
+      <Accordion title="Boundaries">
         <div className="ttx-options__list">
           {ADMIN_LEVELS.map((level) => (
             <button key={level} type="button" onClick={() => mapOp(runtime, o.id, 'map.addBoundaries', { level })}>
@@ -149,8 +227,8 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
             </button>
           ))}
         </div>
-      </section>
-      <BoardEvents board={runtime.board as Board} onPick={(eventId, title) => addAndFit('map.addEventLayer', { eventId, title })} />
+      </Accordion>
+      <BoardEvents board={runtime.board as Board} onPick={addFootprint} />
       <CountryData board={runtime.board as Board} onPick={addChoropleth} />
       <NotebookResults board={runtime.board as Board} onPick={(runId, name, title) => addAndFit('map.addNotebookResult', { runId, name, title })} />
       <section className="ttx-options__section">
@@ -201,11 +279,23 @@ function Drawings({ annotations, onRemove }: { annotations: MapAnnotation[]; onR
 }
 
 /** The events picked on this board, by name, to show where they happened. Names come from the event cache the event cards fill. */
-function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, title: string): void }) {
+function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, title: string): Promise<void> }) {
   const objects = useObjects(board)
   const eventIds = [...new Set(objects.flatMap((o) => (o.type === 'event' && o.eventId ? [o.eventId] : [])))]
   const key = eventIds.join(',')
   const [names, setNames] = useState<Record<string, string>>({})
+  /** The events whose footprint is being read, to add it. */
+  const [adding, setAdding] = useState<Set<string>>(new Set())
+  const pick = (id: string) => {
+    setAdding((a) => new Set(a).add(id))
+    void onPick(id, names[id] ?? id).finally(() =>
+      setAdding((a) => {
+        const next = new Set(a)
+        next.delete(id)
+        return next
+      }),
+    )
+  }
 
   useEffect(() => {
     let current = true
@@ -229,8 +319,8 @@ function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, 
       ) : (
         <div className="ttx-options__list">
           {eventIds.map((id) => (
-            <button key={id} type="button" title={id} onClick={() => onPick(id, names[id] ?? id)}>
-              {names[id] ?? id} <span className="ttx-options__sub">· footprint</span>
+            <button key={id} type="button" title={id} disabled={adding.has(id)} onClick={() => pick(id)}>
+              {names[id] ?? id} <span className="ttx-options__sub">· {adding.has(id) ? 'reading the footprint…' : 'footprint by source'}</span>
             </button>
           ))}
         </div>

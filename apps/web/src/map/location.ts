@@ -1,8 +1,8 @@
 import type { MapArea } from '@ttx/plugins'
 
 /**
- * Typed locations for a map's Location tools (LocationPicker.tsx): a point as "lat, lon" or a bbox as
- * "west, south, east north". Each becomes an area for map.showArea. Numbers may be split by commas or spaces.
+ * Typed locations for a map's Location tools (LocationPicker.tsx): a point as "lat, lon", which becomes an area
+ * for map.showArea. Numbers may be split by commas or spaces.
  */
 
 const numbers = (text: string) => {
@@ -17,16 +17,6 @@ export function parseLatLon(text: string): { lat: number; lon: number } | undefi
   if (v.length !== 2) return undefined
   const [lat, lon] = v as [number, number]
   return Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? { lat, lon } : undefined
-}
-
-/** "west, south, east, north" in degrees, or undefined. West may be greater than east, across the antimeridian. */
-export function parseBbox(text: string): MapArea | undefined {
-  const v = numbers(text)
-  if (v.length !== 4) return undefined
-  const [west, south, east, north] = v as [number, number, number, number]
-  if ([west, east].some((x) => Math.abs(x) > 180) || [south, north].some((y) => Math.abs(y) > 90)) return undefined
-  if (south >= north || west === east) return undefined
-  return { west, south, east, north }
 }
 
 /** About this many km on each side of a typed point: a town and its surroundings. */
