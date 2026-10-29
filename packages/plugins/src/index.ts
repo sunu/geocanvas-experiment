@@ -1,6 +1,7 @@
 export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
-export { boardGet, eventsSearch } from './agentTools.js'
+export { boardGet, bboxOfGeometries, eventsGet, eventsSearch, type EventFacts } from './agentTools.js'
+export { conflict, defineTemplate, MY_VIEW, sitrep, TEMPLATE_OP_PREFIX, templatesPlugin, type Facts, type SeedKind, type TemplateDef, type TemplateNode } from './templates/index.js'
 export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
 export { imagesPlugin, type ImageBoardObject } from './images.js'
 export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
@@ -8,14 +9,12 @@ export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } 
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
 export { CHOROPLETH_TOOL, choroplethLayer, hapiPlugin, INDICATORS, type Indicator, type ConflictBoardObject, type CountryBoardObject, type PresenceBoardObject } from './hapi.js'
 export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } from './reliefweb.js'
-export { APPLY_TEMPLATE, TEMPLATES, templatesPlugin, type BoardTemplate, type TemplateContext, type TemplateId, type TemplateItem } from './templates.js'
 export { geocodeTools, OpenCageGeocoder, OPENCAGE_URL, parseOpenCage, type Geocoder, type Place, type PlaceFeatures } from './geocode.js'
 export {
   ADMIN_LEVEL_NAME,
   ADMIN_LEVELS,
   BOUNDARIES_TOOL,
   bboxOf,
-  boundariesLayer,
   DATA_LAYERS,
   FILTER_OPS,
   guessFormat,

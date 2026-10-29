@@ -98,8 +98,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Start a board from an event | Partial | Picking an event sets up the board with its data and a ReliefWeb feed. |
-| SitRep template: event, feed, map, country context, who's where, conflict, report notes | Built | `board.applyTemplate`. Event and place optional. Schema in `agent-docs/tasks/board-templates.md`. |
-| More templates (event comparison, data explorer) | Not sequenced | One more entry in `TEMPLATES` each. |
+| Templates that prepopulate widgets (SitRep first) | Built (plan-012) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives empty widgets. Historical hazard explorer next. |
 | Create and export reports | Not sequenced | Modeled on OCHA humanitarian snapshots. Design proposal in the design spec (reports and SitRep sections). |
 
 ### 4.7 Non-functional requirements
@@ -117,7 +116,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 2. **Milestone 2, Map features:** steps 3–7.
 3. **Milestone 3, Table:** steps 8–10.
 4. **Then:** dark mode (11), uploads for layers and tables (12), more table sources (13), Chart (14), Notebook `.ipynb` (15), Input (16, stretch).
-5. **Not sequenced yet:** more templates, reports, agent board summary.
+5. **Not sequenced yet:** reports, agent board summary, more templates (plan-012).
 
 One PR per step.
 
@@ -137,7 +136,7 @@ One PR per step.
 - **Live-map cap:** how many live maps at once.
 - **Legend visibility:** focus only, always, toggle, or by zoom.
 - **Reports:** a widget, a mode, or both; how report blocks stay in sync with canvas widgets.
-- **Templates:** which templates follow SitRep. (The schema is decided: `agent-docs/tasks/board-templates.md` §4.)
+- **Templates:** which templates follow the situation report and conflict explorer, and when templates become data that facilitators can edit (plan-012).
 - **Collaboration scope:** comments, mentions and an avatar list are not in `features.md`. In or out?
 - **Design-spec proposals:** frame context, explicit links between widgets, version history and the docked accordion options panel are design proposals, not code. Ticket them before building.
 
@@ -147,5 +146,5 @@ One PR per step.
 - `agent-docs/features.md`: agreed scope.
 - `agent-docs/architect.md`: focus widgets extend the current widget; data in DuckDB-wasm; uploads on Cloudflare.
 - `agent-docs/tasks/in-focus-widgets.md`: focus mode design, widget fields and ops, steps 1–16, decisions.
-- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who.
+- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates.
 - Figma "Atlantis Pod Week Hack - AHD TTX": source of truth for chrome; wireframes for every feature.

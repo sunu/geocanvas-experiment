@@ -82,9 +82,6 @@ export const ADMIN_LEVEL_NAME: Record<AdminLevel, { one: string; many: string }>
 /** Id of a new layer. Unique within one map is enough. */
 export const newLayerId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 
-/** The recipe of a COD-AB boundaries layer. */
-export const boundariesLayer = (level: AdminLevel): MapLayer => ({ id: newLayerId(), tool: BOUNDARIES_TOOL, input: { level }, title: `${ADMIN_LEVEL_NAME[level].many} (COD-AB)` })
-
 /** True when a layer works on an area, which can be reset to someone's view. */
 export const hasArea = (l: MapLayer) => Array.isArray(l.input.area)
 

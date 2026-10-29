@@ -1,5 +1,3 @@
-import type { TemplateId } from '@ttx/plugins'
-
 /**
  * The boards this browser has opened, for the landing page. There are no accounts and the Worker cannot list
  * rooms, so this is the only list of boards; with accounts it becomes per person. Forgetting a board here does
@@ -8,8 +6,8 @@ import type { TemplateId } from '@ttx/plugins'
 export interface RecentBoard {
   room: string
   title?: string
-  template?: TemplateId
-  eventName?: string
+  /** The template it was made from: its op is `template.<id>`. */
+  template?: string
   /** Epoch ms. */
   openedAt: number
 }

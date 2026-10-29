@@ -7,7 +7,7 @@ import { mapPlugin } from './map.js'
 import { notebooksPlugin } from './notebooks.js'
 import { pdfsPlugin } from './pdfs.js'
 import { reliefwebPlugin } from './reliefweb.js'
-import { templatesPlugin } from './templates.js'
+import { templatesPlugin } from './templates/index.js'
 
 /**
  * The headless plugins: object types and ops, with no UI. The web app adds their UI

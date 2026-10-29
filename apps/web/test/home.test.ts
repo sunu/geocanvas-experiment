@@ -26,9 +26,9 @@ describe('recent boards', () => {
 
   it('updates a board it knows, keeping what a later visit does not say', () => {
     const s = memory()
-    recordBoard({ room: 'a', title: 'SitRep', template: 'sitrep', eventName: 'Nepal floods' }, s, 1)
+    recordBoard({ room: 'a', title: 'SitRep', template: 'sitrep' }, s, 1)
     recordBoard({ room: 'a', title: undefined }, s, 5)
-    expect(listBoards('opened', s)).toEqual([{ room: 'a', title: 'SitRep', template: 'sitrep', eventName: 'Nepal floods', openedAt: 5 }])
+    expect(listBoards('opened', s)).toEqual([{ room: 'a', title: 'SitRep', template: 'sitrep', openedAt: 5 }])
   })
 
   it('forgets a board', () => {
@@ -54,9 +54,9 @@ describe('recent boards', () => {
 describe('pending setup', () => {
   it('is read once', () => {
     const s = memory()
-    savePending('a', { title: 'X', template: 'sitrep' }, s)
+    savePending('a', { title: 'X', template: 'sitrep', seeds: { event: 'gdacs-event-1' } }, s)
     expect(takePending('b', s)).toBeUndefined()
-    expect(takePending('a', s)).toEqual({ title: 'X', template: 'sitrep' })
+    expect(takePending('a', s)).toEqual({ title: 'X', template: 'sitrep', seeds: { event: 'gdacs-event-1' } })
     expect(takePending('a', s)).toBeUndefined()
   })
 })

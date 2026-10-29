@@ -1,5 +1,3 @@
-import type { Bbox, TemplateId } from '@ttx/plugins'
-
 /**
  * What the New board dialog chose, for the board page to set up after it loads (App.tsx). It is kept in
  * sessionStorage under the new room, so only the tab that made the board sets it up, and only once: the same
@@ -7,15 +5,10 @@ import type { Bbox, TemplateId } from '@ttx/plugins'
  */
 export interface PendingSetup {
   title?: string
-  /** Without one, a blank board. */
-  template?: TemplateId
-  eventId?: string
-  eventName?: string
-  /** ISO3. */
-  country?: string
-  glides?: string[]
-  /** The place typed in the dialog, to fit the map to. */
-  bbox?: Bbox
+  /** A template's id: its op is `template.<id>`. Without one, a blank board. */
+  template?: string
+  /** The template's seeds, by arg name, as its pickers gave them. A seed left out gives empty widgets. */
+  seeds?: Record<string, unknown>
 }
 
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>

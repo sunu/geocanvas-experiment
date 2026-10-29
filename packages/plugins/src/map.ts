@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import { defineOp, definePlugin, Views, type AnyObject, type BoardTx, type OpContext } from '@ttx/core'
 import {
+  ADMIN_LEVEL_NAME,
   ADMIN_LEVELS,
+  BOUNDARIES_TOOL,
   bboxOf,
-  boundariesLayer,
   DATA_LAYERS,
   guessFormat,
   layerFilter,
@@ -207,7 +208,8 @@ export const mapPlugin = definePlugin({
       args: z.object({ level: z.union(ADMIN_LEVELS.map((l) => z.literal(l))).default(1).describe('1 for provinces, 2 for districts') }),
       prepare(ctx, { level }) {
         const map = mapOf(ctx)
-        return { id: map.id, layers: [...(map.layers ?? []), boundariesLayer(level as AdminLevel)] }
+        const added: MapLayer = { id: newLayerId(), tool: BOUNDARIES_TOOL, input: { level }, title: `${ADMIN_LEVEL_NAME[level as AdminLevel].many} (COD-AB)` }
+        return { id: map.id, layers: [...(map.layers ?? []), added] }
       },
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),
     }),

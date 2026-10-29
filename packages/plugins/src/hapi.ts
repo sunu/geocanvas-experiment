@@ -20,7 +20,7 @@ export type ConflictBoardObject = AnyObject & { type: 'conflict'; country?: stri
 /** The widgets that show one country, picked with country.setCountry. */
 const COUNTRY_WIDGETS = ['country', 'presence', 'conflict']
 
-export const iso3 = z.string().regex(/^[A-Z]{3}$/, 'An ISO 3166-1 alpha-3 code, e.g. "NPL"')
+const iso3 = z.string().regex(/^[A-Z]{3}$/, 'An ISO 3166-1 alpha-3 code, e.g. "NPL"')
 const sector = z.string().describe('A HAPI sector code, e.g. "HEA" for health, or "" for all sectors')
 
 /** HAPI figures that can color a map's provinces or districts (hapi.choropleth in apps/web/src/hapi/choropleth.ts). */
@@ -54,7 +54,7 @@ export const hapiPlugin = definePlugin({
   objectTypes: [
     {
       type: 'country',
-      title: 'Country context',
+      title: 'Country key figures',
       description: "A country's humanitarian context from HDX HAPI: INFORM risk, population, poverty, people in need, displacement and appeal funding.",
       fields: z.object({ country: iso3.meta({ widget: 'country' }).describe('Country').optional() }),
       defaultSize: { w: 380, h: 460 },
@@ -78,7 +78,7 @@ export const hapiPlugin = definePlugin({
     },
     {
       type: 'conflict',
-      title: 'Conflict',
+      title: 'Human conflicts',
       description: 'Political violence events and fatalities in a country over the last 12 months, by month and province (ACLED through HDX HAPI).',
       fields: z.object({ country: iso3.meta({ widget: 'country' }).describe('Country').optional() }),
       defaultSize: { w: 380, h: 420 },

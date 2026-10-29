@@ -13,15 +13,19 @@ import { definePlugin, type ObjectTypeDef } from './types.js'
 // color and fontSize are optional: objects made before they existed use the defaults in style.ts.
 const colorField = z.enum(COLORS).optional()
 
+/** The shapes of a box. A box made before shapes existed has none: it is a rectangle. */
+export const BOX_SHAPES = ['rectangle', 'ellipse', 'line', 'arrow'] as const
+export type BoxShape = (typeof BOX_SHAPES)[number]
+
 export const boxType: ObjectTypeDef = {
   type: 'box',
   title: 'Box',
-  description: 'A colored rectangle, e.g. a background or a frame for other objects.',
-  fields: z.object({ color: colorField }),
+  description: 'A colored shape: a rectangle (the default), an ellipse (a circle when it is as wide as it is tall), or a line or an arrow along the diagonal of its area from top left to bottom right. A rectangle can be a background or a frame for other objects.',
+  fields: z.object({ color: colorField, shape: z.enum(BOX_SHAPES).optional().describe('Rectangle when left out') }),
   defaultSize: { w: 200, h: 120 },
   layer: 'bottom',
   defaultColor: DEFAULT_BOX_COLOR,
-  summarize: (o) => `${(o as BoxObject).color ?? DEFAULT_BOX_COLOR}`,
+  summarize: (o) => `${(o as BoxObject).shape ?? 'rectangle'}, ${(o as BoxObject).color ?? DEFAULT_BOX_COLOR}`,
 }
 
 export const textType: ObjectTypeDef = {
@@ -56,7 +60,7 @@ export const stickyType: ObjectTypeDef = {
   summarize: (o) => JSON.stringify((o as StickyObject).text.slice(0, 200)),
 }
 
-export type BoxObject = AnyObject & { type: 'box'; color?: ColorName }
+export type BoxObject = AnyObject & { type: 'box'; color?: ColorName; shape?: BoxShape }
 export type TextObject = AnyObject & { type: 'text'; text: string; color?: ColorName; fontSize?: number }
 export type StickyObject = AnyObject & { type: 'sticky'; text: string; color?: ColorName; fontSize?: number }
 

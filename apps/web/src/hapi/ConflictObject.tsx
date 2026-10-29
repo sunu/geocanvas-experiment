@@ -1,13 +1,13 @@
-import { SirenIcon } from '@phosphor-icons/react'
 import type { ConflictBoardObject } from '@ttx/plugins'
 import type { ObjectViewProps } from '../canvas/registry'
+import { CONFLICT_FACE } from '../canvas/widgetFaces'
 import { loadConflict, type ConflictMonth } from './conflict'
 import { compact, CountryWidget, errorText, Section, useCountryData } from './CountryWidget'
 
 /** Conflict in a country: political violence over the last 12 months, by month and province (ACLED through HDX HAPI). */
 export function ConflictObject(props: ObjectViewProps<ConflictBoardObject>) {
   return (
-    <CountryWidget {...props} title="Conflict" Icon={SirenIcon} nameInHeader>
+    <CountryWidget {...props} title={CONFLICT_FACE.label} Icon={CONFLICT_FACE.Icon} nameInHeader>
       {(iso3) => <ConflictDetails iso3={iso3} />}
     </CountryWidget>
   )

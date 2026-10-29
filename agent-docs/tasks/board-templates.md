@@ -1,12 +1,12 @@
 # Task: landing page, new board and templates
 
-Date: 2026-10-29. Status: built in PR #55 (steps 1–6); browser check pending. Scope from `agent-docs/features.md` ("Prepopulate the widgets depending on the template that users choose") and PRD 4.6. Resolves the PRD §7 open decision "Templates: the schema".
+Date: 2026-10-29. Status: built in PR #55; browser check pending. Scope from `agent-docs/features.md` ("Prepopulate the widgets depending on the template that users choose") and PRD 4.6. The templates themselves are `plans/plan-012.md` (merged from `main` while this was built); this task adds the way into them from a new board.
 
 ## 1. Requirements
 
 - A **landing page** lists the boards people can go back to, sorted, with a **New board** button.
 - **New board** asks for a name, then offers a **blank board** or a board **from a template**.
-- **From a template:** pick a template and set its context: a Montandon **event** and a **place**, both optional. The board opens already set up with widgets.
+- **From a template:** pick a template and set its context (its seeds: an event, an area). Every part of the context is optional. The board opens already set up with widgets.
 - **The board has a name**, shared with everyone on it, shown in the title bar and editable there.
 - One atomic PR, with a working flow rather than mock screens.
 
@@ -15,219 +15,116 @@ The wireframes (landing grid, new-board dialog, template step) are lo-fi and sho
 Agreed with the product owner on 2026-10-29:
 - The board list is **this browser's recent boards** (localStorage). There are no accounts and no server index of rooms.
 - The board name is **stored in the doc** and written by an op.
-- Templates in this PR: **SitRep**, plus **Blank**. "Event comparison" and "Blank with data explorer" from the wireframe come later.
-- **A template can start without an event.** The event (and the place) can be chosen later, on the board.
+- **A template can start without its seeds.** What is left out is chosen later, on the board.
+- **One template system:** plan-012's `template.<id>` ops. This task first had its own (`board.applyTemplate`); it was dropped when plan-012 reached `main`, and plan-012 gained optional seeds (§4).
 
 ## 2. Where this lands in the current code
 
-- **Rooms:** a board is `#room=<id>` (`apps/web/src/board/room.ts`). In `apps/web/src/App.tsx`, all of this runs at module level, once per page:
-  - it reads the hash
-  - it makes a new id when there is none (lines 19–23)
-  - it calls `connect(room)`
-
-  Changing the hash reloads the page (`hashchange`). There is no router.
-- **No board title.** The doc has `objects`, `oplog`, `chat`, `uploads` and `views`, but no meta map. `chrome/TitleBar.tsx` shows a fixed "Humanitarian TTX", and its menu has only "New board".
+- **Rooms:** a board is `#room=<id>` (`apps/web/src/board/room.ts`). `App.tsx` reads the hash and calls `connect(room)` at module level, once per page; changing the hash reloads the page. There is no router.
 - **No list of boards.** Rooms are Durable Objects addressed by `idFromName`, which cannot be enumerated, and the Worker has no route that lists them.
-- **Reusable parts:**
-  - `EventPicker` (`events/EventObject.tsx`) is already used outside the canvas, as the palette's `event` widget.
-  - `monty.getEvent` and `glidesOf` give an event's country and GLIDE numbers.
-  - `tools.run('data.geocode', …)` gives places, with a `bbox` when OpenCage has bounds.
-  - `fitMapTo`, `fitMapToCountry` and `fitMapToLayer` (`map/MapObject.tsx`) write the runner's view of a map.
-  - The event layer recipe is `eventLayer` (`packages/plugins/src/events.ts`), and the COD-AB boundaries recipe is the one `map.addBoundaries` builds.
-- **Ops:**
-  - `prepare` may be async (use `runtime.invoke`).
-  - `apply` writes through one `BoardTx`, so an op that adds many objects is one transaction and one undo step.
-  - The UndoManager tracks `objects` only.
-  - `core.object.duplicate` is the existing example of an op that adds several objects.
-- **shadcn components present:** avatar, button, dropdown-menu, input, popover, progress, select, separator, textarea, tooltip. There is no dialog yet. `radix-ui` is already a dependency, so `npx shadcn@latest add dialog -c apps/web` adds no package.
+- **Templates** (plan-012): each is an op, `template.<id>`, whose args are its seeds plus `x` and `y`. Its `prepare` looks the seeds up with the runtime's tools, so the dialog only passes what its pickers gave. Its `apply` adds every node in one undo step and sets the runner's view of each new map.
+- **Reusable pickers:** `EventPicker` (`events/EventObject.tsx`) and `AreaPicker` (`templates/AreaPicker.tsx`), the palette's `event` and `area` form widgets.
+- **shadcn:** no dialog existed. `radix-ui` is already a dependency, so the dialog component adds no package.
 
 ## 3. Flows and screens
 
 ### 3.1 Entry
 
-- **No room in the URL** (`/`): the landing page. Today this starts a new empty board; that changes.
+- **No room in the URL** (`/`): the landing page. Before this, it started a new empty board.
 - **`#new`:** the landing page with the New board dialog open. The title bar's "New board…" uses it.
-- **`#room=<id>`:** the board, as today.
+- **`#room=<id>`:** the board.
 
-`main.tsx` reads the hash. With a room, it `import()`s `./App` (its module-level `connect` stays as it is). Without one, it renders `home/Landing`. The landing then loads no Yjs socket, MapLibre or deck.gl. The `hashchange` reload stays, so going from the landing to a board, or back, is a page load.
+`main.tsx` reads the hash. With a room, it `import()`s `./App`; without one, it renders `home/Landing`. The landing page then loads no socket, canvas or maps: about 70 kB gzipped, against 347 kB for the board.
 
 ### 3.2 Landing ("Boards")
 
-- **Header:** the logo and the app name. Help and Login from the wireframe are left out, since there are no accounts or help pages yet.
-- **"Boards" heading row:** a **Sort** select (Last opened, Name) and a **New board** button.
+- **Header:** the logo and the app name. Help and Login from the wireframe are left out: there are no accounts or help pages yet.
+- **"Boards" heading row:** a **Sort** select (Last opened, Name), shown with two boards or more, and **New board**.
 - **Grid of board cards:**
-  - Each shows the title, a line for the template or event ("SitRep · Nepal floods 2026"), and a relative date ("Opened Oct 28").
-  - A card opens its board.
-  - The card's menu has **Copy link** and **Remove from this list**. Removing does not delete the board; anyone with the link can still open it.
-  - The wireframe's grey preview area shows a placeholder for the template: there are no thumbnails yet (§8).
-- **Empty state:** "No boards in this browser yet", with **New board** and a field to paste a board link someone shared.
-- **Recents** (`home/recents.ts`):
-  - localStorage `ttx/boards`, holding `{ room, title, template?, eventName?, openedAt }[]`.
-  - Every read and write is in try/catch: storage can be missing or blocked.
-  - A board opened from a shared link is recorded too.
-  - "Last opened" is what this browser knows. "Last edited" (the wireframe's sort) would need the server.
+  - Each shows the title, the template it was made from, and "Opened Oct 28".
+  - A card is a link to its board.
+  - The card's menu has **Copy link** and **Remove from this list**. Removing does not delete the board.
+  - The preview area shows an icon: there are no thumbnails yet (§6).
+- **Empty state:** "No boards in this browser yet", with **New board** and a field to paste a board link.
+- **Recents** (`home/recents.ts`): localStorage `ttx/boards`, `{ room, title?, template?, openedAt }[]`, at most 200, read and written in try/catch. A board opened from a shared link is recorded too. "Last opened" is what this browser knows; "last edited" would need the server.
 
 ### 3.3 New board dialog, step 1
 
-- **Name:** an input with the placeholder "Untitled board". It can stay empty.
-- **Two choice cards:**
-  - **Blank board:** start from an empty canvas.
-  - **From template:** SitRep, and others later.
-- **Blank → Create:** opens the new board with its name set.
-- **From template → Next:** goes to step 2.
+- **Name:** placeholder "Untitled board"; it can stay empty.
+- **Blank board** or **From a template**. Blank → **Create**; template → **Next**.
 
 ### 3.4 New board dialog, step 2: template and context
 
-- **Template cards:** only **SitRep** in this PR ("Event, map, ReliefWeb, country context, who's where, conflict, report notes"), with a small sketch of its layout. The row has room for more templates later.
-- **Set context:**
-  - **Event:** optional. `EventPicker` (search as you type, recent events without text), with **Choose later**.
-  - **Place / AOI:** optional. Typed text, geocoded on Create. When it is empty, the map fits the event's footprint, or stays at the whole world with no event either.
-  - The wireframe's **date range** is left out: no widget takes one yet (§8).
-- **Back** and **Create board.** Create resolves the context first, so errors show in the dialog, not on a half-made board:
-  - If an event was picked, `monty.getEvent(id)` gives the country (ISO3), the event's name and `glidesOf(event)`.
-  - If a place was typed, `data.geocode` gives its bbox. When there is no place found, the dialog says so.
-  - Then it saves a **pending setup** (§3.5) and opens `#room=<newRoomId()>`.
+- **Template cards:** every `template.*` op, read from the templates plugin (`home/templates.ts`), so a new template appears here with no change. Today: Situation report and Conflict explorer.
+- **Set context:** one picker per seed of the chosen template, chosen by the seed's form widget:
+  - `event`: `EventPicker` (search as you type; recent events without text)
+  - `area`: `AreaPicker`, without "Use my map view", since the board does not exist yet
+
+  Each has **Choose later**.
+- **A typed area must be picked from the list** before Create. The template would look up typed text on the new board, where a failed lookup would show nowhere.
+- **Create board** saves a pending setup (§3.5) and opens `#room=<newRoomId()>`.
 
 ### 3.5 The board opens
 
-- **Pending setup** (`home/pending.ts`): sessionStorage `ttx/pending/<room>`, holding `{ title?, template?, eventId?, eventName?, country?, glides?, bbox? }`.
-  - It is written by the dialog, and read and deleted by the board page, so it reaches only the tab that made the board, and only once. This is the same rule as `addFeedOnPick`: only the browser that acted adds objects.
-- After the provider's first `sync`, `App.tsx` takes the pending setup:
-  - If the board is not empty, it does nothing. That guards against a second apply.
-  - **Blank:** `runtime.invoke('board.setTitle', …)` when a name was given.
-  - **Template:** `runtime.invoke('board.applyTemplate', …)`, then it writes the creator's view of the template's map:
-    - with `fitMapTo(bbox)` for a place
-    - otherwise with `fitMapToLayer` on the event layer
-  - Others who open the board start from that saved view (AGENTS.md "Map widget").
-- Then `recordBoard` adds or updates the board in recents. The title is observed, so recents keep the current name.
+- **Pending setup** (`home/pending.ts`): sessionStorage `ttx/pending/<room>`, holding `{ title?, template?, seeds? }`. The dialog writes it; the board page reads and deletes it, so only the tab that made the board sets it up, and only once (the same rule as `addFeedOnPick`).
+- After the provider's first `sync`, `App.tsx`:
+  - does nothing if the board has objects
+  - runs `board.setTitle` when there is a name
+  - runs `template.<id>` with the seeds, at the center of the view, then zooms to fit. The template sets the creator's view of its maps; others start from that view.
+- Then `recordBoard` adds or updates the board in recents, and keeps its name current as people rename it.
 
 ### 3.6 Title bar on a board
 
-- It shows the board's title, or "Untitled board" when there is none.
-- Clicking the title renames the board inline, as `board/NameButton.tsx` does for a person's name, by dispatching `board.setTitle`. Others see the new name live.
-- The menu has:
-  - **All boards** (the landing)
-  - **New board…** (`#new`), which replaces today's "New board", the one that opens an empty board at once
-- **Share** stays as it is.
+- It shows the board's title ("Untitled board" when there is none). Clicking it renames the board inline, by dispatching `board.setTitle`; others see it live.
+- The logo opens a menu: **All boards** (the landing page) and **New board…** (`#new`).
+- **Share** is unchanged.
 
-## 4. Templates
+## 4. Optional seeds (a change to plan-012)
 
-### 4.1 Schema
+Every seed of a `template.<id>` op is optional. When a seed is left out:
+- a node whose facts are not known is added **empty** if it has `blank` fields, to fill in on the board
+- a node without `blank` is left out, as before
 
-A template is code in a headless plugin, not stored data. The board stores only what the template added: ordinary objects with their recipes.
+A seed that is given but lacks a fact still leaves its node out: for example, an event with no GLIDE numbers gets no ReliefWeb feed.
 
-```ts
-// packages/plugins/src/templates.ts
-export interface TemplateContext {
-  title?: string
-  eventId?: string
-  eventName?: string
-  country?: string   // ISO3
-  glides?: string[]
-}
+| Template | Left out | Added empty |
+| --- | --- | --- |
+| Situation report | event | event card, country context, map (no layers); no ReliefWeb feed |
+| Conflict explorer | area | map (no layers), conflict, who's where, country context |
 
-export interface BoardTemplate {
-  id: 'sitrep'
-  title: string
-  description: string
-  /** Objects to add, with x and y relative to the template's top left; sizes from each type's defaultSize. */
-  build(ctx: TemplateContext): Array<{ type: string; fields: Record<string, unknown> }>
-}
+Headings fall back to "Situation report", or "Conflict: area of interest". The op's summary says "no event yet". Picking an event on the empty card later adds its ReliefWeb feed, through `addFeedOnPick`. It does not fill in the map or the country widgets: that is plan-012's phase 2, linking.
 
-export const TEMPLATES: Record<BoardTemplate['id'], BoardTemplate>
-```
-
-**Op `board.applyTemplate`** (canvas target), in a `templates` plugin listed in `packages/plugins/src/plugins.ts`:
-- **Args:** `{ template, title?, eventId?, country?, glides?, x?, y? }`. Every context field is optional.
-- **`prepare`:** checks the template and lays out its objects around the origin. The origin is the center of the runner's view when `x` and `y` are left out, as adds from the palette do.
-- **`apply`:** one `tx.add` per object, plus `tx.setTitle` when a title is given. That is one transaction, so one undo step and one op log entry.
-- Because it is an op, the agent and the MCP manifest get it with no extra work ("set up a SitRep for the Nepal floods"). An agent's SitRep has no ReliefWeb feed, since its tools do not see GLIDE numbers. This is the same as event picks by the agent today.
-
-### 4.2 SitRep layout
-
-Built only from types and recipes that exist:
-
-| Place | Object | With an event | Without an event |
-| --- | --- | --- | --- |
-| Top | `text` heading | "{title}: situation report" | same, or "Situation report" without a title |
-| Left | `event` | `eventId` set | empty: "Double-click to search for an event" |
-| Left, below | `reliefweb` | when the event has GLIDE numbers | not added |
-| Center | `map` | layers: COD-AB admin 1 boundaries + `eventLayer(eventId)` | boundaries only; shows "Choose a location" |
-| Right | `country`, `presence`, `conflict` | `country` set from the event | no country; double-click opens the country picker |
-| Bottom row | `sticky` × 5 | Key figures, Situation overview, Needs, Response, Gaps | same |
-
-- The sticky notes stand in for the report sections until reports and charts exist (PRD 4.6, step 14).
-- Without an event, people fill the widgets in on the board. Picking an event on the empty card adds its ReliefWeb feed through the existing `addFeedOnPick`. It does **not** fill in the map or the country widgets: that needs explicit links between widgets (PRD §7, design-spec proposals). This is a follow-up.
-- The boundaries recipe is exported from the map plugin and reused, not copied.
+The agent sees every seed as optional too. The op's description tells it to leave a seed out only when asked.
 
 ## 5. Board title
 
-- `packages/core/src/doc/board.ts`: a `meta` Y.Map (`doc.getMap('meta')`) with `title`, and a `Board.title` getter. Older tabs ignore the new key.
-- `BoardTx.setTitle(title)` (`packages/core/src/doc/tx.ts`).
-- Core op `board.setTitle`:
-  - canvas target, `title: z.string().max(80)`
-  - in `packages/core/src/plugins/core.ts`
-- **Not undoable:** the UndoManager tracks `objects` only, as for map views. The op's description says so.
+- `packages/core/src/doc/board.ts`: a `meta` Y.Map with `title`, and a `Board.title` getter. Older tabs ignore the key.
+- `BoardTx.setTitle` and the core op `board.setTitle` (canvas target, at most 80 characters; an empty title removes it).
+- **Not undoable:** the UndoManager tracks `objects` only, as for map views.
 - `summarizeBoard` starts with the title, so the agent knows the board's name.
 
-## 6. Files
+## 6. Decisions and what is out
 
-New:
-- `packages/plugins/src/templates.ts` (+ test)
-- `apps/web/src/home/Landing.tsx`, `BoardCard.tsx`, `NewBoardDialog.tsx`, `recents.ts` (+ test), `pending.ts`, `resolve.ts`
-- `apps/web/src/components/ui/dialog.tsx` (shadcn; change its imports to `@/lib/utils` and Phosphor)
+1. **Recent boards are per browser** (2026-10-29). A server list would show every room to everyone, since there is no access control. With accounts, recents become per account.
+2. **The board title is in the doc**, written by `board.setTitle`, and not undone.
+3. **One template system:** plan-012's, with optional seeds (2026-10-29).
+4. **No new dependency:** the dialog uses the installed `radix-ui`.
 
-Changed:
-- `packages/core/src/doc/board.ts`, `doc/tx.ts`, `plugins/core.ts`, and the board summary (title)
-- `packages/plugins/src/plugins.ts`, `index.ts`, `map.ts` (export the boundaries recipe)
-- `apps/web/src/main.tsx` (entry split), `App.tsx` (no auto-create; apply the pending setup; record recents)
-- `apps/web/src/chrome/TitleBar.tsx` (title, rename, menu)
-- `AGENTS.md`:
-  - the Rooms bullet
-  - a bullet each for the board title and for templates
-  - `home/` in the layout
-- `agent-docs/prd.md`:
-  - 4.1: the landing page and recent boards
-  - 4.6: SitRep template → Built, other templates → Not sequenced
-  - §7: the template schema is decided
-
-## 7. Steps
-
-One PR, in this order:
-
-1. **Board title:** `meta`, `BoardTx.setTitle`, `board.setTitle`, the summary. Node tests.
-2. **Templates plugin:** `TEMPLATES.sitrep` and `board.applyTemplate`. Node tests:
-   - With an event, country and GLIDE numbers, it adds every row of §4.2, in one undo step.
-   - With no event, it adds the full layout: an empty event, a map with boundaries only, HAPI widgets without a country, and no feed.
-   - Leaving out `x` and `y` places the template at the view center.
-3. **Entry split and landing:** `main.tsx`, `Landing`, `BoardCard`, `recents.ts` (Node tests: record, sort, forget, broken storage).
-4. **New board dialog:** both steps, `resolve.ts` and `pending.ts`. Then, in `App.tsx`, apply the pending setup after sync and record recents.
-5. **Title bar:** the title, inline rename, and the menu.
-6. **Docs:** AGENTS.md and the PRD.
-
-**Checks:**
-- `npm test` and `npm run typecheck`.
-- With `npm run sync` and `npm run dev`:
-  1. `/` shows the empty landing.
-  2. Blank board named "Test": the title bar says "Test"; All boards lists it.
-  3. SitRep with an event that has GLIDE numbers (e.g. a Nepal flood): every widget appears, and the map is fitted to the footprint.
-  4. ⌘Z removes the whole template in one step.
-  5. SitRep with **Choose later**: the layout appears empty. Picking an event on the card adds its feed.
-  6. Reloading does not apply the template again.
-  7. A second browser sees the same title and widgets, and its map starts at the creator's view. Renaming shows up there live.
-  8. Asking the agent "set up a SitRep for <event>" runs `board.applyTemplate`.
-
-## 8. Decisions
-
-1. **Recent boards are per browser** (2026-10-29). A server list would show every room to everyone, since there is no access control. When accounts come, recents become per account.
-2. **The board title is in the doc**, written by `board.setTitle`, and is not undoable (2026-10-29).
-3. **A template is code that adds ordinary objects through one op.** It stores no template id on the board, and no template data. The agent and MCP can apply it.
-4. **SitRep first; the event is optional** (2026-10-29).
-5. **No new dependency:** the dialog uses the installed `radix-ui`.
-
-Out of this PR, for later:
-- **Date range** in the context: no widget takes one. It comes with the Input widget (step 16) or with event search by dates.
-- **Board thumbnails** on the landing cards: they need a snapshot of the canvas (see the map snapshots in `map/snapshots.ts`).
+Out, for later:
+- **Date range** in the context: no template takes one yet (plan-012's seed kind `years`).
+- **Board thumbnails** on the landing cards.
 - **"Last edited"** sort, a **server board list**, **Help** and **Login**: they need the server or accounts.
-- The **Event comparison** and **Data explorer** templates.
-- **Linking widgets**, so that picking an event later fills in the map and the country widgets.
+- **Linking widgets** (plan-012 phase 2), so that a seed picked later fills in the map and the country widgets.
+
+## 7. Checks
+
+- `npm test`, `npm run typecheck`, `npm run build`.
+- With `npm run sync` and `npm run dev`:
+  1. `/` shows the empty landing page.
+  2. Blank board named "Test": the title bar says "Test"; All boards lists it.
+  3. Situation report for an event with GLIDE numbers (e.g. a Nepal flood): every widget appears, and the map shows the event.
+  4. ⌘Z removes the whole template in one step.
+  5. Situation report with **Choose later**: the widgets come empty. Picking an event on the card adds its feed.
+  6. Conflict explorer for "Cabo Delgado", picked from the list.
+  7. Reloading does not set the board up again.
+  8. A second browser sees the same title and widgets, and its map starts at the creator's view. Renaming shows up there live.

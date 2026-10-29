@@ -1,5 +1,5 @@
 import { opIdOf, type Actor, type AnyObject, type InvocationRecord, type Runtime, type TurnUndo } from '@ttx/core'
-import { APPLY_TEMPLATE } from '../templates.js'
+import { TEMPLATE_OP_PREFIX } from '../templates/define.js'
 
 /**
  * The rules every agent follows when it runs an op, whatever runs the model: the board's agent (loop.ts) and an
@@ -27,7 +27,7 @@ export class TurnLog {
   }
 }
 
-export type OpCall = Pick<InvocationRecord, 'opId' | 'status' | 'error' | 'created'>
+export type OpCall = Pick<InvocationRecord, 'opId' | 'status' | 'error' | 'created' | 'summary'>
 
 /**
  * Run one op as a tool call (input { ids, args }) for an agent: refuse junk sizes, place an add without x and y,
@@ -71,16 +71,15 @@ function addedSize(runtime: Runtime, opId: string) {
  * to the right of `nextTo`.
  */
 function place(runtime: Runtime, opId: string, args: unknown, center: { x: number; y: number } | undefined, nextTo: AnyObject | undefined) {
-  if (!center || !args || typeof args !== 'object') return
-  const a = args as { x?: unknown; y?: unknown; w?: unknown; h?: unknown }
-  // A template's x and y are its center.
-  if (opId === APPLY_TEMPLATE) {
-    a.x ??= Math.round(center.x)
-    a.y ??= Math.round(center.y)
+  // A template's x and y are the middle of its set: in the middle of the person's view.
+  if (opId.startsWith(TEMPLATE_OP_PREFIX) && center && args && typeof args === 'object') {
+    const a = args as { x?: unknown; y?: unknown }
+    if (a.x === undefined && a.y === undefined) Object.assign(a, { x: Math.round(center.x), y: Math.round(center.y) })
     return
   }
   const def = addedSize(runtime, opId)
-  if (!def) return
+  if (!def || !center || !args || typeof args !== 'object') return
+  const a = args as { x?: unknown; y?: unknown; w?: unknown; h?: unknown }
   const w = typeof a.w === 'number' ? a.w : def.w
   const h = typeof a.h === 'number' ? a.h : def.h
   a.x ??= Math.round(nextTo ? nextTo.x + nextTo.w + GAP : center.x - w / 2)

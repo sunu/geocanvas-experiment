@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EVENT_FOOTPRINT_TOOL, eventsSearch, type MapBoardObject } from '@ttx/plugins'
+import { TEMPLATE_OP_PREFIX } from '@ttx/plugins'
 import { setAgentChat } from './agent/ask'
 import { startBrowserAgent } from './agent/browserAgent'
 import { ChatPanel } from './agent/ChatPanel'
@@ -8,10 +8,8 @@ import { roomFromHash } from './board/room'
 import { Canvas } from './canvas/Canvas'
 import { TitleBar } from './chrome/TitleBar'
 import { UserMenu } from './chrome/UserMenu'
-import { monty } from './events/monty'
 import { takePending, type PendingSetup } from './home/pending'
 import { recordBoard } from './home/recents'
-import { fitMapTo, fitMapToLayer } from './map/MapObject'
 import { startBridge, useBridgeStatus } from './mcp/bridge'
 import { Executor } from './mcp/executor'
 import { plugins } from './plugins'
@@ -35,7 +33,7 @@ void startBridge(
       person: runtime.actor,
       view: () => runtime.view,
       selection: () => (provider.awareness.getLocalState() as { selection?: string[] } | null)?.selection ?? [],
-      tools: [...tools.list(), eventsSearch(monty)],
+      tools: tools.list(),
     }),
   { room, person: runtime.actor },
 )
@@ -43,21 +41,16 @@ void startBridge(
 if (import.meta.env.DEV) Object.assign(window, { board, runtime, provider, chat, uploads })
 
 /**
- * A board made with the New board dialog in this tab: name it and add its template, then fit this person's map
- * to the place or the event. Others start from that view. Not on a board that has objects already.
+ * A board made with the New board dialog in this tab: name it, then run its template with the seeds picked
+ * there, in the middle of the view. The template sets this person's view of its maps; others start from it.
+ * Not on a board that has objects already.
  */
-async function setUp({ template, bbox, ...context }: PendingSetup) {
+async function setUp({ title, template, seeds }: PendingSetup) {
   if (board.list().length) return
-  if (!template) {
-    if (context.title) await runtime.invoke('board.setTitle', { kind: 'canvas' }, { title: context.title })
-    return
-  }
-  const center = runtime.view?.center() ?? { x: 0, y: 0 }
-  const r = await runtime.invoke('board.applyTemplate', { kind: 'canvas' }, { template, ...context, ...center })
-  const map = r.created?.map((id) => board.get(id)).find((o): o is MapBoardObject => o?.type === 'map')
-  const footprint = map?.layers?.find((l) => l.tool === EVENT_FOOTPRINT_TOOL)
-  if (map && bbox) fitMapTo(runtime, map.id, bbox)
-  else if (map && footprint) fitMapToLayer(runtime, map.id, footprint)
+  if (title) await runtime.invoke('board.setTitle', { kind: 'canvas' }, { title })
+  if (!template) return
+  const r = await runtime.invoke(`${TEMPLATE_OP_PREFIX}${template}`, { kind: 'canvas' }, { ...seeds, ...runtime.view?.center() })
+  if (r.status === 'failed') console.error(`Setting up the board from ${template} failed: ${r.error}`)
   runtime.view?.fitAll()
 }
 
@@ -76,14 +69,14 @@ export function App() {
   const [uploadsOpen, setUploadsOpen] = useState(false)
   return (
     <>
-      <Canvas runtime={runtime} status={status} awareness={provider.awareness} />
+      <Canvas runtime={runtime} awareness={provider.awareness} />
       <TitleBar runtime={runtime} />
       <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} />
       {/* The open gallery takes the user menu's corner and has its own close button. */}
       {uploadsOpen ? (
         <UploadsPanel runtime={runtime} uploads={uploads} onClose={() => setUploadsOpen(false)} />
       ) : (
-        <UserMenu actor={runtime.actor} awareness={provider.awareness} bridge={bridge} onUploads={() => setUploadsOpen(true)} />
+        <UserMenu runtime={runtime} status={status} actor={runtime.actor} awareness={provider.awareness} bridge={bridge} />
       )}
     </>
   )
