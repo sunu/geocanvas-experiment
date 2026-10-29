@@ -34,6 +34,7 @@ Rules:
 - If the request needs objects and nothing is selected or named, or you are not sure which objects the person means, do not guess: ask.
 - When you add an object, leave out x, y, w and h: it goes in the middle of the person's view, at its type's default size, and each further object you add goes to the right of the last one. An object that would cover others is moved to the nearest free spot. Give x and y only to put it at a given place (e.g. next to an object), and w and h only when the person asks for a size.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner.
+- Only some tools are loaded. To do something none of them does, read the skill for it, or call tools__search with a few words for what you need: it loads the tools it finds.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
 /** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read-only tools. */
@@ -48,11 +49,41 @@ export function agentTools(runtime: Runtime, tools: ToolRunner): FunctionTool[] 
   return defs.map((t): FunctionTool => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
 }
 
+/**
+ * The tools loaded at the start of every turn: the core ops (move, delete, rename, ...), every '<type>.add' op and
+ * board.get. The others are loaded by skills__read or tools__search, so each model call does not carry every schema.
+ */
+export function coreToolNames(runtime: Runtime): Set<string> {
+  const core = runtime.registry.plugins.find((p) => p.id === 'core')?.ops ?? []
+  const ids = [...core.map((op) => op.id), ...runtime.registry.objectTypes().map((t) => `${t.type}.add`), 'board.get']
+  return new Set(ids.map(toolNameOf))
+}
+
 /** The skills whose required tools are all among these tool names. */
 export const availableSkills = (names: Set<string>): Skill[] => SKILLS.filter((s) => s.requires.every((id) => names.has(toolNameOf(id))))
 
+/** At most this many tools for one tools__search. */
+export const SEARCH_RESULTS = 5
+
+/** The tools that best match the words of `query` in their name and description, best first. */
+export function searchTools(tools: FunctionTool[], query: string): FunctionTool[] {
+  const words = query.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2)
+  return tools
+    .map((t) => {
+      const name = t.function.name.toLowerCase()
+      const text = `${name} ${t.function.description.toLowerCase()}`
+      // A word in the name counts twice: "layer" should find map__addLayer before a tool that mentions layers.
+      return { t, score: words.reduce((n, w) => n + (name.includes(w) ? 2 : text.includes(w) ? 1 : 0), 0) }
+    })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, SEARCH_RESULTS)
+    .map((r) => r.t)
+}
+
 const fn = (name: string, description: string, parameters: Record<string, unknown>): FunctionTool => ({ type: 'function', function: { name, description, parameters } })
 const SKILLS_READ = 'skills__read'
+const TOOLS_SEARCH = 'tools__search'
 
 /** One line about an object, as in summarizeBoard. */
 function describe(runtime: Runtime, o: AnyObject): string {
@@ -119,15 +150,24 @@ export async function runTurn(
   const tools = agentTools(runtime, readTools)
   const all = new Set(tools.map((t) => t.function.name))
   const skills = availableSkills(all)
-  const meta = skills.length
-    ? [
-        fn(SKILLS_READ, "Read a skill. Gives the skill's steps.", {
-          type: 'object',
-          properties: { name: { type: 'string', enum: skills.map((s) => s.name) } },
-          required: ['name'],
-        }),
-      ]
-    : []
+  // The tools sent with the next model call; skills__read and tools__search add to it.
+  const loaded = coreToolNames(runtime)
+  const meta = [
+    fn(TOOLS_SEARCH, 'Search tools. Finds tools that are not loaded yet by a few words for what they do, and loads them.', {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Words for what the tool does, e.g. "route closure road"' } },
+      required: ['query'],
+    }),
+    ...(skills.length
+      ? [
+          fn(SKILLS_READ, "Read a skill. Gives the skill's steps and loads its tools.", {
+            type: 'object',
+            properties: { name: { type: 'string', enum: skills.map((s) => s.name) } },
+            required: ['name'],
+          }),
+        ]
+      : []),
+  ]
   const skillList = skills.length
     ? `\n\nSkills (workflows): call ${SKILLS_READ} only when a skill's "use when" matches the request, usually one skill, before you use its tools.\n${skills.map((s) => `- ${s.name}: ${s.description} (use when: ${s.whenToUse})`).join('\n')}`
     : ''
@@ -144,7 +184,7 @@ export async function runTurn(
 
   try {
     for (let step = 0; step < MAX_STEPS; step++) {
-      const answer = await complete(messages, [...meta, ...tools])
+      const answer = await complete(messages, [...meta, ...tools.filter((t) => loaded.has(t.function.name))])
       messages.push({ role: 'assistant', content: answer.content ?? null, ...(answer.tool_calls?.length && { tool_calls: answer.tool_calls }) })
       if (!answer.tool_calls?.length) return result(answer.content?.trim() || 'Done.')
       for (const call of answer.tool_calls) {
@@ -171,8 +211,16 @@ export async function runTurn(
         calls.push({ tool: name, title: 'Read a skill', status: 'failed', error: 'No such skill' })
         return JSON.stringify({ status: 'failed', error: `No such skill. Skills: ${skills.map((s) => s.name).join(', ')}` })
       }
+      for (const id of [...skill.requires, ...skill.optional]) if (all.has(toolNameOf(id))) loaded.add(toolNameOf(id))
       calls.push({ tool: name, title: `Read the ${skill.name} skill`, status: 'applied' })
       return skill.body
+    }
+    if (name === TOOLS_SEARCH) {
+      const query = String((input as { query?: unknown }).query ?? '')
+      const found = searchTools(tools.filter((t) => !loaded.has(t.function.name)), query)
+      for (const t of found) loaded.add(t.function.name)
+      calls.push({ tool: name, title: 'Search tools', status: 'applied' })
+      return JSON.stringify(found.length ? { loaded: found.map((t) => ({ name: t.function.name, description: t.function.description })) } : { loaded: [], note: 'No tool matches. Try other words.' })
     }
     const read = readTools.list().find((t) => toolNameOf(t.id) === name)
     if (read) {

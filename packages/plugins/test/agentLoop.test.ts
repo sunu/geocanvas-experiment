@@ -13,6 +13,7 @@ import {
   MAX_STEPS,
   plugins,
   runTurn,
+  SEARCH_RESULTS,
   TURNS_PER_HOUR,
   type Complete,
   type FunctionTool,
@@ -506,7 +507,7 @@ describe('undoing an agent turn', () => {
   })
 })
 
-describe('skills', () => {
+describe('skills and deferred tools', () => {
   const names = (t: FunctionTool[]) => t.map((x) => x.function.name)
   /** A model that gives these answers in turn, and records the tools and system prompt of each call. */
   function recording(...answers: Extract<Message, { role: 'assistant' }>[]) {
@@ -524,21 +525,45 @@ describe('skills', () => {
   }
   const geocoder: Geocoder = { forward: async () => [], reverse: async () => undefined }
 
-  it('lists only the skills whose tools the agent has', async () => {
+  it('sends the core tools first, and lists only the skills whose tools the agent has', async () => {
     const { doc, chat } = board()
     const m = recording()
     await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'hi', selection: [] }), m.complete, geocodeTools(geocoder))
-    expect(m.sent[0]).toContain('skills__read')
+    expect(m.sent[0]).toEqual(expect.arrayContaining(['tools__search', 'skills__read', 'box__add', 'map__add', 'core__object__delete', 'board__get']))
+    expect(m.sent[0]).not.toContain('map__showArea')
+    expect(m.sent[0]).not.toContain('data__geocode')
     // Geocoding is there, Montandon search is not.
     expect(m.system()).toContain('- show-place:')
     expect(m.system()).not.toContain('add-event')
   })
 
-  it("gives a skill's steps", async () => {
+  it("gives a skill's steps and loads its tools for the next call", async () => {
     const { doc, chat } = board()
     const m = recording(tools(call('skills__read', { name: 'show-place' })))
     const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'show Beira', selection: [] }), m.complete, geocodeTools(geocoder))
     expect(m.results[0]).toContain('data__geocode first')
+    expect(m.sent[1]).toEqual(expect.arrayContaining(['data__geocode', 'map__showArea']))
     expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the show-place skill', status: 'applied' }])
+  })
+
+  it('loads the tools a search finds', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('tools__search', { query: 'road closure' })))
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'close the bridge', selection: [] }), m.complete)
+    const found = (JSON.parse(m.results[0]!) as { loaded: { name: string }[] }).loaded.map((t) => t.name)
+    expect(found[0]).toBe('map__addClosure')
+    expect(found.length).toBeLessThanOrEqual(SEARCH_RESULTS)
+    expect(m.sent[1]).toEqual(expect.arrayContaining(found))
+    expect(m.sent[0]).not.toContain('map__addClosure')
+  })
+
+  it('runs a tool that is not loaded when the model names it', async () => {
+    const { doc, person, chat } = board()
+    const map = person.dispatch('map.add', canvas, { x: 0, y: 400 }).created![0]!
+    const m = recording(tools(call('map__setBasemap', { ids: [map], args: { basemap: 'dark' } })))
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'make it dark', selection: [map] }), m.complete)
+    expect(m.sent[0]).not.toContain('map__setBasemap')
+    expect(reply.calls[0]).toMatchObject({ tool: 'map.setBasemap', status: 'applied' })
+    expect(person.board.get(map)).toMatchObject({ basemap: 'dark' })
   })
 })
