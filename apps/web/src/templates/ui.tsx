@@ -1,5 +1,5 @@
 import { registerWidget } from '../canvas/registry'
-import { AreaPicker } from './AreaPicker'
+import { AreaPicker } from '../inputs/AreaPicker'
 
 /** An area of interest in a form, e.g. for 'template.conflict' in the palette. */
 registerWidget('area', ({ value, onChange }) => (

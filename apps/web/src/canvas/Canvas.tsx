@@ -12,6 +12,7 @@ import { ObjectMenu } from './ObjectMenu'
 import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { useAgentTouched } from '../board/agentActivity'
+import { Links } from './Links'
 import { Peers } from './Peers'
 import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
@@ -604,6 +605,7 @@ export function Canvas({ runtime, awareness }: { runtime: Runtime; awareness: Aw
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
+        {!focus && <Links objects={objects} byId={byId} selected={selected} camera={camera} />}
         {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentTouched} />}
         {!focus && [...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
