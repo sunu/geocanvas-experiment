@@ -2998,3 +2998,145 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   margin: 4px 0 0;
   color: #dc2626;
 }
+
+/* --- Report (reports/ReportObject.tsx) ------------------------------------------------------------------------------
+ * The report's first page, laid out at the paper's size in CSS px and scaled to the object by a transform, so the
+ * preview is the page report mode shows. A canvas object: square corners, a border, no shadow.
+ */
+
+.ttx-report {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
+  background: var(--ttx-bg);
+}
+
+.ttx-report__page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  overflow: hidden;
+  background: #fff;
+  color: var(--ttx-ink);
+  font-family: var(--ttx-font);
+}
+
+.ttx-report__content {
+  box-sizing: border-box;
+  padding: 56px;
+}
+
+.ttx-report__title {
+  margin: 0 0 24px;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.ttx-report__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+}
+
+.ttx-report__block {
+  min-width: 0;
+}
+
+.ttx-report__heading {
+  margin: 8px 0 0;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.ttx-report__heading--1 {
+  font-size: 24px;
+}
+
+.ttx-report__heading--2 {
+  font-size: 19px;
+}
+
+.ttx-report__heading--3 {
+  font-size: 16px;
+}
+
+.ttx-report__text {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ttx-report__text p {
+  margin: 0 0 8px;
+}
+
+.ttx-report__image {
+  display: block;
+  max-width: 100%;
+}
+
+.ttx-report__divider {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--ttx-border);
+}
+
+.ttx-report__card {
+  position: relative;
+  padding: 12px 14px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-bg);
+  font-size: 14px;
+}
+
+.ttx-report__card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.ttx-report__card-text {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.ttx-report__card.is-gone {
+  color: var(--ttx-muted);
+  font-style: italic;
+}
+
+.ttx-report__tag {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ttx-report__credits {
+  margin-top: 4px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-report__empty {
+  margin: 80px 0 0;
+  color: var(--ttx-muted);
+  font-size: 18px;
+  text-align: center;
+}
+
+.ttx-report__count {
+  position: absolute;
+  right: 56px;
+  bottom: 28px;
+  color: var(--ttx-muted);
+  font-size: 13px;
+}
