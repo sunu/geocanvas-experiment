@@ -13,9 +13,9 @@ import { titleOf } from './reports'
 const SHEET_PAD = 32
 
 /**
- * A report (agent-docs/tasks/reports.md §4, §5). On the canvas: its first page, scaled down to the object. In report
- * mode (focus): every page, in a column that scrolls, as large as fits up to 100%. Both are the page as it prints
- * (ReportPages). Items show as cards until each widget type gets its own report view (step 7).
+ * A report (agent-docs/tasks/reports.md §4, §5). On the canvas: its first page, scaled down to the object, with items as
+ * compact cards. In report mode (focus): every page, in a column that scrolls, as large as fits up to 100%, with items
+ * in full (a map's picture, a widget's own view). Both use the pages as they print (ReportPages).
  */
 export function ReportObject({ runtime, object: r, focused, onFocus }: ObjectViewProps<ReportBoardObject>) {
   const board = runtime.board as Board
@@ -39,6 +39,7 @@ export function ReportObject({ runtime, object: r, focused, onFocus }: ObjectVie
             runtime={runtime}
             which="first"
             scale={Math.min(r.w / page.w, r.h / page.h)}
+            full={false}
             footer={(_, count) => `Page 1 of ${count} · ${items} item${items === 1 ? '' : 's'}`}
           />
         </div>
@@ -62,7 +63,7 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   const scale = width ? Math.min(1, (width - 2 * SHEET_PAD) / pageWidth) : 1
   return (
     <div ref={column} className="ttx-reportmode">
-      <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} footer={(n, count) => `Page ${n} of ${count}`} />
+      <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} full footer={(n, count) => `Page ${n} of ${count}`} />
     </div>
   )
 }

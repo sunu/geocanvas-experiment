@@ -27,6 +27,7 @@ export function ReportPages({
   runtime,
   which,
   scale,
+  full,
   footer,
 }: {
   report: ReportBoardObject
@@ -34,6 +35,8 @@ export function ReportPages({
   runtime: Runtime
   which: 'first' | 'all'
   scale: number
+  /** Items in full, as report mode shows them (a map's picture, a widget's own view, with captions); else compact cards, for the preview on the canvas. */
+  full: boolean
   /** What a page shows at its bottom, from its number and the page count. */
   footer(page: number, count: number): ReactNode
 }) {
@@ -61,12 +64,13 @@ export function ReportPages({
   const shown = which === 'first' ? pages.slice(0, 1) : pages
   const contentWidth = page.w - 2 * MARGIN
   const rowView = (row: Row, measuring = false) => (
-    <RowView key={row.join()} row={row} blocks={r.blocks} board={board} runtime={runtime} contentWidth={contentWidth} measuring={measuring} />
+    <RowView key={row.join()} row={row} blocks={r.blocks} board={board} runtime={runtime} contentWidth={contentWidth} measuring={measuring} full={measuring || full} />
   )
 
   return (
     <>
-      {/* Out of sight, unscaled, at the content's width: what pagination measures. */}
+      {/* Out of sight, unscaled, at the content's width: what pagination measures, always at full size, so the pages are
+          report mode's even where the canvas shows compact cards. Widgets are boxes of their height here, not drawn. */}
       <div ref={measure} className="ttx-report__measure" style={{ width: page.w - 2 * MARGIN }} aria-hidden>
         <h1 className="ttx-report__title">{title}</h1>
         {rows.map((row) => rowView(row, true))}
@@ -88,7 +92,7 @@ export function ReportPages({
 }
 
 /** One row of the two-column grid: a full-width block, two one-column blocks, or one in the left column. */
-function RowView({ row, blocks, board, runtime, contentWidth, measuring }: { row: Row; blocks: Block[]; board: Board; runtime: Runtime; contentWidth: number; measuring: boolean }) {
+function RowView({ row, blocks, board, runtime, contentWidth, measuring, full }: { row: Row; blocks: Block[]; board: Board; runtime: Runtime; contentWidth: number; measuring: boolean; full: boolean }) {
   return (
     <div className="ttx-report__row">
       {row.map((i) => {
@@ -96,7 +100,7 @@ function RowView({ row, blocks, board, runtime, contentWidth, measuring }: { row
         const width = b.span === 2 ? contentWidth : (contentWidth - COLUMN_GAP) / 2
         return (
           <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
-            <BlockView block={b} board={board} runtime={runtime} width={width} measuring={measuring} />
+            <BlockView block={b} board={board} runtime={runtime} width={width} measuring={measuring} full={full} />
           </div>
         )
       })}
@@ -114,6 +118,8 @@ interface BlockProps {
   width: number
   /** Laid out only to be measured: widgets are boxes of their height, not drawn twice. */
   measuring: boolean
+  /** Items in full (report mode), or as compact cards (the preview on the canvas). */
+  full: boolean
 }
 
 function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
@@ -144,7 +150,7 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
  * (a sticky note, a text, an event, a country's figures, a feed…) as its own view, at its own proportions, scaled to
  * the block and read-only. A caption names it. A removed source says so.
  */
-function ItemView({ block: b, source, runtime, width, measuring }: BlockProps & { block: Extract<Block, { kind: 'item' }>; source: AnyObject | undefined }) {
+function ItemView({ block: b, source, runtime, width, measuring, full }: BlockProps & { block: Extract<Block, { kind: 'item' }>; source: AnyObject | undefined }) {
   if (b.mode === 'frozen' && b.frozen) {
     const f = b.frozen
     return (
@@ -161,9 +167,9 @@ function ItemView({ block: b, source, runtime, width, measuring }: BlockProps & 
   if (source.type === 'frame') return <h2 className="ttx-report__heading ttx-report__heading--1">{o.name || o.title || 'Frame'}</h2>
   const Icon = objectUI(source.type)?.tool?.Icon ?? SquaresFourIcon
   const label = o.name || (runtime.registry.objectType(source.type)?.title ?? source.type)
-  // A type this app cannot draw (a newer one): its name, and its text if it has some.
-  if (!objectUI(source.type)?.View) {
-    const text = o.text
+  // On the canvas, or for a type this app cannot draw (a newer one): a compact card, its name and its text if any.
+  if (!full || !objectUI(source.type)?.View) {
+    const text = source.type === 'input' ? `Area of interest: ${o.value?.name ?? 'not set'}` : o.text
     return (
       <div className="ttx-report__card">
         <div className="ttx-report__card-head">
