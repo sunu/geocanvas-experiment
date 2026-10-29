@@ -100,7 +100,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Bring your own key in the browser | Built | Key stays in localStorage and goes only to the provider. |
 | External agents through the MCP companion | Built | Local only. Tools are the tab's ops and read-only tools. |
 | Add, remove and edit every widget | Ongoing rule | Holds as long as every change is an op. Check it for each new widget. |
-| Summarize the board into a report | Next (with reports) | `summarizeBoard` exists for prompts. Comes with the report feature (4.6). |
+| Summarize the board into a report | Next (with reports) | `summarizeBoard` exists for prompts. Step 10 of `agent-docs/tasks/reports.md`. |
 | LLM behavior | Rule | Follow the LLM parts of `agents.md` on the `experiment` branch only. |
 
 ### 4.6 Templates and reports
@@ -109,7 +109,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Start a board from an event | Built | New board → Situation report with the event (`agent-docs/tasks/board-templates.md`). Picking an event on an event card also adds its ReliefWeb feed. Related events in its geography are not built. |
 | Templates that prepopulate widgets (SitRep first) | Built (plan-012) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives empty widgets. Historical hazard explorer next. |
-| Create and export reports | Next (design first) | Modeled on OCHA humanitarian snapshots. Design proposal in the design spec (reports and SitRep sections). |
+| Create and export reports | Next (design first) | A report is a widget on the canvas and a mode (focus): a document editor with two columns, A4 or Letter, rich text, items added from the board, live or frozen. PDF export and a report URL. Modeled on OCHA humanitarian snapshots. Spec and steps: `agent-docs/tasks/reports.md`. |
 
 ### 4.7 Non-functional requirements
 
@@ -146,7 +146,7 @@ One PR per step.
 - **Uploads on R2:** bucket names, file size and count limits, cleanup for deleted branch previews.
 - **Live-map cap:** how many live maps at once.
 - **Legend visibility:** focus only, always, toggle, or by zoom.
-- **Reports:** a widget, a mode, or both; how report blocks stay in sync with canvas widgets.
+- **Reports:** decided: both a widget and a mode, with live or frozen items. Still open: the PDF approach (a spike decides), rich text storage, the report URL's expiry and permissions, and the others in `agent-docs/tasks/reports.md` §10.
 - **Templates:** which templates follow the situation report and conflict explorer, and when templates become data that facilitators can edit (plan-012).
 - **Collaboration scope:** comments, mentions and an avatar list are not in `features.md`. In or out?
 - **Design-spec proposals:** frame context, explicit links between widgets, version history and the docked accordion options panel are design proposals, not code. Ticket them before building.
@@ -157,5 +157,6 @@ One PR per step.
 - `agent-docs/features.md`: agreed scope.
 - `agent-docs/architect.md`: focus widgets extend the current widget; data in DuckDB-wasm; uploads on Cloudflare.
 - `agent-docs/tasks/in-focus-widgets.md`: focus mode design, widget fields and ops, steps 1–16, decisions.
+- `agent-docs/tasks/reports.md`: reports: the widget, report mode, live and frozen items, PDF export options, the report URL, steps 1–10.
 - `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates.
 - Figma "Atlantis Pod Week Hack - AHD TTX": source of truth for chrome; wireframes for every feature.
