@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Runtime } from '@ttx/core'
 import type { BoardObject } from '../board/board'
 import type { Rect } from './camera'
-import { ObjectLabelSlot } from './ObjectHeader'
+import { ObjectLabelSlot, ObjectNameContext } from './ObjectHeader'
 import { objectUI } from './registry'
 
 interface Props {
@@ -29,6 +29,10 @@ export function ObjectView({ runtime, object: o, layer, editing, selected, arriv
   const known = !!runtime.registry.objectType(o.type)
   const ui = known ? objectUI(o.type) : undefined
   const r = focused?.rect ?? o
+  const rename = (name: string) => {
+    runtime.beginGesture()
+    runtime.dispatch('core.object.rename', { kind: 'objects', ids: [o.id] }, { name })
+  }
   return (
     <div
       data-id={o.id}
@@ -42,7 +46,9 @@ export function ObjectView({ runtime, object: o, layer, editing, selected, arriv
       ) : (
         ui?.View && (
           <ObjectLabelSlot.Provider value={label}>
-            <ui.View runtime={runtime} object={o} editing={editing} onDone={onDone} focused={!!focused} onFocus={onFocus} />
+            <ObjectNameContext.Provider value={{ name: o.name ?? '', rename }}>
+              <ui.View runtime={runtime} object={o} editing={editing} onDone={onDone} focused={!!focused} onFocus={onFocus} />
+            </ObjectNameContext.Provider>
           </ObjectLabelSlot.Provider>
         )
       )}

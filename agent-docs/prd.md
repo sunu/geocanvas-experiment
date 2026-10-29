@@ -37,6 +37,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Own infinite canvas: pan, zoom, select, layer order | Built | vsticky-style DOM world layer. Camera is local, never synced. |
 | Rooms by link, New board | Built | `#room=<id>` |
+| Landing page: boards this browser opened, New board dialog, board title | Built | Per browser until accounts exist. `agent-docs/tasks/board-templates.md`. |
 | Real-time sync | Built | Yjs over y-websocket to one Durable Object per room, Hibernation API. |
 | Presence: cursors, selections, names, colors | Built | Collaborator avatar list is not built. |
 | Command palette (⌘K) with forms from op schemas | Built |  |
@@ -96,8 +97,8 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Start a board from an event | Partial | Picking an event sets up the board with its data and a ReliefWeb feed. |
-| Templates that prepopulate widgets (SitRep first) | Built (plan-012) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the Templates button, ⌘K and the agent run it. Historical hazard explorer next. |
+| Start a board from an event | Built | New board → Situation report with the event (`agent-docs/tasks/board-templates.md`). Picking an event on an event card also adds its ReliefWeb feed. Related events in its geography are not built. |
+| Templates that prepopulate widgets (SitRep first) | Built (plan-012) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives empty widgets. Historical hazard explorer next. |
 | Create and export reports | Not sequenced | Modeled on OCHA humanitarian snapshots. Design proposal in the design spec (reports and SitRep sections). |
 
 ### 4.7 Non-functional requirements

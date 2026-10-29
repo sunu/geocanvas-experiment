@@ -16,11 +16,14 @@ export const sitrep = defineTemplate({
   description:
     'Start a situation report for a disaster event: the event card, a map of where it happened, its ReliefWeb updates (when it has GLIDE numbers), the country context, and notes for key figures, needs and gaps.',
   seeds: { event: { kind: seed.event, label: 'Event' } },
-  heading: (f) => `Situation report: ${f.name ?? f.eventId}${f.start ? ` (${when(f.start, f.end)})` : ''}`,
+  heading: (f) => {
+    const about = f.name ?? f.eventId
+    return about ? `Situation report: ${about}${f.start ? ` (${when(f.start, f.end)})` : ''}` : 'Situation report'
+  },
   nodes: [
-    { type: 'event', needs: ['eventId'], fields: (f) => ({ eventId: f.eventId }), col: 0 },
-    { type: 'country', needs: ['country'], fields: (f) => ({ country: f.country }), col: 0 },
-    { type: 'map', needs: ['eventId'], fields: (f) => ({ layers: [eventLayer(f.eventId!, f.name)] }), col: 1, size: { w: 640, h: 520 } },
+    { type: 'event', needs: ['eventId'], fields: (f) => ({ eventId: f.eventId }), blank: () => ({}), col: 0 },
+    { type: 'country', needs: ['country'], fields: (f) => ({ country: f.country }), blank: () => ({}), col: 0 },
+    { type: 'map', needs: ['eventId'], fields: (f) => ({ layers: [eventLayer(f.eventId!, f.name)] }), blank: () => ({}), col: 1, size: { w: 640, h: 520 } },
     { type: 'reliefweb', needs: ['glides'], fields: (f) => ({ glides: f.glides, ...(f.name && { title: f.name }) }), col: 2 },
     sticky('Key figures', 3),
     sticky('Needs', 3),
@@ -37,10 +40,10 @@ export const conflict = defineTemplate({
   seeds: { area: { kind: seed.area, label: 'Area of interest' } },
   heading: (f) => `Conflict: ${f.name ?? 'area of interest'}`,
   nodes: [
-    { type: 'map', needs: ['country'], fields: (f) => ({ layers: [choroplethLayer(f.country!, 'conflictEvents', 1)] }), col: 0, size: { w: 640, h: 520 } },
-    { type: 'conflict', needs: ['country'], fields: (f) => ({ country: f.country }), col: 1 },
-    { type: 'presence', needs: ['country'], fields: (f) => ({ country: f.country }), col: 1 },
-    { type: 'country', needs: ['country'], fields: (f) => ({ country: f.country }), col: 2 },
+    { type: 'map', needs: ['country'], fields: (f) => ({ layers: [choroplethLayer(f.country!, 'conflictEvents', 1)] }), blank: () => ({}), col: 0, size: { w: 640, h: 520 } },
+    { type: 'conflict', needs: ['country'], fields: (f) => ({ country: f.country }), blank: () => ({}), col: 1 },
+    { type: 'presence', needs: ['country'], fields: (f) => ({ country: f.country }), blank: () => ({}), col: 1 },
+    { type: 'country', needs: ['country'], fields: (f) => ({ country: f.country }), blank: () => ({}), col: 2 },
     sticky('Hotspots', 3),
     sticky('Access constraints', 3),
   ],
