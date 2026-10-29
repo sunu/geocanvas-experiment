@@ -37,6 +37,7 @@ export default defineConfig({
     // The sync Worker (npm run sync), which also proxies Montandon searches, geocoding and Notebook Factory, and stores uploads.
     proxy: {
       '/connect': { target: 'ws://localhost:8787', ws: true },
+      '/agent': 'http://localhost:8787',
       '/monty': 'http://localhost:8787',
       '/tools': 'http://localhost:8787',
       '/notebooks': 'http://localhost:8787',

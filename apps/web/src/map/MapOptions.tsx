@@ -12,6 +12,7 @@ import {
   type MapBoardObject,
   type MapLayer,
   type Place,
+  URL_FORMATS,
 } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import type { Board } from '../board/board'
@@ -22,8 +23,10 @@ import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/ap
 import { LayerList } from './LayerList'
 import { useLayerStates } from './layers'
 import { areaOf, goTo, liveMap } from './live'
+import { LocationPicker } from './LocationPicker'
 import { fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
+import { UrlLayerForm, type UrlLayerArgs } from './UrlLayerForm'
 
 /** A map op as its own undo step. In focus, `runtime` is the draft: others see it once shared. */
 function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, unknown>) {
@@ -34,7 +37,7 @@ function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, un
 const NO_LAYERS: MapLayer[] = []
 
 /**
- * The map's contextual tools in focus mode: go to a place, its data layers, add data for the area in view,
+ * The map's contextual tools in focus mode: where everyone looks, go to a place, its data layers, add data for the area in view,
  * admin boundaries, and the events, country figures and notebook results on the board, basemap.
  */
 export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObject>) {
@@ -63,6 +66,12 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
     if (added) fitMapToLayer(runtime, o.id, added)
   }
 
+  /** A layer from a URL, for everyone; features also fit this person's view once read. */
+  const addUrlLayer = (args: UrlLayerArgs) => {
+    if (URL_FORMATS[args.format].tool === 'data.urlFeatures') addAndFit('map.addUrlLayer', { ...args })
+    else mapOp(runtime, o.id, 'map.addUrlLayer', { ...args })
+  }
+
   /** A HAPI figure by province or district, for everyone; this person's view fits the country. */
   const addChoropleth = (country: string, indicator: Indicator, level: AdminLevel, sector?: string) => {
     mapOp(runtime, o.id, 'map.addChoropleth', { country, indicator, level, ...(sector && { sector }) })
@@ -77,6 +86,7 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
 
   return (
     <>
+      <LocationPicker runtime={runtime} mapId={o.id} />
       <section className="ttx-options__section">
         <h3>Go to place</h3>
         <PlaceSearch
@@ -89,7 +99,14 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
       </section>
       <section className="ttx-options__section">
         <h3>Layers</h3>
-        <LayerList layers={layers} states={states} onUseMyView={useMyView} onRemove={(layerId) => mapOp(runtime, o.id, 'map.removeLayer', { layerId })} />
+        <LayerList
+          layers={layers}
+          states={states}
+          onUseMyView={useMyView}
+          onRemove={(layerId) => mapOp(runtime, o.id, 'map.removeLayer', { layerId })}
+          onFilter={(layerId, filter) => mapOp(runtime, o.id, 'map.setLayerFilter', { layerId, ...(filter && { filter }) })}
+          onStyle={(layerId, style) => mapOp(runtime, o.id, 'map.setLayerStyle', { layerId, style })}
+        />
       </section>
       <section className="ttx-options__section">
         <h3>Add data for this area</h3>
@@ -100,6 +117,10 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
             </button>
           ))}
         </div>
+      </section>
+      <section className="ttx-options__section">
+        <h3>Add from a URL</h3>
+        <UrlLayerForm onAdd={addUrlLayer} />
       </section>
       <section className="ttx-options__section">
         <h3>Boundaries</h3>

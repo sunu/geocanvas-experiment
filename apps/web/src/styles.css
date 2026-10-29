@@ -2263,3 +2263,262 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
 }
+
+/* A new map asks where to look (opens focus, with the map's Location tools). */
+.ttx-map__place {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ttx-accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* A map's Location tools in its Options panel (map/LocationPicker.tsx). */
+.ttx-location {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ttx-location form {
+  display: flex;
+  gap: 4px;
+}
+
+.ttx-location input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+}
+
+.ttx-location input[aria-invalid='true'] {
+  border-color: #dc2626;
+}
+
+.ttx-location button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttx-location button:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.04);
+}
+
+.ttx-location button:disabled {
+  color: var(--ttx-muted);
+  cursor: default;
+}
+
+.ttx-location button.is-active {
+  border-color: var(--ttx-accent);
+  color: var(--ttx-accent);
+}
+
+.ttx-layers__legend i.is-point {
+  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+}
+
+.ttx-layers__legend i.is-line {
+  height: 2px;
+  border-radius: 1px;
+  box-shadow: none;
+}
+
+/* A raster's color ramp and its range. */
+.ttx-layers__ramp {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ttx-muted);
+}
+
+.ttx-layers__ramp i {
+  display: block;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.ttx-layers__ramp > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.ttx-location select {
+  font: inherit;
+}
+
+.ttx-location__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* A layer's attributes, filter and style (map/LayerList.tsx). */
+.ttx-layers__item button.is-active {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-accent);
+}
+
+.ttx-layers__details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 6px 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.03);
+  font-size: 12px;
+}
+
+.ttx-layers__details label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ttx-layers__details select,
+.ttx-layers__details input {
+  min-width: 0;
+  font: inherit;
+}
+
+.ttx-layers__swatches {
+  display: flex;
+  gap: 4px;
+}
+
+.ttx-layers .ttx-layers__swatches button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+.ttx-layers .ttx-layers__swatches button.is-active {
+  box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 4px var(--ttx-ink);
+}
+
+.ttx-layers__filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.ttx-layers__filter input {
+  flex: 1;
+  width: 60px;
+}
+
+.ttx-layers .ttx-layers__filter button {
+  padding: 2px 8px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+}
+
+.ttx-layers .ttx-layers__filter button:disabled {
+  color: var(--ttx-muted);
+}
+
+.ttx-layers__attrs {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ttx-layers__attrs th {
+  color: var(--ttx-muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+.ttx-layers__attrs th:nth-child(2) {
+  width: 52px;
+}
+
+.ttx-layers__attrs td {
+  overflow: hidden;
+  padding: 2px 4px 2px 0;
+  border-top: 1px solid var(--ttx-border);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A map that is not live shows a picture of its view (map/snapshots.ts), with the credits its control would show. */
+.ttx-map__snapshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+/* Collapsed to an ⓘ like MapLibre's compact attribution; the credits show on hover or focus. */
+.ttx-map__credits {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  max-width: calc(100% - 8px);
+  min-height: 20px;
+  box-sizing: border-box;
+  padding: 0 20px 0 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.8);
+  color: #333;
+  font-size: 10px;
+  pointer-events: auto;
+}
+
+.ttx-map__credits::after {
+  content: 'i';
+  position: absolute;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #333;
+  color: #fff;
+  font: italic bold 9px/12px Georgia, serif;
+  text-align: center;
+}
+
+.ttx-map__credits span {
+  display: none;
+  overflow: hidden;
+  padding: 0 4px 0 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttx-map__credits:hover span,
+.ttx-map__credits:focus span {
+  display: block;
+}
