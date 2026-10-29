@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { z } from 'zod'
-import { corePlugin, defineOp, definePlugin, Runtime, summarizeBoard, type Actor } from '../src/index'
+import { corePlugin, defineOp, definePlugin, framedBy, Runtime, summarizeBoard, type Actor } from '../src/index'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
 const canvas = { kind: 'canvas' } as const
@@ -71,5 +71,22 @@ describe('BoardTx.clear', () => {
     expect(rt.board.get(card)).toMatchObject({ country: 'NPL' })
     expect(rt.dispatch('card.clear', target, { keys: ['country', 'name'] })).toMatchObject({ status: 'failed', error: 'card cannot clear name' })
     expect(rt.board.get(card)).toMatchObject({ country: 'NPL', name: 'a' })
+  })
+})
+
+describe('what a frame holds', () => {
+  const at = (id: string, type: string, x: number, y: number, w = 10, h = 10) => ({ id, type, x, y, w, h, z: 0 })
+
+  it('gives the objects directly in a frame, in reading order, without those in a frame inside it', () => {
+    const outer = at('outer', 'frame', 0, 0, 1000, 1000)
+    const inner = at('inner', 'frame', 500, 500, 400, 400)
+    const objects = [outer, inner, at('right', 'text', 300, 10), at('left', 'text', 10, 10), at('below', 'map', 10, 100), at('nested', 'text', 600, 600), at('outside', 'text', 2000, 0)]
+    expect(framedBy(outer, objects).map((o) => o.id)).toEqual(['left', 'right', 'below', 'inner'])
+    expect(framedBy(inner, objects).map((o) => o.id)).toEqual(['nested'])
+  })
+
+  it('leaves out objects that stick out of the frame', () => {
+    const frame = at('f', 'frame', 0, 0, 100, 100)
+    expect(framedBy(frame, [frame, at('half', 'text', 90, 90, 50, 50)])).toEqual([])
   })
 })

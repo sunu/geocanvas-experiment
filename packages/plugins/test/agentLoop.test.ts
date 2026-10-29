@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, Runtime, ToolRunner, Views, type Actor, type AgentReply, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
+import { Chat, Runtime, ToolRunner, Views, type Actor, type AgentReply, type AnyObject, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
 import {
   Agent,
   boardGet,
   chatCompletions,
   eventsSearch,
+  GAP,
   geocodeTools,
   HISTORY_ENTRIES,
   HISTORY_MS,
@@ -18,6 +19,7 @@ import {
   type Geocoder,
   type Message,
 } from '../src/index'
+import { freeSpot } from '../src/agent/call'
 import type { MontyClient } from '../src/monty/client'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
@@ -180,15 +182,15 @@ describe('runTurn', () => {
   it('puts adds without x and y in the middle of the view, and the next ones to the right', async () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'add a map and a box', selection: [], center: { x: 1000, y: 500 } })
-    const model = scripted(tools(call('map__add', { args: {} }), call('box__add', { args: {} })), tools(call('text__add', { args: { x: 5, y: 6, text: 'here' } })))
+    const model = scripted(tools(call('map__add', { args: {} }), call('box__add', { args: {} })), tools(call('text__add', { args: { x: 5, y: 600, text: 'here' } })))
     await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     const board_ = new Runtime({ doc, plugins, actor: ada }).board
     const map = board_.list().find((o) => o.type === 'map')!
     const box = board_.list().find((o) => o.type === 'box' && o.x > 900)!
     expect([map.x + map.w / 2, map.y + map.h / 2]).toEqual([1000, 500])
     expect([box.x, box.y + box.h / 2]).toEqual([map.x + map.w + 24, 500])
-    // Given x and y stay.
-    expect(board_.list().find((o) => o.type === 'text')).toMatchObject({ x: 5, y: 6 })
+    // Given x and y in free space stay.
+    expect(board_.list().find((o) => o.type === 'text')).toMatchObject({ x: 5, y: 600 })
   })
 
   it('refuses an add with a size far over its default, and lets the model try again', async () => {
@@ -241,6 +243,96 @@ describe('runTurn', () => {
     const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     expect(reply.text).toMatch(/OpenRouter 502/)
     expect(Object.keys(reply.undo!.before)).toEqual([a])
+  })
+})
+
+describe('placing what an agent adds', () => {
+  const agent = (doc: Y.Doc) => new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } })
+  const overlap = (a: AnyObject, b: AnyObject) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  /** Pairs of objects (frames aside) that overlap, by type, to read in a failure. */
+  const overlaps = (doc: Y.Doc) => {
+    const objects = person(doc).board.list().filter((o) => o.type !== 'frame')
+    return objects.flatMap((a, i) => objects.slice(i + 1).filter((b) => overlap(a, b)).map((b) => `${a.type} ${a.id} / ${b.type} ${b.id}`))
+  }
+
+  it("does not put a second turn's add on the first turn's", async () => {
+    const { doc, chat } = board()
+    const center = { x: 1000, y: 500 }
+    await turn(agent(doc), chat.send({ actor: ada, text: 'add a map', selection: [], center }), scripted(tools(call('map__add', { args: {} }))).complete)
+    await turn(agent(doc), chat.send({ actor: ada, text: 'add another', selection: [], center }), scripted(tools(call('map__add', { args: {} }))).complete)
+    // Maps go below what is there, so the second is first in layer order.
+    const [second, first] = person(doc).board.list().filter((o) => o.type === 'map')
+    expect(overlaps(doc)).toEqual([])
+    expect([first!.x + first!.w / 2, first!.y + first!.h / 2]).toEqual([1000, 500])
+    // The nearest free spot: on the same row, to the right.
+    expect(second).toMatchObject({ x: first!.x + first!.w + GAP, y: first!.y })
+  })
+
+  it('does not stack adds the model gave the view center as x and y', async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'add three notes', selection: [], center: { x: 1000, y: 500 } })
+    const note = (text: string) => call('sticky__add', { args: { x: 1000, y: 500, text } }, text)
+    await turn(agent(doc), message, scripted(tools(note('a'), note('b'), note('c'))).complete)
+    const notes = person(doc).board.list().filter((o) => o.type === 'sticky')
+    expect(overlaps(doc)).toEqual([])
+    // The first is where it was asked; the others to its right.
+    expect(notes.map((o) => [o.x, o.y])).toEqual([
+      [1000, 500],
+      [1000 + 200 + GAP, 500],
+      [1000 + 2 * (200 + GAP), 500],
+    ])
+  })
+
+  it('moves an add down a row when its row is taken far to the right', async () => {
+    const { doc, person: ada_, chat } = board()
+    // A wall right of the three boxes, as wide as many notes.
+    ada_.dispatch('box.add', canvas, { x: 800, y: 0, w: 4000, h: 120 })
+    const message = chat.send({ actor: ada, text: 'add a note', selection: [] })
+    await turn(agent(doc), message, scripted(tools(call('sticky__add', { args: { x: 0, y: 0, text: 'hi' } }))).complete)
+    expect(overlaps(doc)).toEqual([])
+    expect(person(doc).board.list().find((o) => o.type === 'sticky')).toMatchObject({ x: 0, y: 200 + GAP })
+  })
+
+  it('leaves an add in free space where it was asked', async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'add a note', selection: [], center: { x: 1000, y: 500 } })
+    await turn(agent(doc), message, scripted(tools(call('sticky__add', { args: { x: -500, y: 300, text: 'hi' } }))).complete)
+    expect(person(doc).board.list().find((o) => o.type === 'sticky')).toMatchObject({ x: -500, y: 300 })
+  })
+
+  it('puts an add inside a frame where it was asked, and moves it only off the objects in the frame', async () => {
+    const { doc, person: ada_, chat } = board()
+    // A frame around the three boxes, with room below them.
+    ada_.dispatch('frame.add', canvas, { x: -100, y: -100, w: 1000, h: 800 })
+    const message = chat.send({ actor: ada, text: 'add notes in the frame', selection: [] })
+    const note = (x: number, y: number) => call('sticky__add', { args: { x, y, text: `${x}` } }, `${x}`)
+    await turn(agent(doc), message, scripted(tools(note(0, 300), note(600, 0))).complete)
+    const [free, moved] = person(doc).board.list().filter((o) => o.type === 'sticky')
+    expect(free).toMatchObject({ x: 0, y: 300 })
+    // On the third box: the next free spot to its right is outside the frame's right edge.
+    expect(moved).toMatchObject({ x: 800 + GAP, y: 0 })
+    expect(overlaps(doc)).toEqual([])
+  })
+
+  it('goes below everything when no near row is free', () => {
+    const wall = { x: -5000, y: -5000, w: 20000, h: 10000 }
+    expect(freeSpot({ x: 0, y: 0, w: 200, h: 200 }, [wall])).toEqual({ x: 0, y: 5000 + GAP })
+  })
+
+  it('leaves a frame given x and y where it was asked, around what is there', async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'frame these', selection: [] })
+    await turn(agent(doc), message, scripted(tools(call('frame__add', { args: { x: -50, y: -50, w: 900, h: 300 } }))).complete)
+    expect(person(doc).board.list().find((o) => o.type === 'frame')).toMatchObject({ x: -50, y: -50 })
+  })
+
+  it('moves a frame without x and y off what is in the middle of the view, frames too', async () => {
+    const { doc, person: ada_, chat } = board()
+    const empty = ada_.dispatch('frame.add', canvas, { x: 1000, y: -200, w: 800, h: 600 }).created![0]!
+    const message = chat.send({ actor: ada, text: 'add a frame', selection: [], center: { x: 300, y: 60 } })
+    await turn(agent(doc), message, scripted(tools(call('frame__add', { args: {} }))).complete)
+    const frame = person(doc).board.list().find((o) => o.type === 'frame' && o.id !== empty)!
+    expect(person(doc).board.list().filter((o) => o.id !== frame.id && overlap(o, frame))).toEqual([])
   })
 })
 
