@@ -1020,7 +1020,7 @@ body,
   visibility: hidden;
 }
 
-body:has(.ttx-canvas.is-focus) .ttx-chrome {
+body:has(.ttx-canvas.is-focus) .ttx-shell {
   display: none;
 }
 
