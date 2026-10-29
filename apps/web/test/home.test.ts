@@ -14,21 +14,19 @@ function memory() {
 }
 
 describe('recent boards', () => {
-  it('lists the last opened first, or by name', () => {
+  it('lists the last opened first', () => {
     const s = memory()
     recordBoard({ room: 'a', title: 'Nepal floods review' }, s, 1)
     recordBoard({ room: 'b', title: 'cyclone Freddy' }, s, 3)
     recordBoard({ room: 'c' }, s, 2)
-    expect(listBoards('opened', s).map((b) => b.room)).toEqual(['b', 'c', 'a'])
-    // Untitled boards first, then case-insensitive.
-    expect(listBoards('name', s).map((b) => b.room)).toEqual(['c', 'b', 'a'])
+    expect(listBoards(s).map((b) => b.room)).toEqual(['b', 'c', 'a'])
   })
 
   it('updates a board it knows, keeping what a later visit does not say', () => {
     const s = memory()
     recordBoard({ room: 'a', title: 'SitRep', template: 'sitrep' }, s, 1)
     recordBoard({ room: 'a', title: undefined }, s, 5)
-    expect(listBoards('opened', s)).toEqual([{ room: 'a', title: 'SitRep', template: 'sitrep', openedAt: 5 }])
+    expect(listBoards(s)).toEqual([{ room: 'a', title: 'SitRep', template: 'sitrep', openedAt: 5 }])
   })
 
   it('forgets a board', () => {
@@ -36,18 +34,18 @@ describe('recent boards', () => {
     recordBoard({ room: 'a' }, s, 1)
     recordBoard({ room: 'b' }, s, 2)
     forgetBoard('a', s)
-    expect(listBoards('opened', s).map((b) => b.room)).toEqual(['b'])
+    expect(listBoards(s).map((b) => b.room)).toEqual(['b'])
   })
 
   it('starts over from broken or blocked storage', () => {
     const s = memory()
     s.setItem('ttx/boards', '{nope')
-    expect(listBoards('opened', s)).toEqual([])
+    expect(listBoards(s)).toEqual([])
     s.setItem('ttx/boards', JSON.stringify([{ room: 'a', openedAt: 1 }, { title: 'no room' }, null]))
-    expect(listBoards('opened', s).map((b) => b.room)).toEqual(['a'])
+    expect(listBoards(s).map((b) => b.room)).toEqual(['a'])
     const blocked = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') } }
     expect(() => recordBoard({ room: 'a' }, blocked)).not.toThrow()
-    expect(listBoards('opened', blocked)).toEqual([])
+    expect(listBoards(blocked)).toEqual([])
   })
 })
 

@@ -4,7 +4,7 @@ Date: 2026-10-29. Status: built in PR #55; browser check pending. Scope from `ag
 
 ## 1. Requirements
 
-- A **landing page** lists the boards people can go back to, sorted, with a **New board** button.
+- A **landing page** lists the boards people can go back to, the last opened first, with a **New board** button.
 - **New board** asks for a name, then offers a **blank board** or a board **from a template**.
 - **From a template:** pick a template and set its context (its seeds: an event, an area). Every part of the context is optional. The board opens already set up with widgets.
 - **The board has a name**, shared with everyone on it, shown in the title bar and editable there.
@@ -39,7 +39,7 @@ Agreed with the product owner on 2026-10-29:
 ### 3.2 Landing ("Boards")
 
 - **Header:** the logo and the app name. Help and Login from the wireframe are left out: there are no accounts or help pages yet.
-- **"Boards" heading row:** a **Sort** select (Last opened, Name), shown with two boards or more, **Open board** and **New board**. Open board is always there: a popover with a **Board ID or URL** field, for a link held as text (from a chat, on another device). It takes a full URL or a bare room id (`roomFromLink`), and says "Not a board ID or URL" otherwise. A link opened in the browser needs none of this: the board opens and lists itself.
+- **"Boards" heading row:** **Open board** and **New board**. Boards are listed the last opened first, with no sort control for now (§6). Open board is always there: a popover with a **Board ID or URL** field, for a link held as text (from a chat, on another device). It takes a full URL or a bare room id (`roomFromLink`), and says "Not a board ID or URL" otherwise. A link opened in the browser needs none of this: the board opens and lists itself.
 - **Grid of board cards:**
   - Each shows the title, the template it was made from, and "Opened Oct 28".
   - A card is a link to its board.
@@ -113,7 +113,7 @@ The agent sees every seed as optional too. The op's description tells it to leav
 Out, for later:
 - **Date range** in the context: no template takes one yet (plan-012's seed kind `years`).
 - **Board thumbnails** on the landing cards.
-- **"Last edited"** sort, a **server board list**, **Help** and **Login**: they need the server or accounts.
+- **Sorting** (by name, or by last edited, which needs the server), a **server board list**, **Help** and **Login**: they need the server or accounts.
 - **Linking widgets** (plan-012 phase 2), so that a seed picked later fills in the map and the country widgets.
 
 ## 7. Checks

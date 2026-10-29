@@ -3,12 +3,11 @@ import { LinkIcon, PlusIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import logo from '../assets/logo.svg'
 import { roomFromLink, roomHash } from '../board/room'
 import { BoardCard } from './BoardCard'
 import { NewBoardDialog } from './NewBoardDialog'
-import { forgetBoard, listBoards, type BoardSort } from './recents'
+import { forgetBoard, listBoards } from './recents'
 
 /**
  * Open a board by its ID or URL: for a link held as text, e.g. from a chat, or on another device. A link
@@ -59,10 +58,9 @@ function OpenBoardButton() {
  * #new opens the New board dialog at once (the title bar's New board).
  */
 export function Landing({ startNew }: { startNew: boolean }) {
-  const [sort, setSort] = useState<BoardSort>('opened')
   const [creating, setCreating] = useState(startNew)
   const [, refresh] = useState(0)
-  const boards = listBoards(sort)
+  const boards = listBoards()
 
   return (
     <div className="ttx-ui min-h-full bg-background font-sans text-foreground">
@@ -74,17 +72,6 @@ export function Landing({ startNew }: { startNew: boolean }) {
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">Boards</h1>
           <div className="flex items-center gap-2">
-            {boards.length > 1 && (
-              <Select value={sort} onValueChange={(v) => setSort(v as BoardSort)}>
-                <SelectTrigger aria-label="Sort boards">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="opened">Last opened</SelectItem>
-                  <SelectItem value="name">Name</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
             <OpenBoardButton />
             <Button onClick={() => setCreating(true)}>
               <PlusIcon />

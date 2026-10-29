@@ -12,8 +12,6 @@ export interface RecentBoard {
   openedAt: number
 }
 
-export type BoardSort = 'opened' | 'name'
-
 const KEY = 'ttx/boards'
 /** Oldest boards are dropped beyond this. */
 const MAX_BOARDS = 200
@@ -38,11 +36,9 @@ function write(list: RecentBoard[], store = local()) {
   }
 }
 
-export function listBoards(sort: BoardSort = 'opened', store = local()): RecentBoard[] {
-  const list = read(store)
-  return sort === 'name'
-    ? list.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? '', undefined, { sensitivity: 'base' }) || b.openedAt - a.openedAt)
-    : list.sort((a, b) => b.openedAt - a.openedAt)
+/** The last opened first. */
+export function listBoards(store = local()): RecentBoard[] {
+  return read(store).sort((a, b) => b.openedAt - a.openedAt)
 }
 
 /** Add a board or update it, keeping what is already known about it. Undefined fields are left as they are. */
