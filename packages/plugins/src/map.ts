@@ -183,6 +183,7 @@ export const mapPlugin = definePlugin({
           shapes.length && `shapes: ${shapes.join(', ')}`,
           routes.length && `routes: ${routes.join(', ')}`,
           closures.length && `road closures: ${closures.join(', ')}`,
+          scenario.exposure?.buildings && 'exposure: buildings in flood areas counted',
         ]
           .filter(Boolean)
           .join('; ')
@@ -555,6 +556,20 @@ export const mapPlugin = definePlugin({
         const map = mapOf(ctx)
         const scenario = map.scenario ?? NO_SCENARIO
         return { id: map.id, scenario: { ...scenario, closures: changeItem(scenario.closures, closureId, 'closure', () => undefined) } }
+      },
+      apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
+    }),
+    defineOp({
+      id: 'map.setExposure',
+      title: 'Count exposed buildings',
+      description:
+        "Count the buildings in a map scenario's flood areas, for everyone, or stop counting them: the polygons of its road closures that are on and of its layers that block roads. Each browser counts Overture's buildings and OpenStreetMap's health facilities and schools in them, and the count with the closures (what-ifs) is compared with the count without them. Areas up to about half a square degree; a country-wide area is too large.",
+      target: oneMap,
+      args: z.object({ buildings: z.boolean().describe('Count buildings in the flood areas') }),
+      prepare(ctx, { buildings }) {
+        const map = mapOf(ctx)
+        const { exposure: _, ...scenario } = map.scenario ?? NO_SCENARIO
+        return { id: map.id, scenario: buildings ? { ...scenario, exposure: { buildings } } : scenario }
       },
       apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
     }),

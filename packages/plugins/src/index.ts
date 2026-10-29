@@ -80,6 +80,7 @@ export {
   ROUTE_PROFILES,
   type ClosureGeometry,
   type MapScenario,
+  type ScenarioExposure,
   type RouteColor,
   type RouteProfile,
   type ScenarioClosure,

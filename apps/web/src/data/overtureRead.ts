@@ -147,20 +147,29 @@ export interface ReadOptions {
   parsers?: Record<string, unknown>
   /** More row groups than this fail before any download. */
   maxRowGroups?: number
+  /** More files than this fail before their footers are read (about 0.6 MB and 1–3 s each). */
+  maxFiles?: number
+  /** Drops more row groups by the bbox of their statistics (rowGroupsInBbox), e.g. those that miss a polygon. */
+  keep?: (rowGroupBbox: Bbox) => boolean
 }
 
 /**
  * The rows of the row groups that may hold features in `bbox`, one row group at a time, in file order.
  * Rows are not filtered by bbox: the caller does that with the `bbox` column.
  */
-export async function* readOverture<T>(type: OvertureType, bbox: Bbox, { columns, signal, parsers, maxRowGroups = Infinity }: ReadOptions): AsyncGenerator<T[]> {
-  const files = filesInBbox(await collection(collectionUrl(await release(), type)), bbox)
+export async function* readOverture<T>(
+  type: OvertureType,
+  bbox: Bbox,
+  { columns, signal, parsers, maxRowGroups = Infinity, maxFiles = Infinity, keep }: ReadOptions,
+): AsyncGenerator<T[]> {
+  const files = filesInBbox(await collection(collectionUrl(await release(), type)), bbox).filter((f) => !keep || keep(f.bbox))
+  if (files.length > maxFiles) throw new Error(`Area too large: ${files.length} Overture files to read (at most ${maxFiles})`)
   const tasks: (() => Promise<T[]>)[] = []
   for (const f of files) {
     const a = await asset(f.item)
     const metadata = await footer(a)
     signal.throwIfAborted()
-    for (const { rowStart, rowEnd } of rowGroupsInBbox(metadata.row_groups, bbox)) {
+    for (const { rowStart, rowEnd } of rowGroupsInBbox(metadata.row_groups, bbox, keep)) {
       tasks.push(() => readRowGroup<T>(a, metadata, rowStart, rowEnd, columns, signal, parsers))
     }
   }

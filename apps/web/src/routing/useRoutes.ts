@@ -26,22 +26,26 @@ export interface RouteState {
  * What closes roads in a map's scenario: `all`, the geometries routing goes around (the closures that are on, and the
  * features of the map's layers that block roads, once loaded), and `closures`, every closure, which the map draws
  * (those switched off faded). Each stays the same array until it changes: `states` is kept while no layer or result
- * changes.
+ * changes. `fromLayers` is the part of `all` that comes from data, not from what-ifs, as features (with their titles).
  */
-export function useClosures(scenario: MapScenario | undefined, layers: MapLayer[], states: LayerState[]): { all: GeoJSON.Geometry[]; closures: ScenarioClosure[] } {
+export function useClosures(
+  scenario: MapScenario | undefined,
+  layers: MapLayer[],
+  states: LayerState[],
+): { all: GeoJSON.Geometry[]; fromLayers: GeoJSON.Feature[]; closures: ScenarioClosure[] } {
   const closuresKey = stableJson(scenario?.closures ?? [])
   const closures = useMemo(() => JSON.parse(closuresKey) as ScenarioClosure[], [closuresKey])
   const blockingKey = layers.flatMap((l) => (l.blocks ? [l.id] : [])).join(',')
-  const all = useMemo(() => {
+  const fromLayers = useMemo(() => {
     const blocking = new Set(blockingKey.split(','))
-    const fromLayers = states.flatMap((s) =>
+    return states.flatMap((s) =>
       blocking.has(s.id) && s.output === 'geo.features' && s.value
-        ? (s.value as GeoJSON.FeatureCollection).features.flatMap((f) => (f.geometry ? [f.geometry] : []))
+        ? (s.value as GeoJSON.FeatureCollection).features.filter((f) => !!f.geometry)
         : [],
     )
-    return [...closures.flatMap((c) => (c.off ? [] : [c.geometry as GeoJSON.Geometry])), ...fromLayers]
-  }, [closures, blockingKey, states])
-  return { all, closures }
+  }, [blockingKey, states])
+  const all = useMemo(() => [...closures.flatMap((c) => (c.off ? [] : [c.geometry as GeoJSON.Geometry])), ...fromLayers.map((f) => f.geometry)], [closures, fromLayers])
+  return { all, fromLayers, closures }
 }
 
 const routeInput = (r: ScenarioRoute, closures: GeoJSON.Geometry[]) => ({ from: r.from, to: r.to, profile: r.profile, closures })

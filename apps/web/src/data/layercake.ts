@@ -57,6 +57,43 @@ export type HealthFeature = GeoJSON.Feature<GeoJSON.Point, HealthProps>
 
 export const isHealthFacility = (r: PoiRow) => !!r.healthcare || (r.amenity !== null && HEALTH_AMENITIES.has(r.amenity))
 
+/** amenity values that are places of education, for exposure counts. */
+const EDUCATION_AMENITIES = new Set(['school', 'kindergarten', 'college', 'university'])
+
+/** What a facility is for, in exposure counts: health first, so a hospital school counts as health. */
+export type FacilityCategory = 'health' | 'education'
+
+export function facilityCategory(r: PoiRow): FacilityCategory | undefined {
+  if (isHealthFacility(r)) return 'health'
+  if (r.amenity !== null && EDUCATION_AMENITIES.has(r.amenity)) return 'education'
+  return undefined
+}
+
+export interface FacilityProps {
+  osm: string
+  name: string | null
+  category: FacilityCategory
+  /** `healthcare` if tagged, else `amenity`, e.g. hospital, clinic, school. */
+  kind: string | null
+}
+
+export type FacilityFeature = GeoJSON.Feature<GeoJSON.Point, FacilityProps>
+
+/** Appends the health facilities and places of education among `rows` whose bbox intersects the query bbox. */
+export function appendFacilities(out: FacilityFeature[], rows: PoiRow[], bbox: Bbox): void {
+  for (const r of rows) {
+    const category = facilityCategory(r)
+    if (!category) continue
+    const b = r.bbox
+    if (!bboxesIntersect([b.xmin, b.ymin, b.xmax, b.ymax], bbox)) continue
+    out.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [(b.xmin + b.xmax) / 2, (b.ymin + b.ymax) / 2] },
+      properties: { osm: `${r.type}/${r.id}`, name: r.name?.[0] ?? null, category, kind: r.healthcare || r.amenity },
+    })
+  }
+}
+
 /** Appends the health facilities among `rows` whose bbox intersects the query bbox, as points at their bbox center. */
 export function appendHealthFacilities(out: HealthFeature[], rows: PoiRow[], bbox: Bbox): void {
   for (const r of rows) {

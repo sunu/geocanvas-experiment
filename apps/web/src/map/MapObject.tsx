@@ -106,7 +106,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const scenario = useScenario(o, layers, states)
   // Routes are found on Overture's roads, whose license asks for attribution like a layer's. A forecast's caption (model,
   // run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
-  const results = [...states.map((st) => st.value), ...scenario.routes.map((r) => r.result)]
+  const results = [...states.map((st) => st.value), ...scenario.routes.map((r) => r.result), scenario.exposure?.result]
   const credits = [...new Set(results.flatMap((v) => [attributionOf(v), captionOf(v)]).filter((a) => !!a))].join(' · ')
   /** In focus: Map mode (data, notes, drawings) or Scenario mode (routes, closures); the Options panel's tabs pick it. */
   const mode = useMapMode(o.id)
@@ -381,7 +381,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
         )}
         {/* Notes and shapes are added in focus only; a double-click on the canvas lets the map pan, nothing more. */}
         {focused && mode === 'map' && <DrawingBox tool={tool} color={shapeColor} onTool={setTool} onColor={setShapeColor} />}
-        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} active={!!focused && mode === 'scenario'} />
+        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} exposure={scenario.exposure} active={!!focused && mode === 'scenario'} />
         {!live && snapshot && (
           <>
             <img className="ttx-map__snapshot" src={snapshot} alt="" draggable={false} />
