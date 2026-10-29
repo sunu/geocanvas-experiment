@@ -18,6 +18,7 @@ import { placeFiles } from '../uploads/drop'
 import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
 import { publishViewState } from './viewState'
+import { publishViewport } from './viewport'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
 const MIN_SIZE = 16
@@ -127,6 +128,22 @@ export function Canvas({ runtime, awareness }: { runtime: Runtime; awareness: Aw
     }
     lastEditing.current = editingId
   }, [board, runtime, editingId])
+
+  // What this person sees, for views that ration something by it (a live map for only some maps: map/budget.ts).
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = rootRef.current!
+    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  const focusId = focus?.id ?? null
+  useEffect(
+    () => publishViewport({ camera, width: size.w, height: size.h, objects, selected, editing: editingId, focused: focusId }),
+    [camera, size, objects, selected, editingId, focusId],
+  )
 
   // This person's camera, for view ops (zoom to fit, zoom to selection) from the palette or tools.
   useEffect(() => {

@@ -5,12 +5,38 @@ import { z } from 'zod'
  * each person's browser runs the tool (apps/web/src/map/layers.ts). An area-based tool gets its area
  * when the layer is added, so everyone sees the same data although map views are per person.
  */
+export const FILTER_OPS = ['=', '!=', '>', '>=', '<', '<=', 'contains'] as const
+export type FilterOp = (typeof FILTER_OPS)[number]
+
+/** Which features of a layer are drawn: those whose property compares so to the value. Runs in each browser on the loaded features. */
+export const layerFilter = z.object({
+  property: z.string().min(1).describe("A property of the layer's features"),
+  op: z.enum(FILTER_OPS),
+  value: z.union([z.string(), z.number()]).describe('Numbers compare as numbers; contains ignores case'),
+})
+export type LayerFilter = z.infer<typeof layerFilter>
+
+/** How a layer is drawn. Each part is optional: absent, the default (the accent color, fully opaque). */
+export const layerStyle = z.object({
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .optional()
+    .describe('Color of the features, #rrggbb'),
+  byProperty: z.string().min(1).optional().describe('Color the features by this property instead: classes for numbers, categories for text'),
+  opacity: z.number().min(0.1).max(1).optional().describe('Opacity of the whole layer'),
+})
+export type LayerStyle = z.infer<typeof layerStyle>
+
 export const mapLayer = z.object({
   id: z.string(),
   /** A tool id, e.g. 'data.population' (apps/web/src/tools/registry.ts). */
   tool: z.string(),
   input: z.record(z.string(), z.unknown()),
   title: z.string(),
+  /** Added after layers: absent on older ones. Filter and color apply to features only; opacity to every deck.gl layer. */
+  filter: layerFilter.optional(),
+  style: layerStyle.optional(),
 })
 export type MapLayer = z.infer<typeof mapLayer>
 
@@ -68,4 +94,46 @@ const round4 = (v: number) => Math.round(v * 1e4) / 1e4
  */
 export function bboxOf(a: { west: number; south: number; east: number; north: number }): Bbox {
   return [round4(clamp(a.west, -180, 180)), round4(clamp(a.south, -90, 90)), round4(clamp(a.east, -180, 180)), round4(clamp(a.north, -90, 90))]
+}
+
+/**
+ * Data from a URL: each browser reads the file itself (apps/web/src/data/fromUrl.ts), so the server must allow
+ * CORS. Features (GeoJSON, GeoParquet, a zipped shapefile) are read whole, up to a cap; a COG is read by range
+ * request; XYZ tiles as the view needs them. Each format's tool gives one kind of result, which picks the renderer.
+ */
+export const URL_FORMATS = {
+  geojson: { label: 'GeoJSON', tool: 'data.urlFeatures' },
+  geoparquet: { label: 'GeoParquet', tool: 'data.urlFeatures' },
+  shapefile: { label: 'Shapefile (.zip)', tool: 'data.urlFeatures' },
+  cog: { label: 'Cloud-Optimized GeoTIFF', tool: 'data.urlRaster' },
+  xyz: { label: 'XYZ raster tiles', tool: 'data.urlTiles' },
+} as const satisfies Record<string, { label: string; tool: string }>
+
+export type UrlFormat = keyof typeof URL_FORMATS
+
+/** The format a URL's name suggests, or undefined when it says nothing (then the person picks one). */
+export function guessFormat(url: string): UrlFormat | undefined {
+  if (/\{z\}/i.test(url) && /\{x\}/i.test(url) && /\{y\}/i.test(url)) return 'xyz'
+  let path: string
+  try {
+    path = new URL(url).pathname.toLowerCase()
+  } catch {
+    return undefined
+  }
+  if (/\.(geo)?json$/.test(path)) return 'geojson'
+  if (/\.(geo)?parquet$/.test(path)) return 'geoparquet'
+  if (/\.(zip|shp)$/.test(path)) return 'shapefile'
+  if (/\.tiff?$/.test(path)) return 'cog'
+  return undefined
+}
+
+/** A layer's title from its URL: the file name, or the host for tiles. */
+export function urlTitle(url: string, format: UrlFormat): string {
+  try {
+    const u = new URL(url.replace(/\{[a-z]\}/gi, '0'))
+    if (format === 'xyz') return u.host
+    return decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() ?? u.host)
+  } catch {
+    return url
+  }
 }

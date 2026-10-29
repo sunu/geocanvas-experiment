@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { eventsSearch } from '@ttx/plugins'
+import { setAgentChat } from './agent/ask'
 import { startBrowserAgent } from './agent/browserAgent'
 import { ChatPanel } from './agent/ChatPanel'
 import { connect, useConnectionStatus } from './board/connect'
@@ -24,6 +25,8 @@ if (!room) {
 addEventListener('hashchange', () => location.reload())
 
 const { board, runtime, provider, chat, uploads } = connect(room)
+// Widgets ask the agent through the board's chat (agent/ask.ts).
+setAgentChat(chat)
 // Answers only the messages this tab sends on the person's own key; idle otherwise.
 startBrowserAgent(provider.doc, provider.awareness)
 // On a local app paired with the MCP companion (apps/mcp): an external agent works on this board through this tab.
