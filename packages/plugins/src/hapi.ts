@@ -20,7 +20,7 @@ export type ConflictBoardObject = AnyObject & { type: 'conflict'; country?: stri
 /** The widgets that show one country, picked with country.setCountry. */
 const COUNTRY_WIDGETS = ['country', 'presence', 'conflict']
 
-const iso3 = z.string().regex(/^[A-Z]{3}$/, 'An ISO 3166-1 alpha-3 code, e.g. "NPL"')
+export const iso3 = z.string().regex(/^[A-Z]{3}$/, 'An ISO 3166-1 alpha-3 code, e.g. "NPL"')
 const sector = z.string().describe('A HAPI sector code, e.g. "HEA" for health, or "" for all sectors')
 
 /** HAPI figures that can color a map's provinces or districts (hapi.choropleth in apps/web/src/hapi/choropleth.ts). */
