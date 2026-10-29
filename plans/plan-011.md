@@ -1,91 +1,41 @@
-# Plan 011 — Templates: a set of nodes from a few seeds
+# Plan 011: who is who on the canvas
 
-Date: 2026-10-29. Status: phase 1 implemented on `feat/templates` (framework, sit rep, conflict explorer). Phase 2 (linking) not started.
+Colors and marks that tell people apart on the board: what you have selected, what others have selected, where their
+pointers are, and where the agent has worked. Design source: the "Collaborator styles" frame of the Figma file
+(Atlantis Pod Week Hack, AHD TTX). Implemented in `apps/web/src/canvas/Peers.tsx`, `board/collaborators.ts` and the
+`--canvas-accent` / `--agent` tokens in `apps/web/src/shadcn.css`.
 
-## 1. Outcome
+## Roles
 
-Many exercises start with the same set of nodes. A template puts a set of nodes on the canvas from one or more seeds. A seed is a typed input: an event, an area of interest, a country, a hazard type or a time range. A template is not tied to events.
-
-Examples:
-
-- **Situation report.** Seed: an event.
-- **Conflict explorer.** Seed: an area of interest.
-- **Historical hazard explorer.** Seeds: an area of interest, a hazard type and a year range. Not built yet.
-
-In phase 1, the template fills its nodes one time from the seeds. The nodes do not stay linked to the seeds.
-
-## 2. Decisions
-
-| Question | Decision |
-| --- | --- |
-| Area across a border | One country: the country at the center of the area. |
-| How to give an area | A place name (geocoded), or "my view": the area of your most recent map view on the board. |
-| Selection | A selected event card gives the event seed its value. The template always adds a full new set. |
-| Who writes templates | Developers, in code. Keep the definition simple, so that it can become data (JSON) later. |
-| First delivery | The framework, the seed kinds `event` and `area`, the sit rep and the conflict explorer. |
-| Where to start a template | The command palette, and the Templates button in the toolbar (the palette with templates only). In the palette, "Insert template…" opens the list of templates. A template shows in the full palette only when you search for it. |
-| Data access in an op | An optional `tools` (`ToolRunner`) on `OpContext`. Approved change to a shared contract. |
-| Text as a seed | Each seed also accepts `{ "text": "…" }`. The form shows candidates. The op uses the best match and tells which match it used. |
-| One text box for a full template | No. The chat agent does this with text seeds. |
-
-## 3. Design
-
-```
-seeds ──lookup──▶ seed values ──resolve──▶ facts ──build──▶ nodes, layout
-"Nepal floods 2026"  events.search   eventId    events.get   name, country, glides, area
-"Beira"              data.geocode    bbox       reverse geocode   area, country, name
-```
-
-### 3.1 A template is an op
-
-`defineTemplate` (`packages/plugins/src/templates/define.ts`) makes one op, `template.<id>`, on the canvas:
-
-- `args`: the seeds, plus optional `x` and `y`, the middle of the set.
-- `prepare` (async, read-only): resolve each seed to facts, complete the facts, keep the nodes whose `needs` are known, and lay them out. It checks each node against its type before the first write.
-- `apply`: add all nodes and a gray frame `box` under them, in one transaction. It also sets the runner's view of each new map to the area. Because the view is in the same transaction, it is there before the map shows.
-- `describePlan`: "Situation report for Flood in Nepal (gdacs-event-…)". `Runtime.invoke` puts this text in `InvocationRecord.summary`. The agent and the MCP companion get it in the result of the call.
-
-Thus, the palette, the agent and the MCP companion get each template with no more code. One undo step removes the full set. No new stored object type is necessary.
-
-### 3.2 Seeds and facts
-
-`packages/plugins/src/templates/seeds.ts`. Facts are one flat record: `eventId`, `name`, `start`, `end`, `country`, `glides`, `area`. When two seeds give the same fact, the first seed in the template wins.
-
-| Kind | Value | Form widget | Facts |
+| Role | Color | Outline | Marks |
 | --- | --- | --- | --- |
-| `event` | event id, or `{ text }` | `event` (the event picker) | eventId, name, start, end, country, glides, area (bbox of the hazard areas) |
-| `area` | `{ west, south, east, north, name? }`, `{ text }`, or `"my view"` | `area` (`apps/web/src/templates/`) | area, name, country |
+| You | `--canvas-accent`, cyan-500 | solid 1.5 px | draggable corner handles; marquee and draw draft in the same color |
+| Another person | one of six, `board/collaborators.ts` | solid 1.5 px | decorative corner marks, cursor arrow, name tag |
+| The agent | `--agent`, violet-500 | dashed 1.5 px | sparkle in its tag, in the chat and on its avatar |
 
-After the seeds, `complete` adds the facts that follow from other facts. An area without a country gets the country at its center (`data.reverseGeocode`). A country without an area gets the country's bbox (`data.geocode`). Areas smaller than 0.2° grow to 0.2°, so that a point does not zoom a map in fully.
+- **Yours is cyan for everyone.** Each person sees their own selection in cyan, so the color that means "mine" is the
+  same on every screen. Cyan is never assigned to anyone else.
+- **People keep one color.** It is picked once per browser from the six (orange, pink, yellow, blue, emerald, red),
+  stored with the person (`board/person.ts`) and sent in presence as a hex, so every browser draws them the same.
+  A stored color from outside the palette is replaced on load. Six is the Figma file's count; with more people than
+  colors, two share one, and the name tag tells them apart.
+- **The agent is violet, and violet is not a person's color.** The Figma file gave violet to a person and black to the
+  agent; violet moved to the agent so that "violet means the agent" holds everywhere. The agent has no cursor or
+  selection of its own, so its work is marked by the objects it added or changed in the last 5 s
+  (`board/agentActivity.ts`, from the shared op log), as dashed violet outlines.
+- **Color is never the only signal.** Solid means a person and dashed the agent; name tags carry the name; the agent
+  has a sparkle and a square avatar, people a circle.
 
-A node with a fact in `needs` that is not known is not added. An empty list is not known (an event with no GLIDE numbers gets no ReliefWeb feed). Without `tools`, the only facts are the ones in the seed values. For example, an event id gives the event card and its map, but no country context.
+## Rules
 
-### 3.3 Tools
+- Chrome colors (these) and content colors (the palette of boxes, text and sticky notes, `canvas/style.ts`) are
+  separate: content can be any hue; selection and presence marks sit on top with their handles and tags.
+- A label on a person's color uses the text color that reads on it (`onColor`; the Figma file's `user-N-on`).
+- Only your own handles are interactive. Others' corner marks have no pointer events.
+- Other accents in the app (`--ttx-accent`: drop targets, buttons) are not part of this and stay as they are.
 
-New read-only tool `events.get` (`packages/plugins/src/agentTools.ts`). It gives one event's name, dates, country, GLIDE numbers and the bbox of its hazard areas. The browser registry, the room's agent and the MCP executor give their `ToolRunner` to their runtime. The browser registry now has `events.search` and `events.get`, so the app no longer adds `eventsSearch` separately.
+## Not done
 
-### 3.4 Layout and placement
-
-There is a heading text at the top. Below it are columns from left to right, and the nodes of a column stack from top to bottom. The gap is 24 canvas units. Placement:
-
-- Palette: the middle of the view.
-- Agent: the middle of the asker's view (`callOp` sets `x` and `y` for `template.*` ops).
-- No `x` or `y`: to the right of all objects on the board.
-
-## 4. Templates in this delivery
-
-- **Situation report** (`template.sitrep`): heading, event card, country context, map with the event footprint, ReliefWeb feed, and notes "Key figures", "Needs", "Gaps".
-- **Conflict explorer** (`template.conflict`): heading, map with a choropleth of political violence events by province, the Conflict widget, Who's where, country context, and notes "Hotspots", "Access constraints".
-
-## 5. Not built
-
-- The historical hazard explorer. It needs a Montandon query for events in an area and a time range (see `packages/plugin-disasters/src/montyProvider.ts` on `experiment`), and maybe an event list node.
-- Seed kinds `country`, `hazard` and `years`.
-- Phase 2, linking: the frame becomes a `template` object with the template id, the seeds and the node ids. A change to a seed resolves the facts again and updates the nodes that people did not change. `needs` already tells which nodes use which facts.
-- Templates as data, and "save this board as a template".
-- The event widget does not send typed text as `{ text }`. You must select an event in the list.
-
-## 6. Verification
-
-- `packages/plugins/test/templates.test.ts`: each template with fake tools, from text and from values; one undo step; frame under and around the nodes; the runner's map view; no feed without GLIDE numbers; no tools; no match fails before a write; placement; the agent's placement and summary.
-- Manually, with `npm run sync` and `npm run dev`: Templates button → Situation report → "nepal flood"; Conflict explorer → "Cabo Delgado". Ask the agent for each.
+- Object name labels above selections (the Figma frame shows one; objects have no names yet).
+- Collaborator avatars (no list of people on the board exists yet).
+- Updating the Figma frame to the violet agent.

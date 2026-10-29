@@ -1,6 +1,24 @@
 import { z } from 'zod'
 import { defineOp, definePlugin, Views, type AnyObject, type BoardTx, type OpContext } from '@ttx/core'
-import { ADMIN_LEVEL_NAME, ADMIN_LEVELS, BOUNDARIES_TOOL, bboxOf, DATA_LAYERS, mapLayer, newLayerId, type AdminLevel, type DataLayerKey, type MapLayer } from './mapLayers.js'
+import {
+  ADMIN_LEVEL_NAME,
+  ADMIN_LEVELS,
+  BOUNDARIES_TOOL,
+  bboxOf,
+  DATA_LAYERS,
+  guessFormat,
+  layerFilter,
+  layerStyle,
+  mapLayer,
+  newLayerId,
+  URL_FORMATS,
+  urlTitle,
+  type AdminLevel,
+  type DataLayerKey,
+  type MapLayer,
+  type UrlFormat,
+} from './mapLayers.js'
+import { mapAnnotation, type MapAnnotation } from './mapAnnotations.js'
 import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
 
 /** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
@@ -22,10 +40,11 @@ export type MapArea = z.infer<typeof area>
 
 /**
  * Each person's view of a map is not here: it is in the doc's `views` (Views in @ttx/core).
- * `layers` (mapLayers.ts) is optional: maps made before it have none. It is replaced as a whole, so two
- * people adding a layer at the same moment keep only one of the two.
+ * `layers` (mapLayers.ts) and `annotations` (mapAnnotations.ts) are optional: maps made before them have none.
+ * Each is replaced as a whole, so two people adding a layer at the same moment keep only one of the two, and two
+ * people typing in two stickies of one map at the same moment can lose each other's last keystrokes.
  */
-export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[] }
+export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[]; annotations?: MapAnnotation[] }
 
 const oneMap = { kind: 'objects', types: ['map'], min: 1, max: 1 } as const
 
@@ -48,6 +67,27 @@ function areaFor(ctx: OpContext, map: MapBoardObject, given: MapArea | undefined
 /** A layer write: the map's whole new list (see MapBoardObject). */
 const setLayers = (tx: BoardTx, id: string, layers: MapLayer[]) => tx.update({ [id]: { layers } })
 
+/** The map's layers with one of them changed, or an error if it has no such layer. */
+function changeLayer(map: MapBoardObject, layerId: string, change: (l: MapLayer) => MapLayer) {
+  const layers = map.layers ?? []
+  if (!layers.some((l) => l.id === layerId)) throw new Error(`The map has no layer ${layerId}`)
+  return { id: map.id, layers: layers.map((l) => (l.id === layerId ? change(l) : l)) }
+}
+
+/** An annotation write: the map's whole new list. */
+const setAnnotations = (tx: BoardTx, id: string, annotations: MapAnnotation[]) => tx.update({ [id]: { annotations } })
+
+/** The map's annotations with one of them changed, or an error if it has no such annotation. */
+function changeAnnotation(map: MapBoardObject, annotationId: string, change: (a: MapAnnotation) => MapAnnotation | undefined) {
+  const annotations = map.annotations ?? []
+  if (!annotations.some((a) => a.id === annotationId)) throw new Error(`The map has no annotation ${annotationId}`)
+  return { id: map.id, annotations: annotations.flatMap((a) => (a.id === annotationId ? (change(a) ?? []) : [a])) }
+}
+
+const lng = z.number().min(-180).max(180).describe('Longitude')
+const lat = z.number().min(-90).max(90).describe('Latitude')
+const annotationId = z.string().describe("The annotation's id, from the map's annotations")
+
 const dataLayer = z.enum(Object.keys(DATA_LAYERS) as [DataLayerKey, ...DataLayerKey[]])
 const layerId = z.string().describe("The layer's id, from the map's layers")
 
@@ -65,12 +105,13 @@ export const mapPlugin = definePlugin({
       type: 'map',
       title: 'Map',
       description: 'A live map. Its basemap is shared; each person has their own view (use map.showArea to change one).',
-      fields: z.object({ basemap: basemap.default('light'), layers: z.array(mapLayer).optional() }),
+      fields: z.object({ basemap: basemap.default('light'), layers: z.array(mapLayer).optional(), annotations: z.array(mapAnnotation).optional() }),
       defaultSize: { w: 520, h: 360 },
       layer: 'bottom',
       summarize: (o) => {
-        const { basemap, layers } = o as MapBoardObject
-        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id})`).join(', ')}` : ''}`
+        const { basemap, layers, annotations } = o as MapBoardObject
+        const stickies = annotations?.map((a) => `${JSON.stringify(a.text.slice(0, 100))} at ${a.lngLat.join(', ')} (${a.id})`)
+        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''})`).join(', ')}` : ''}${stickies?.length ? `; sticky notes: ${stickies.join(', ')}` : ''}`
       },
     },
   ],
@@ -128,6 +169,38 @@ export const mapPlugin = definePlugin({
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),
     }),
     defineOp({
+      id: 'map.addUrlLayer',
+      title: 'Add layer from a URL',
+      description: `Add a layer read from a URL to a map, for everyone. Formats: ${Object.entries(URL_FORMATS)
+        .map(([k, f]) => `${k} (${f.label})`)
+        .join(', ')}. Without a format it is guessed from the URL. The server must allow CORS. A COG must have one band; give its value range for the color ramp.`,
+      target: oneMap,
+      args: z.object({
+        url: z.url({ protocol: /^https?$/ }).describe('http(s) URL; for xyz a template with {z}, {x} and {y}'),
+        format: z.enum(Object.keys(URL_FORMATS) as [UrlFormat, ...UrlFormat[]]).optional().describe('Guessed from the URL when left out'),
+        title: z.string().min(1).optional(),
+        min: z.number().optional().describe('cog only: values at or below this are not drawn (default 0)'),
+        max: z.number().optional().describe('cog only: values at or above this get the last color (default 100)'),
+        attribution: z.string().optional().describe("The data's attribution, which its license may require"),
+      }),
+      prepare(ctx, { url, format, title, min, max, attribution }) {
+        const f = format ?? guessFormat(url)
+        if (!f) throw new Error(`Give \`format\`: the URL does not say which it is (${Object.keys(URL_FORMATS).join(', ')})`)
+        if (f === 'xyz' && !/\{z\}/i.test(url)) throw new Error('An xyz URL needs {z}, {x} and {y}')
+        if (f === 'cog' && min !== undefined && max !== undefined && min >= max) throw new Error('`min` must be below `max`')
+        const map = mapOf(ctx)
+        const input = {
+          url,
+          ...(URL_FORMATS[f].tool === 'data.urlFeatures' && { format: f }),
+          ...(f === 'cog' && { rescale: [min ?? 0, max ?? 100] }),
+          ...(attribution && { attribution }),
+        }
+        const added: MapLayer = { id: newLayerId(), tool: URL_FORMATS[f].tool, input, title: title ?? urlTitle(url, f) }
+        return { id: map.id, layers: [...(map.layers ?? []), added] }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
       id: 'map.addBoundaries',
       title: 'Add boundaries',
       description: "Add OCHA's administrative boundaries (COD-AB) to a map, for everyone: provinces (level 1) or districts (level 2), with their P-codes, in the 112 countries COD-AB covers.",
@@ -169,6 +242,67 @@ export const mapPlugin = definePlugin({
         return { id: map.id, layers: layers.map((l) => (l.id === layerId ? { ...l, input: { ...l.input, area: bbox } } : l)) }
       },
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.setLayerFilter',
+      title: 'Filter layer',
+      description: "Draw only the features of a map's layer whose property matches, for everyone. Without `filter`: draw them all again. Features only, not rasters, tiles or boundaries.",
+      target: oneMap,
+      args: z.object({ layerId, filter: layerFilter.optional() }),
+      prepare: (ctx, { layerId, filter }) => changeLayer(mapOf(ctx), layerId, ({ filter: _, ...l }) => (filter ? { ...l, filter } : l)),
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.setLayerStyle',
+      title: 'Style layer',
+      description: "Set how a map's layer is drawn, for everyone: its color or the property that colors it (features only), and its opacity. Replaces the layer's style; {} goes back to the default.",
+      target: oneMap,
+      args: z.object({ layerId, style: layerStyle }),
+      prepare: (ctx, { layerId, style }) =>
+        changeLayer(mapOf(ctx), layerId, ({ style: _, ...l }) => (Object.values(style).some((v) => v !== undefined) ? { ...l, style } : l)),
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.addSticky',
+      title: 'Add sticky note on map',
+      description: 'Pin a sticky note with text to a place on a map, for everyone. It stays on that place as people pan and zoom.',
+      target: oneMap,
+      args: z.object({ lng, lat, text: z.string().default('').describe('The text') }),
+      prepare(ctx, { lng, lat, text }) {
+        const map = mapOf(ctx)
+        const added: MapAnnotation = { id: newLayerId(), kind: 'sticky', lngLat: [lng, lat], text }
+        return { id: map.id, annotations: [...(map.annotations ?? []), added] }
+      },
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
+    }),
+    defineOp({
+      id: 'map.setStickyText',
+      title: 'Set sticky note text',
+      description: "Replace the text of a sticky note on a map.",
+      target: oneMap,
+      // Typing: one op log entry per editing gesture.
+      gesture: true,
+      args: z.object({ annotationId, text: z.string() }),
+      prepare: (ctx, { annotationId, text }) => changeAnnotation(mapOf(ctx), annotationId, (a) => ({ ...a, text })),
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
+    }),
+    defineOp({
+      id: 'map.moveAnnotation',
+      title: 'Move annotation',
+      description: 'Move an annotation of a map to another place, for everyone.',
+      target: oneMap,
+      args: z.object({ annotationId, lng, lat }),
+      prepare: (ctx, { annotationId, lng, lat }) => changeAnnotation(mapOf(ctx), annotationId, (a) => ({ ...a, lngLat: [lng, lat] })),
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
+    }),
+    defineOp({
+      id: 'map.removeAnnotation',
+      title: 'Remove annotation',
+      description: 'Remove an annotation from a map, for everyone.',
+      target: oneMap,
+      args: z.object({ annotationId }),
+      prepare: (ctx, { annotationId }) => changeAnnotation(mapOf(ctx), annotationId, () => undefined),
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
     }),
     defineOp({
       id: 'map.removeLayer',

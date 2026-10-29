@@ -16,14 +16,23 @@ export {
   BOUNDARIES_TOOL,
   bboxOf,
   DATA_LAYERS,
+  FILTER_OPS,
+  guessFormat,
   hasArea,
   mapLayer,
   newLayerId,
+  URL_FORMATS,
+  urlTitle,
   type AdminLevel,
   type Bbox,
   type DataLayerKey,
+  type FilterOp,
+  type LayerFilter,
+  type LayerStyle,
   type MapLayer,
+  type UrlFormat,
 } from './mapLayers.js'
+export { mapAnnotation, mapSticky, type MapAnnotation, type MapSticky } from './mapAnnotations.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
 export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
 export { agentTools, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn } from './agent/loop.js'

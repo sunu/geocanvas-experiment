@@ -6,6 +6,7 @@ import { roomFromHash } from '../board/room'
 import type { ObjectViewProps } from '../canvas/registry'
 import { CopyLinkButton } from '../uploads/CopyLinkButton'
 import { fileLink, frameHeight, maxMb, typesOf, uploadFile } from '../uploads/upload'
+import { ObjectHeader } from '../canvas/ObjectHeader'
 
 /**
  * An uploaded picture. The board stores the upload's id; the file is served by the Worker at its link,
@@ -60,10 +61,7 @@ export function ImageObject({ runtime, object: o, editing, onDone }: ObjectViewP
 
   return (
     <div className="ttx-image" onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()} onDrop={onDrop}>
-      {/* The header takes the pointer without double-clicking: its buttons must not start a drag. */}
-      <div className="ttx-image__header" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-        <ImageIcon size={14} aria-hidden />
-        <span className="ttx-image__title">{o.name ?? 'Image'}</span>
+      <ObjectHeader icon={<ImageIcon size={14} aria-hidden />} title={o.name ?? 'Image'}>
         {link && (
           <>
             <CopyLinkButton link={link} />
@@ -72,7 +70,7 @@ export function ImageObject({ runtime, object: o, editing, onDone }: ObjectViewP
             </a>
           </>
         )}
-      </div>
+      </ObjectHeader>
       <div className="ttx-image__body">
         {o.imageId && !uploading ? (
           <img className="ttx-image__img" src={uploadUrl(o.imageId)} alt={o.name ?? ''} draggable={false} />

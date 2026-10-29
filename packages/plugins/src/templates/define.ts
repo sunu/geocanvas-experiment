@@ -4,7 +4,7 @@ import { MAP_HEADER_PX, viewOfArea } from '../mapView.js'
 import { complete, type Facts, type SeedKind } from './seeds.js'
 
 /**
- * Templates (plans/plan-011.md): a set of nodes put on the canvas from a few seeds. Each template is one op,
+ * Templates (plans/plan-012.md): a set of nodes put on the canvas from a few seeds. Each template is one op,
  * `template.<id>`, so the palette, the agent and the MCP companion list it, and one undo step takes it back.
  * Nodes are filled once from the seeds; they are not linked to them.
  */

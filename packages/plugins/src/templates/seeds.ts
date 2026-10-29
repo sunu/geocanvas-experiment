@@ -7,7 +7,7 @@ import { areaOfView, MAP_HEADER_PX, type Area } from '../mapView.js'
 import { countryName } from '../monty/countries.js'
 
 /**
- * Seeds: the inputs of a template (plans/plan-011.md). A seed kind turns what a person gives (an event id, or
+ * Seeds: the inputs of a template (plans/plan-012.md). A seed kind turns what a person gives (an event id, or
  * text such as "Nepal floods 2026") into facts, which the template's nodes are made from. People type text; the
  * form's widget lists candidates, and the op takes the best match.
  */
