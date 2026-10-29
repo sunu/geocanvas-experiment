@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Draft, type Runtime, type TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
-import { useObjects, type ConnectionStatus } from '../board/connect'
+import { useObjects } from '../board/connect'
 import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
@@ -17,6 +17,7 @@ import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
 import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
+import { publishViewState } from './viewState'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
 const MIN_SIZE = 16
@@ -76,7 +77,7 @@ function trackDrag(
  * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
  * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
  */
-export function Canvas({ runtime, status, awareness }: { runtime: Runtime; status: ConnectionStatus; awareness: Awareness }) {
+export function Canvas({ runtime, awareness }: { runtime: Runtime; awareness: Awareness }) {
   const board = runtime.board as Board
   const objects = useObjects(board)
   const peers = usePeers(awareness)
@@ -173,7 +174,8 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     }
 
     if (tool !== 'select') {
-      const type = tool
+      // 'box:ellipse' is the box tool drawing an ellipse (canvas/Toolbar.tsx).
+      const [type, shape] = tool.split(':') as [string, string | undefined]
       const p = screenPoint(e)
       const p0 = toWorld(cameraRef.current, p.x, p.y)
       let drawn: Rect | null = null
@@ -188,7 +190,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
           setDraft(null)
           const d = runtime.registry.objectType(type)!.defaultSize
           const r = drawn && drawn.w >= MIN_SIZE && drawn.h >= MIN_SIZE ? drawn : { x: p0.x - d.w / 2, y: p0.y - d.h / 2, ...d }
-          const newId = runtime.dispatch(`${type}.add`, { kind: 'canvas' }, r).created?.[0]
+          const newId = runtime.dispatch(`${type}.add`, { kind: 'canvas' }, shape ? { ...r, shape } : r).created?.[0]
           setTool('select')
           if (!newId) return
           setSelection(new Set([newId]))
@@ -393,7 +395,9 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         const o = byId.get([...selected][0]!)
         if (o && isFocusable(objectUI(o.type))) enterFocus(o.id)
       } else if (!mod && !e.altKey) {
-        const t = tools().find((t) => t.key.toLowerCase() === e.key.toLowerCase())
+        // ⇧ with a key picks the tool listed as '⇧<key>' (the arrow is ⇧L), else the plain one.
+        const k = e.key.toUpperCase()
+        const t = (e.shiftKey && tools().find((t) => t.key === `⇧${k}`)) || tools().find((t) => t.key.toUpperCase() === k)
         if (t) setTool(t.tool)
       }
     }
@@ -515,6 +519,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   }
 
   const single = selected.size === 1 && !editingId && !focus ? byId.get([...selected][0]!) : undefined
+  useEffect(() => publishViewState({ zoom: camera.z, focused: !!focus }), [camera.z, focus])
   const grid = GRID * camera.z
   // The dots' radius follows the zoom like their spacing does, but not below half a pixel, so they stay drawn while they fade.
   const dotRadius = Math.max(0.5, camera.z)
@@ -616,15 +621,9 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} camera={camera} />}
 
       {!focus && <Toolbar
-        runtime={runtime}
         tool={tool}
         onTool={setTool}
-        zoom={camera.z}
-        onResetZoom={() => {
-          const r = rootRef.current!.getBoundingClientRect()
-          setCamera((c) => zoomAt(c, 1 / c.z, r.width / 2, r.height / 2))
-        }}
-        status={status}
+        onFiles={(files) => placeFiles(runtime, files, viewCenter())}
       />}
 
       {paletteOpen && (

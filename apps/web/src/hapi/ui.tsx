@@ -4,7 +4,7 @@ import { CountryObject } from './CountryObject'
 import { CountryPicker } from './CountryWidget'
 import { PresenceObject } from './PresenceObject'
 
-// No toolbar tools: these are added from the palette (country.add, presence.add, conflict.add), or by the agent.
+// No key tools: they are in the toolbar's Event context menu (canvas/Toolbar.tsx), and in the palette (country.add, presence.add, conflict.add) and for the agent.
 registerObjectUI('country', { View: CountryObject, editable: true, editOnCreate: true })
 registerObjectUI('presence', { View: PresenceObject, editable: true, editOnCreate: true })
 registerObjectUI('conflict', { View: ConflictObject, editable: true, editOnCreate: true })
