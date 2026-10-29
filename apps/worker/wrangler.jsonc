@@ -3,11 +3,11 @@
   "name": "humanitarian-ttx",
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-20",
-  // The built web app. Everything except /connect/*, /agent/*, /monty/*, /tools/*, /notebooks/*, /reliefweb/*, /floodmaps/*, /hapi/* and /uploads is served from here, without running the Worker.
+  // The built web app. API paths and /connect/* run the Worker; other requests are served from these assets.
   "assets": {
     "directory": "../web/dist",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/connect/*", "/agent/*", "/monty/*", "/tools/*", "/notebooks/*", "/reliefweb/*", "/floodmaps/*", "/hapi/*", "/uploads", "/uploads/*"]
+    "run_worker_first": ["/connect/*", "/agent/*", "/monty/*", "/tools/*", "/notebooks/*", "/reliefweb/*", "/floodmaps/*", "/hapi/*", "/openeo/*", "/uploads", "/uploads/*"]
   },
   // Montandon STAC API, the database agent-docs/features.md scopes us to, and Notebook Factory (published
   // notebook runs; read anonymously). API keys are secrets: apps/worker/.dev.vars locally, `wrangler secret`
@@ -15,8 +15,14 @@
   "vars": {
     "MONTANDON_BASE_URL": "https://montandon-eoapi-stage.ifrc.org/stac",
     "NOTEBOOK_FACTORY_URL": "https://notebook-factory-staging.montandondata.org",
+    "OPENEO_BASE_URL": "https://api.explorer.eopf.copernicus.eu/openeo",
+    // Empty on purpose: because of `secrets.required` below, Wrangler passes .dev.vars entries to the Worker only if
+    // they are listed there or declared here. openEO is optional, so these are not required (a required secret
+    // fails the first deploy of every branch Worker). Locally, .dev.vars overrides them; deployed, they stay empty.
+    "OPENEO_USER": "",
+    "OPENEO_PASS": "",
     // The board agent's model on OpenRouter: a low-cost model that can call tools (plans/plan-008.md).
-    "AGENT_MODEL": "z-ai/glm-5.3-flash"
+    "AGENT_MODEL": "openai/gpt-6-luna"
   },
   // OPENROUTER_API_KEY: without it, the agent answers that it is not configured. HAPI_APP_IDENTIFIER is
   // base64("app name:email") for HDX HAPI; not a key, but it carries the email (apps/worker/src/hapi.ts).

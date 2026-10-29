@@ -1,5 +1,6 @@
 export { Board, readObject, type AnyObject, type Placed } from './doc/board.js'
 export { BoardTx } from './doc/tx.js'
+export { contains, framedBy, readingOrder, withFramed } from './frames.js'
 export { Draft } from './ops/draft.js'
 export { Runtime, matchTarget, GESTURE_IDLE_MS, type RuntimeOptions, type DispatchOptions } from './ops/runtime.js'
 export { defineOp, type Actor, type InvocationRecord, type OpContext, type OpDef, type OplogEntry, type TargetRef, type TargetSpec, type ViewController } from './ops/types.js'

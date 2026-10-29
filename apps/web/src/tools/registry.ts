@@ -1,7 +1,7 @@
 import { adminBoundariesTool, WorldBankBoundaries } from '../data/boundaries'
 import { OvertureParquet, overtureTool } from '../data/buildings'
 import { uploadFeaturesTool, UrlFeatures, urlFeaturesTool, urlRasterTool, urlTilesTool } from '../data/fromUrl'
-import { eventsGet, eventsSearch, forecastTool, geocodeTools, gfs, OpenCageGeocoder } from '@ttx/plugins'
+import { eventsGet, eventsSearch, forecastTool, geocodeTools, gfs, OpenCageGeocoder, openeoCollections, openeoCoverage, openEOTilesTool } from '@ttx/plugins'
 import { healthFacilitiesTool, LayercakeHealth } from '../data/health'
 import { populationTool, SourceCoopPopulation } from '../data/population'
 import { eventFootprintTool } from '../events/footprint'
@@ -39,6 +39,9 @@ export const tools = new ToolRunner([
   eventsGet(monty),
   boundariesTool,
   choroplethTool,
+  openEOTilesTool,
+  openeoCollections(),
+  openeoCoverage(),
   routeTool(routing),
   exposureTool(new ExposureWorker(), layercake),
 ])

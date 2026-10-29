@@ -96,7 +96,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Room agent in the Durable Object | Built | OpenRouter tool loop, 8 model calls per turn, 20 turns per room per hour. Undo per turn. |
+| Room agent in the Durable Object | Built | OpenRouter tool loop, 12 model calls per turn, 20 turns per room per hour. Undo per turn. |
 | Bring your own key in the browser | Built | Key stays in localStorage and goes only to the provider. |
 | External agents through the MCP companion | Built | Local only. Tools are the tab's ops and read-only tools. |
 | Add, remove and edit every widget | Ongoing rule | Holds as long as every change is an op. Check it for each new widget. |
@@ -109,7 +109,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Start a board from an event | Built | New board → Situation report with the event (`agent-docs/tasks/board-templates.md`). Picking an event on an event card also adds its ReliefWeb feed. Related events in its geography are not built. |
 | Templates that prepopulate widgets (SitRep first) | Built (plan-012, plan-013) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives an empty root and blank widgets. Its objects follow the seed's root (the event card, an area input) and sit in a frame: change the root and they update. Historical hazard explorer next. |
-| Create and export reports | Next (design first) | A report is a widget on the canvas and a mode (focus): a document editor with two columns, A4 or Letter, rich text, items added from the board, live or frozen. PDF export and a report URL. Modeled on OCHA humanitarian snapshots. Spec and steps: `agent-docs/tasks/reports.md`. |
+| Create and export reports | Next (steps 2 to 4 of 10 built) | A report is a widget on the canvas and a mode (focus): a document editor with two columns, A4 or Letter, rich text, items added from the board, live or frozen. PDF export and a report URL. Modeled on OCHA humanitarian snapshots. Spec and steps: `agent-docs/tasks/reports.md`. |
 
 ### 4.7 Non-functional requirements
 
