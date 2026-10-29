@@ -25,6 +25,14 @@ describe('map data layers', () => {
     expect(deckLayers(states).map((l) => l.id)).toEqual(['layer-pop-raster', 'layer-pin'])
   })
 
+  // openEO's tool answers { status: 'running' } until the Worker has made its tile service; the layer list says it is waiting.
+  it('draws an XYZ tile result once it has a url, below the features, and nothing while it has none', () => {
+    const tiles = { id: 'sar', title: 'Change', output: 'geo.tiles', loading: false, value: { status: 'ready', url: 'https://eopf.example/{z}/{x}/{y}' } }
+    const pin = { id: 'pin', title: 'Beira', output: 'geo.features', loading: false, value: points }
+    expect(deckLayers([pin, tiles]).map((l) => l.id)).toEqual(['layer-sar', 'layer-pin'])
+    expect(deckLayers([{ ...tiles, value: { status: 'running' } }])).toEqual([])
+  })
+
   it('draws nothing for layers still loading, failed, or of a kind it cannot show', () => {
     expect(
       deckLayers([

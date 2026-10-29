@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
 import { useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { TAB_ID } from './browserAgent'
-import { DEFAULT_MODEL, forgetKey, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
+import { DEFAULT_MODEL, forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
 
 /** A message for a browser agent with no reply after this long, and nobody thinking: its tab has closed. */
 const LOST_AFTER_MS = 120_000
@@ -29,7 +29,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   const [text, setText] = useState('')
   const dictation = useDictation((spoken) => setText((t) => (t && !/\s$/.test(t) ? `${t} ${spoken}` : t + spoken)))
   const [mode, setMode] = useState<AgentMode>(loadMode)
-  const [hasKey, setHasKey] = useState(() => loadKey() !== null)
+  const [hasKey, setHasKey] = useState(() => keyIsUsable(loadKey()))
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Collapsed: only the header. The draft, mode and key settings stay in this state.
   const [collapsed, setCollapsed] = useState(loadCollapsed)
@@ -106,7 +106,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
             <KeySettings
               onSave={(config) => {
                 saveKey(config)
-                setHasKey(true)
+                setHasKey(keyIsUsable(config))
                 setSettingsOpen(false)
               }}
               onForget={() => {
@@ -203,7 +203,7 @@ function KeySettings({ onSave, onForget }: { onSave: (config: KeyConfig) => void
   const [config, setConfig] = useState<KeyConfig>(() => loadKey() ?? { provider: 'openrouter', url: OPENROUTER_URL, model: DEFAULT_MODEL, apiKey: '' })
   const set = (fields: Partial<KeyConfig>) => setConfig((c) => ({ ...c, ...fields }))
   const url = config.provider === 'openrouter' ? OPENROUTER_URL : config.url
-  const valid = config.model.trim() && (config.provider === 'openrouter' ? config.apiKey.trim() : /^https?:\/\//.test(config.url))
+  const valid = keyIsUsable(config)
 
   function submit(e: FormEvent) {
     e.preventDefault()

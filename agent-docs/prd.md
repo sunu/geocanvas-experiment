@@ -96,7 +96,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Room agent in the Durable Object | Built | OpenRouter tool loop, 8 model calls per turn, 20 turns per room per hour. Undo per turn. |
+| Room agent in the Durable Object | Built | OpenRouter tool loop, 12 model calls per turn, 20 turns per room per hour. Undo per turn. |
 | Bring your own key in the browser | Built | Key stays in localStorage and goes only to the provider. |
 | External agents through the MCP companion | Built | Local only. Tools are the tab's ops and read-only tools. |
 | Add, remove and edit every widget | Ongoing rule | Holds as long as every change is an op. Check it for each new widget. |

@@ -576,10 +576,17 @@ export const mapPlugin = definePlugin({
       prepare(ctx, { layerId }) {
         const map = mapOf(ctx)
         const layers = map.layers ?? []
-        if (!layers.some((l) => l.id === layerId)) throw new Error(`The map has no layer ${layerId}`)
-        return { id: map.id, layers: layers.filter((l) => l.id !== layerId) }
+        const removed = layers.find((l) => l.id === layerId)
+        if (!removed) throw new Error(`The map has no layer ${layerId}`)
+        const analysisId = removed.tool === 'openeo.tiles' && typeof removed.input.analysisId === 'string' ? removed.input.analysisId : undefined
+        return { id: map.id, layers: layers.filter((l) => l.id !== layerId), ...(analysisId ? { analysisId } : {}) }
       },
-      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+      apply(tx, { id, layers, analysisId }) {
+        setLayers(tx, id, layers)
+        // Removing an openEO layer also removes its board object. The Worker observes that
+        // deletion and cancels the public EOPF service, including if it is still starting.
+        if (analysisId) tx.remove([analysisId])
+      },
     }),
   ],
 })

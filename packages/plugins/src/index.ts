@@ -29,6 +29,9 @@ export {
   type RichDoc,
 } from './reports.js'
 export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } from './reliefweb.js'
+export { openeoCollections, openeoCoverage, openeoPreview, previewOpenEOGraph } from './openeoTools.js'
+export { describeGraph, EXAMPLE_GRAPH, graphProblems, MAX_AREA_SQ_DEG, type ProcessGraph } from './openeoGraph.js'
+export { OPENEO_BASE_URL, isActive as isActiveOpenEOAnalysis, openEOPlugin, openEOTilesTool, type OpenEOAnalysisObject, type OpenEOStatus } from './openeo.js'
 export { geocodeTools, OpenCageGeocoder, OPENCAGE_URL, parseOpenCage, type Geocoder, type Place, type PlaceFeatures } from './geocode.js'
 export {
   ADMIN_LEVEL_NAME,
@@ -50,6 +53,7 @@ export {
   type LayerFilter,
   type LayerStyle,
   type MapLayer,
+  type TileRaster,
   type UrlFormat,
 } from './mapLayers.js'
 export {
