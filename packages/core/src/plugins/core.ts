@@ -96,6 +96,15 @@ const move = defineOp({
   apply: (tx, rects) => tx.update(rects),
 })
 
+const rename = defineOp({
+  id: 'core.object.rename',
+  title: 'Rename',
+  description: "Rename the selected object: the name shown above it on the canvas. An empty name goes back to the object's own.",
+  target: { kind: 'objects', min: 1, max: 1 },
+  args: z.object({ name: z.string().max(80).describe('The new name') }),
+  apply: (tx, { name }, target) => tx.update({ [idsOf(target)[0]!]: { name: name.trim() } }),
+})
+
 const remove = defineOp({
   id: 'core.object.delete',
   title: 'Delete',
@@ -257,5 +266,5 @@ export const corePlugin = definePlugin({
   id: 'core',
   title: 'Core',
   objectTypes: [boxType, textType, stickyType],
-  ops: [setRect, move, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), ...viewOps],
+  ops: [setRect, move, rename, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), ...viewOps],
 })

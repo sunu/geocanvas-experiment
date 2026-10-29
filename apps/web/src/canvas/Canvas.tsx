@@ -638,7 +638,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       )}
 
       {single && objectUI(single.type)?.panel && (
-        <ObjectPanel runtime={runtime} chat={chat} object={single} info={objectUI(single.type)!.panel!(single)} onEdit={isFocusable(objectUI(single.type)) ? () => enterFocus(single.id) : undefined} />
+        <ObjectPanel runtime={runtime} chat={chat} object={single} info={objectUI(single.type)!.panel!(single)} onOpen={isFocusable(objectUI(single.type)) ? () => enterFocus(single.id) : undefined} />
       )}
 
       {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} camera={camera} />}

@@ -100,6 +100,25 @@ body,
   min-width: 0;
 }
 
+.ttx-obj__name > input {
+  box-sizing: border-box;
+  min-width: 4ch;
+  /* Its width follows the name (canvas/ObjectHeader.tsx). */
+  height: 22px;
+  padding: 0 6px;
+  border: 2px solid var(--canvas-accent);
+  border-radius: 4px;
+  outline: 0;
+  background: #fff;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.ttx-obj__name > input::selection {
+  background: var(--canvas-accent);
+  color: #fff;
+}
+
 .ttx-obj__name > span {
   overflow: hidden;
   text-overflow: ellipsis;
