@@ -25,7 +25,7 @@ describe('dropping on a report', () => {
     expect(reportUnder([note], board, new Set([note]))).toBeUndefined()
   })
 
-  it('asks about what was dragged, saying when a frame brings its contents', () => {
+  it('asks about what was dragged, saying when a frame brings all its contents', () => {
     const rt = setup()
     const board = rt.board as Board
     const note = add(rt, 'sticky')
@@ -34,7 +34,8 @@ describe('dropping on a report', () => {
     const r = add(rt, 'report')
     expect(dropQuestion(board, [note], 'Flood SitRep')).toBe('Add this object to Flood SitRep?')
     expect(dropQuestion(board, [note, map, r], 'Flood SitRep')).toBe('Add 2 objects to Flood SitRep?')
-    expect(dropQuestion(board, [frame], 'Untitled report')).toBe('Add this frame and what is in it to Untitled report?')
+    expect(dropQuestion(board, [frame], 'Untitled report')).toBe('Add this frame and all its contents to Untitled report?')
+    expect(dropQuestion(board, [frame, note], 'Flood SitRep')).toBe('Add 2 objects, including all frame contents, to Flood SitRep?')
   })
 
   it('puts the objects back and adds them in the drag\'s own undo step, as the canvas does on Add', () => {
