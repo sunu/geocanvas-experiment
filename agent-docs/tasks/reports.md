@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: planned, not started (design). Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: step 2 built (the headless `reports` plugin); step 1 (PDF spike) waits on approvals; the UI starts with step 3. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -85,7 +85,7 @@ A headless plugin, `reports`, in `packages/plugins`, with its UI in `apps/web/sr
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `paper` | `'a4' \| 'letter'` | Default to decide (§10). |
+| `paper` | `'a4' \| 'letter'` | Default A4 for now; the default is still open (§10). |
 | `orientation` | `'portrait' \| 'landscape'` | Default portrait. |
 | `blocks` | `Block[]` | The report's content, in reading order. |
 
@@ -200,13 +200,13 @@ All with zod schemas, so they are in ⌘K, are agent tools, and are in the MCP m
 | --- | --- | --- |
 | `report.add` | canvas | the type's fields, as every `<type>.add` |
 | `report.setPage` | one report | `paper`, `orientation` |
-| `report.addItems` | the selection | `reportId`, `mode` (default live). A frame in the selection adds a section (§4). |
-| `report.addBlock` | one report | `kind`, its content, `index` |
+| `report.addItems` | the selection | `reportId`, `index` (default: the end). Items are added live; freeze them afterwards with `report.setItemMode`. A frame adds a section (§4). Objects already in the report, and reports, are skipped. Maps and frames take the full width, other items one column. |
+| `report.addBlock` | one report | `block` (a heading with its level, text as plain `text` or a rich `doc`, an image, or a divider), `index`. Headings and dividers take the full width. |
 | `report.removeBlock` | one report | `blockId` |
 | `report.moveBlock` | one report | `blockId`, `index` |
 | `report.setSpan` | one report | `blockId`, `span` |
-| `report.setItemMode` | one report | `blockId`, `mode`, `frozen` (from the UI) |
-| `report.setText` | one report | `blockId`, the editor's JSON. A gesture op, hidden from tools. |
+| `report.setItemMode` | one report | `blockId`, `mode`, `frozen`. Texts, sticky notes, frames and areas are frozen by the op itself (`freezeText`); a map or a data widget needs `frozen` from the browser. |
+| `report.setText` | one report | `blockId`, and `text` for a heading or `doc` (the editor's JSON) for a text block. A gesture op, hidden from tools. |
 
 ## 7. PDF export
 
@@ -273,7 +273,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
 ## 9. Steps (one PR each)
 
 1. **PDF spike.** Compare the options (§7.4); record the results and the decision here.
-2. **`reports` plugin:** the type, blocks and ops (§3, §6), with `summarize`. Node tests:
+2. **`reports` plugin** (built: `packages/plugins/src/reports.ts`, tests in `packages/plugins/test/reports.test.ts`; the frame containment rule moved to `packages/core/src/frames.ts`): the type, blocks and ops (§3, §6), with `summarize`. Node tests:
    - each op, and one undo step for each
    - `report.addItems` from a selection, for several objects at once
    - a frame adds a heading and the objects inside it, in reading order, with nested frames
