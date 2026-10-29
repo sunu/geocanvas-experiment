@@ -5,6 +5,7 @@ import {
   CodeIcon,
   CursorIcon,
   FilePdfIcon,
+  FolderOpenIcon,
   FlowArrowIcon,
   HandIcon,
   ImageIcon,
@@ -20,7 +21,7 @@ import {
 } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Hint } from '@/components/Hint'
@@ -88,6 +89,8 @@ interface Props {
   onTool(tool: Tool): void
   /** PDFs chosen with the PDF button, to put in the middle of the view. */
   onFiles(files: File[]): void
+  /** Open the gallery of what was uploaded to this board before. */
+  onUploads(): void
 }
 
 /** A category of the toolbar, named for screen readers: its buttons in a row. */
@@ -171,7 +174,7 @@ function ToolGroup({ name, items, tool, onTool }: GroupProps) {
  * weight and a one-word name under each, the selected tool filled, each with a tooltip for its key. Arrange, delete and the command palette have no
  * button here: they are on the keys (], [, Delete, ⌘K).
  */
-export function Toolbar({ tool, onTool, onFiles }: Props) {
+export function Toolbar({ tool, onTool, onFiles, onUploads }: Props) {
   const pdfInput = useRef<HTMLInputElement>(null)
   const separator = <Separator orientation="vertical" className="data-[orientation=vertical]:h-8" />
   const button = ({ label, text, Icon, tool: type, key }: Item) => (
@@ -232,6 +235,11 @@ export function Toolbar({ tool, onTool, onFiles }: Props) {
               <DropdownMenuItem onSelect={() => pdfInput.current?.click()}>
                 <FilePdfIcon />
                 PDF
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem title="Files uploaded to this board, to put back or share" onSelect={onUploads}>
+                <FolderOpenIcon />
+                See previous uploads
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -78,7 +78,7 @@ function trackDrag(
  * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
  * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
  */
-export function Canvas({ runtime, awareness }: { runtime: Runtime; awareness: Awareness }) {
+export function Canvas({ runtime, awareness, onUploads }: { runtime: Runtime; awareness: Awareness; onUploads(): void }) {
   const board = runtime.board as Board
   const objects = useObjects(board)
   const peers = usePeers(awareness)
@@ -641,6 +641,7 @@ export function Canvas({ runtime, awareness }: { runtime: Runtime; awareness: Aw
         tool={tool}
         onTool={setTool}
         onFiles={(files) => placeFiles(runtime, files, viewCenter())}
+        onUploads={onUploads}
       />}
 
       {paletteOpen && (
