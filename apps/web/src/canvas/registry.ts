@@ -15,6 +15,14 @@ export interface ObjectViewProps<O extends BoardObject = BoardObject> {
   onFocus?(): void
 }
 
+/** The parts of the object panel that depend on the type. Its type's name is the badge, and its history gives Updated and Prompt. */
+export interface PanelInfo {
+  title: string
+  description?: string
+  /** Label and value rows under Metadata. */
+  metadata: [label: string, value: string][]
+}
+
 /** How the canvas shows one object type. Plugins' object types are headless; their UI registers here. */
 export interface ObjectUI<O extends BoardObject = BoardObject> {
   /** Content of the object's frame. */
@@ -31,6 +39,8 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
   widthOnly?: boolean
   /** Removed when editing ends with nothing in it. */
   isEmpty?(object: O): boolean
+  /** What the object panel (canvas/ObjectPanel.tsx) says about one of them when it is the only selection. A type without it has no panel. */
+  panel?(object: O): PanelInfo
 }
 
 /**

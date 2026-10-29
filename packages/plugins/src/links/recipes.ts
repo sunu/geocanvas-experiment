@@ -64,7 +64,12 @@ const list: Recipe[] = [
   {
     id: 'frameTitle',
     types: ['frame'],
-    render: (f, _node, args) => (f.name ? { set: { title: `${typeof args.prefix === 'string' ? args.prefix : ''}${f.name}` } } : { set: {}, clear: ['title'] }),
+    // Without a name, the prefix alone: "Situation report: " gives "Situation report".
+    render: (f, _node, args) => {
+      const prefix = typeof args.prefix === 'string' ? args.prefix : ''
+      const title = f.name ? `${prefix}${f.name}` : prefix.replace(/[\s:]+$/, '')
+      return title ? { set: { title } } : { set: {}, clear: ['title'] }
+    },
   },
 ]
 

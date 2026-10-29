@@ -85,9 +85,18 @@ export const newLayerId = () => `${Date.now().toString(36)}${Math.random().toStr
 /** The tool that reads an event's footprint from Montandon in the browser (apps/web/src/events/footprint.ts). */
 export const EVENT_FOOTPRINT_TOOL = 'events.footprint'
 
-/** A map layer for where an event happened: the recipe names the event, and each browser asks Montandon. */
-export function eventLayer(eventId: string, title?: string): MapLayer {
-  return { id: newLayerId(), tool: EVENT_FOOTPRINT_TOOL, input: { eventId }, title: title ?? `Event ${eventId}` }
+/**
+ * A map layer for where an event happened: the recipe names the event, and each browser asks Montandon. With a
+ * part (events.ts, `FootprintPart`), only one item's area or track, or only the points.
+ */
+export function eventLayer(eventId: string, title?: string, part?: { itemId?: string; points?: true; style?: LayerStyle }): MapLayer {
+  return {
+    id: newLayerId(),
+    tool: EVENT_FOOTPRINT_TOOL,
+    input: { eventId, ...(part?.itemId && { itemId: part.itemId }), ...(part?.points && { points: true }) },
+    title: title ?? `Event ${eventId}`,
+    ...(part?.style && { style: part.style }),
+  }
 }
 
 /** True when a layer works on an area, which can be reset to someone's view. */

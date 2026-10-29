@@ -76,15 +76,15 @@ export function ModelPicker() {
     <div ref={root}>
       <Button
         variant="ghost"
-        className="h-auto gap-1 px-2 py-1.5 text-xs font-normal text-muted-foreground"
+        className="h-auto gap-1 px-1.5 py-1 text-[11px] font-normal text-muted-foreground"
         title="Which model answers"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => (open ? close() : setOpen(true))}
       >
-        <current.Icon className="size-4" />
+        <current.Icon className="size-3.5" />
         <span className="mr-0.5">{label}</span>
-        <CaretDownIcon className="size-3" />
+        <CaretDownIcon className="size-2.5" />
       </Button>
       {/* Placed with CSS against the panel (the nearest positioned ancestor): beside it, bottom edges level. */}
       {open && (

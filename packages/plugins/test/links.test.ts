@@ -60,6 +60,16 @@ describe('links', () => {
     expect(rt.board.get(country) as CountryBoardObject).not.toHaveProperty('country')
   })
 
+  it('keep a name someone gave a follower, and the link, when the root changes', async () => {
+    const { rt, event, frame } = sitrep()
+    rt.dispatch('core.object.rename', { kind: 'objects', ids: [frame] }, { name: 'Our sitrep' })
+    await rt.invoke('event.setEvent', { kind: 'objects', ids: [event] }, { eventId: idai.id })
+    expect(rt.board.get(frame)).toMatchObject({ name: 'Our sitrep', title: 'Situation report: Cyclone Idai', link: { from: event } })
+    // An empty name goes back to the linked title.
+    rt.dispatch('core.object.rename', { kind: 'objects', ids: [frame] }, { name: '' })
+    expect(rt.board.get(frame)).toMatchObject({ name: '', title: 'Situation report: Cyclone Idai' })
+  })
+
   it('leave an unlinked object as it is', async () => {
     const { rt, event, country } = sitrep()
     expect(rt.dispatch('link.remove', { kind: 'objects', ids: [country] }, {}).status).toBe('applied')

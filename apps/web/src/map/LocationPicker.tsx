@@ -5,16 +5,15 @@ import type { Runtime } from '@ttx/core'
 import { askAgent, useAgentCanGeocode } from '../agent/ask'
 import { drawBox } from './draw'
 import { liveMap } from './live'
-import { areaAround, parseBbox, parseLatLon } from './location'
+import { areaAround, parseLatLon } from './location'
 
 /**
- * Where a map looks, for everyone: drag an area on the map, type a point or a bbox, or describe it to the agent.
+ * Where a map looks, for everyone: drag an area on the map, type a point, or describe it to the agent.
  * Each moves everyone's view through map.showArea; in focus that is on the draft, so others see it once shared.
  */
 export function LocationPicker({ runtime, mapId }: { runtime: Runtime; mapId: string }) {
   const [drawing, setDrawing] = useState<() => void>()
   const [point, setPoint] = useState('')
-  const [bbox, setBbox] = useState('')
   const [words, setWords] = useState('')
   const [asked, setAsked] = useState(false)
   const canAsk = useAgentCanGeocode()
@@ -38,7 +37,6 @@ export function LocationPicker({ runtime, mapId }: { runtime: Runtime; mapId: st
   }
 
   const typedPoint = parseLatLon(point)
-  const typedBbox = parseBbox(bbox)
 
   return (
     <section className="ttx-options__section">
@@ -56,17 +54,6 @@ export function LocationPicker({ runtime, mapId }: { runtime: Runtime; mapId: st
         >
           <input aria-label="Latitude, longitude" placeholder="lat, lon  e.g. -19.84, 34.84" value={point} onChange={(e) => setPoint(e.target.value)} aria-invalid={!!point.trim() && !typedPoint} />
           <button type="submit" disabled={!typedPoint}>
-            Go
-          </button>
-        </form>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (typedBbox) showArea(typedBbox)
-          }}
-        >
-          <input aria-label="Bounding box: west, south, east, north" placeholder="west, south, east, north" value={bbox} onChange={(e) => setBbox(e.target.value)} aria-invalid={!!bbox.trim() && !typedBbox} />
-          <button type="submit" disabled={!typedBbox}>
             Go
           </button>
         </form>

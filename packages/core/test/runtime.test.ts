@@ -214,6 +214,19 @@ describe('sync, undo and the op log', () => {
     expect(b.board.get(id)).toEqual(a.board.get(id))
   })
 
+  it('names the board for everyone, outside undo, and clears the name with an empty title', () => {
+    const { a, b } = pair()
+    expect(b.board.title).toBeUndefined()
+    a.beginGesture()
+    expect(a.dispatch('board.setTitle', canvas, { title: '  Nepal floods review ' }).status).toBe('applied')
+    expect(b.board.title).toBe('Nepal floods review')
+    a.undo()
+    expect(b.board.title).toBe('Nepal floods review')
+    expect(a.dispatch('board.setTitle', canvas, { title: 'x'.repeat(81) }).status).toBe('failed')
+    a.dispatch('board.setTitle', canvas, { title: '' })
+    expect(b.board.title).toBeUndefined()
+  })
+
   it('undoes only your own edits, one gesture at a time', () => {
     const { a, b } = pair()
     const id = addText(a)
@@ -327,6 +340,14 @@ describe('tools', () => {
       properties: { ids: { type: 'array', minItems: 1 }, args: { properties: { color: { enum: expect.arrayContaining(['red']), widget: 'color' } } } },
     })
     for (const t of tools) expect(JSON.parse(JSON.stringify(t))).toEqual(t)
+  })
+
+  it('lets an agent name the board, and gives the name first in the summary', async () => {
+    const rt = runtime()
+    await rt.callTool('pin__add', { args: { label: 'Clinic' } })
+    expect(summarizeBoard(rt.board, rt.registry)).toMatch(/^- pin /)
+    expect(await rt.callTool('board__setTitle', { args: { title: 'Clinics' } }, { kind: 'agent', id: 'helper' })).toMatchObject({ status: 'applied' })
+    expect(summarizeBoard(rt.board, rt.registry)).toMatch(/^Board: "Clinics"\n- pin /)
   })
 
   it('runs a tool call, and refuses hidden ops and high-risk ops from an agent', async () => {

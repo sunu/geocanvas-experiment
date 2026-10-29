@@ -75,7 +75,7 @@ export const event: SeedKind<string | { text: string }> = {
       label: `${e.name} (${id})`,
     }
   },
-  root: (f) => ({ type: 'event', fields: { eventId: f.eventId } }),
+  root: (f) => ({ type: 'event', fields: { ...(f.eventId && { eventId: f.eventId }) } }),
 }
 
 /** "my view": what the runner (for an agent: the person it acts for) last looked at on a map of this board. */

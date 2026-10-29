@@ -24,6 +24,16 @@ describe('events.footprint', () => {
     expect(fc.attribution).toBe('IFRC Montandon')
   })
 
+  it('gives one part: an item, or the points', async () => {
+    const point = { type: 'Feature' as const, geometry: { type: 'Point', coordinates: [85.3, 28.1] }, properties: { id: 'gdacs-event-1', kind: 'event' as const, source: 'gdacs' } }
+    const tools = runner({ 'gdacs-event-1': { ...extent, features: [...extent.features, point] } })
+    const item = await tools.run<EventFootprint>('events.footprint', { eventId: 'gdacs-event-1', itemId: 'gdacs-hazard-1' })
+    expect(item.features).toEqual(extent.features)
+    const points = await tools.run<EventFootprint>('events.footprint', { eventId: 'gdacs-event-1', points: true })
+    expect(points.features).toEqual([point])
+    await expect(tools.run('events.footprint', { eventId: 'gdacs-event-1', itemId: 'cems-hazard-gone' })).rejects.toThrow(/no longer has cems-hazard-gone/)
+  })
+
   it('says so when Montandon has no location for the event, or does not know it', async () => {
     const tools = runner({ 'gdacs-event-2': { type: 'FeatureCollection', features: [] } })
     await expect(tools.run('events.footprint', { eventId: 'gdacs-event-2' })).rejects.toThrow(/no location/)

@@ -40,8 +40,10 @@ describe('frames', () => {
     const rt = setup()
     const id = rt.dispatch('frame.add', canvas, { x: 0, y: 0, title: 'Sit rep' }).created![0]!
     expect(rt.board.get(id)).toMatchObject({ type: 'frame', w: 800, h: 600, title: 'Sit rep' })
-    expect(rt.dispatch('frame.setTitle', { kind: 'objects', ids: [id] }, { title: 'Nepal' }).status).toBe('applied')
-    expect(summarizeBoard(rt.board, rt.registry)).toContain(`frame ${id} at (0, 0) size 800×600: "Nepal"`)
+    // A rename is the object's name, beside its title: a link writes only the title.
+    expect(rt.dispatch('core.object.rename', { kind: 'objects', ids: [id] }, { name: 'Nepal' }).status).toBe('applied')
+    expect(rt.board.get(id)).toMatchObject({ title: 'Sit rep', name: 'Nepal' })
+    expect(summarizeBoard(rt.board, rt.registry)).toContain(`frame ${id} named "Nepal" at (0, 0) size 800×600: "Sit rep"`)
   })
 })
 

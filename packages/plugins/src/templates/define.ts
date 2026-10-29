@@ -72,12 +72,15 @@ interface Plan {
 const isRoot = (n: TemplateNode): n is RootNode => 'root' in n
 
 export function defineTemplate(def: TemplateDef): OpDef<any, Plan> {
-  const seeds = Object.fromEntries(Object.entries(def.seeds).map(([k, s]) => [k, s.kind.schema.describe(s.label)]))
+  const seeds = Object.fromEntries(Object.entries(def.seeds).map(([k, s]) => [k, s.kind.schema.optional().describe(s.label)]))
   const firstSeed = Object.keys(def.seeds)[0]!
   return defineOp({
     id: `${TEMPLATE_OP_PREFIX}${def.id}`,
     title: def.title,
-    description: `${def.description} Each seed takes text to look up (best match), e.g. { "text": "…" }. Its objects follow the seed's root object: change the root later and they update.`,
+    description:
+      `${def.description} Each seed takes text to look up (best match), e.g. { "text": "…" }. ` +
+      "Its objects follow the seed's root object: change the root later and they update. " +
+      'Leave a seed out only when asked to: its root and the objects that follow it are then added empty, to fill in on the board.',
     target: { kind: 'canvas' },
     args: z.object({
       ...seeds,
@@ -89,7 +92,14 @@ export function defineTemplate(def: TemplateDef): OpDef<any, Plan> {
       const labels: string[] = []
       const roots: Record<string, Planned> = {}
       for (const [key, seed] of Object.entries(def.seeds)) {
-        const r = await seed.kind.resolve(ctx, (args as Record<string, unknown>)[key])
+        const value = (args as Record<string, unknown>)[key]
+        // A seed left out gives an empty root (an event card to pick an event in), and its followers stay blank.
+        if (value === undefined) {
+          roots[key] = { id: crypto.randomUUID(), ...seed.kind.root({}) }
+          labels.push(`no ${seed.label.toLowerCase()} yet`)
+          continue
+        }
+        const r = await seed.kind.resolve(ctx, value)
         const own = await complete(ctx, r.facts)
         roots[key] = { id: crypto.randomUUID(), ...seed.kind.root(own) }
         // Facts already known win: the first seed's.

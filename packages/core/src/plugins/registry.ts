@@ -14,13 +14,14 @@ export const linkSchema = z.object({
 })
 export type Link = z.infer<typeof linkSchema>
 
-/** Fields that every object has, beside its type's own fields: placement, and a link when it follows another. */
+/** Fields that every object has, beside its type's own fields: placement, its name, and a link when it follows another. */
 const placement = z.object({
   x: z.number(),
   y: z.number(),
   w: z.number().positive(),
   h: z.number().positive(),
   z: z.number(),
+  name: z.string().max(80).optional(),
   link: linkSchema.optional(),
 })
 

@@ -64,7 +64,7 @@ export const frameType: ObjectTypeDef = {
   type: 'frame',
   title: 'Frame',
   description: 'A frame that holds other objects together: moving it moves the objects inside it. It has a title above it.',
-  fields: z.object({ title: z.string().optional().describe('The title above the frame') }),
+  fields: z.object({ title: z.string().optional().describe("The frame's own title, which a link may write. A name given with core.object.rename shows instead") }),
   defaultSize: { w: 800, h: 600 },
   layer: 'bottom',
   summarize: (o) => JSON.stringify((o as FrameObject).title ?? ''),
@@ -105,6 +105,15 @@ const move = defineOp({
       return [id, { x: o.x + dx, y: o.y + dy }]
     })),
   apply: (tx, rects) => tx.update(rects),
+})
+
+const rename = defineOp({
+  id: 'core.object.rename',
+  title: 'Rename',
+  description: "Rename the selected object: the name shown above it on the canvas. An empty name goes back to the object's own.",
+  target: { kind: 'objects', min: 1, max: 1 },
+  args: z.object({ name: z.string().max(80).describe('The new name') }),
+  apply: (tx, { name }, target) => tx.update({ [idsOf(target)[0]!]: { name: name.trim() } }),
 })
 
 const remove = defineOp({
@@ -199,16 +208,6 @@ const setText = defineOp({
   apply: (tx, { text }, target) => tx.update({ [idsOf(target)[0]!]: { text } }),
 })
 
-const setFrameTitle = defineOp({
-  id: 'frame.setTitle',
-  title: 'Rename frame',
-  description: 'Set the title of the selected frame.',
-  target: { kind: 'objects', types: ['frame'], max: 1 },
-  args: z.object({ title: z.string().describe('Title') }),
-  defaults: (ctx) => ({ title: (ctx.board.get(idsOf(ctx.target)[0] ?? '') as FrameObject | undefined)?.title ?? '' }),
-  apply: (tx, { title }, target) => tx.update({ [idsOf(target)[0]!]: { title } }),
-})
-
 const setFontSize = defineOp({
   id: 'text.setFontSize',
   title: 'Set text size',
@@ -238,6 +237,16 @@ const stepSize = (dir: 1 | -1) =>
     },
     apply: (tx, sizes) => tx.update(sizes),
   })
+
+const setTitle = defineOp({
+  id: 'board.setTitle',
+  title: 'Rename board',
+  description: 'Set the name of the board, for everyone. An empty name removes it. Undo does not cover it.',
+  target: { kind: 'canvas' },
+  args: z.object({ title: z.string().trim().max(80).describe('Board name') }),
+  nl: { aliases: ['name board', 'title board'] },
+  apply: (tx, { title }) => tx.setTitle(title),
+})
 
 const viewOps = [
   defineOp({
@@ -278,5 +287,5 @@ export const corePlugin = definePlugin({
   id: 'core',
   title: 'Core',
   objectTypes: [boxType, textType, stickyType, frameType],
-  ops: [setRect, move, remove, duplicate, ...layerOps, setColor, setText, setFrameTitle, setFontSize, stepSize(1), stepSize(-1), ...viewOps],
+  ops: [setRect, move, rename, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), setTitle, ...viewOps],
 })

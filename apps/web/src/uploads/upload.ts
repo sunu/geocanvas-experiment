@@ -5,10 +5,27 @@ export const typesOf = (kind: UploadKind) => Object.keys(UPLOAD_TYPES).filter((t
 
 export const maxMb = (kind: UploadKind) => MAX_UPLOAD_BYTES[kind] / 1024 / 1024
 
+const KIND_NAMES: Record<UploadKind, string> = { media: 'PNG, JPEG, GIF and WebP images', document: 'PDFs', data: 'GeoJSON, GeoParquet and zipped shapefiles' }
+
+/** Browsers often give map data no type, or another one (.geojson as ''), so its type comes from the name. */
+const DATA_EXTENSIONS: Record<string, string> = {
+  geojson: 'application/geo+json',
+  json: 'application/geo+json',
+  parquet: 'application/vnd.apache.parquet',
+  geoparquet: 'application/vnd.apache.parquet',
+  zip: 'application/zip',
+}
+
+/** A file's type, one of UPLOAD_TYPES when the board keeps it. The room reads it again from the bytes. */
+export function uploadType(file: File): string {
+  if (UPLOAD_TYPES[file.type]) return file.type
+  return DATA_EXTENSIONS[file.name.split('.').pop()?.toLowerCase() ?? ''] ?? file.type
+}
+
 /** Why a file cannot be uploaded (its type or size), checked before sending it; undefined if it can. */
-export function refusal(file: File): string | undefined {
-  const kind = UPLOAD_TYPES[file.type]
-  if (!kind) return 'Only PNG, JPEG, GIF and WebP images and PDFs can be added'
+export function refusal(file: File, kinds: UploadKind[] = Object.keys(MAX_UPLOAD_BYTES) as UploadKind[]): string | undefined {
+  const kind = UPLOAD_TYPES[uploadType(file)]
+  if (!kind || !kinds.includes(kind)) return `Only ${kinds.map((k) => KIND_NAMES[k]).join(', ')} can be added`
   if (file.size > MAX_UPLOAD_BYTES[kind]) return `This file can be at most ${maxMb(kind)} MB; it is ${(file.size / 1024 / 1024).toFixed(1)} MB`
   return undefined
 }
@@ -24,7 +41,7 @@ export function uploadFile(file: File, room: string, person: string, onProgress?
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `/uploads?${new URLSearchParams({ room, name: file.name })}`)
-    xhr.setRequestHeader('content-type', file.type)
+    xhr.setRequestHeader('content-type', uploadType(file))
     xhr.setRequestHeader('x-ttx-person', person)
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total)
     xhr.onload = () => {

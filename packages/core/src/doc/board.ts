@@ -20,6 +20,8 @@ export interface Placed {
   z: number
   /** Set when it follows another object (plugins/registry.ts). */
   link?: { from: string; recipe: string; args?: Record<string, unknown> }
+  /** The name shown above a widget on the canvas. Absent or '': the widget's own (an update cannot clear a field, so '' means none). */
+  name?: string
 }
 
 /** Any object. The fields beside the placement come from its type (plugins/types.ts). */
@@ -31,12 +33,15 @@ export const readObject = <O extends AnyObject>(id: string, m: Y.Map<unknown>): 
 export class Board<O extends AnyObject = AnyObject> {
   readonly doc: Y.Doc
   readonly objects: Y.Map<Y.Map<unknown>>
+  /** Fields of the board itself, such as its title. Not undone: the UndoManager tracks `objects` only. */
+  readonly meta: Y.Map<unknown>
   private cached: O[] | null = null
   private listeners = new Set<() => void>()
 
   constructor(doc: Y.Doc) {
     this.doc = doc
     this.objects = doc.getMap('objects')
+    this.meta = doc.getMap('meta')
     // Observe from the start, so changes that arrive before the UI subscribes are not missed.
     this.objects.observeDeep(() => {
       this.cached = null
@@ -65,5 +70,11 @@ export class Board<O extends AnyObject = AnyObject> {
   get(id: string): O | undefined {
     const m = this.objects.get(id)
     return m && readObject<O>(id, m)
+  }
+
+  /** The board's name, shared with everyone on it. Undefined until someone names it. */
+  get title(): string | undefined {
+    const t = this.meta.get('title')
+    return typeof t === 'string' && t ? t : undefined
   }
 }

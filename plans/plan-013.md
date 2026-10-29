@@ -24,7 +24,7 @@ In phase 1, a template fills its nodes one time. To use another event, you must 
 
 ### 3.1 Frame (core)
 
-- Type `frame` in the core plugin (`packages/core/src/plugins/core.ts`). Field `title?`. Layer `bottom`. Default size 800×600. Ops `frame.add` and `frame.setTitle`.
+- Type `frame` in the core plugin (`packages/core/src/plugins/core.ts`). Field `title?`. Layer `bottom`. Default size 800×600. Op `frame.add`. Renaming a frame sets its `name` with `core.object.rename` (from main), not `title`, so the `frameTitle` link keeps writing `title` and a name someone gave wins.
 - View (`apps/web/src/canvas/coreUI.tsx`): a light fill (`--ttx-frame-fill`), with the title in the label row above it. Tool key **A**, in the Board section of the toolbar.
 - A drag moves the objects that are fully in a moved frame (`withFramed` in `apps/web/src/canvas/camera.ts`). Frames in the frame, and their contents, move too. The canvas finds the objects from their positions when the drag starts. Thus, a frame keeps no list of members, and this list cannot become incorrect between persons. The drag is one `core.object.setRect` gesture, so it is one undo step.
 
