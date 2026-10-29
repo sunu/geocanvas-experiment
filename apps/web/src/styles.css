@@ -6,7 +6,8 @@
   --ttx-panel: #ffffff;
   --ttx-border: rgb(0 0 0 / 0.12);
   --ttx-accent: #2563eb;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ttx-font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--ttx-font);
   color: var(--ttx-ink);
 }
 
@@ -24,7 +25,12 @@ body,
   inset: 0;
   overflow: hidden;
   background-color: var(--ttx-bg);
-  background-image: radial-gradient(circle, var(--ttx-grid) 1px, transparent 1px);
+  /* --ttx-dots (0 to 1) is the dots' opacity and --ttx-dot-r their radius in px, both from the zoom (Canvas.tsx). */
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--ttx-grid) calc(var(--ttx-dots, 1) * 100%), transparent) calc(var(--ttx-dot-r, 1) * 1px),
+    transparent calc(var(--ttx-dot-r, 1) * 1px)
+  );
   touch-action: none;
   user-select: none;
   cursor: default;
@@ -52,13 +58,117 @@ body,
   box-sizing: border-box;
 }
 
+/*
+ * The name row above a widget, as Figma labels a frame (canvas/ObjectHeader.tsx): its icon and name, which is where it
+ * is grabbed and identified, and its actions, shown on hover or selection. It lives inside the world, so it is scaled
+ * back by the zoom to keep its size on screen, and widened by it to keep the object's width.
+ */
+.ttx-obj__label {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: calc(100% * var(--ttx-zoom, 1));
+  height: 24px;
+  padding-bottom: 4px;
+  transform: scale(calc(1 / var(--ttx-zoom, 1)));
+  transform-origin: 0 100%;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Boxes, texts and sticky notes have no name: no row, so no hit area above them. */
+.ttx-obj__label:empty {
+  display: none;
+}
+
+.ttx-obj.is-selected .ttx-obj__label {
+  color: var(--canvas-accent);
+}
+
+.ttx-obj__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ttx-obj__name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ttx-obj__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+
+.ttx-obj:hover .ttx-obj__actions,
+.ttx-obj.is-selected .ttx-obj__actions,
+.ttx-obj.is-editing .ttx-obj__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ttx-obj__actions button,
+.ttx-obj__actions a {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ttx-obj__actions button:hover:not(:disabled),
+.ttx-obj__actions a:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+/* In focus mode the object fills the screen: its row goes inside, at the top, as a bar. */
+.ttx-obj.is-focused {
+  padding-top: 32px;
+}
+
+.ttx-obj.is-focused .ttx-obj__label {
+  top: 0;
+  bottom: auto;
+  z-index: 1;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  transform: none;
+  border-bottom: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+}
+
+.ttx-obj.is-focused .ttx-obj__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* Fill and border color come from the object's color (canvas/style.ts). */
 .ttx-box {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
   border: 2px solid;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 /* Fill color comes from the note's color; its text is always dark (objects/sticky.tsx). */
@@ -67,12 +177,8 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  /* Like a paper note: no outline, a darker lip along the bottom edge, and a soft cast shadow. */
-  box-shadow:
-    inset 0 -4px 0 rgb(0 0 0 / 0.08),
-    0 1px 2px rgb(0 0 0 / 0.2),
-    0 8px 18px rgb(0 0 0 / 0.2);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Flat, like everything on the canvas: its color is its edge. */
+  font-family: var(--ttx-font);
   font-weight: 300;
   line-height: 1.3;
 }
@@ -106,7 +212,7 @@ body,
   height: 100%;
   padding: 8px;
   border: 1px dashed var(--ttx-border);
-  border-radius: 6px;
+  border-radius: 0;
   color: var(--ttx-muted);
   font-size: 12px;
 }
@@ -114,7 +220,7 @@ body,
 /* Font size and color come from the object. The plain div sets the height; the editor sits over it. */
 .ttx-text-wrap {
   position: relative;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--ttx-font);
   line-height: 1.4;
 }
 
@@ -145,7 +251,7 @@ body,
 .ttx-draft {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px dashed var(--ttx-accent);
+  border: 1.5px dashed var(--canvas-accent);
 }
 
 /*
@@ -168,12 +274,12 @@ body,
 }
 
 .ttx-selection {
-  border: 1.5px solid var(--ttx-accent);
+  border: 1.5px solid var(--canvas-accent);
 }
 
 .ttx-marquee {
-  border: 1px solid var(--ttx-accent);
-  background: rgb(37 99 235 / 0.08);
+  border: 1px solid var(--canvas-accent);
+  background: color-mix(in srgb, var(--canvas-accent) 8%, transparent);
 }
 
 .ttx-handle {
@@ -182,7 +288,7 @@ body,
   height: 10px;
   margin: -5px 0 0 -5px;
   box-sizing: border-box;
-  border: 1.5px solid var(--ttx-accent);
+  border: 1.5px solid var(--canvas-accent);
   border-radius: 2px;
   background: #fff;
   pointer-events: auto;
@@ -198,12 +304,47 @@ body,
   cursor: nesw-resize;
 }
 
-/* Other people: their cursors and selections, in their color (canvas/Peers.tsx). */
+/* Other people and the agent: selections, cursors and name tags in their color (canvas/Peers.tsx, board/collaborators.ts). */
 .ttx-peer-selection {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px dashed;
-  border-radius: 2px;
+  border: 1.5px solid;
+}
+
+/* The agent's marks are dashed, so they do not depend on color alone. */
+.ttx-peer-selection.is-agent {
+  border-style: dashed;
+}
+
+/* Corner marks, as the handles of the Figma file. They are not draggable: only your own selection is. */
+.ttx-peer-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  border: 1.5px solid;
+  border-radius: 1px;
+  background: #fff;
+}
+
+.ttx-peer-handle--nw {
+  left: -5px;
+  top: -5px;
+}
+
+.ttx-peer-handle--ne {
+  right: -5px;
+  top: -5px;
+}
+
+.ttx-peer-handle--sw {
+  left: -5px;
+  bottom: -5px;
+}
+
+.ttx-peer-handle--se {
+  right: -5px;
+  bottom: -5px;
 }
 
 .ttx-cursor {
@@ -220,33 +361,19 @@ body,
 
 .ttx-cursor__name {
   position: absolute;
-  left: 12px;
-  top: 16px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 11px;
+  left: 14px;
+  top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
   line-height: 16px;
   white-space: nowrap;
 }
 
-/* --- Style panel (left; shown for selected boxes and texts) ------------- */
-
-.ttx-style {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 6px;
-  border-radius: 10px;
-  background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.08);
-  z-index: 1000002;
-}
+/* The color swatches of the palette's color field (canvas/coreUI.tsx). */
 
 .ttx-swatch {
   width: 22px;
@@ -261,45 +388,6 @@ body,
   box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 4px var(--ttx-accent);
 }
 
-.ttx-style__label {
-  color: var(--ttx-muted);
-}
-
-.ttx-style button:not(.ttx-swatch) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ttx-ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.ttx-style button:not(.ttx-swatch):hover {
-  background: rgb(0 0 0 / 0.06);
-}
-
-.ttx-style__sep {
-  width: 20px;
-  height: 1px;
-  margin: 2px 0;
-  background: var(--ttx-border);
-}
-
-.ttx-style__size {
-  font-size: 12px;
-  color: var(--ttx-muted);
-}
-
-/* --- Board actions (top left; outside the canvas, so clicks never reach it) --- */
-
 /* --- Map ---------------------------------------------------------------- */
 
 .ttx-map {
@@ -307,28 +395,11 @@ body,
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
-}
-
-.ttx-map__header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-map__title {
-  font-weight: 600;
-}
-
-.ttx-map__header .ttx-focusbtn {
-  margin-left: auto;
 }
 
 .ttx-map__body {
@@ -366,24 +437,11 @@ body,
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
-}
-
-.ttx-event__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-event__title {
-  font-weight: 600;
 }
 
 .ttx-event__body {
@@ -719,6 +777,46 @@ body,
 
 /* --- Agent chat (right; outside the canvas, so clicks never reach it) ---- */
 
+/* The Uploads panel (uploads/UploadsPanel.tsx) takes the top-right corner, in the place of the user menu. */
+.ttx-chat {
+  position: fixed;
+  right: 8px;
+  top: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100% - 16px));
+  border-radius: 10px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.08);
+  font-size: 13px;
+  z-index: 1000003;
+}
+
+.ttx-chat__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 10px 14px;
+  border-bottom: 1px solid var(--ttx-border);
+  font-weight: 600;
+}
+
+.ttx-chat__close {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  cursor: pointer;
+}
+
+.ttx-chat__close:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
 .ttx-chat__list {
   flex: 1;
   min-height: 0;
@@ -746,7 +844,7 @@ body,
 }
 
 .ttx-chat__entry--agent .ttx-chat__who {
-  color: #7c3aed;
+  color: var(--agent);
 }
 
 .ttx-chat__chip {
@@ -1251,38 +1349,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
-}
-
-.ttx-notebook__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-notebook__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.ttx-notebook__header a {
-  display: inline-flex;
-  color: var(--ttx-muted);
-}
-
-.ttx-notebook__header a:hover {
-  color: var(--ttx-ink);
 }
 
 .ttx-notebook__views {
@@ -1548,7 +1619,7 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   gap: 10px;
   padding: 16px;
   border: 1.5px dashed var(--ttx-accent);
-  border-radius: 8px;
+  border-radius: 0;
   background: color-mix(in srgb, var(--ttx-panel) 85%, var(--ttx-accent));
   color: var(--ttx-ink);
   font-size: 13px;
@@ -1625,50 +1696,16 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
-}
-
-.ttx-pdf__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  box-sizing: border-box;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-pdf__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
 }
 
 .ttx-pdf__count {
   flex: none;
   color: var(--ttx-muted);
-}
-
-.ttx-pdf__header > button,
-.ttx-pdf__header > a {
-  display: inline-flex;
-  padding: 2px;
-  border: 0;
-  background: transparent;
-  color: var(--ttx-muted);
-  cursor: pointer;
-}
-
-.ttx-pdf__header > button:hover,
-.ttx-pdf__header > a:hover {
-  color: var(--ttx-ink);
 }
 
 .ttx-pdf__body {
@@ -1703,7 +1740,7 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
 .ttx-pdf__slot {
   margin: 0 auto 16px;
   background: #fff;
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  box-shadow: 0 0 0 1px var(--ttx-border);
 }
 
 .ttx-pdfopts__pager {
@@ -1766,45 +1803,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
-}
-
-.ttx-image__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  box-sizing: border-box;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-image__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.ttx-image__header button,
-.ttx-image__header a {
-  display: inline-flex;
-  padding: 2px;
-  border: 0;
-  background: transparent;
-  color: var(--ttx-muted);
-  cursor: pointer;
-}
-
-.ttx-image__header button:hover,
-.ttx-image__header a:hover {
-  color: var(--ttx-ink);
 }
 
 .ttx-image__body {
@@ -1973,46 +1976,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
-}
-
-.ttx-relief__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-relief__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.ttx-relief__header button,
-.ttx-relief__header a {
-  display: inline-flex;
-  padding: 2px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--ttx-muted);
-  cursor: pointer;
-}
-
-.ttx-relief__header button:hover:not(:disabled),
-.ttx-relief__header a:hover {
-  color: var(--ttx-ink);
-  background: rgb(0 0 0 / 0.05);
 }
 
 .ttx-relief__list {
@@ -2091,24 +2059,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
-}
-
-.ttx-country__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-country__title {
-  font-weight: 600;
 }
 
 .ttx-country__body {

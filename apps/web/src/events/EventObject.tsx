@@ -8,6 +8,7 @@ import { overviewOf } from '@ttx/plugins/monty/search'
 import { sourceLabel } from '@ttx/plugins/monty/sources'
 import { feedFor, glidesOf, type EventBoardObject } from '@ttx/plugins'
 import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from '@ttx/plugins/monty/types'
+import { ObjectHeader } from '../canvas/ObjectHeader'
 
 /** Phosphor has no earthquake symbol; a seismograph pulse stands in (see AGENTS.md on hazard icons). */
 const TYPE_ICON: Record<DisasterType, Icon> = { cyclone: HurricaneIcon, flood: WavesIcon, earthquake: PulseIcon, drought: SunIcon }
@@ -67,10 +68,7 @@ export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewP
 
   return (
     <div className="ttx-event">
-      <div className="ttx-event__header">
-        <WarningIcon size={14} aria-hidden />
-        <span className="ttx-event__title">Event</span>
-      </div>
+      <ObjectHeader icon={<WarningIcon size={14} aria-hidden />} title="Event" />
       <div ref={bodyRef} className="ttx-event__body">
         {editing ? (
           <EventPicker selected={o.eventId} onPick={pick} />

@@ -13,7 +13,7 @@ const BRIDGE_LABEL = { connecting: 'Connecting to the MCP companion…', connect
 export function UserMenu({ actor, awareness, bridge, onUploads }: { actor: Actor; awareness: Awareness; bridge: ReturnType<typeof useBridgeStatus>; onUploads: () => void }) {
   const name = usePersonName(actor, awareness)
   return (
-    <div className="ttx-ui ttx-shell fixed top-4 right-4 z-[1000002] flex items-center gap-2 rounded-xl border bg-card p-3 font-sans shadow-sm">
+    <div className="ttx-ui ttx-shell fixed top-2 right-2 z-[1000002] flex items-center gap-2 rounded-xl border bg-card p-3 font-sans shadow-sm">
       {bridge !== 'off' && (
         <span
           className={bridge === 'connected' ? 'text-teal-700' : 'text-muted-foreground'}

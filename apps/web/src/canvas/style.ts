@@ -6,14 +6,17 @@ import type { ColorName } from '@ttx/core'
 
 export { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STICKY_COLOR, DEFAULT_TEXT_COLOR, FONT_SIZES, stepFontSize, type ColorName } from '@ttx/core'
 
+/** The shadcn color primitives, which are Tailwind's palette (the --color-* variables in shadcn.css). */
+const c = (name: string, shade: number) => `var(--color-${name}-${shade})`
+
 /** ink: text and swatch color; fill and stroke: a box's background and border. */
 export const PALETTE: Record<ColorName, { ink: string; fill: string; stroke: string }> = {
-  ink: { ink: '#18181b', fill: '#e4e4e7', stroke: '#3f3f46' },
-  gray: { ink: '#71717a', fill: '#f4f4f5', stroke: '#a1a1aa' },
-  red: { ink: '#dc2626', fill: '#fee2e2', stroke: '#ef4444' },
-  orange: { ink: '#ea580c', fill: '#ffedd5', stroke: '#f97316' },
-  yellow: { ink: '#ca8a04', fill: '#fef9c3', stroke: '#eab308' },
-  green: { ink: '#16a34a', fill: '#dcfce7', stroke: '#22c55e' },
-  blue: { ink: '#2563eb', fill: '#dbeafe', stroke: '#3b82f6' },
-  purple: { ink: '#9333ea', fill: '#f3e8ff', stroke: '#a855f7' },
+  ink: { ink: c('neutral', 900), fill: c('neutral', 200), stroke: c('neutral', 700) },
+  gray: { ink: c('neutral', 500), fill: c('neutral', 100), stroke: c('neutral', 400) },
+  red: { ink: c('red', 500), fill: c('red', 100), stroke: c('red', 400) },
+  orange: { ink: c('orange', 500), fill: c('orange', 100), stroke: c('orange', 400) },
+  yellow: { ink: c('yellow', 500), fill: c('yellow', 100), stroke: c('yellow', 400) },
+  green: { ink: c('green', 500), fill: c('green', 100), stroke: c('green', 400) },
+  blue: { ink: c('blue', 500), fill: c('blue', 100), stroke: c('blue', 400) },
+  purple: { ink: c('purple', 500), fill: c('purple', 100), stroke: c('purple', 400) },
 }

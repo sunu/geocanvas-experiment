@@ -18,7 +18,7 @@ export function TitleBar({ onNewBoard }: { onNewBoard: () => void }) {
     })
   }
   return (
-    <div className="ttx-ui ttx-shell fixed top-4 left-4 z-[1000002] flex w-[360px] max-w-[calc(100%-2rem)] items-center justify-between rounded-xl border bg-card p-3 font-sans shadow-sm">
+    <div className="ttx-ui ttx-shell fixed top-2 left-2 z-[1000002] flex w-[360px] max-w-[calc(100%-1rem)] items-center justify-between rounded-xl border bg-card p-3 font-sans shadow-sm">
       <div className="flex items-center gap-1">
         <img src={logo} alt="" className="size-8" />
         <DropdownMenu>

@@ -11,6 +11,7 @@ import {
   NoteIcon,
   ScribbleLoopIcon,
   ShapesIcon,
+  TextTIcon,
   UploadSimpleIcon,
   type Icon,
 } from '@phosphor-icons/react'
@@ -33,9 +34,6 @@ export const tools = (): { tool: Tool; label: string; key: string; Icon: Icon }[
   ...toolTypes().map((t) => ({ tool: t.type, label: t.label, key: t.key, Icon: t.Icon })),
 ]
 
-/** Icon size (px) of the style panel. */
-export const ICON = 18
-
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
 
 interface Item {
@@ -55,6 +53,7 @@ const GROUPS: Item[][] = [
     { label: 'Select', Icon: CursorIcon, tool: 'select', key: 'V' },
     { label: 'Move', Icon: HandIcon, tool: 'hand', key: 'H' },
     { label: 'Add sticky note', Icon: NoteIcon, tool: 'sticky', key: 'S' },
+    { label: 'Add text', Icon: TextTIcon, tool: 'text', key: 'T' },
     { label: 'Draw', Icon: ScribbleLoopIcon },
     { label: 'Add shape', Icon: ShapesIcon, tool: 'box', key: 'R' },
     { label: 'Add connector', Icon: FlowArrowIcon },
@@ -91,9 +90,9 @@ function Hint({ label, keys, children }: { label: string; keys?: string; childre
 }
 
 /**
- * The Canvas Toolbar of the Figma file: a pill of 36px round buttons with Phosphor icons at the regular
- * weight, the selected tool filled, each with a tooltip. Arrange, delete, text and the command palette have no
- * button here: they are on the keys (], [, Delete, T, ⌘K).
+ * The Canvas Toolbar of the Figma file: a rounded-lg bar of 36px rounded-md buttons with Phosphor icons at the regular
+ * weight, the selected tool filled, each with a tooltip. Arrange, delete and the command palette have no
+ * button here: they are on the keys (], [, Delete, ⌘K).
  */
 export function Toolbar({ runtime, tool, onTool, zoom, onResetZoom, status }: Props) {
   const separator = <Separator orientation="vertical" className="data-[orientation=vertical]:h-5" />
@@ -103,8 +102,8 @@ export function Toolbar({ runtime, tool, onTool, zoom, onResetZoom, status }: Pr
       // A disabled button gets no pointer events, so its tooltip hangs on a wrapper.
       return (
         <Hint key={label} label={`${label} (coming soon)`}>
-          <span tabIndex={0} className="rounded-full">
-            <Button variant="ghost" size="icon" className="size-9 rounded-full" aria-label={label} disabled>
+          <span tabIndex={0} className="rounded-md">
+            <Button variant="ghost" size="icon" className="size-9 rounded-md" aria-label={label} disabled>
               <Icon className="size-5" />
             </Button>
           </span>
@@ -113,7 +112,7 @@ export function Toolbar({ runtime, tool, onTool, zoom, onResetZoom, status }: Pr
     }
     return (
       <Hint key={label} label={label} keys={key}>
-        <Button variant={tool === type ? 'default' : 'ghost'} size="icon" className="size-9 rounded-full" aria-label={label} aria-pressed={tool === type} onClick={() => onTool(type)}>
+        <Button variant={tool === type ? 'default' : 'ghost'} size="icon" className="size-9 rounded-md" aria-label={label} aria-pressed={tool === type} onClick={() => onTool(type)}>
           <Icon className="size-5" />
         </Button>
       </Hint>
@@ -121,7 +120,7 @@ export function Toolbar({ runtime, tool, onTool, zoom, onResetZoom, status }: Pr
   }
   const action = (label: string, Icon: Icon, keys: string, onClick: () => void) => (
     <Hint label={label} keys={keys}>
-      <Button variant="ghost" size="icon" className="size-9 rounded-full" aria-label={label} onClick={onClick}>
+      <Button variant="ghost" size="icon" className="size-9 rounded-md" aria-label={label} onClick={onClick}>
         <Icon className="size-5" />
       </Button>
     </Hint>
@@ -129,7 +128,7 @@ export function Toolbar({ runtime, tool, onTool, zoom, onResetZoom, status }: Pr
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
       <div
-        className="ttx-ui absolute bottom-4 left-1/2 z-[1000002] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full border bg-card p-1.5 font-sans shadow-[0_2px_2px_rgb(0_0_0/0.1),0_4px_3px_rgb(0_0_0/0.1)]"
+        className="ttx-ui absolute bottom-2 left-1/2 z-[1000002] flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border bg-card p-1.5 font-sans shadow-[0_2px_2px_rgb(0_0_0/0.1),0_4px_3px_rgb(0_0_0/0.1)]"
         onPointerDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >

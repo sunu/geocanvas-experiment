@@ -4,6 +4,7 @@ import type { ConflictBoardObject, CountryBoardObject, PresenceBoardObject } fro
 import { countryName } from '@ttx/plugins/monty/countries'
 import type { ObjectViewProps } from '../canvas/registry'
 import { loadCountries, type Country, type Source } from './api'
+import { ObjectHeader } from '../canvas/ObjectHeader'
 
 /** The board objects that show one country's HAPI data. */
 type CountryWidgetObject = CountryBoardObject | PresenceBoardObject | ConflictBoardObject
@@ -42,13 +43,10 @@ export function CountryWidget({ runtime, object: o, editing, onDone, title, Icon
 
   return (
     <div className="ttx-country">
-      <div className="ttx-country__header">
-        <Icon size={14} aria-hidden />
-        <span className="ttx-country__title">
-          {title}
-          {nameInHeader && o.country && ` · ${countryName(o.country) ?? o.country}`}
-        </span>
-      </div>
+      <ObjectHeader
+        icon={<Icon size={14} aria-hidden />}
+        title={`${title}${nameInHeader && o.country ? ` · ${countryName(o.country) ?? o.country}` : ''}`}
+      />
       <div ref={bodyRef} className="ttx-country__body">
         {editing ? (
           <CountryPicker selected={o.country} onPick={pick} />
