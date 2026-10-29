@@ -94,6 +94,11 @@ What it shows:
   once per page. If they cannot be read (more than 12 row groups), the building count stands and the panel says why.
 - **The flood polygons are indexed** in a 64 × 64 grid over their bounds (`Flood`): an uploaded flood extent can have
   thousands of polygons.
+- **A footprint comes into a scenario by source** (after PR #67 split footprints into a layer per source's area):
+  only the hazard areas up to 4 deg² are ticked as affected areas (`affectedByDefault`). For Nepal that is GDACS's
+  region and the 10 CEMS areas; EM-DAT's hazard area (all of Nepal), the IFRC and EM-DAT event areas and the points
+  come unticked. So routes no longer find every road in Nepal closed, and the count is 77,003 buildings, 51 health
+  facilities and 147 schools, with nothing left out.
 - **Facilities are drawn on live maps only**, as rose (health) and teal (education) dots; the legend line is on
   snapshots too.
 
@@ -112,8 +117,6 @@ buildings. Switching the what-if off gave 77,003 (the baseline) at once, from th
 
 ## Later
 
-- **Choosing areas within a footprint**: main now adds an event's footprint from the map menu as a layer per source's
-  area (PR #67), and splits a whole one. The Scenario panel's own "add a footprint" still adds it whole.
 
 - **People exposed**: sum WorldPop (already a COG layer, `data.population`) in the polygons, reading pixels rather
   than drawing them.

@@ -179,3 +179,13 @@ export function areasToCount(areas: NamedArea[]): { counted: GeoJSON.Geometry[];
   }
   return { counted, leftOut }
 }
+
+/**
+ * Whether a part of an event's footprint is taken as an affected area when it is added to a scenario: a hazard's area
+ * (a flood extent, an earthquake's area), not wider than MAX_AREA_DEG2. Not an area that only locates the event, a
+ * point, a track, or a whole country (EM-DAT's hazard areas can be one); people can tick those by hand.
+ */
+export function affectedByDefault(f: { geometry: { type: string }; properties: { kind: string } }): boolean {
+  const b = boundsOf(floodPolygons([f.geometry as unknown as GeoJSON.Geometry]))
+  return f.properties.kind === 'hazard' && !!b && (b[2] - b[0]) * (b[3] - b[1]) <= MAX_AREA_DEG2
+}

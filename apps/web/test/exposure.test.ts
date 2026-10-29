@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ToolRunner } from '@ttx/core'
-import { areasToCount, countBuildings, Flood, floodPolygons, noBuildings, rectMeetsFlood, type BuildingRow } from '../src/exposure/areas'
+import { affectedByDefault, areasToCount, countBuildings, Flood, floodPolygons, noBuildings, rectMeetsFlood, type BuildingRow } from '../src/exposure/areas'
 import { exposureTool, type BuildingSource, type FacilitySource } from '../src/exposure/exposure'
 import { appendFacilities, type FacilityFeature, type PoiRow } from '../src/data/layercake'
 import { rowGroupsInBbox, type RowGroupMeta } from '../src/data/wkb'
@@ -93,6 +93,16 @@ describe('areas to count', () => {
         { geometry: AREAS[2]!, label: 'A point' },
       ]),
     ).toEqual({ counted: [AREAS[0]], leftOut: ['EM-DAT Flash flood in Nepal'] })
+  })
+})
+
+describe("a footprint's affected areas by default", () => {
+  it('are the hazard areas up to a region, not areas that locate the event, points or a country', () => {
+    const hazard = (geometry: GeoJSON.Geometry) => ({ geometry, properties: { kind: 'hazard' } })
+    expect(affectedByDefault(hazard(AREAS[0]!))).toBe(true)
+    expect(affectedByDefault({ geometry: AREAS[0]!, properties: { kind: 'event' } })).toBe(false)
+    expect(affectedByDefault(hazard(AREAS[2]!))).toBe(false)
+    expect(affectedByDefault(hazard({ type: 'Polygon', coordinates: [square(80, 26.4, 8)] }))).toBe(false)
   })
 })
 
