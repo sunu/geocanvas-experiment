@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { defineTool } from '@ttx/core'
+import { defineTool, UPLOAD_ID, uploadUrl } from '@ttx/core'
+import { UPLOAD_FEATURES_TOOL } from '@ttx/plugins'
 import type { Raster } from '../map/raster'
 import type { Features } from './urlData'
 import type { UrlDataRequest, UrlDataResponse, UrlFeatureFormat } from './urlData.worker'
@@ -66,6 +67,21 @@ export function urlFeaturesTool(source: Pick<UrlFeatures, 'read'>) {
       const fc = await source.read(url, format, ctx.signal)
       return attribution ? { ...fc, attribution } : fc
     },
+  })
+}
+
+/**
+ * Features of a GeoJSON file uploaded to the board (map.addUploadLayer), read from the board's own origin, so no CORS
+ * is needed. The recipe keeps the file's id, not a host.
+ */
+export function uploadFeaturesTool(source: Pick<UrlFeatures, 'read'>) {
+  return defineTool({
+    id: UPLOAD_FEATURES_TOOL,
+    title: 'Uploaded features',
+    description: 'Features of a GeoJSON file uploaded to the board, by its id. At most 100,000 features (then truncated is true).',
+    input: z.object({ fileId: z.string().regex(UPLOAD_ID) }),
+    output: 'geo.features',
+    run: ({ fileId }, ctx) => source.read(new URL(uploadUrl(fileId), location.origin).href, 'geojson', ctx.signal),
   })
 }
 

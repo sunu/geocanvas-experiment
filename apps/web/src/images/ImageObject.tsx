@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { ArrowSquareOutIcon, ImageIcon, UploadSimpleIcon } from '@phosphor-icons/react'
-import { UPLOAD_TYPES, uploadUrl } from '@ttx/core'
+import { uploadUrl } from '@ttx/core'
 import type { ImageBoardObject } from '@ttx/plugins'
 import { roomFromHash } from '../board/room'
 import type { ObjectViewProps } from '../canvas/registry'
 import { CopyLinkButton } from '../uploads/CopyLinkButton'
-import { fileLink, frameHeight, maxMb, typesOf, uploadFile } from '../uploads/upload'
+import { fileLink, frameHeight, kindOf, maxMb, typesOf, uploadFile } from '../uploads/upload'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import { useReportLoading } from '../canvas/loading'
 
@@ -58,7 +58,7 @@ export function ImageObject({ runtime, object: o, editing, onDone }: ObjectViewP
   // Only a picture replaces this one; any other file falls through to the canvas, which places it on its own.
   const onDrop = (e: DragEvent) => {
     const file = e.dataTransfer.files[0]
-    if (!file || UPLOAD_TYPES[file.type] !== 'media') return
+    if (!file || kindOf(file) !== 'media') return
     e.preventDefault()
     void upload(file)
   }

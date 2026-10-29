@@ -19,6 +19,8 @@ import { registerLiveMap } from './live'
 import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
 import { useSnapshot } from './snapshots'
+import { setMapMode, useMapMode } from './mode'
+import { ScenarioOnMap, useScenario } from '../routing/ScenarioOnMap'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
 // build the worker (?worker&url) and point MapLibre at it. MapLibre 6 also draws right-to-left
@@ -103,8 +105,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
   useReportLoading(states.some((st) => st.loading))
-  // A forecast's caption (model, run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
-  const credits = [...new Set(states.flatMap((st) => [attributionOf(st.value), captionOf(st.value)]).filter((a) => !!a))].join(' · ')
+  const scenario = useScenario(o, layers, states)
+  // Routes are found on Overture's roads, whose license asks for attribution like a layer's. A forecast's caption (model,
+  // run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
+  const results = [...states.map((st) => st.value), ...scenario.routes.map((r) => r.result)]
+  const credits = [...new Set(results.flatMap((v) => [attributionOf(v), captionOf(v)]).filter((a) => !!a))].join(' · ')
+  /** In focus: Map mode (data, notes, drawings) or Scenario mode (routes, closures); the Options panel's tabs pick it. */
+  const mode = useMapMode(o.id)
   /** The latest states, for map events. */
   const statesRef = useRef(states)
   /** MapLibre layers can be added: the style has loaded, and no basemap change is under way. */
@@ -124,17 +131,29 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const shapes = useMemo(() => annotations.filter((a) => a.kind === 'shape'), [shapesKey])
   const shapesRef = useRef(shapes)
+  const scenarioRef = useRef(scenario.deck)
   const views = useMemo(() => new Views(runtime.board.doc), [runtime])
   const subscribeViews = useCallback((listener: () => void) => views.subscribe(listener), [views])
   const latest = useSyncExternalStore(subscribeViews, () => views.latest(o.id)?.view)
   const mine = useSyncExternalStore(subscribeViews, () => views.get(runtime.actor.id, o.id))
   /** Nobody has moved this map from the whole world, and it has no data or notes yet: a new map, which asks for its location. */
-  const unplaced = atStart(latest) && !layers.length && !annotations.length
+  const unplaced = atStart(latest) && !layers.length && !annotations.length && !o.scenario?.routes.length
   // The pool learns of editing and focus a render later, from the canvas; a map that has the pointer is live now.
   const live = useLiveMap(o.id) || editing || focused
   const view = mine ?? latest ?? WORLD
   const snapshot = useSnapshot(
-    live ? undefined : { view: { center: view.center, zoom: view.zoom, bearing: view.bearing }, width: o.w, height: o.h - MAP_HEADER_PX, basemap: o.basemap, layers, shapes },
+    live
+      ? undefined
+      : {
+          view: { center: view.center, zoom: view.zoom, bearing: view.bearing },
+          width: o.w,
+          height: o.h - MAP_HEADER_PX,
+          basemap: o.basemap,
+          layers,
+          shapes,
+          routes: scenario.routes,
+          closures: scenario.closures,
+        },
   )
 
   useEffect(() => {
@@ -156,7 +175,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     // deck.gl data layers go here. Overlay mode (its own canvas above the map), not interleaved:
     // deck.gl 9.4's interleaved mode throws on every frame with MapLibre 6. The cost is a second
     // WebGL context per map, and deck.gl layers draw above the map's labels.
-    const overlay = new MapboxOverlay({ interleaved: false, layers: [...deckLayers(statesRef.current), shapeLayer(shapesRef.current)] })
+    const overlay = new MapboxOverlay({ interleaved: false, layers: [...deckLayers(statesRef.current), shapeLayer(shapesRef.current), ...scenarioRef.current] })
     map.addControl(overlay as unknown as IControl)
     // The box changes size when resized, and in focus mode (a local size that is never stored).
     const resize = new ResizeObserver(() => map.resize())
@@ -193,9 +212,10 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
 
   // Leaving edit mode ends writing; leaving focus puts the drawing box's tool away, since it is a focus tool.
   useEffect(() => {
-    if (!focused) setTool(undefined)
+    if (!focused) setMapMode(o.id, 'map')
+    if (!focused || mode !== 'map') setTool(undefined)
     if (!editing) setWriting(undefined)
-  }, [editing, focused])
+  }, [editing, focused, mode, o.id])
 
   // Drawing a shape: the person draws it on the map, then it is added for everyone (in focus: on the draft).
   useEffect(() => {
@@ -320,11 +340,12 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Only when a layer or its result changed: new deck.gl layers make deck.gl redraw all their data, and the canvas
   // re-renders the map on every camera move.
   useEffect(() => {
-    overlayRef.current?.setProps({ layers: [...deckLayers(states), shapeLayer(shapes)] })
+    overlayRef.current?.setProps({ layers: [...deckLayers(states), shapeLayer(shapes), ...scenario.deck] })
     statesRef.current = states
     shapesRef.current = shapes
+    scenarioRef.current = scenario.deck
     if (mapRef.current && styleReadyRef.current) syncAdminLayers(mapRef.current, states)
-  }, [states, shapes])
+  }, [states, shapes, scenario.deck])
 
   useEffect(() => {
     if (styleRef.current === o.basemap) return
@@ -361,7 +382,8 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
           />
         )}
         {/* Notes and shapes are added in focus only; a double-click on the canvas lets the map pan, nothing more. */}
-        {focused && <DrawingBox tool={tool} color={shapeColor} onTool={setTool} onColor={setShapeColor} />}
+        {focused && mode === 'map' && <DrawingBox tool={tool} color={shapeColor} onTool={setTool} onColor={setShapeColor} />}
+        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} active={!!focused && mode === 'scenario'} />
         {!live && snapshot && (
           <>
             <img className="ttx-map__snapshot" src={snapshot} alt="" draggable={false} />
