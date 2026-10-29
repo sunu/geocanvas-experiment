@@ -13,6 +13,7 @@ import {
   NoteIcon,
   ScribbleLoopIcon,
   SquareIcon,
+  SquaresFourIcon,
   TextTIcon,
   UploadSimpleIcon,
   WarningIcon,
@@ -88,6 +89,8 @@ interface Props {
   onTool(tool: Tool): void
   /** PDFs chosen with the PDF button, to put in the middle of the view. */
   onFiles(files: File[]): void
+  /** The Templates button: the palette with templates only. */
+  onTemplates(): void
 }
 
 /** A category of the toolbar, named for screen readers: its buttons in a row. */
@@ -171,7 +174,7 @@ function ToolGroup({ name, items, tool, onTool }: GroupProps) {
  * weight and a one-word name under each, the selected tool filled, each with a tooltip for its key. Arrange, delete and the command palette have no
  * button here: they are on the keys (], [, Delete, ⌘K).
  */
-export function Toolbar({ tool, onTool, onFiles }: Props) {
+export function Toolbar({ tool, onTool, onFiles, onTemplates }: Props) {
   const pdfInput = useRef<HTMLInputElement>(null)
   const separator = <Separator orientation="vertical" className="data-[orientation=vertical]:h-8" />
   const button = ({ label, text, Icon, tool: type, key }: Item) => (
@@ -203,6 +206,12 @@ export function Toolbar({ tool, onTool, onFiles }: Props) {
         </Section>
         {separator}
         <Section name="Explore">
+          {/* An action, not a tool: it opens the palette's list of templates. */}
+          <Hint label="Insert a template, e.g. a situation report">
+            <Button variant="ghost" size="sm" className={BTN} aria-label="Insert a template" onClick={onTemplates}>
+              <Face Icon={SquaresFourIcon} text="Templates" />
+            </Button>
+          </Hint>
           {button(EVENT)}
           {EVENT_CONTEXT.map(button)}
           {MAP_AND_REPORT.map(button)}

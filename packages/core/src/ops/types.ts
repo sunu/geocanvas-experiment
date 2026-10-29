@@ -2,6 +2,7 @@ import type { z } from 'zod'
 import type { Board } from '../doc/board.js'
 import type { BoardTx } from '../doc/tx.js'
 import type { Registry } from '../plugins/registry.js'
+import type { ToolRunner } from '../tools/runner.js'
 
 export interface Actor {
   kind: 'user' | 'agent' | 'system'
@@ -25,6 +26,8 @@ export interface OpContext {
   actor: Actor
   target: TargetRef
   signal: AbortSignal
+  /** The read-only tools of this environment, for a prepare that needs data (e.g. a template's lookups). */
+  tools?: ToolRunner
 }
 
 /** This person's camera. The canvas implements it; view ops use it and write nothing to the board. */
@@ -86,6 +89,8 @@ export interface InvocationRecord {
   error?: string
   /** Ids of the objects the invocation added. */
   created?: string[]
+  /** What the op did, from its describePlan, e.g. which event a template's search found. */
+  summary?: string
 }
 
 export type OplogEntry =

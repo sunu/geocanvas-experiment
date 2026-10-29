@@ -163,6 +163,6 @@ export async function runTurn(
     // As the agent, for the person who asked: ops that act on "my" things (map.showArea) act on theirs.
     const record = await callOp(runtime, name, input, { actor: { ...runtime.actor, onBehalfOf: message.actor.id }, turn, center: message.center })
     calls.push({ tool: record.opId, ...(ids && { ids }), status: record.status, ...(record.error && { error: record.error }) })
-    return JSON.stringify({ status: record.status, error: record.error, created: record.created })
+    return JSON.stringify({ status: record.status, error: record.error, created: record.created, summary: record.summary })
   }
 }
