@@ -189,8 +189,9 @@ export const reportsPlugin = definePlugin({
       description:
         'A report: a document made from the board, with a page size and blocks (headings, text, images, and items that show objects of the board, live or frozen). Name it with core.object.rename.',
       fields: z.object({
-        paper: z.enum(PAPERS).default('a4').describe('Paper size'),
-        orientation: z.enum(ORIENTATIONS).default('portrait').describe('Orientation'),
+        // A new report starts on A4, portrait: forms fold these away, and report mode's Options panel changes them.
+        paper: z.enum(PAPERS).default('a4').meta({ advanced: true }).describe('Paper size'),
+        orientation: z.enum(ORIENTATIONS).default('portrait').meta({ advanced: true }).describe('Orientation'),
         blocks: z.array(block).default([]).meta({ advanced: true }).describe("The report's content, in reading order"),
         titleFrom: z.string().optional().meta({ advanced: true }).describe("A frame whose title is the report's title, until the report is renamed"),
       }),

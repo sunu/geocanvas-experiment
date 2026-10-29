@@ -17,6 +17,9 @@ describe('reports', () => {
     expect(report(rt, r)).toMatchObject({ paper: 'a4', orientation: 'portrait', blocks: [] })
     const summarize = rt.registry.objectType('report')!.summarize!
     expect(summarize(report(rt, r))).toBe('A4 portrait; empty')
+    // Forms fold the page away: a new report from the palette asks nothing, and its settings change the page.
+    const addArgs = (exportTools(rt.availableOps(canvas)).find((t) => t.name === 'report__add')!.input_schema as any).properties.args.properties
+    for (const k of ['paper', 'orientation', 'blocks', 'titleFrom']) expect(addArgs[k]).toMatchObject({ advanced: true })
     rt.dispatch('report.setPage', one(r), { paper: 'letter', orientation: 'landscape' })
     expect(report(rt, r)).toMatchObject({ paper: 'letter', orientation: 'landscape' })
   })

@@ -85,7 +85,7 @@ A headless plugin, `reports`, in `packages/plugins`, with its UI in `apps/web/sr
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `paper` | `'a4' \| 'letter'` | Default A4 for now; the default is still open (§10). |
+| `paper` | `'a4' \| 'letter'` | Default A4 for now; the default is still open (§10). A new report does not ask for it: forms fold the page away (`advanced`), and the Options panel changes it (`report.setPage`). |
 | `orientation` | `'portrait' \| 'landscape'` | Default portrait. |
 | `blocks` | `Block[]` | The report's content, in reading order. A flat list: nothing in a report is a container. |
 | `titleFrom` | object id, optional | The frame the report was made from (§4): its title is the report's title until the report is renamed. |
