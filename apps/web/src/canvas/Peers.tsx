@@ -4,17 +4,9 @@ import { isAgent, onColor } from '../board/collaborators'
 import type { Peer } from '../board/presence'
 import { toScreen, type Camera } from './camera'
 
-const CORNERS = ['nw', 'ne', 'sw', 'se'] as const
-
-/** An outline in someone's color with the four corner handles. Only yours (Canvas.tsx) can be dragged; these are marks. */
+/** An outline in someone's color. No handles: only your own selection has them, as only yours can be resized. */
 function Outline({ r, color, dashed }: { r: { x: number; y: number; w: number; h: number }; color: string; dashed?: boolean }) {
-  return (
-    <div className={`ttx-peer-selection ${dashed ? 'is-agent' : ''}`} style={{ left: r.x, top: r.y, width: r.w, height: r.h, borderColor: color }}>
-      {CORNERS.map((c) => (
-        <span key={c} className={`ttx-peer-handle ttx-peer-handle--${c}`} style={{ borderColor: color }} />
-      ))}
-    </div>
-  )
+  return <div className={`ttx-peer-selection ${dashed ? 'is-agent' : ''}`} style={{ left: r.x, top: r.y, width: r.w, height: r.h, borderColor: color }} />
 }
 
 /**

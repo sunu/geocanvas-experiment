@@ -9,8 +9,8 @@ pointers are, and where the agent has worked. Design source: the "Collaborator s
 
 | Role | Color | Outline | Marks |
 | --- | --- | --- | --- |
-| You | `--canvas-accent`, cyan-500 | solid 1.5 px | draggable corner handles; marquee and draw draft in the same color |
-| Another person | one of six, `board/collaborators.ts` | solid 1.5 px | decorative corner marks, cursor arrow, name tag |
+| You | `--canvas-accent`, cyan-500 | solid 1.5 px | corner handles (only yours); marquee and draw draft in the same color |
+| Another person | one of six, `board/collaborators.ts` | solid 1.5 px | cursor arrow and name tag; no handles |
 | The agent | `--agent`, violet-500 | dashed 1.5 px | sparkle in its tag, in the chat and on its avatar |
 
 - **Yours is cyan for everyone.** Each person sees their own selection in cyan, so the color that means "mine" is the
@@ -31,7 +31,8 @@ pointers are, and where the agent has worked. Design source: the "Collaborator s
 - Chrome colors (these) and content colors (the palette of boxes, text and sticky notes, `canvas/style.ts`) are
   separate: content can be any hue; selection and presence marks sit on top with their handles and tags.
 - A label on a person's color uses the text color that reads on it (`onColor`; the Figma file's `user-N-on`).
-- Only your own handles are interactive. Others' corner marks have no pointer events.
+- Only your own selection has handles; others' and the agent's outlines have none, so nothing looks draggable that is not.
+- Widgets have no border at rest: the outline appears only when someone selects them.
 - Other accents in the app (`--ttx-accent`: drop targets, buttons) are not part of this and stay as they are.
 
 ## Not done
