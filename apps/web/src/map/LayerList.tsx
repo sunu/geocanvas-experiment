@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { CrosshairSimpleIcon, SlidersHorizontalIcon, XIcon } from '@phosphor-icons/react'
-import { FILTER_OPS, hasArea, type FilterOp, type LayerFilter, type LayerStyle, type MapLayer } from '@ttx/plugins'
+import { ArrowsSplitIcon, CrosshairSimpleIcon, SlidersHorizontalIcon, XIcon } from '@phosphor-icons/react'
+import { FILTER_OPS, hasArea, isWholeFootprint, type FilterOp, type LayerFilter, type LayerStyle, type MapLayer } from '@ttx/plugins'
 import { ADMIN_AREAS, classify, type AdminAreas } from './adminAreas'
 import { attributes, featurePaint, filterFeatures, type Attribute } from './featureStyle'
 import { attributionOf, geometryKinds, truncationOf, type LayerState } from './layers'
@@ -15,13 +15,15 @@ interface Props {
   /** Without a filter: show every feature again. */
   onFilter(id: string, filter: LayerFilter | undefined): void
   onStyle(id: string, style: LayerStyle): void
+  /** Replace a whole event footprint by a layer per source's area, and one for its points. */
+  onSplit(id: string): void
 }
 
 /** deck.gl layers can be styled; COD-AB boundaries and choropleths are MapLibre's, and have their own colors. */
 const STYLED = new Set(['geo.features', 'geo.raster', 'geo.tiles'])
 
 /** A map's data layers, in its Options panel: title, legend, status or attribution, actions, and each one's details. */
-export function LayerList({ layers, states, onUseMyView, onRemove, onFilter, onStyle }: Props) {
+export function LayerList({ layers, states, onUseMyView, onRemove, onFilter, onStyle, onSplit }: Props) {
   const [open, setOpen] = useState<string>()
   if (!states.length) return <p className="ttx-options__empty">No data layers yet.</p>
   return (
@@ -47,6 +49,11 @@ export function LayerList({ layers, states, onUseMyView, onRemove, onFilter, onS
                   onClick={() => setOpen(open === s.id ? undefined : s.id)}
                 >
                   <SlidersHorizontalIcon size={14} />
+                </button>
+              )}
+              {layers[i] && isWholeFootprint(layers[i]) && s.value !== undefined && (
+                <button type="button" title="Split into a layer per source's area, and one for the points" aria-label={`Split ${s.title} by source`} onClick={() => onSplit(s.id)}>
+                  <ArrowsSplitIcon size={14} />
                 </button>
               )}
               {layers[i] && hasArea(layers[i]) && (

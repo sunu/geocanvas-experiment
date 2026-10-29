@@ -6,6 +6,7 @@ import {
   ADMIN_LEVELS,
   BASEMAPS,
   DATA_LAYERS,
+  footprintParts,
   INDICATORS,
   type AdminLevel,
   type DataLayerKey,
@@ -19,16 +20,17 @@ import {
   URL_FORMATS,
 } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
+import type { EventFootprint } from '@ttx/plugins/monty/client'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import type { ObjectViewProps } from '../canvas/registry'
 import { monty } from '../events/monty'
 import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/api'
 import { LayerList } from './LayerList'
-import { useLayerStates } from './layers'
+import { boundsOf, useLayerStates } from './layers'
 import { areaOf, goTo, liveMap } from './live'
 import { LocationPicker } from './LocationPicker'
-import { fitMapToCountry, fitMapToLayer } from './MapObject'
+import { fitMapTo, fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
 import { FileLayerButton } from './FileLayerButton'
 import { UrlLayerForm, type UrlLayerArgs } from './UrlLayerForm'
@@ -84,6 +86,28 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
     if (added) fitMapToLayer(runtime, o.id, added)
   }
 
+  /**
+   * An event's footprint, for everyone, as a layer per source's area or track and one for its points, named, so each
+   * can be styled, filtered or removed on its own. This person's view fits the hazard areas (not the areas that only
+   * locate the event, often a whole country). Without a footprint, one layer, which says why in the list.
+   */
+  const addFootprint = (eventId: string, title: string) =>
+    monty.getFootprint(eventId).then(
+      (fc) => {
+        mapOp(runtime, o.id, 'map.addEventLayers', { eventId, parts: footprintParts(fc, title) })
+        const hazards = fc.features.filter((f) => f.properties.kind === 'hazard')
+        const bounds = boundsOf({ type: 'FeatureCollection', features: (hazards.length ? hazards : fc.features) as GeoJSON.Feature[] })
+        if (bounds) fitMapTo(runtime, o.id, bounds)
+      },
+      () => addAndFit('map.addEventLayer', { eventId, title }),
+    )
+
+  /** A whole footprint already on the map (the agent's, a template's, an older board's), split in its place. */
+  const splitFootprint = (layerId: string) => {
+    const s = states.find((st) => st.id === layerId)
+    if (s?.value) mapOp(runtime, o.id, 'map.splitEventLayer', { layerId, parts: footprintParts(s.value as EventFootprint, s.title) })
+  }
+
   /** A layer from a URL, for everyone; features also fit this person's view once read. */
   const addUrlLayer = (args: UrlLayerArgs) => {
     if (URL_FORMATS[args.format].tool === 'data.urlFeatures') addAndFit('map.addUrlLayer', { ...args })
@@ -124,6 +148,7 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
           onRemove={(layerId) => mapOp(runtime, o.id, 'map.removeLayer', { layerId })}
           onFilter={(layerId, filter) => mapOp(runtime, o.id, 'map.setLayerFilter', { layerId, ...(filter && { filter }) })}
           onStyle={(layerId, style) => mapOp(runtime, o.id, 'map.setLayerStyle', { layerId, style })}
+          onSplit={splitFootprint}
         />
       </section>
       <Drawings annotations={o.annotations ?? []} onRemove={(annotationId) => mapOp(runtime, o.id, 'map.removeAnnotation', { annotationId })} />
@@ -149,7 +174,7 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
           ))}
         </div>
       </Accordion>
-      <BoardEvents board={runtime.board as Board} onPick={(eventId, title) => addAndFit('map.addEventLayer', { eventId, title })} />
+      <BoardEvents board={runtime.board as Board} onPick={addFootprint} />
       <CountryData board={runtime.board as Board} onPick={addChoropleth} />
       <NotebookResults board={runtime.board as Board} onPick={(runId, name, title) => addAndFit('map.addNotebookResult', { runId, name, title })} />
       <section className="ttx-options__section">
@@ -200,11 +225,23 @@ function Drawings({ annotations, onRemove }: { annotations: MapAnnotation[]; onR
 }
 
 /** The events picked on this board, by name, to show where they happened. Names come from the event cache the event cards fill. */
-function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, title: string): void }) {
+function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, title: string): Promise<void> }) {
   const objects = useObjects(board)
   const eventIds = [...new Set(objects.flatMap((o) => (o.type === 'event' && o.eventId ? [o.eventId] : [])))]
   const key = eventIds.join(',')
   const [names, setNames] = useState<Record<string, string>>({})
+  /** The events whose footprint is being read, to add it. */
+  const [adding, setAdding] = useState<Set<string>>(new Set())
+  const pick = (id: string) => {
+    setAdding((a) => new Set(a).add(id))
+    void onPick(id, names[id] ?? id).finally(() =>
+      setAdding((a) => {
+        const next = new Set(a)
+        next.delete(id)
+        return next
+      }),
+    )
+  }
 
   useEffect(() => {
     let current = true
@@ -228,8 +265,8 @@ function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, 
       ) : (
         <div className="ttx-options__list">
           {eventIds.map((id) => (
-            <button key={id} type="button" title={id} onClick={() => onPick(id, names[id] ?? id)}>
-              {names[id] ?? id} <span className="ttx-options__sub">· footprint</span>
+            <button key={id} type="button" title={id} disabled={adding.has(id)} onClick={() => pick(id)}>
+              {names[id] ?? id} <span className="ttx-options__sub">· {adding.has(id) ? 'reading the footprint…' : 'footprint by source'}</span>
             </button>
           ))}
         </div>
