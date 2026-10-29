@@ -218,6 +218,16 @@ const stepSize = (dir: 1 | -1) =>
     apply: (tx, sizes) => tx.update(sizes),
   })
 
+const setTitle = defineOp({
+  id: 'board.setTitle',
+  title: 'Rename board',
+  description: 'Set the name of the board, for everyone. An empty name removes it. Undo does not cover it.',
+  target: { kind: 'canvas' },
+  args: z.object({ title: z.string().trim().max(80).describe('Board name') }),
+  nl: { aliases: ['name board', 'title board'] },
+  apply: (tx, { title }) => tx.setTitle(title),
+})
+
 const viewOps = [
   defineOp({
     id: 'core.view.fitAll',
@@ -257,5 +267,5 @@ export const corePlugin = definePlugin({
   id: 'core',
   title: 'Core',
   objectTypes: [boxType, textType, stickyType],
-  ops: [setRect, move, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), ...viewOps],
+  ops: [setRect, move, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), setTitle, ...viewOps],
 })

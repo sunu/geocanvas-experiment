@@ -14,6 +14,11 @@ export interface TemplateNode {
   /** The facts this node is made from. Without them, it is left out (e.g. no GLIDE numbers: no ReliefWeb feed). */
   needs?: (keyof Facts)[]
   fields(facts: Facts): Record<string, unknown>
+  /**
+   * Fields for an empty node, to fill in on the board, when a seed was left out and the node's facts are not known.
+   * Without it, the node is left out then too.
+   */
+  blank?(): Record<string, unknown>
   /** Its column: nodes of one column stack top to bottom, in order. */
   col: number
   /** Default: the type's default size. */
@@ -59,11 +64,13 @@ const known = (v: unknown) => v !== undefined && !(Array.isArray(v) && !v.length
 export const TEMPLATE_OP_PREFIX = 'template.'
 
 export function defineTemplate(def: TemplateDef): OpDef<any, Plan> {
-  const seeds = Object.fromEntries(Object.entries(def.seeds).map(([k, s]) => [k, s.kind.schema.describe(s.label)]))
+  const seeds = Object.fromEntries(Object.entries(def.seeds).map(([k, s]) => [k, s.kind.schema.optional().describe(s.label)]))
   return defineOp({
     id: `${TEMPLATE_OP_PREFIX}${def.id}`,
     title: def.title,
-    description: `${def.description} Each seed takes text to look up (best match), e.g. { "text": "…" }.`,
+    description:
+      `${def.description} Each seed takes text to look up (best match), e.g. { "text": "…" }. ` +
+      'Leave a seed out only when asked to: its widgets are then added empty, to fill in on the board.',
     target: { kind: 'canvas' },
     args: z.object({
       ...seeds,
@@ -73,14 +80,24 @@ export function defineTemplate(def: TemplateDef): OpDef<any, Plan> {
     async prepare(ctx, args) {
       let facts: Facts = {}
       const labels: string[] = []
+      let skipped = false
       // Facts already known win: the first seed's.
-      for (const key of Object.keys(def.seeds)) {
-        const r = await def.seeds[key]!.kind.resolve(ctx, (args as Record<string, unknown>)[key])
+      for (const [key, s] of Object.entries(def.seeds)) {
+        const value = (args as Record<string, unknown>)[key]
+        if (value === undefined) {
+          skipped = true
+          labels.push(`no ${s.label.toLowerCase()} yet`)
+          continue
+        }
+        const r = await s.kind.resolve(ctx, value)
         facts = { ...r.facts, ...facts }
         labels.push(r.label)
       }
       facts = await complete(ctx, facts)
-      const nodes = def.nodes.filter((n) => (n.needs ?? []).every((k) => known(facts[k])))
+      // A seed left out gives empty nodes to fill in; a seed without some data (no GLIDE numbers) leaves its nodes out.
+      const nodes = def.nodes.flatMap((n) =>
+        (n.needs ?? []).every((k) => known(facts[k])) ? [{ n, fields: n.fields(facts) }] : skipped && n.blank ? [{ n, fields: n.blank() }] : [],
+      )
       return { ...layout(ctx, def, facts, nodes, args), summary: `${def.title} for ${labels.join(', ')}` }
     },
     apply(tx, plan) {
@@ -102,11 +119,11 @@ export function defineTemplate(def: TemplateDef): OpDef<any, Plan> {
  * The heading on top, then columns left to right; nodes of a column stack top to bottom. Each node is checked
  * against its type before any write.
  */
-function layout(ctx: OpContext, def: TemplateDef, facts: Facts, nodes: TemplateNode[], at: { x?: number; y?: number }) {
-  const sized = nodes.map((n) => {
+function layout(ctx: OpContext, def: TemplateDef, facts: Facts, nodes: { n: TemplateNode; fields: Record<string, unknown> }[], at: { x?: number; y?: number }) {
+  const sized = nodes.map(({ n, fields }) => {
     const type = ctx.registry.objectType(n.type)
     if (!type) throw new Error(`Unknown object type: ${n.type}`)
-    return { n, ...(n.size ?? type.defaultSize) }
+    return { n, fields, ...(n.size ?? type.defaultSize) }
   })
   const cols = [...new Set(sized.map((s) => s.n.col))].sort((a, b) => a - b)
   const placed: { type: string; fields: Record<string, unknown>; x: number; y: number; w: number; h: number }[] = []
@@ -116,7 +133,7 @@ function layout(ctx: OpContext, def: TemplateDef, facts: Facts, nodes: TemplateN
     const inCol = sized.filter((s) => s.n.col === col)
     let y = GAP + HEADING.h + GAP
     for (const s of inCol) {
-      placed.push({ type: s.n.type, fields: s.n.fields(facts), x, y, w: s.w, h: s.h })
+      placed.push({ type: s.n.type, fields: s.fields, x, y, w: s.w, h: s.h })
       y += s.h + GAP
     }
     bottom = Math.max(bottom, y)

@@ -15,7 +15,7 @@ const areaOf = (p: Place) => {
  * An area of interest for a template: a place found as you type, or the area you last looked at on a map. Typed
  * text that is not picked is sent as `{ text }`, and the template takes the best match.
  */
-export function AreaPicker({ value, onChange }: { value: unknown; onChange(v: unknown): void }) {
+export function AreaPicker({ value, onChange, myView = true }: { value: unknown; onChange(v: unknown): void; /** Offer "Use my map view": not on a board that does not exist yet. */ myView?: boolean }) {
   const [q, setQ] = useState('')
   const [found, setFound] = useState<LiveState<Place[]>>({ loading: false })
   const live = useRef<ReturnType<typeof createLiveSearch<Place[]>>>(undefined)
@@ -58,10 +58,12 @@ export function AreaPicker({ value, onChange }: { value: unknown; onChange(v: un
       />
       <div className="ttx-eventpick__status">{status}</div>
       <div className="ttx-eventpick__list">
-        <button type="button" className={`ttx-eventpick__item ${value === MY_VIEW ? 'is-on' : ''}`} onClick={() => onChange(MY_VIEW)}>
-          <CrosshairIcon size={14} aria-hidden />
-          <span className="ttx-eventpick__name">Use my map view</span>
-        </button>
+        {myView && (
+          <button type="button" className={`ttx-eventpick__item ${value === MY_VIEW ? 'is-on' : ''}`} onClick={() => onChange(MY_VIEW)}>
+            <CrosshairIcon size={14} aria-hidden />
+            <span className="ttx-eventpick__name">Use my map view</span>
+          </button>
+        )}
         {(found.results ?? []).map((p) => (
           <button type="button" key={p.name} className={`ttx-eventpick__item ${picked === p.name ? 'is-on' : ''}`} onClick={() => onChange(areaOf(p))}>
             <MapPinIcon size={14} aria-hidden />

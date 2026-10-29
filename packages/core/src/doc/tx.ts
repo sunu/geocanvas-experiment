@@ -80,6 +80,12 @@ export class BoardTx {
     this.add(type, fields, id)
   }
 
+  /** Name the board, for everyone. An empty title removes the name. */
+  setTitle(title: string) {
+    if (title) this.board.meta.set('title', title)
+    else this.board.meta.delete('title')
+  }
+
   /** Change a person's view of an object, e.g. the agent moves the map of the person who asked. */
   setView(person: string, objectId: string, view: Omit<SavedView, 'at'>) {
     if (!this.board.objects.has(objectId)) throw new Error(`Object ${objectId} does not exist`)

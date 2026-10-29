@@ -1,6 +1,6 @@
 # Plan 012 — Templates: a set of nodes from a few seeds
 
-Date: 2026-10-29. Status: phase 1 implemented on `feat/templates` (framework, sit rep, conflict explorer). Phase 2 (linking) not started.
+Date: 2026-10-29. Status: phase 1 built (framework, sit rep, conflict explorer). Optional seeds and the New board dialog added in PR #55 (`agent-docs/tasks/board-templates.md`). Phase 2 (linking) not started.
 
 ## 1. Outcome
 
@@ -23,7 +23,8 @@ In phase 1, the template fills its nodes one time from the seeds. The nodes do n
 | Selection | A selected event card gives the event seed its value. The template always adds a full new set. |
 | Who writes templates | Developers, in code. Keep the definition simple, so that it can become data (JSON) later. |
 | First delivery | The framework, the seed kinds `event` and `area`, the sit rep and the conflict explorer. |
-| Where to start a template | The command palette, and the Templates button in the toolbar (the palette with templates only). In the palette, "Insert template…" opens the list of templates. A template shows in the full palette only when you search for it. |
+| Where to start a template | The command palette, and the Templates button in the toolbar (the palette with templates only). In the palette, "Insert template…" opens the list of templates. A template shows in the full palette only when you search for it. A new board can also start from one: the New board dialog on the landing page lists every template (PR #55). |
+| A seed left out | Allowed (PR #55): its nodes come empty when they have `blank` fields, to fill in on the board (§3.2). A seed that is given but lacks a fact still leaves its node out. |
 | Data access in an op | An optional `tools` (`ToolRunner`) on `OpContext`. Approved change to a shared contract. |
 | Text as a seed | Each seed also accepts `{ "text": "…" }`. The form shows candidates. The op uses the best match and tells which match it used. |
 | One text box for a full template | No. The chat agent does this with text seeds. |
@@ -58,7 +59,7 @@ Thus, the palette, the agent and the MCP companion get each template with no mor
 
 After the seeds, `complete` adds the facts that follow from other facts. An area without a country gets the country at its center (`data.reverseGeocode`). A country without an area gets the country's bbox (`data.geocode`). Areas smaller than 0.2° grow to 0.2°, so that a point does not zoom a map in fully.
 
-A node with a fact in `needs` that is not known is not added. An empty list is not known (an event with no GLIDE numbers gets no ReliefWeb feed). Without `tools`, the only facts are the ones in the seed values. For example, an event id gives the event card and its map, but no country context.
+A node with a fact in `needs` that is not known is not added. An empty list is not known (an event with no GLIDE numbers gets no ReliefWeb feed). Every seed is optional (for the New board dialog's "Choose later", `agent-docs/tasks/board-templates.md`): when one is left out, a node whose facts are not known is added empty if it has `blank` fields (an event card with no event, a map with no layers, HAPI widgets with no country), to fill in on the board. A seed that is given but lacks a fact still leaves its node out. Without `tools`, the only facts are the ones in the seed values. For example, an event id gives the event card and its map, but no country context.
 
 ### 3.3 Tools
 
@@ -87,5 +88,5 @@ There is a heading text at the top. Below it are columns from left to right, and
 
 ## 6. Verification
 
-- `packages/plugins/test/templates.test.ts`: each template with fake tools, from text and from values; one undo step; frame under and around the nodes; the runner's map view; no feed without GLIDE numbers; no tools; no match fails before a write; placement; the agent's placement and summary.
-- Manually, with `npm run sync` and `npm run dev`: Templates button → Situation report → "nepal flood"; Conflict explorer → "Cabo Delgado". Ask the agent for each.
+- `packages/plugins/test/templates.test.ts`: each template with fake tools, from text and from values; one undo step; frame under and around the nodes; the runner's map view; no feed without GLIDE numbers; a seed left out gives empty nodes; seeds are optional with their picker widget; no tools; no match fails before a write; placement; the agent's placement and summary.
+- Manually, with `npm run sync` and `npm run dev`: Templates button → Situation report → "nepal flood"; Conflict explorer → "Cabo Delgado". Ask the agent for each. New board → From a template → Situation report with "Choose later": empty widgets.
