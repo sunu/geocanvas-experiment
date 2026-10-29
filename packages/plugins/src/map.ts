@@ -18,6 +18,7 @@ import {
   type MapLayer,
   type UrlFormat,
 } from './mapLayers.js'
+import { mapAnnotation, type MapAnnotation } from './mapAnnotations.js'
 import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
 
 /** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
@@ -39,10 +40,11 @@ export type MapArea = z.infer<typeof area>
 
 /**
  * Each person's view of a map is not here: it is in the doc's `views` (Views in @ttx/core).
- * `layers` (mapLayers.ts) is optional: maps made before it have none. It is replaced as a whole, so two
- * people adding a layer at the same moment keep only one of the two.
+ * `layers` (mapLayers.ts) and `annotations` (mapAnnotations.ts) are optional: maps made before them have none.
+ * Each is replaced as a whole, so two people adding a layer at the same moment keep only one of the two, and two
+ * people typing in two stickies of one map at the same moment can lose each other's last keystrokes.
  */
-export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[] }
+export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[]; annotations?: MapAnnotation[] }
 
 const oneMap = { kind: 'objects', types: ['map'], min: 1, max: 1 } as const
 
@@ -72,6 +74,20 @@ function changeLayer(map: MapBoardObject, layerId: string, change: (l: MapLayer)
   return { id: map.id, layers: layers.map((l) => (l.id === layerId ? change(l) : l)) }
 }
 
+/** An annotation write: the map's whole new list. */
+const setAnnotations = (tx: BoardTx, id: string, annotations: MapAnnotation[]) => tx.update({ [id]: { annotations } })
+
+/** The map's annotations with one of them changed, or an error if it has no such annotation. */
+function changeAnnotation(map: MapBoardObject, annotationId: string, change: (a: MapAnnotation) => MapAnnotation | undefined) {
+  const annotations = map.annotations ?? []
+  if (!annotations.some((a) => a.id === annotationId)) throw new Error(`The map has no annotation ${annotationId}`)
+  return { id: map.id, annotations: annotations.flatMap((a) => (a.id === annotationId ? (change(a) ?? []) : [a])) }
+}
+
+const lng = z.number().min(-180).max(180).describe('Longitude')
+const lat = z.number().min(-90).max(90).describe('Latitude')
+const annotationId = z.string().describe("The annotation's id, from the map's annotations")
+
 const dataLayer = z.enum(Object.keys(DATA_LAYERS) as [DataLayerKey, ...DataLayerKey[]])
 const layerId = z.string().describe("The layer's id, from the map's layers")
 
@@ -89,12 +105,13 @@ export const mapPlugin = definePlugin({
       type: 'map',
       title: 'Map',
       description: 'A live map. Its basemap is shared; each person has their own view (use map.showArea to change one).',
-      fields: z.object({ basemap: basemap.default('light'), layers: z.array(mapLayer).optional() }),
+      fields: z.object({ basemap: basemap.default('light'), layers: z.array(mapLayer).optional(), annotations: z.array(mapAnnotation).optional() }),
       defaultSize: { w: 520, h: 360 },
       layer: 'bottom',
       summarize: (o) => {
-        const { basemap, layers } = o as MapBoardObject
-        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''})`).join(', ')}` : ''}`
+        const { basemap, layers, annotations } = o as MapBoardObject
+        const stickies = annotations?.map((a) => `${JSON.stringify(a.text.slice(0, 100))} at ${a.lngLat.join(', ')} (${a.id})`)
+        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''})`).join(', ')}` : ''}${stickies?.length ? `; sticky notes: ${stickies.join(', ')}` : ''}`
       },
     },
   ],
@@ -244,6 +261,48 @@ export const mapPlugin = definePlugin({
       prepare: (ctx, { layerId, style }) =>
         changeLayer(mapOf(ctx), layerId, ({ style: _, ...l }) => (Object.values(style).some((v) => v !== undefined) ? { ...l, style } : l)),
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.addSticky',
+      title: 'Add sticky note on map',
+      description: 'Pin a sticky note with text to a place on a map, for everyone. It stays on that place as people pan and zoom.',
+      target: oneMap,
+      args: z.object({ lng, lat, text: z.string().default('').describe('The text') }),
+      prepare(ctx, { lng, lat, text }) {
+        const map = mapOf(ctx)
+        const added: MapAnnotation = { id: newLayerId(), kind: 'sticky', lngLat: [lng, lat], text }
+        return { id: map.id, annotations: [...(map.annotations ?? []), added] }
+      },
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
+    }),
+    defineOp({
+      id: 'map.setStickyText',
+      title: 'Set sticky note text',
+      description: "Replace the text of a sticky note on a map.",
+      target: oneMap,
+      // Typing: one op log entry per editing gesture.
+      gesture: true,
+      args: z.object({ annotationId, text: z.string() }),
+      prepare: (ctx, { annotationId, text }) => changeAnnotation(mapOf(ctx), annotationId, (a) => ({ ...a, text })),
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
+    }),
+    defineOp({
+      id: 'map.moveAnnotation',
+      title: 'Move annotation',
+      description: 'Move an annotation of a map to another place, for everyone.',
+      target: oneMap,
+      args: z.object({ annotationId, lng, lat }),
+      prepare: (ctx, { annotationId, lng, lat }) => changeAnnotation(mapOf(ctx), annotationId, (a) => ({ ...a, lngLat: [lng, lat] })),
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
+    }),
+    defineOp({
+      id: 'map.removeAnnotation',
+      title: 'Remove annotation',
+      description: 'Remove an annotation from a map, for everyone.',
+      target: oneMap,
+      args: z.object({ annotationId }),
+      prepare: (ctx, { annotationId }) => changeAnnotation(mapOf(ctx), annotationId, () => undefined),
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
     }),
     defineOp({
       id: 'map.removeLayer',
