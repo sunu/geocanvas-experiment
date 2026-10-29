@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
-    "sync": "npm run dev -w apps/worker",
+    "sync": "node apps/worker/scripts/dev-with-op.mjs",
     "build": "npm run build -w apps/web",
     "deploy": "npm run build -w apps/web && npm run deploy -w apps/worker",
     "test": "vitest run",
