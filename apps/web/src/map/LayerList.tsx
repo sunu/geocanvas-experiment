@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { ArrowsSplitIcon, CrosshairSimpleIcon, SlidersHorizontalIcon, XIcon } from '@phosphor-icons/react'
-import { FILTER_OPS, hasArea, isWholeFootprint, type FilterOp, type LayerFilter, type LayerStyle, type MapLayer } from '@ttx/plugins'
+import { FILTER_OPS, GRID_OUTPUT, hasArea, isWholeFootprint, type FilterOp, type LayerFilter, type LayerStyle, type MapLayer } from '@ttx/plugins'
 import { ADMIN_AREAS, classify, type AdminAreas } from './adminAreas'
 import { attributes, featurePaint, filterFeatures, type Attribute } from './featureStyle'
-import { attributionOf, geometryKinds, truncationOf, type LayerState } from './layers'
+import { attributionOf, captionOf, geometryKinds, truncationOf, type LayerState } from './layers'
 import { rampGradient, type Raster } from './raster'
 
 interface Props {
@@ -29,7 +29,7 @@ export function LayerList({ layers, states, onUseMyView, onRemove, onFilter, onS
   return (
     <div className="ttx-layers">
       {states.map((s, i) => {
-        const note = s.error ?? (s.loading ? 'Loading…' : [truncationOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
+        const note = s.error ?? (s.loading ? 'Loading…' : [truncationOf(s.value), captionOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
         const styled = s.value !== undefined && STYLED.has(s.output ?? '')
         return (
           <div key={s.id} className="ttx-layers__entry">
@@ -209,7 +209,8 @@ function AttributeTable({ attrs }: { attrs: Attribute[] }) {
 /** What a layer's colors mean: by kind of result. Tiles have their own colors, and no legend. */
 function Legend({ state: s }: { state: LayerState }) {
   if (s.output === ADMIN_AREAS) return <AdminLegend areas={s.value as AdminAreas} />
-  if (s.output === 'geo.raster') return <RasterLegend raster={s.value as Raster} />
+  // A forecast grid has the raster's range, colors and unit, and the same square-root ramp.
+  if (s.output === 'geo.raster' || s.output === GRID_OUTPUT) return <RasterLegend raster={s.value as Raster} />
   if (s.output === 'geo.features') return <FeatureLegend state={s} />
   return null
 }

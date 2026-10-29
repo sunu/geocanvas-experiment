@@ -9,6 +9,9 @@
   },
   "dependencies": {
     "@ttx/core": "*",
+    "fzstd": "^0.1.1",
+    "icechunk-js": "^0.6.1",
+    "zarrita": "^0.7.5",
     "zod": "^4.6.7"
   }
 }

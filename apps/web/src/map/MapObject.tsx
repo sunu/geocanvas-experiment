@@ -13,7 +13,7 @@ import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } fr
 import { BASEMAP_CREDITS, basemapStyle } from './basemaps'
 import { DrawingBox, type DrawTool } from './DrawingBox'
 import { drawShape } from './draw'
-import { attributionOf, boundsOf, deckLayers, shapeLayer, useLayerStates } from './layers'
+import { attributionOf, boundsOf, captionOf, deckLayers, shapeLayer, useLayerStates } from './layers'
 import { registerLiveMap } from './live'
 import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
@@ -101,7 +101,8 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   runtimeRef.current = runtime
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
-  const credits = [...new Set(states.map((st) => attributionOf(st.value)).filter((a) => !!a))].join(' · ')
+  // A forecast's caption (model, run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
+  const credits = [...new Set(states.flatMap((st) => [attributionOf(st.value), captionOf(st.value)]).filter((a) => !!a))].join(' · ')
   /** The latest states, for map events. */
   const statesRef = useRef(states)
   /** MapLibre layers can be added: the style has loaded, and no basemap change is under way. */
