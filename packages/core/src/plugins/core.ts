@@ -60,6 +60,17 @@ export const stickyType: ObjectTypeDef = {
   summarize: (o) => JSON.stringify((o as StickyObject).text.slice(0, 200)),
 }
 
+export const frameType: ObjectTypeDef = {
+  type: 'frame',
+  title: 'Frame',
+  description: 'A frame that holds other objects together: moving it moves the objects inside it. It has a title above it.',
+  fields: z.object({ title: z.string().optional().describe("The frame's own title, which a link may write. A name given with core.object.rename shows instead") }),
+  defaultSize: { w: 800, h: 600 },
+  layer: 'bottom',
+  summarize: (o) => JSON.stringify((o as FrameObject).title ?? ''),
+}
+
+export type FrameObject = AnyObject & { type: 'frame'; title?: string }
 export type BoxObject = AnyObject & { type: 'box'; color?: ColorName; shape?: BoxShape }
 export type TextObject = AnyObject & { type: 'text'; text: string; color?: ColorName; fontSize?: number }
 export type StickyObject = AnyObject & { type: 'sticky'; text: string; color?: ColorName; fontSize?: number }
@@ -275,6 +286,6 @@ const viewOps = [
 export const corePlugin = definePlugin({
   id: 'core',
   title: 'Core',
-  objectTypes: [boxType, textType, stickyType],
+  objectTypes: [boxType, textType, stickyType, frameType],
   ops: [setRect, move, rename, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), setTitle, ...viewOps],
 })

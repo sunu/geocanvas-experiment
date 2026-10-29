@@ -6,6 +6,8 @@
   --ttx-panel: #ffffff;
   --ttx-border: rgb(0 0 0 / 0.12);
   --ttx-accent: #2563eb;
+  /* A frame's fill: light, so what it holds stands out. */
+  --ttx-frame-fill: rgb(255 255 255 / 0.6);
   --ttx-font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-family: var(--ttx-font);
   color: var(--ttx-ink);
@@ -334,6 +336,39 @@ body,
 }
 
 /* Other people and the agent: selections, cursors and name tags in their color (canvas/Peers.tsx, board/collaborators.ts). */
+/* Links from a root to what follows it (canvas/Links.tsx): arrows in the world, attached to the objects' sides. */
+.ttx-links {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ttx-links > path {
+  fill: none;
+  stroke: var(--ttx-muted);
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.ttx-links > path.is-on {
+  stroke: var(--canvas-accent); /* the selection outline's color */
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.ttx-links .ttx-links__head path {
+  fill: var(--ttx-muted);
+  stroke: none;
+}
+
+.ttx-links .ttx-links__head.is-on path {
+  fill: var(--canvas-accent);
+}
+
 .ttx-peer-selection {
   position: absolute;
   box-sizing: border-box;
@@ -2104,6 +2139,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   padding: 12px;
   color: var(--ttx-muted);
   text-align: center;
+}
+
+.ttx-input__error {
+  margin-top: 6px;
+  color: var(--destructive);
 }
 
 .ttx-country__details {

@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { defineOp, definePlugin, type AnyObject, type OpContext } from '@ttx/core'
 import type { MapBoardObject } from './map.js'
-import { layerStyle, newLayerId, type LayerStyle, type MapLayer } from './mapLayers.js'
+import { applyLinks, planLinks } from './links/propagate.js'
+import { EVENT_FOOTPRINT_TOOL, eventLayer, layerStyle, type LayerStyle, type MapLayer } from './mapLayers.js'
 import type { EventFootprint } from './monty/client.js'
 import { sourceLabel } from './monty/sources.js'
 
@@ -13,8 +14,8 @@ import { sourceLabel } from './monty/sources.js'
 /** eventId is absent until someone picks an event. */
 export type EventBoardObject = AnyObject & { type: 'event'; eventId?: string }
 
-/** The tool that reads an event's footprint from Montandon in the browser (apps/web/src/events/footprint.ts). */
-export const EVENT_FOOTPRINT_TOOL = 'events.footprint'
+// In mapLayers.ts, so that the link recipes (links/) can use it without importing this plugin.
+export { EVENT_FOOTPRINT_TOOL, eventLayer } from './mapLayers.js'
 
 /**
  * One part of an event's footprint, as its own map layer: one Montandon item's area or track (`itemId`), or all the
@@ -30,17 +31,6 @@ export const footprintPart = z
   })
   .refine((p) => !p.itemId !== !p.points, 'Give either itemId or points')
 export type FootprintPart = z.infer<typeof footprintPart>
-
-/** A map layer for where an event happened: the recipe names the event, and each browser asks Montandon. */
-export function eventLayer(eventId: string, title?: string, part?: Omit<FootprintPart, 'title'>): MapLayer {
-  return {
-    id: newLayerId(),
-    tool: EVENT_FOOTPRINT_TOOL,
-    input: { eventId, ...(part?.itemId && { itemId: part.itemId }), ...(part?.points && { points: true }) },
-    title: title ?? `Event ${eventId}`,
-    ...(part?.style && { style: part.style }),
-  }
-}
 
 /**
  * Each source's areas in their own color, from the layer list's swatches (apps/web/src/map/LayerList.tsx), so the
@@ -112,11 +102,19 @@ export const eventsPlugin = definePlugin({
     defineOp({
       id: 'event.setEvent',
       title: 'Pick event',
-      description: 'Show a Montandon event in the selected event object.',
+      description: 'Show a Montandon event in the selected event object. Objects that follow it (a map, a feed, a country card) show the new event too.',
       target: { kind: 'objects', types: ['event'], max: 1 },
       args: z.object({ eventId: eventId.meta({ widget: 'event' }).describe('Event') }),
       nl: { aliases: ['change event', 'select event'] },
-      apply: (tx, { eventId }, target) => target.kind === 'objects' && tx.update({ [target.ids[0]!]: { eventId } }),
+      // The followers re-render in the same transaction: picking an event and its effects are one undo step.
+      async prepare(ctx, { eventId }) {
+        const id = ctx.target.kind === 'objects' ? ctx.target.ids[0]! : ''
+        return { id, eventId, links: await planLinks(ctx, { ...ctx.board.get(id)!, eventId } as EventBoardObject) }
+      },
+      apply(tx, { id, eventId, links }) {
+        tx.update({ [id]: { eventId } })
+        applyLinks(tx, links)
+      },
     }),
     defineOp({
       id: 'map.addEventLayer',
