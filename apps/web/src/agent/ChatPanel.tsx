@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowCounterClockwiseIcon, ArrowUpIcon, CheckIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
+import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CheckIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
 import type { AgentReply, Chat, OplogEntry, Runtime, UserMessage } from '@ttx/core'
 import { OPENROUTER_URL } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
-import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
 import { useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { TAB_ID } from './browserAgent'
-import { DEFAULT_MODEL, forgetKey, loadKey, loadMode, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
+import { DEFAULT_MODEL, forgetKey, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
 
 /** A message for a browser agent with no reply after this long, and nobody thinking: its tab has closed. */
 const LOST_AFTER_MS = 120_000
@@ -31,6 +30,8 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   const [mode, setMode] = useState<AgentMode>(loadMode)
   const [hasKey, setHasKey] = useState(() => loadKey() !== null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Collapsed: only the header, with the model menu. The draft, mode and key settings stay in this state.
+  const [collapsed, setCollapsed] = useState(loadCollapsed)
   const pending = new Set(chat.pending().map((m) => m.id))
   const ownWithoutKey = mode === 'own' && !hasKey
 
@@ -41,9 +42,18 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   }
   const listRef = useRef<HTMLDivElement>(null)
 
+  // On new entries, and on opening the panel: show the latest.
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
-  }, [entries.length, thinking])
+  }, [entries.length, thinking, collapsed])
+
+  function toggle() {
+    const next = !collapsed
+    setCollapsed(next)
+    saveCollapsed(next)
+    // Its button is hidden while collapsed.
+    if (next && dictation.listening) dictation.toggle()
+  }
 
   function send(e?: FormEvent) {
     e?.preventDefault()
@@ -65,80 +75,102 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
       className="ttx-ui ttx-shell fixed top-[74px] left-2 z-[1000002] flex max-h-[calc(100%-82px)] w-[360px] max-w-[calc(100%-1rem)] flex-col rounded-xl border bg-card font-sans shadow-sm"
       aria-label="Agent chat"
     >
-      <header className="flex shrink-0 items-center px-4 pt-4 pb-1.5">
-        <h2 className="font-heading text-lg font-[550] tracking-tight text-foreground">Describe</h2>
-      </header>
-      {settingsOpen && (
-        <KeySettings
-          onSave={(config) => {
-            saveKey(config)
-            setHasKey(true)
-            setSettingsOpen(false)
-          }}
-          onForget={() => {
-            forgetKey()
-            setHasKey(false)
-          }}
-        />
-      )}
-      {(entries.length > 0 || thinking) && (
-        <div className="ttx-chat__list" ref={listRef}>
-          {entries.map((e) =>
-            e.kind === 'user' ? (
-              <UserEntry key={e.id} message={e} lost={isLost(e, pending, thinking)} />
-            ) : (
-              <AgentEntry key={e.id} reply={e} runtime={runtime} undone={undone.has(e.id)} />
-            ),
-          )}
-          {thinking && <p className="ttx-chat__thinking">Agent is thinking…</p>}
-        </div>
-      )}
-      <form className="flex shrink-0 flex-col gap-3 px-4 pt-0 pb-4" onSubmit={send}>
-        <div className="flex h-[184px] flex-col justify-between rounded-lg border border-input bg-background p-4">
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Describe the disaster, map or chart you want to add to the canvas…"
-            aria-label="Message to the agent"
-            className="min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0 md:text-base"
-          />
-          <div className="flex shrink-0 items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className={cn('size-9', dictation.listening && 'bg-accent')}
-              disabled={!dictation.supported}
-              title={dictation.supported ? (dictation.listening ? 'Stop dictating' : 'Dictate') : "This browser can't dictate"}
-              aria-label="Dictate"
-              aria-pressed={dictation.listening}
-              onClick={dictation.toggle}
-            >
-              <MicrophoneIcon className="size-[18px]" weight={dictation.listening ? 'fill' : 'regular'} />
-            </Button>
-            <Button type="submit" size="icon" className="size-9 rounded-full" disabled={!text.trim() || ownWithoutKey} title="Send" aria-label="Send">
-              <ArrowUpIcon className="size-[18px]" />
-            </Button>
-          </div>
-        </div>
-        {(ownWithoutKey || selection.length > 0) && (
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            {ownWithoutKey ? (
-              <span className="text-xs text-muted-foreground">Add your key first: open the model menu below</span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2 py-1.5">
-                <CursorIcon className="size-3.5" />
-                {selection.length} selected
-              </span>
-            )}
-          </div>
-        )}
-      </form>
-      <Separator />
-      <footer className="shrink-0 rounded-b-xl bg-panel-footer px-4 py-2">
+      <header className={cn('flex shrink-0 items-center gap-1 px-4 pt-4', collapsed ? 'pb-4' : 'pb-1.5')}>
+        <h2 className="font-heading text-lg font-[550] tracking-tight text-foreground">
+          <button type="button" className="rounded-md" aria-expanded={!collapsed} onClick={toggle}>
+            Describe
+          </button>
+        </h2>
         <ModelPicker />
-      </footer>
+        {collapsed && thinking && (
+          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
+            <span className="size-2 rounded-full bg-[var(--agent)]" aria-hidden />
+            Thinking…
+          </span>
+        )}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={cn(!(collapsed && thinking) && 'ml-auto')}
+          title={collapsed ? 'Open chat' : 'Collapse chat'}
+          aria-label={collapsed ? 'Open chat' : 'Collapse chat'}
+          aria-expanded={!collapsed}
+          onClick={toggle}
+        >
+          {collapsed ? <CaretDownIcon className="size-4" /> : <CaretUpIcon className="size-4" />}
+        </Button>
+      </header>
+      {!collapsed && (
+        <>
+          {settingsOpen && (
+            <KeySettings
+              onSave={(config) => {
+                saveKey(config)
+                setHasKey(true)
+                setSettingsOpen(false)
+              }}
+              onForget={() => {
+                forgetKey()
+                setHasKey(false)
+              }}
+            />
+          )}
+          {(entries.length > 0 || thinking) && (
+            <div className="ttx-chat__list" ref={listRef}>
+              {entries.map((e) =>
+                e.kind === 'user' ? (
+                  <UserEntry key={e.id} message={e} lost={isLost(e, pending, thinking)} />
+                ) : (
+                  <AgentEntry key={e.id} reply={e} runtime={runtime} undone={undone.has(e.id)} />
+                ),
+              )}
+              {thinking && <p className="ttx-chat__thinking">Agent is thinking…</p>}
+            </div>
+          )}
+          <form className="flex shrink-0 flex-col gap-3 px-4 pt-0 pb-4" onSubmit={send}>
+            <div className="flex h-[184px] flex-col justify-between rounded-lg border border-input bg-background p-4">
+              <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="Describe the disaster, map or chart you want to add to the canvas…"
+                aria-label="Message to the agent"
+                className="min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0 md:text-base"
+              />
+              <div className="flex shrink-0 items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn('size-9', dictation.listening && 'bg-accent')}
+                  disabled={!dictation.supported}
+                  title={dictation.supported ? (dictation.listening ? 'Stop dictating' : 'Dictate') : "This browser can't dictate"}
+                  aria-label="Dictate"
+                  aria-pressed={dictation.listening}
+                  onClick={dictation.toggle}
+                >
+                  <MicrophoneIcon className="size-[18px]" weight={dictation.listening ? 'fill' : 'regular'} />
+                </Button>
+                <Button type="submit" size="icon" className="size-9 rounded-full" disabled={!text.trim() || ownWithoutKey} title="Send" aria-label="Send">
+                  <ArrowUpIcon className="size-[18px]" />
+                </Button>
+              </div>
+            </div>
+            {(ownWithoutKey || selection.length > 0) && (
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                {ownWithoutKey ? (
+                  <span className="text-xs text-muted-foreground">Add your key first: open the model menu above</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2 py-1.5">
+                    <CursorIcon className="size-3.5" />
+                    {selection.length} selected
+                  </span>
+                )}
+              </div>
+            )}
+          </form>
+        </>
+      )}
     </aside>
   )
 }

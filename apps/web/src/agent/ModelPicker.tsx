@@ -86,9 +86,9 @@ export function ModelPicker() {
         <span className="mr-0.5">{label}</span>
         <CaretDownIcon className="size-3" />
       </Button>
-      {/* Placed with CSS against the panel (the nearest positioned ancestor): beside it, bottom edges level. */}
+      {/* Placed with CSS against the panel (the nearest positioned ancestor): beside it, top edges level, since the menu is in the panel's header. */}
       {open && (
-        <div className="ttx-ui absolute bottom-0 left-full z-10 ml-3 flex items-start gap-3 font-sans">
+        <div className="ttx-ui absolute top-0 left-full z-10 ml-3 flex items-start gap-3 font-sans">
           <Card className="w-[300px] gap-0.5 p-1" role="menu" aria-label="Run the model">
             <p className="px-2 py-1.5 text-xs text-muted-foreground">Run the model</p>
             {OPTIONS.map(({ id, title, hint, Icon }) => (
