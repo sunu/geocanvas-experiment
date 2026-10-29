@@ -38,6 +38,9 @@ import { fitMapTo, fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
 import { FileLayerButton } from './FileLayerButton'
 import { UrlLayerForm, type UrlLayerArgs } from './UrlLayerForm'
+import { setMapMode, useMapMode, type MapMode } from './mode'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ScenarioPanel } from '../routing/ScenarioPanel'
 
 /** A map op as its own undo step. In focus, `runtime` is the draft: others see it once shared. */
 function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, unknown>) {
@@ -61,10 +64,33 @@ function Accordion({ title, children }: { title: string; children: React.ReactNo
 }
 
 /**
- * The map's contextual tools in focus mode: where everyone looks, go to a place, its data layers, add data for the area in view,
+ * The map's Options in focus, in two modes (mode.ts): Map, its data, notes and drawings; and Scenario, routes and what
+ * closes roads (routing/ScenarioPanel.tsx). The tab also picks the toolbar on the map.
+ */
+export function MapOptions(props: ObjectViewProps<MapBoardObject>) {
+  const id = props.object.id
+  const mode = useMapMode(id)
+  return (
+    <Tabs value={mode} onValueChange={(v) => setMapMode(id, v as MapMode)} className="mt-3 gap-0">
+      <TabsList className="ttx-ui w-full">
+        <TabsTrigger value="map">Map</TabsTrigger>
+        <TabsTrigger value="scenario">Scenario</TabsTrigger>
+      </TabsList>
+      <TabsContent value="map">
+        <MapTab {...props} />
+      </TabsContent>
+      <TabsContent value="scenario">
+        <ScenarioPanel runtime={props.runtime} object={props.object} />
+      </TabsContent>
+    </Tabs>
+  )
+}
+
+/**
+ * The map's contextual tools in Map mode: where everyone looks, go to a place, its data layers, add data for the area in view,
  * admin boundaries, and the events, country figures and notebook results on the board, basemap.
  */
-export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObject>) {
+function MapTab({ runtime, object: o }: ObjectViewProps<MapBoardObject>) {
   const map = () => liveMap(o.id)
   const layers = o.layers ?? NO_LAYERS
   // The map runs the same tools; the tool runner shares the runs and caches the results.
@@ -265,24 +291,12 @@ function Drawings({ annotations, onRemove }: { annotations: MapAnnotation[]; onR
   )
 }
 
-/** The events picked on this board, by name, to show where they happened. Names come from the event cache the event cards fill. */
-function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, title: string): Promise<void> }) {
+/** The events picked on this board, by name. Names come from the event cache the event cards fill; until then, the id. */
+export function useBoardEvents(board: Board): { id: string; name: string }[] {
   const objects = useObjects(board)
   const eventIds = [...new Set(objects.flatMap((o) => (o.type === 'event' && o.eventId ? [o.eventId] : [])))]
   const key = eventIds.join(',')
   const [names, setNames] = useState<Record<string, string>>({})
-  /** The events whose footprint is being read, to add it. */
-  const [adding, setAdding] = useState<Set<string>>(new Set())
-  const pick = (id: string) => {
-    setAdding((a) => new Set(a).add(id))
-    void onPick(id, names[id] ?? id).finally(() =>
-      setAdding((a) => {
-        const next = new Set(a)
-        next.delete(id)
-        return next
-      }),
-    )
-  }
 
   useEffect(() => {
     let current = true
@@ -298,16 +312,34 @@ function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
+  return eventIds.map((id) => ({ id, name: names[id] ?? id }))
+}
+
+/** The events picked on this board, to show where they happened. */
+function BoardEvents({ board, onPick }: { board: Board; onPick(eventId: string, title: string): Promise<void> }) {
+  const events = useBoardEvents(board)
+  /** The events whose footprint is being read, to add it. */
+  const [adding, setAdding] = useState<Set<string>>(new Set())
+  const pick = (e: { id: string; name: string }) => {
+    setAdding((a) => new Set(a).add(e.id))
+    void onPick(e.id, e.name).finally(() =>
+      setAdding((a) => {
+        const next = new Set(a)
+        next.delete(e.id)
+        return next
+      }),
+    )
+  }
   return (
     <section className="ttx-options__section">
       <h3>Events on this board</h3>
-      {!eventIds.length ? (
+      {!events.length ? (
         <p className="ttx-options__empty">Pick an event on the board to show where it happened</p>
       ) : (
         <div className="ttx-options__list">
-          {eventIds.map((id) => (
-            <button key={id} type="button" title={id} disabled={adding.has(id)} onClick={() => pick(id)}>
-              {names[id] ?? id} <span className="ttx-options__sub">· {adding.has(id) ? 'reading the footprint…' : 'footprint by source'}</span>
+          {events.map((e) => (
+            <button key={e.id} type="button" title={e.id} disabled={adding.has(e.id)} onClick={() => pick(e)}>
+              {e.name} <span className="ttx-options__sub">· {adding.has(e.id) ? 'reading the footprint…' : 'footprint by source'}</span>
             </button>
           ))}
         </div>

@@ -37,6 +37,8 @@ export const mapLayer = z.object({
   /** Added after layers: absent on older ones. Filter and color apply to features only; opacity to every deck.gl layer. */
   filter: layerFilter.optional(),
   style: layerStyle.optional(),
+  /** Its features close the roads they cover, for the map's routes (mapRoutes.ts): e.g. a flood extent. */
+  blocks: z.boolean().optional(),
 })
 export type MapLayer = z.infer<typeof mapLayer>
 

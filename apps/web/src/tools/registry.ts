@@ -1,6 +1,6 @@
 import { adminBoundariesTool, WorldBankBoundaries } from '../data/boundaries'
 import { OvertureParquet, overtureTool } from '../data/buildings'
-import { UrlFeatures, urlFeaturesTool, urlRasterTool, urlTilesTool } from '../data/fromUrl'
+import { uploadFeaturesTool, UrlFeatures, urlFeaturesTool, urlRasterTool, urlTilesTool } from '../data/fromUrl'
 import { eventsGet, eventsSearch, forecastTool, geocodeTools, gfs, OpenCageGeocoder } from '@ttx/plugins'
 import { healthFacilitiesTool, LayercakeHealth } from '../data/health'
 import { populationTool, SourceCoopPopulation } from '../data/population'
@@ -11,7 +11,11 @@ import { boundariesTool } from '../map/adminAreas'
 import { notebookFactory } from '../notebooks/api'
 import { notebookArtifactTool } from '../notebooks/artifact'
 import { notebookRunsTool } from '../notebooks/runs'
+import { routeTool, routing } from '../routing/routing'
 import { ToolRunner } from '@ttx/core'
+
+/** Reads GeoJSON, GeoParquet and shapefiles from URLs and uploads, in one worker. */
+const urlFeatures = new UrlFeatures()
 
 /** Every tool the app has, and the one runner for them, so all maps on the board share one cache. */
 export const tools = new ToolRunner([
@@ -20,7 +24,8 @@ export const tools = new ToolRunner([
   adminBoundariesTool(new WorldBankBoundaries()),
   overtureTool(new OvertureParquet()),
   healthFacilitiesTool(new LayercakeHealth()),
-  urlFeaturesTool(new UrlFeatures()),
+  urlFeaturesTool(urlFeatures),
+  uploadFeaturesTool(urlFeatures),
   urlRasterTool(),
   urlTilesTool,
   notebookArtifactTool(notebookFactory),
@@ -31,4 +36,5 @@ export const tools = new ToolRunner([
   eventsGet(monty),
   boundariesTool,
   choroplethTool,
+  routeTool(routing),
 ])

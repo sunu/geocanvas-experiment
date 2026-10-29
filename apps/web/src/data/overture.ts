@@ -8,21 +8,23 @@ import { bboxesIntersect, wkbToGeometry, type PolygonGeometry } from './wkb'
  */
 export const OVERTURE_STAC_CATALOG = 'https://stac.overturemaps.org/catalog.json'
 
-export type OvertureType = 'buildings'
+/** `segments` are the road network routing reads (apps/web/src/routing/), not a map layer. */
+export type OvertureType = 'buildings' | 'segments'
 
 /** STAC path of each type, below the release: `<release>/<theme>/<type>`. */
-const COLLECTION_PATHS: Record<OvertureType, string> = { buildings: 'buildings/building' }
+const COLLECTION_PATHS: Record<OvertureType, string> = { buildings: 'buildings/building', segments: 'transportation/segment' }
 
-/** The buildings collection states `license: ODbL-1.0`; most buildings come from OpenStreetMap. */
+/** Both collections state `license: ODbL-1.0`; most buildings and roads come from OpenStreetMap. */
 export const OVERTURE_ATTRIBUTION: Record<OvertureType, string> = {
   buildings: '© OpenStreetMap contributors, Overture Maps Foundation (ODbL)',
+  segments: '© OpenStreetMap contributors, Overture Maps Foundation (ODbL)',
 }
 
 /**
  * Limits measured on the 2026-10-21.0 release: a 6 × 6 km box in central Beira (0.0036 deg²) reads
  * 8 row groups (~15 MB) and returns 76k buildings. Larger areas fail before any download.
  */
-export const OVERTURE_LIMITS: Record<OvertureType, { maxAreaDeg2: number; maxFeatures: number }> = {
+export const OVERTURE_LIMITS: Record<'buildings', { maxAreaDeg2: number; maxFeatures: number }> = {
   buildings: { maxAreaDeg2: 0.01, maxFeatures: 100_000 },
 }
 

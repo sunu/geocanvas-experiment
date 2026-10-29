@@ -7,7 +7,7 @@ export { imagesPlugin, type ImageBoardObject } from './images.js'
 export { inputsPlugin, INPUT_KINDS, type InputBoardObject } from './inputs.js'
 export { applyLinks, factsOf, linkedLayerId, linksPlugin, personOf, planLinks, RECIPES, renderLinks, ROOT_TYPES, type LinkPatch, type LinkPlan, type Recipe, type Rendered } from './links/index.js'
 export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
-export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
+export { mapPlugin, BASEMAPS, UPLOAD_FEATURES_TOOL, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
 export { CHOROPLETH_TOOL, choroplethLayer, hapiPlugin, INDICATORS, type Indicator, type ConflictBoardObject, type CountryBoardObject, type PresenceBoardObject } from './hapi.js'
 export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } from './reliefweb.js'
@@ -49,6 +49,20 @@ export {
   type ShapeColor,
   type ShapePart,
 } from './mapAnnotations.js'
+export {
+  closureGeometry,
+  mapScenario,
+  MAX_ROUTE_KM,
+  nextRouteColor,
+  ROUTE_COLORS,
+  ROUTE_PROFILES,
+  type ClosureGeometry,
+  type MapScenario,
+  type RouteColor,
+  type RouteProfile,
+  type ScenarioClosure,
+  type ScenarioRoute,
+} from './mapScenario.js'
 export {
   checkArea,
   FORECAST_TOOL,
