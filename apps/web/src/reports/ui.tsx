@@ -2,11 +2,18 @@ import { FileTextIcon } from '@phosphor-icons/react'
 import type { Board } from '../board/board'
 import { registerObjectUI, registerWidget } from '../canvas/registry'
 import { ReportObject } from './ReportObject'
+import { ReportOptions } from './ReportOptions'
 import { boardReports } from './reports'
 
-/** Reports (agent-docs/tasks/reports.md): the widget on the canvas. Report mode (focus) comes in step 5. */
+/**
+ * Reports (agent-docs/tasks/reports.md): the widget on the canvas, and report mode in focus. Report mode is live (no
+ * private draft: the agent edits reports too) and keeps the agent chat open on the left.
+ */
 registerObjectUI('report', {
   View: ReportObject,
+  Options: ReportOptions,
+  live: true,
+  keepChat: true,
   tool: { key: 'P', label: 'Add report', Icon: FileTextIcon },
   panel: (o) => {
     const items = o.blocks.filter((b) => b.kind === 'item').length

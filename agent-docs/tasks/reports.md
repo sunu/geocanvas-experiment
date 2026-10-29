@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: steps 2 to 4 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: steps 2 to 5a built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -112,7 +112,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   - Letter is 816 × 1056 px.
   - Landscape swaps the two sides.
   - Margins are fixed.
-- **Page breaks.** A block that does not fit moves to the next page. A block taller than a page is scaled down to fit (maps, images), or split between lines (text).
+- **Page breaks** (built in step 5a, `apps/web/src/reports/pages.ts` and `ReportPages.tsx`). The flow becomes rows: a full-width block is a row by itself, two one-column blocks in a row share it, and a one-column block before a full-width one sits alone in the left column. Every block is laid out once out of sight at the page's column widths to measure its row, and measured again when a row changes size (an image loads). Rows go on pages in order, page 1 under the report's title; a row that does not fit what is left starts the next page. A row taller than a whole page gets a page of its own and is clipped for now; scaling maps and images down, and splitting text between lines, come later. Each page shows its number at the bottom.
 
 ### 3.3 Live and frozen items
 
@@ -174,6 +174,8 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   - Items always go at the end; move them afterwards in report mode.
 
 ## 5. Report mode
+
+Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ button, a double-click, or the Object panel's Open), live edits, the chat beside it, every page in a scrolling column, and the Options panel. **5b** is editing on the page: dragging blocks to reorder, the column toggle, the insert menu, × and Delete on a block, and typing headings and plain text.
 
 ### 5.1 The view
 
@@ -319,7 +321,9 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
    - blocks that reference a removed object
 3. **The widget on the canvas** (built: `apps/web/src/reports/`, the Report tool on P in the toolbar's Map and report group, Add to report in the right-click menu and the Object panel, with the canvas's notice saying what it did): the preview, the toolbar tool, and Add to report from the right-click menu, the Object panel and ⌘K, with the report picker.
 4. **Drag onto a report** (built): the drop zone, the confirmation, objects back in place, one undo step.
-5. **Report mode:** pages, the two-column grid, reordering by drag, spans, paper and orientation, the insert menu, headings and plain text.
+5. **Report mode,** in two PRs:
+   - **5a** (built): report mode opens from ⤢, a double-click or the Object panel's Open; it is live (`FocusableObjectUI.live`: no draft, Share or exit dialog) and keeps the agent chat on the left (`keepChat`); every page scrolls in the middle, on real pages; the Options panel has the name, the page, and the items (Live or Frozen, Go to source, Remove).
+   - **5b:** editing on the page: drag to reorder, the column toggle, the insert menu, × and Delete, headings and plain text.
 6. **Rich text:** the editor (Tiptap, needs approval), `report.setText`.
 7. **Live and frozen:**
    - report renderers and `freeze` for each type

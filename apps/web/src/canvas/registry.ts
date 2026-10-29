@@ -13,6 +13,8 @@ export interface ObjectViewProps<O extends BoardObject = BoardObject> {
   focused: boolean
   /** Open it in focus mode: for a focus button in its header. Only for focusable types, and not while focused. */
   onFocus?(): void
+  /** In focus, for its Options: leave focus and show another object on the canvas (e.g. a report item's source). */
+  onGoTo?(id: string): void
 }
 
 /** The parts of the object panel that depend on the type. Its type's name is the badge, and its history gives Updated and Prompt. */
@@ -45,14 +47,21 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
 
 /**
  * A type with in-focus mode (agent-docs/tasks/in-focus-widgets.md): its view fills the screen, with
- * its Options panel beside it. Both get this person's draft of the board as `runtime`, so changes made
- * there reach others only when shared.
+ * its Options panel beside it. By default both get this person's draft of the board as `runtime`, so
+ * changes made there reach others only when shared.
  */
 export interface FocusableObjectUI<O extends BoardObject = BoardObject> extends ObjectUI<O> {
-  /** Contextual tools, beside the object in focus. Every change is an op on `runtime` (the draft). */
+  /** Contextual tools, beside the object in focus. Every change is an op on `runtime` (the draft, or the board when `live`). */
   Options: ComponentType<ObjectViewProps<O>>
   /** Ops to run on the draft just before it is shared, e.g. a map shares its view. */
   beforeShare?(runtime: Runtime, object: O): void
+  /**
+   * Focus edits the board itself, with no private draft, Share or exit dialog: others and the agent see changes as
+   * they happen. For a report, which the agent edits too, and which a draft's Share could overwrite.
+   */
+  live?: true
+  /** The agent chat stays open on the left in focus, so people can ask it to work on the object. */
+  keepChat?: true
 }
 
 export const isFocusable = (ui: ObjectUI | undefined): ui is FocusableObjectUI => !!ui && 'Options' in ui

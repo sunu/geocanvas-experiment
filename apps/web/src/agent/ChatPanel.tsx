@@ -73,7 +73,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
 
   return (
     <aside
-      className="ttx-ui ttx-shell fixed top-[74px] left-2 z-[1000002] flex max-h-[calc(100%-82px)] w-[360px] max-w-[calc(100%-1rem)] flex-col rounded-xl border bg-card font-sans shadow-sm"
+      className="ttx-ui ttx-shell ttx-chatpanel fixed top-[74px] left-2 z-[1000002] flex max-h-[calc(100%-82px)] w-[360px] max-w-[calc(100%-1rem)] flex-col rounded-xl border bg-card font-sans shadow-sm"
       aria-label="Agent chat"
     >
       <header className={cn('flex shrink-0 items-center gap-1 px-4 pt-4', collapsed ? 'pb-4' : 'pb-1.5')}>

@@ -13,9 +13,12 @@ export const PANEL_W = 320
 const GAP = 16
 const ANIMATION_MS = 250
 
-/** The screen area the focused object fills, in a canvas of w × h. */
-export function focusArea(w: number, h: number): Rect {
-  return { x: GAP, y: GAP, w: Math.max(1, w - PANEL_W - 3 * GAP), h: Math.max(1, h - 2 * GAP) }
+/** Room kept on the left for the agent chat when a type keeps it in focus (a report): its width and margin (agent/ChatPanel.tsx). */
+export const CHAT_INSET = 368
+
+/** The screen area the focused object fills, in a canvas of w × h, beside the Options panel and, with `left`, the chat. */
+export function focusArea(w: number, h: number, { left = 0 }: { left?: number } = {}): Rect {
+  return { x: GAP + left, y: GAP, w: Math.max(1, w - left - PANEL_W - 3 * GAP), h: Math.max(1, h - 2 * GAP) }
 }
 
 /** The camera that shows world rectangle r centered in screen area a, as large as fits. */
