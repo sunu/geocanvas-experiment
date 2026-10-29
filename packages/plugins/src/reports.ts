@@ -102,6 +102,9 @@ const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : 
 
 const oneReport = { kind: 'objects', types: ['report'], min: 1, max: 1 } as const
 
+/** Space between objects and the new report made for them, in canvas units. */
+const NEW_REPORT_GAP = 48
+
 function reportOf(ctx: OpContext, id?: string): ReportBoardObject {
   const rid = id ?? (ctx.target.kind === 'objects' ? ctx.target.ids[0] : undefined)
   const report = rid ? ctx.board.get(rid) : undefined
@@ -218,31 +221,50 @@ export const reportsPlugin = definePlugin({
       id: 'report.addItems',
       title: 'Add to report',
       description:
-        'Add the selected objects to a report, as live items. A frame adds a heading (its title), then the objects inside it; ' +
-        'added to an empty report, a frame becomes the whole report instead: its title is the report\'s title, with no heading. ' +
-        'The objects stay where they are on the board. Objects already in the report are skipped.',
+        'Add the selected objects to the end of a report, as live items, or to a new report beside them when no report is given. ' +
+        'A frame adds a heading (its title), then the objects inside it; added to an empty report, a frame becomes the whole report instead: ' +
+        "its title is the report's title, with no heading. The objects stay where they are on the board. Objects already in the report are skipped.",
       target: { kind: 'objects', min: 1 },
-      args: z.object({ reportId: z.string().min(1).meta({ widget: 'report' }).describe('The report to add them to'), index: z.number().int().optional().describe('Where in the report. Default: at the end') }),
-      prepare(ctx, { reportId, index }) {
-        const report = reportOf(ctx, reportId)
-        const already = new Set(report.blocks.flatMap((b) => (b.kind === 'item' ? [b.sourceId] : [])))
+      args: z.object({
+        reportId: z.string().min(1).optional().meta({ widget: 'report' }).describe('The report to add them to. Leave it out for a new report'),
+      }),
+      // With one report on the board, that one; otherwise a new report unless someone picks one.
+      defaults: (ctx) => {
+        const reports = ctx.board.list().filter((o) => o.type === 'report')
+        return reports.length === 1 ? { reportId: reports[0]!.id } : {}
+      },
+      prepare(ctx, { reportId }) {
+        const report = reportId ? reportOf(ctx, reportId) : undefined
+        const blocks = report?.blocks ?? []
+        const already = new Set(blocks.flatMap((b) => (b.kind === 'item' ? [b.sourceId] : [])))
         const selected = (ctx.target.kind === 'objects' ? ctx.target.ids : []).flatMap((id) => ctx.board.get(id) ?? [])
         let sources = itemsToAdd(selected, ctx.board.list(), already)
         if (!sources.length) throw new Error('Nothing to add: the objects are already in the report, or are reports')
         // One frame (with what is in it) into an empty report is the report: its title is the report's, not a heading.
         const [first] = sources
-        const whole = !report.blocks.length && first!.type === 'frame' && sources.every((o) => o === first || contains(first!, o))
+        const whole = !blocks.length && first!.type === 'frame' && sources.every((o) => o === first || contains(first!, o))
         if (whole) sources = sources.slice(1)
         const added: Block[] = sources.map((o) => ({ id: newId(), kind: 'item', sourceId: o.id, mode: 'live', span: spanFor('item', o.type) }))
         return {
-          id: report.id,
-          blocks: insertAt(report.blocks, added, index),
+          id: report?.id,
+          // A new report goes to the right of the objects, top-aligned with them.
+          at: report
+            ? undefined
+            : {
+                x: Math.round(Math.max(...selected.map((o) => o.x + o.w)) + NEW_REPORT_GAP),
+                y: Math.round(Math.min(...selected.map((o) => o.y))),
+                ...ctx.registry.objectType('report')!.defaultSize,
+              },
+          blocks: [...blocks, ...added],
           ...(whole && { titleFrom: first!.id }),
           count: added.length,
-          name: report.name || 'the report',
+          name: report ? report.name || 'the report' : 'a new report',
         }
       },
-      apply: (tx, { id, blocks, titleFrom }) => tx.update({ [id]: { blocks, titleFrom } }),
+      apply(tx, { id, at, blocks, titleFrom }) {
+        if (id) tx.update({ [id]: { blocks, titleFrom } })
+        else tx.add('report', { ...at, blocks, ...(titleFrom && { titleFrom }) })
+      },
       describePlan: ({ count, name, titleFrom }) => `Added ${count} item${count === 1 ? '' : 's'} to ${name}${titleFrom ? ', titled after the frame' : ''}`,
     }),
     defineOp({

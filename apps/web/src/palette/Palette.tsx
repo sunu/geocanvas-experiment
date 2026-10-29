@@ -202,7 +202,7 @@ function ArgsStep({ runtime, op, target, center, run, onBack, selection }: Props
           <div className="ttx-op__desc">{op.description}</div>
         </div>
       </div>
-      <SchemaForm schema={schema} value={args} onChange={change} />
+      <SchemaForm runtime={runtime} schema={schema} value={args} onChange={change} />
       {summary && <div className="ttx-palette__summary">{summary}</div>}
       {error && <div className="ttx-palette__error">{error}</div>}
       <div className="ttx-palette__foot">

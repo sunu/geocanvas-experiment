@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { Runtime } from '@ttx/core'
 import { widget } from '../canvas/registry'
 
 type Schema = Record<string, any>
@@ -14,7 +15,7 @@ export function isAdvanced(s: Schema) {
 export const mainFields = (schema: Schema) => Object.entries<Schema>(schema.properties ?? {}).filter(([, s]) => !isAdvanced(s))
 
 /** A form made from an op's args as JSON Schema (from zod). Plugin widgets render fields with a `widget` hint. */
-export function SchemaForm({ schema, value, onChange }: { schema: Schema; value: Record<string, unknown>; onChange(v: Record<string, unknown>): void }) {
+export function SchemaForm({ runtime, schema, value, onChange }: { runtime: Runtime; schema: Schema; value: Record<string, unknown>; onChange(v: Record<string, unknown>): void }) {
   const all = Object.entries<Schema>(schema.properties ?? {})
   const required = new Set<string>(schema.required ?? [])
   const advanced = all.filter(([, s]) => isAdvanced(s))
@@ -24,7 +25,7 @@ export function SchemaForm({ schema, value, onChange }: { schema: Schema; value:
         {s.description ?? humanize(key)}
         {required.has(key) && s.default === undefined && <em> *</em>}
       </span>
-      <Field schema={s} value={value[key]} onChange={(v) => onChange({ ...value, [key]: v })} />
+      <Field runtime={runtime} schema={s} value={value[key]} onChange={(v) => onChange({ ...value, [key]: v })} />
     </label>
   )
   if (!all.length) return null
@@ -41,9 +42,9 @@ export function SchemaForm({ schema, value, onChange }: { schema: Schema; value:
   )
 }
 
-function Field({ schema, value, onChange }: { schema: Schema; value: unknown; onChange(v: unknown): void }) {
+function Field({ runtime, schema, value, onChange }: { runtime: Runtime; schema: Schema; value: unknown; onChange(v: unknown): void }) {
   const Widget = schema.widget ? widget(schema.widget) : undefined
-  if (Widget) return <Widget schema={schema} value={value} onChange={onChange} />
+  if (Widget) return <Widget runtime={runtime} schema={schema} value={value} onChange={onChange} />
   if (schema.enum) {
     return (
       <select value={String(value ?? '')} onChange={(e) => onChange(e.target.value || undefined)}>

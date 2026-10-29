@@ -90,6 +90,31 @@ describe('reports', () => {
     expect(report(rt, r).titleFrom).toBeUndefined()
   })
 
+  it('make a new report beside the objects when none is given, titled after a lone frame', async () => {
+    const rt = setup()
+    const frame = add(rt, 'frame', { x: 100, y: 50, w: 600, h: 400, title: 'Situation report: Flood in Nepal' })
+    const map = add(rt, 'map', { x: 120, y: 80 })
+    const res = await rt.invoke('report.addItems', one(frame), {})
+    expect(res.status, res.error).toBe('applied')
+    expect(res.summary).toBe('Added 1 item to a new report, titled after the frame')
+    const r = res.created![0]!
+    expect(report(rt, r)).toMatchObject({ x: 100 + 600 + 48, y: 50, w: 300, h: 424, paper: 'a4', orientation: 'portrait', titleFrom: frame })
+    expect(items(rt, r)).toEqual([map])
+    rt.undo()
+    expect(rt.board.list().some((o) => o.type === 'report')).toBe(false)
+  })
+
+  it('offer the one report on the board, and a new report when there are none or several', () => {
+    const rt = setup()
+    const note = add(rt, 'sticky')
+    const defaults = () => rt.defaultsFor('report.addItems', one(note))
+    expect(defaults()).toEqual({})
+    const r = add(rt, 'report', { x: 5000 })
+    expect(defaults()).toEqual({ reportId: r })
+    add(rt, 'report', { x: 6000 })
+    expect(defaults()).toEqual({})
+  })
+
   it('never put a report in a report', async () => {
     const rt = setup()
     const r = add(rt, 'report')

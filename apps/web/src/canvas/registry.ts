@@ -73,6 +73,8 @@ export interface WidgetProps {
   onChange(value: unknown): void
   /** The field's JSON Schema, from zod. */
   schema: Record<string, unknown>
+  /** The board the form is for, for widgets that list its objects (e.g. its reports). */
+  runtime: Runtime
 }
 
 const widgets = new Map<string, ComponentType<WidgetProps>>()

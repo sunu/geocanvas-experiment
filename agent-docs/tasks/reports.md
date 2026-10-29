@@ -159,9 +159,10 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 - **Dragging a frame onto a report** moves its contents with it while dragging, as any frame drag does. On Add, everything goes back to where it was.
 - **Seeing what is in a report:** when a report is selected, its live sources get a light outline on the canvas. There are no permanent arrows: the canvas already draws link arrows, and report arrows would crowd it.
 - **Add to report…** from the right-click menu, the Object panel and ⌘K (`report.addItems`, which acts on the selection):
-  - with one report on the board, it adds directly
-  - with several, a submenu lists the reports by name
-  - with none, "New report with these" makes one
+  - a dropdown lists the board's reports by title, and **New report** (the `report` form widget, `apps/web/src/reports/ui.tsx`)
+  - with one report on the board, it is chosen already; with none or several, New report is
+  - New report makes a report to the right of the objects, top-aligned with them
+  - items always go at the end; move them afterwards in report mode
 
 ## 5. Report mode
 
@@ -202,7 +203,7 @@ All with zod schemas, so they are in ⌘K, are agent tools, and are in the MCP m
 | --- | --- | --- |
 | `report.add` | canvas | the type's fields, as every `<type>.add` |
 | `report.setPage` | one report | `paper`, `orientation` |
-| `report.addItems` | the selection | `reportId`, `index` (default: the end). Items are added live; freeze them afterwards with `report.setItemMode`. A frame adds the objects in it; into an empty report, it also titles the report (§4). Objects already in the report, and reports, are skipped. Maps and frames take the full width, other items one column. |
+| `report.addItems` | the selection | `reportId`, optional: without it, a new report is made to the right of the objects. Its defaults choose the board's report when there is exactly one. Items go at the end, live; freeze them afterwards with `report.setItemMode`. A frame adds the objects in it; into an empty report, it also titles the report (§4). Objects already in the report, and reports, are skipped. Maps and frames take the full width, other items one column. |
 | `report.addBlock` | one report | `block` (a heading with its level, text as plain `text` or a rich `doc`, an image, or a divider), `index`. Headings and dividers take the full width. |
 | `report.removeBlock` | one report | `blockId` |
 | `report.moveBlock` | one report | `blockId`, `index` |
