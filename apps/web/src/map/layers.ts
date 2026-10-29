@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Layer } from '@deck.gl/core'
-import { GeoJsonLayer } from '@deck.gl/layers'
+import { TileLayer } from '@deck.gl/geo-layers'
+import { BitmapLayer, GeoJsonLayer } from '@deck.gl/layers'
+import type { Tiles } from '../data/fromUrl'
 import { tools } from '../tools/registry'
 import { stableJson } from '@ttx/core'
 import { rasterLayers } from './raster'
@@ -92,16 +94,35 @@ export function useLayerStates(layers: MapLayer[]): LayerState[] {
 }
 
 /** Accent color of data layers, [r, g, b]. */
-const ACCENT = [37, 99, 235] as const
+export const ACCENT = [37, 99, 235] as const
+
+/** The kinds of geometry in a feature collection, for its legend. */
+export function geometryKinds(fc: GeoJSON.FeatureCollection): Set<'point' | 'line' | 'area'> {
+  const kinds = new Set<'point' | 'line' | 'area'>()
+  const add = (g: GeoJSON.Geometry | null): void => {
+    if (!g) return
+    if (g.type === 'GeometryCollection') return g.geometries.forEach(add)
+    kinds.add(g.type.endsWith('Point') ? 'point' : g.type.endsWith('LineString') ? 'line' : 'area')
+  }
+  for (const f of fc.features) {
+    add(f.geometry)
+    if (kinds.size === 3) break
+  }
+  return kinds
+}
 
 const isArea = (f: GeoJSON.Feature) => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon'
 
-/** deck.gl layers for the layers that have a result, by kind of result. Rasters draw below features. */
+/** Drawing order by kind of result: tiles at the bottom, then rasters, then features. */
+const DRAW_ORDER: Record<string, number> = { 'geo.tiles': 0, 'geo.raster': 1 }
+const drawOrder = (s: LayerState) => DRAW_ORDER[s.output ?? ''] ?? 2
+
+/** deck.gl layers for the layers that have a result, by kind of result. Tiles and rasters draw below features. */
 export function deckLayers(states: LayerState[]): Layer[] {
-  const rasters = states.filter((s) => s.output === 'geo.raster')
-  const others = states.filter((s) => s.output !== 'geo.raster')
-  return [...rasters, ...others].flatMap((s): Layer[] => {
+  // A stable sort: within a kind, the list's order.
+  return [...states].sort((a, b) => drawOrder(a) - drawOrder(b)).flatMap((s): Layer[] => {
     if (s.value === undefined) return []
+    if (s.output === 'geo.tiles') return [tileLayer(s.value as Tiles, `layer-${s.id}`)]
     if (s.output === 'geo.raster') return rasterLayers(s.value, { id: `layer-${s.id}` })
     if (s.output === 'geo.features') {
       // Points: solid dots. Polygons (countries, buildings): a light fill and an outline, so the basemap stays readable.
@@ -126,6 +147,21 @@ export function deckLayers(states: LayerState[]): Layer[] {
       ]
     }
     return []
+  })
+}
+
+/** XYZ raster tiles, each drawn as an image over its own bounds. */
+function tileLayer(t: Tiles, id: string): Layer {
+  return new TileLayer({
+    id,
+    data: t.url,
+    tileSize: 256,
+    minZoom: 0,
+    maxZoom: 19,
+    renderSubLayers: (props) => {
+      const { west, south, east, north } = props.tile.bbox as { west: number; south: number; east: number; north: number }
+      return new BitmapLayer({ ...props, data: undefined, image: props.data, bounds: [west, south, east, north] })
+    },
   })
 }
 

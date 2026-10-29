@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { Runtime, Views, type Actor } from '@ttx/core'
-import { bboxOf, DATA_LAYERS, plugins, type MapBoardObject } from '../src/index'
+import { bboxOf, DATA_LAYERS, guessFormat, plugins, type MapBoardObject } from '../src/index'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
 const agentFor = (person: string): Actor => ({ kind: 'agent', id: 'agent', name: 'Agent', onBehalfOf: person })
@@ -87,5 +87,38 @@ describe('map layers', () => {
   it('keeps layer areas on the globe and rounded', () => {
     expect(bboxOf({ west: -250, south: -95, east: 250, north: 95 })).toEqual([-180, -90, 180, 90])
     expect(bboxOf({ west: 34.812345678, south: -19.86, east: 34.87, north: -19.8000049 })).toEqual([34.8123, -19.86, 34.87, -19.8])
+  })
+})
+
+describe('map layers from a URL', () => {
+  it('guesses the format from the URL', () => {
+    expect(guessFormat('https://example.org/data/flood.geojson')).toBe('geojson')
+    expect(guessFormat('https://example.org/a.json?x=1')).toBe('geojson')
+    expect(guessFormat('https://example.org/b.parquet')).toBe('geoparquet')
+    expect(guessFormat('https://example.org/roads.zip')).toBe('shapefile')
+    expect(guessFormat('https://example.org/dem.tif')).toBe('cog')
+    expect(guessFormat('https://tile.example.org/{z}/{x}/{y}.png')).toBe('xyz')
+    expect(guessFormat('https://example.org/api/data')).toBeUndefined()
+  })
+
+  it('adds a recipe whose tool matches the format, titled by the file name', () => {
+    const { rt, target, layersOf } = setup()
+    expect(rt.dispatch('map.addUrlLayer', target, { url: 'https://example.org/data/flood%20extent.geojson' }).status).toBe('applied')
+    rt.dispatch('map.addUrlLayer', target, { url: 'https://example.org/dem.tif', min: 10, max: 2000, attribution: 'NASA' })
+    rt.dispatch('map.addUrlLayer', target, { url: 'https://tile.example.org/{z}/{x}/{y}.png' })
+    expect(layersOf()).toEqual([
+      { id: expect.any(String), tool: 'data.urlFeatures', input: { url: 'https://example.org/data/flood%20extent.geojson', format: 'geojson' }, title: 'flood extent.geojson' },
+      { id: expect.any(String), tool: 'data.urlRaster', input: { url: 'https://example.org/dem.tif', rescale: [10, 2000], attribution: 'NASA' }, title: 'dem.tif' },
+      { id: expect.any(String), tool: 'data.urlTiles', input: { url: 'https://tile.example.org/{z}/{x}/{y}.png' }, title: 'tile.example.org' },
+    ])
+  })
+
+  it('refuses a URL whose format it cannot tell, and URLs that are not http(s)', () => {
+    const { rt, target, layersOf } = setup()
+    expect(rt.dispatch('map.addUrlLayer', target, { url: 'https://example.org/api/data' })).toMatchObject({ status: 'failed', error: expect.stringMatching(/format/) })
+    expect(rt.dispatch('map.addUrlLayer', target, { url: 'javascript:alert(1)', format: 'geojson' }).status).toBe('failed')
+    expect(rt.dispatch('map.addUrlLayer', target, { url: 'https://example.org/t.png', format: 'xyz' }).status).toBe('failed')
+    expect(rt.dispatch('map.addUrlLayer', target, { url: 'https://example.org/api/data', format: 'geojson', title: 'Shelters' }).status).toBe('applied')
+    expect(layersOf().map((l) => l.title)).toEqual(['Shelters'])
   })
 })

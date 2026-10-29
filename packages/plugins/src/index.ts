@@ -15,13 +15,17 @@ export {
   BOUNDARIES_TOOL,
   bboxOf,
   DATA_LAYERS,
+  guessFormat,
   hasArea,
   mapLayer,
   newLayerId,
+  URL_FORMATS,
+  urlTitle,
   type AdminLevel,
   type Bbox,
   type DataLayerKey,
   type MapLayer,
+  type UrlFormat,
 } from './mapLayers.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
 export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'

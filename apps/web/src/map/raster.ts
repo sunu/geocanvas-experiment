@@ -40,6 +40,9 @@ const COLORMAPS: Record<RasterColormap, string[]> = {
   ylorrd: ['#ffffcc', '#fff5b5', '#feec9f', '#fee28a', '#fed875', '#fec560', '#fdb14b', '#fd9e43', '#fc8c3b', '#fc6e33', '#fc4e2a', '#ef3423', '#e31a1c', '#d00d20', '#bd0025', '#9e0026', '#800026'],
 }
 
+/** A color ramp as a CSS gradient, left to right, for legends. */
+export const rampGradient = (name: RasterColormap = 'magma') => `linear-gradient(to right, ${(COLORMAPS[name] ?? COLORMAPS.magma).join(', ')})`
+
 /** A 256×1 RGBA ramp, linearly interpolated between the stops. */
 function rampPixels(stops: string[]): Uint8Array {
   const rgb = stops.map((s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)))

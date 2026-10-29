@@ -2333,3 +2333,43 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   border-color: var(--ttx-accent);
   color: var(--ttx-accent);
 }
+
+.ttx-layers__legend i.is-point {
+  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+}
+
+.ttx-layers__legend i.is-line {
+  height: 2px;
+  border-radius: 1px;
+  box-shadow: none;
+}
+
+/* A raster's color ramp and its range. */
+.ttx-layers__ramp {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ttx-muted);
+}
+
+.ttx-layers__ramp i {
+  display: block;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.ttx-layers__ramp > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.ttx-location select {
+  font: inherit;
+}
+
+.ttx-location__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

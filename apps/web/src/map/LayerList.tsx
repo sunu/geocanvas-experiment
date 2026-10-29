@@ -1,7 +1,8 @@
 import { CrosshairSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { hasArea, type MapLayer } from '@ttx/plugins'
 import { ADMIN_AREAS, classify, type AdminAreas } from './adminAreas'
-import { attributionOf, truncationOf, type LayerState } from './layers'
+import { ACCENT, attributionOf, geometryKinds, truncationOf, type LayerState } from './layers'
+import { rampGradient, type Raster } from './raster'
 
 interface Props {
   /** The recipes, in the same order as `states`. */
@@ -22,7 +23,7 @@ export function LayerList({ layers, states, onUseMyView, onRemove }: Props) {
           <div key={s.id} className={`ttx-layers__item ${s.error ? 'is-error' : ''}`}>
             <div className="ttx-layers__text">
               <div className="ttx-layers__title">{s.title}</div>
-              {s.output === ADMIN_AREAS && s.value !== undefined && <AdminLegend areas={s.value as AdminAreas} />}
+              {s.value !== undefined && <Legend state={s} />}
               {note && <div className="ttx-layers__note">{note}</div>}
             </div>
             {layers[i] && hasArea(layers[i]) && (
@@ -36,6 +37,46 @@ export function LayerList({ layers, states, onUseMyView, onRemove }: Props) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** What a layer's colors mean: by kind of result. Tiles have their own colors, and no legend. */
+function Legend({ state: s }: { state: LayerState }) {
+  if (s.output === ADMIN_AREAS) return <AdminLegend areas={s.value as AdminAreas} />
+  if (s.output === 'geo.raster') return <RasterLegend raster={s.value as Raster} />
+  if (s.output === 'geo.features') return <FeatureLegend fc={s.value as GeoJSON.FeatureCollection} />
+  return null
+}
+
+const accent = `rgb(${ACCENT.join(' ')})`
+
+/** The layer's color, in the shape of what it has: dots, lines or areas, as deckLayers draws them. */
+function FeatureLegend({ fc }: { fc: GeoJSON.FeatureCollection }) {
+  const kinds = geometryKinds(fc)
+  const n = fc.features.length
+  return (
+    <div className="ttx-layers__legend">
+      {kinds.has('point') && <i className="is-point" style={{ background: accent }} />}
+      {kinds.has('line') && <i className="is-line" style={{ background: accent }} />}
+      {kinds.has('area') && <i style={{ background: `rgb(${ACCENT.join(' ')} / 0.12)`, boxShadow: `inset 0 0 0 1px ${accent}` }} />}
+      <span className="ttx-layers__note">
+        {n.toLocaleString('en-US')} {n === 1 ? 'feature' : 'features'}
+      </span>
+    </div>
+  )
+}
+
+/** The ramp over its range. Values at or below the minimum are not drawn; the ramp follows the square root of the value. */
+function RasterLegend({ raster: r }: { raster: Raster }) {
+  const [min, max] = r.rescale
+  return (
+    <div className="ttx-layers__ramp">
+      <i style={{ background: rampGradient(r.colormap) }} title="Square-root scale: low values stay visible" />
+      <span>
+        {min.toLocaleString('en-US')}
+        <span>{r.unit}</span>≥ {max.toLocaleString('en-US')}
+      </span>
     </div>
   )
 }

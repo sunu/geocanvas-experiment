@@ -1,6 +1,21 @@
 import { z } from 'zod'
 import { defineOp, definePlugin, Views, type AnyObject, type BoardTx, type OpContext } from '@ttx/core'
-import { ADMIN_LEVEL_NAME, ADMIN_LEVELS, BOUNDARIES_TOOL, bboxOf, DATA_LAYERS, mapLayer, newLayerId, type AdminLevel, type DataLayerKey, type MapLayer } from './mapLayers.js'
+import {
+  ADMIN_LEVEL_NAME,
+  ADMIN_LEVELS,
+  BOUNDARIES_TOOL,
+  bboxOf,
+  DATA_LAYERS,
+  guessFormat,
+  mapLayer,
+  newLayerId,
+  URL_FORMATS,
+  urlTitle,
+  type AdminLevel,
+  type DataLayerKey,
+  type MapLayer,
+  type UrlFormat,
+} from './mapLayers.js'
 import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
 
 /** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
@@ -123,6 +138,38 @@ export const mapPlugin = definePlugin({
         const map = mapOf(ctx)
         const d = DATA_LAYERS[layer]
         const added: MapLayer = { id: newLayerId(), tool: d.tool, input: { ...d.input, area: areaFor(ctx, map, area) }, title: d.title }
+        return { id: map.id, layers: [...(map.layers ?? []), added] }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.addUrlLayer',
+      title: 'Add layer from a URL',
+      description: `Add a layer read from a URL to a map, for everyone. Formats: ${Object.entries(URL_FORMATS)
+        .map(([k, f]) => `${k} (${f.label})`)
+        .join(', ')}. Without a format it is guessed from the URL. The server must allow CORS. A COG must have one band; give its value range for the color ramp.`,
+      target: oneMap,
+      args: z.object({
+        url: z.url({ protocol: /^https?$/ }).describe('http(s) URL; for xyz a template with {z}, {x} and {y}'),
+        format: z.enum(Object.keys(URL_FORMATS) as [UrlFormat, ...UrlFormat[]]).optional().describe('Guessed from the URL when left out'),
+        title: z.string().min(1).optional(),
+        min: z.number().optional().describe('cog only: values at or below this are not drawn (default 0)'),
+        max: z.number().optional().describe('cog only: values at or above this get the last color (default 100)'),
+        attribution: z.string().optional().describe("The data's attribution, which its license may require"),
+      }),
+      prepare(ctx, { url, format, title, min, max, attribution }) {
+        const f = format ?? guessFormat(url)
+        if (!f) throw new Error(`Give \`format\`: the URL does not say which it is (${Object.keys(URL_FORMATS).join(', ')})`)
+        if (f === 'xyz' && !/\{z\}/i.test(url)) throw new Error('An xyz URL needs {z}, {x} and {y}')
+        if (f === 'cog' && min !== undefined && max !== undefined && min >= max) throw new Error('`min` must be below `max`')
+        const map = mapOf(ctx)
+        const input = {
+          url,
+          ...(URL_FORMATS[f].tool === 'data.urlFeatures' && { format: f }),
+          ...(f === 'cog' && { rescale: [min ?? 0, max ?? 100] }),
+          ...(attribution && { attribution }),
+        }
+        const added: MapLayer = { id: newLayerId(), tool: URL_FORMATS[f].tool, input, title: title ?? urlTitle(url, f) }
         return { id: map.id, layers: [...(map.layers ?? []), added] }
       },
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),

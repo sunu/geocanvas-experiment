@@ -12,6 +12,7 @@ import {
   type MapBoardObject,
   type MapLayer,
   type Place,
+  URL_FORMATS,
 } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import type { Board } from '../board/board'
@@ -25,6 +26,7 @@ import { areaOf, goTo, liveMap } from './live'
 import { LocationPicker } from './LocationPicker'
 import { fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
+import { UrlLayerForm, type UrlLayerArgs } from './UrlLayerForm'
 
 /** A map op as its own undo step. In focus, `runtime` is the draft: others see it once shared. */
 function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, unknown>) {
@@ -62,6 +64,12 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
     mapOp(runtime, o.id, op, args)
     const added = (runtime.board.get(o.id) as MapBoardObject | undefined)?.layers?.find((l) => !before.has(l.id))
     if (added) fitMapToLayer(runtime, o.id, added)
+  }
+
+  /** A layer from a URL, for everyone; features also fit this person's view once read. */
+  const addUrlLayer = (args: UrlLayerArgs) => {
+    if (URL_FORMATS[args.format].tool === 'data.urlFeatures') addAndFit('map.addUrlLayer', { ...args })
+    else mapOp(runtime, o.id, 'map.addUrlLayer', { ...args })
   }
 
   /** A HAPI figure by province or district, for everyone; this person's view fits the country. */
@@ -102,6 +110,10 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
             </button>
           ))}
         </div>
+      </section>
+      <section className="ttx-options__section">
+        <h3>Add from a URL</h3>
+        <UrlLayerForm onAdd={addUrlLayer} />
       </section>
       <section className="ttx-options__section">
         <h3>Boundaries</h3>
