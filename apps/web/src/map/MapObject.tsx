@@ -2,17 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl, type MapMouseEvent } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
-import { MapTrifoldIcon, NoteIcon } from '@phosphor-icons/react'
+import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
-import { Views, type Runtime, type SavedView } from '@ttx/core'
-import { MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures } from '@ttx/plugins'
+import { stableJson, Views, type Runtime, type SavedView } from '@ttx/core'
+import { MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import { tools } from '../tools/registry'
 import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
 import { BASEMAP_CREDITS, basemapStyle } from './basemaps'
-import { attributionOf, boundsOf, deckLayers, useLayerStates } from './layers'
+import { DrawingBox, type DrawTool } from './DrawingBox'
+import { drawShape } from './draw'
+import { attributionOf, boundsOf, deckLayers, shapeLayer, useLayerStates } from './layers'
 import { registerLiveMap } from './live'
 import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
@@ -109,11 +111,17 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const [hover, setHover] = useState<{ text: string; x: number; y: number }>()
   /** The live map, for what is drawn on it with React (stickies). */
   const [liveMap, setLiveMap] = useState<MapLibreMap>()
-  /** The next click on the map adds a sticky there. */
-  const [placing, setPlacing] = useState(false)
+  /** The drawing box's tool: the next click on the map adds a sticky there, or the next drag draws a shape. */
+  const [tool, setTool] = useState<DrawTool>()
+  const [shapeColor, setShapeColor] = useState<ShapeColor>('red')
   /** The sticky being written in. */
   const [writing, setWriting] = useState<string>()
   const annotations = o.annotations ?? NO_ANNOTATIONS
+  // Shapes are drawn by deck.gl: a new layer only when they change, not on every camera move (as for data layers).
+  const shapesKey = stableJson(annotations.filter((a) => a.kind === 'shape'))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const shapes = useMemo(() => annotations.filter((a) => a.kind === 'shape'), [shapesKey])
+  const shapesRef = useRef(shapes)
   const views = useMemo(() => new Views(runtime.board.doc), [runtime])
   const subscribeViews = useCallback((listener: () => void) => views.subscribe(listener), [views])
   const latest = useSyncExternalStore(subscribeViews, () => views.latest(o.id)?.view)
@@ -124,7 +132,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const live = useLiveMap(o.id) || editing || focused
   const view = mine ?? latest ?? WORLD
   const snapshot = useSnapshot(
-    live ? undefined : { view: { center: view.center, zoom: view.zoom, bearing: view.bearing }, width: o.w, height: o.h - MAP_HEADER_PX, basemap: o.basemap, layers },
+    live ? undefined : { view: { center: view.center, zoom: view.zoom, bearing: view.bearing }, width: o.w, height: o.h - MAP_HEADER_PX, basemap: o.basemap, layers, shapes },
   )
 
   useEffect(() => {
@@ -146,7 +154,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     // deck.gl data layers go here. Overlay mode (its own canvas above the map), not interleaved:
     // deck.gl 9.4's interleaved mode throws on every frame with MapLibre 6. The cost is a second
     // WebGL context per map, and deck.gl layers draw above the map's labels.
-    const overlay = new MapboxOverlay({ interleaved: false, layers: deckLayers(statesRef.current) })
+    const overlay = new MapboxOverlay({ interleaved: false, layers: [...deckLayers(statesRef.current), shapeLayer(shapesRef.current)] })
     map.addControl(overlay as unknown as IControl)
     // The box changes size when resized, and in focus mode (a local size that is never stored).
     const resize = new ResizeObserver(() => map.resize())
@@ -181,11 +189,24 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     }
   }, [o.id, live])
 
-  // Leaving edit mode ends writing; leaving focus ends placing, since the note tool is a focus tool.
+  // Leaving edit mode ends writing; leaving focus puts the drawing box's tool away, since it is a focus tool.
   useEffect(() => {
-    if (!focused) setPlacing(false)
+    if (!focused) setTool(undefined)
     if (!editing) setWriting(undefined)
   }, [editing, focused])
+
+  // Drawing a shape: the person draws it on the map, then it is added for everyone (in focus: on the draft).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !tool || tool === 'note') return
+    return drawShape(map, tool, SHAPE_COLORS[shapeColor], (points) => {
+      setTool(undefined)
+      if (!points) return
+      const rt = runtimeRef.current
+      rt.beginGesture()
+      rt.dispatch('map.addShape', { kind: 'objects', ids: [o.id] }, { shape: tool, points, color: shapeColor })
+    })
+  }, [tool, shapeColor, o.id])
 
   // Writing in a sticky ends with a press on the map outside it. Not on blur: a note's text box loses focus when
   // its marker is put in the page again (React mounts twice in development).
@@ -202,10 +223,10 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Placing a sticky: the next click on the map, not on a note, adds one there, for everyone, and opens it to write.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !placing) return
+    if (!map || tool !== 'note') return
     const onClick = (e: MapMouseEvent) => {
       if ((e.originalEvent.target as Element).closest('.ttx-mapsticky')) return
-      setPlacing(false)
+      setTool(undefined)
       const rt = runtimeRef.current
       const before = new Set((rt.board.get(o.id) as MapBoardObject | undefined)?.annotations?.map((a) => a.id))
       const p = e.lngLat.wrap()
@@ -223,7 +244,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       map.getCanvas().style.cursor = ''
       map.off('click', onClick)
     }
-  }, [placing, o.id])
+  }, [tool, o.id])
 
   // Save this person's pans as their view, in the doc the runtime has (a draft in focus mode), and follow
   // changes to their view from elsewhere (the agent, another tab).
@@ -297,10 +318,11 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Only when a layer or its result changed: new deck.gl layers make deck.gl redraw all their data, and the canvas
   // re-renders the map on every camera move.
   useEffect(() => {
-    overlayRef.current?.setProps({ layers: deckLayers(states) })
+    overlayRef.current?.setProps({ layers: [...deckLayers(states), shapeLayer(shapes)] })
     statesRef.current = states
+    shapesRef.current = shapes
     if (mapRef.current && styleReadyRef.current) syncAdminLayers(mapRef.current, states)
-  }, [states])
+  }, [states, shapes])
 
   useEffect(() => {
     if (styleRef.current === o.basemap) return
@@ -338,21 +360,8 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
             onWrite={setWriting}
           />
         )}
-        {/* Notes are added in focus only; a double-click on the canvas lets the map pan, nothing more. */}
-        {focused && (
-          <div className="ttx-map__tools" role="toolbar" aria-label="Annotate">
-            <button
-              type="button"
-              className={placing ? 'is-on' : undefined}
-              title={placing ? 'Click on the map to place the note' : 'Sticky note: click on the map to place it'}
-              aria-label="Sticky note"
-              aria-pressed={placing}
-              onClick={() => setPlacing((p) => !p)}
-            >
-              <NoteIcon size={16} />
-            </button>
-          </div>
-        )}
+        {/* Notes and shapes are added in focus only; a double-click on the canvas lets the map pan, nothing more. */}
+        {focused && <DrawingBox tool={tool} color={shapeColor} onTool={setTool} onColor={setShapeColor} />}
         {!live && snapshot && (
           <>
             <img className="ttx-map__snapshot" src={snapshot} alt="" draggable={false} />

@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { Map as MapLibreMap, type IControl } from 'maplibre-gl'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { stableJson } from '@ttx/core'
-import type { Basemap, MapLayer } from '@ttx/plugins'
+import type { Basemap, MapAnnotation, MapLayer } from '@ttx/plugins'
 import { syncAdminLayers } from './adminAreas'
 import { basemapStyle } from './basemaps'
-import { deckLayers, loadLayerStates } from './layers'
+import { deckLayers, loadLayerStates, shapeLayer } from './layers'
 
 /**
  * Pictures of the maps that are not live (budget.ts), all drawn by one hidden map: one MapLibre map and its deck.gl
@@ -21,6 +21,8 @@ export interface SnapshotRequest {
   height: number
   basemap: Basemap
   layers: MapLayer[]
+  /** The shapes drawn on the map. Sticky notes are DOM markers on a live map, and are not in snapshots. */
+  shapes: MapAnnotation[]
 }
 
 /** Snapshots kept, as object URLs (each a few hundred KB of PNG). */
@@ -106,7 +108,7 @@ async function draw(req: SnapshotRequest): Promise<string> {
   }
   map.jumpTo(req.view)
   const states = await loadLayerStates(req.layers)
-  overlay.setProps({ layers: deckLayers(states) })
+  overlay.setProps({ layers: [...deckLayers(states), shapeLayer(req.shapes)] })
   syncAdminLayers(map, states)
   const deadline = performance.now() + TIMEOUT_MS
   await Promise.race([once(map, 'idle'), sleep(TIMEOUT_MS)])
