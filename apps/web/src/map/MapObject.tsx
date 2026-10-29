@@ -4,7 +4,6 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
-import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { stableJson, Views, type Runtime, type SavedView } from '@ttx/core'
 import { MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
@@ -14,7 +13,7 @@ import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } fr
 import { BASEMAP_CREDITS, basemapStyle } from './basemaps'
 import { DrawingBox, type DrawTool } from './DrawingBox'
 import { drawShape } from './draw'
-import { attributionOf, boundsOf, deckLayers, shapeLayer, useLayerStates } from './layers'
+import { attributionOf, boundsOf, captionOf, deckLayers, shapeLayer, useLayerStates } from './layers'
 import { registerLiveMap } from './live'
 import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
@@ -105,9 +104,10 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
   const scenario = useScenario(o, layers, states)
-  // Routes are found on Overture's roads, whose license asks for attribution like a layer's.
+  // Routes are found on Overture's roads, whose license asks for attribution like a layer's. A forecast's caption (model,
+  // run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
   const results = [...states.map((st) => st.value), ...scenario.routes.map((r) => r.result)]
-  const credits = [...new Set(results.map(attributionOf).filter((a) => !!a))].join(' · ')
+  const credits = [...new Set(results.flatMap((v) => [attributionOf(v), captionOf(v)]).filter((a) => !!a))].join(' · ')
   /** In focus: Map mode (data, notes, drawings) or Scenario mode (routes, closures); the Options panel's tabs pick it. */
   const mode = useMapMode(o.id)
   /** The latest states, for map events. */
@@ -365,9 +365,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
 
   return (
     <div className="ttx-map">
-      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title="Map">
-        {!focused && onFocus && <FocusButton onFocus={onFocus} />}
-      </ObjectHeader>
+      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title="Map" />
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {liveMap && (

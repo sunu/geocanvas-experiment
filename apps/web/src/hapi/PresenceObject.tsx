@@ -1,6 +1,6 @@
-import { UsersThreeIcon } from '@phosphor-icons/react'
 import type { PresenceBoardObject } from '@ttx/plugins'
 import type { ObjectViewProps } from '../canvas/registry'
+import { PRESENCE_FACE } from '../canvas/widgetFaces'
 import { CountryWidget, errorText, Section, useCountryData } from './CountryWidget'
 import { loadPresence, presenceOf } from './presence'
 
@@ -10,7 +10,7 @@ const PROVINCES = 8
 /** Who works where in a country (HDX HAPI operational presence): organizations by province, for one sector or all. */
 export function PresenceObject(props: ObjectViewProps<PresenceBoardObject>) {
   return (
-    <CountryWidget {...props} title="Who's where" Icon={UsersThreeIcon} nameInHeader>
+    <CountryWidget {...props} title={PRESENCE_FACE.label} Icon={PRESENCE_FACE.Icon} nameInHeader>
       {(iso3) => <PresenceDetails {...props} iso3={iso3} />}
     </CountryWidget>
   )

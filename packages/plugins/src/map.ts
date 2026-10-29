@@ -21,6 +21,7 @@ import {
 import { mapAnnotation, SHAPE_COLORS, SHAPE_POINTS, SHAPES, type MapAnnotation, type MapShape, type ShapeColor } from './mapAnnotations.js'
 import { closureGeometry, mapScenario, MAX_ROUTE_KM, nextRouteColor, ROUTE_PROFILES, type ClosureGeometry, type MapScenario } from './mapScenario.js'
 import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
+import { checkArea, FORECAST_VARIABLES, forecastLayer, gfs, HORIZONS, latestRun, type ForecastVariable, type Horizon } from './weather.js'
 
 /** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
 
@@ -301,6 +302,29 @@ export const mapPlugin = definePlugin({
         const map = mapOf(ctx)
         const added: MapLayer = { id: newLayerId(), tool: BOUNDARIES_TOOL, input: { level }, title: `${ADMIN_LEVEL_NAME[level as AdminLevel].many} (COD-AB)` }
         return { id: map.id, layers: [...(map.layers ?? []), added] }
+      },
+      apply: (tx, { id, layers }) => setLayers(tx, id, layers),
+    }),
+    defineOp({
+      id: 'map.addForecast',
+      title: 'Add weather forecast',
+      description: `Add a NOAA GFS weather forecast to a map, for everyone: ${Object.entries(FORECAST_VARIABLES)
+        .map(([k, v]) => `${k} (${v.description})`)
+        .join(', ')}, over the next 24, 48, 72 or 120 hours, on a 0.25° grid (about 28 km). It is forecast context, not an official warning or impact estimate. ` +
+        'The latest complete forecast run is fixed when the layer is added, so everyone sees the same run. Without an area: the area the asker sees on the map (at most 30° wide and high).',
+      target: oneMap,
+      args: z.object({
+        variable: z.enum(Object.keys(FORECAST_VARIABLES) as [ForecastVariable, ...ForecastVariable[]]).describe('rain: total rain; wind: strongest wind'),
+        hours: z.union(HORIZONS.map((h) => z.literal(h))).default(72).describe('Hours ahead'),
+        area: area.optional(),
+        run: z.iso.datetime().optional().describe('A forecast run (ISO time) instead of the latest'),
+      }),
+      async prepare(ctx, { variable, hours, area, run }) {
+        const map = mapOf(ctx)
+        const bbox = areaFor(ctx, map, area)
+        checkArea(bbox)
+        const at = run ?? (await latestRun(gfs, variable, hours as Horizon, bbox))
+        return { id: map.id, layers: [...(map.layers ?? []), forecastLayer(variable, hours as Horizon, at, bbox)] }
       },
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),
     }),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { CaretDownIcon, CheckIcon, CircleNotchIcon, EyeIcon, EyeSlashIcon, GlobeIcon, HardDriveIcon, HardDrivesIcon, KeyIcon, type Icon } from '@phosphor-icons/react'
+import { CaretDownIcon, CheckIcon, CircleNotchIcon, EyeIcon, EyeSlashIcon, GlobeIcon, HardDriveIcon, HardDrivesIcon, KeyIcon, TerminalWindowIcon, type Icon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
@@ -76,15 +76,15 @@ export function ModelPicker() {
     <div ref={root}>
       <Button
         variant="ghost"
-        className="h-auto gap-1 px-2 py-1.5 text-xs font-normal text-muted-foreground"
+        className="h-auto gap-1 px-1.5 py-1 text-[11px] font-normal text-muted-foreground"
         title="Which model answers"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => (open ? close() : setOpen(true))}
       >
-        <current.Icon className="size-4" />
+        <current.Icon className="size-3.5" />
         <span className="mr-0.5">{label}</span>
-        <CaretDownIcon className="size-3" />
+        <CaretDownIcon className="size-2.5" />
       </Button>
       {/* Placed with CSS against the panel (the nearest positioned ancestor): beside it, bottom edges level. */}
       {open && (
@@ -114,6 +114,16 @@ export function ModelPicker() {
                 )}
               </button>
             ))}
+            {/* Not a choice: a note on the other way in, so it is not a menu item. */}
+            <div className="mt-0.5 flex items-start gap-3 border-t p-2 pt-2.5">
+              <span className="flex size-5 shrink-0 items-center justify-center">
+                <TerminalWindowIcon className="size-4" />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-sm/5 font-medium text-popover-foreground">Your coding agent (MCP)</span>
+                <span className="text-xs/4 text-muted-foreground">Run npm run mcp, then add it to Claude Code or Codex</span>
+              </span>
+            </div>
           </Card>
           {setup === 'key' && <KeySetup provider={provider} onProvider={setProvider} onCancel={() => setSetup(null)} onSave={() => use('key')} />}
           {setup === 'ollama' && <OllamaSetup model={ollamaModel} onModel={setOllamaModel} onCancel={() => setSetup(null)} onUse={() => use('ollama')} />}

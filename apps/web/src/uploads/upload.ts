@@ -5,19 +5,33 @@ export const typesOf = (kind: UploadKind) => Object.keys(UPLOAD_TYPES).filter((t
 
 export const maxMb = (kind: UploadKind) => MAX_UPLOAD_BYTES[kind] / 1024 / 1024
 
-/**
- * The type a file is uploaded as. Browsers give GeoJSON files no type or application/json, so a .geojson or .json
- * name counts as GeoJSON; the room checks the bytes either way (apps/worker/src/uploads.ts).
- */
-export const uploadType = (file: File) => (UPLOAD_TYPES[file.type] || !/\.(geo)?json$/i.test(file.name) ? file.type : 'application/geo+json')
+const KIND_NAMES: Record<UploadKind, string> = { media: 'PNG, JPEG, GIF and WebP images', document: 'PDFs', data: 'GeoJSON, GeoParquet and zipped shapefiles' }
+
+/** Browsers often give map data no type, or another one (.geojson as ''), so its type comes from the name. */
+const DATA_EXTENSIONS: Record<string, string> = {
+  geojson: 'application/geo+json',
+  json: 'application/geo+json',
+  parquet: 'application/vnd.apache.parquet',
+  geoparquet: 'application/vnd.apache.parquet',
+  zip: 'application/zip',
+}
+
+/** A file's type, one of UPLOAD_TYPES when the board keeps it. The room reads it again from the bytes. */
+export function uploadType(file: File): string {
+  if (UPLOAD_TYPES[file.type]) return file.type
+  return DATA_EXTENSIONS[file.name.split('.').pop()?.toLowerCase() ?? ''] ?? file.type
+}
 
 /** The kind of a file (media, document, data), or undefined when the board does not keep its type. */
 export const kindOf = (file: File): UploadKind | undefined => UPLOAD_TYPES[uploadType(file)]
 
+/** GeoJSON, the map data a layer can read by an upload's id (data.uploadFeatures): dropped on the board or a scenario's affected areas. */
+export const isGeoJsonFile = (file: File) => uploadType(file) === 'application/geo+json'
+
 /** Why a file cannot be uploaded (its type or size), checked before sending it; undefined if it can. */
-export function refusal(file: File): string | undefined {
+export function refusal(file: File, kinds: UploadKind[] = Object.keys(MAX_UPLOAD_BYTES) as UploadKind[]): string | undefined {
   const kind = kindOf(file)
-  if (!kind) return 'Only PNG, JPEG, GIF and WebP images, PDFs and GeoJSON files can be added'
+  if (!kind || !kinds.includes(kind)) return `Only ${kinds.map((k) => KIND_NAMES[k]).join(', ')} can be added`
   if (file.size > MAX_UPLOAD_BYTES[kind]) return `This file can be at most ${maxMb(kind)} MB; it is ${(file.size / 1024 / 1024).toFixed(1)} MB`
   return undefined
 }

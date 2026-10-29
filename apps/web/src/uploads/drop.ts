@@ -5,7 +5,7 @@ import { naturalSize } from '../images/ImageObject'
 import { fitMapToLayer } from '../map/MapObject'
 import { loadPdf } from '../pdfs/pdf'
 import { addPending, removePending, updatePending } from './pending'
-import { frameHeight, kindOf, refusal, uploadFile } from './upload'
+import { frameHeight, isGeoJsonFile, kindOf, refusal, uploadFile } from './upload'
 
 type Size = { w: number; h: number }
 
@@ -33,7 +33,8 @@ async function placeFile(runtime: Runtime, file: File, at: { x: number; y: numbe
   const h = picture ? frameHeight(size.w, picture) : size.h
   const key = addPending({ name: file.name, rect: { x: at.x - size.w / 2, y: at.y - h / 2, w: size.w, h } })
   const room = roomFromHash(location.hash)
-  const refused = room ? refusal(file) : 'This board has no room to upload to'
+  // GeoJSON goes on a new map; other map data goes on a map, from its Add layer options.
+  const refused = !room ? 'This board has no room to upload to' : kind === 'data' && !isGeoJsonFile(file) ? 'Add GeoParquet and zipped shapefiles to a map, from its Add layer options' : refusal(file)
   if (refused) return updatePending(key, { error: refused })
   try {
     const id = await uploadFile(file, room!, runtime.actor.id, (sent) => updatePending(key, { progress: sent }))

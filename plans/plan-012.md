@@ -1,94 +1,92 @@
-# Plan 012: scenario routing on maps
+# Plan 012 — Templates: a set of nodes from a few seeds
 
-Routes on a map, found in the browser, that go around closed roads, so people can ask: "if this bridge is out and this
-area is flooded, how do trucks get from the port to the hospital, and how much longer does it take?" Implemented in
-`apps/web/src/routing/` (engine, worker, tool, UI), the map plugin (`packages/plugins/src/mapScenario.ts`, `blocks` on
-layers, ops in `map.ts`) and GeoJSON uploads (`data` kind in `packages/core/src/uploads.ts`).
+Date: 2026-10-29. Status: phase 1 built (framework, sit rep, conflict explorer). Optional seeds and the New board dialog added in PR #55 (`agent-docs/tasks/board-templates.md`). Phase 2 (linking) not started.
 
-## Scenario mode
+## 1. Outcome
 
-Planning is a mode of the map, not a widget of its own: what it works on is already on the map (event footprints,
-flood extents, notebook results, and later health facilities), and duplicating a map gives two scenarios side by
-side. In focus the Options panel has two tabs, Map and Scenario (`map/mode.ts`, per tab, never on the board), and the
-tab picks the toolbar on the map too: the drawing box (notes and shapes) in Map mode, the scenario toolbar in Scenario
-mode. So a polygon drawn to point at something never closes roads by accident.
+Many exercises start with the same set of nodes. A template puts a set of nodes on the canvas from one or more seeds. A seed is a typed input: an event, an area of interest, a country, a hazard type or a time range. A template is not tied to events.
 
-- **Toolbar** (`routing/ScenarioToolbar.tsx`): Route (a click for each end), Close a road (snaps to the stretch
-  between two junctions nearest the click, within 15 px, and names it after the road; a point closure when no road is
-  near), Close an area (a polygon, drawn with the drawing box's `drawShape`), Import (a GeoJSON file; or drop it on the
-  map).
-- **Panel** (`routing/ScenarioPanel.tsx`): each route with its color, name (edited in place), vehicle, time and
-  length, what the closures add, and the roads it takes; affected areas from data (every feature layer, each with a
-  "blocks roads" checkbox; import a file; add an event's footprint); and what-ifs (drawn closures, each switched on or
-  off with a note). Switching things off and on is how people compare: the route is found again in milliseconds.
-- **On the canvas**: routes, closures and a legend (each route's time and what the closures add) show on every map,
-  also outside focus and in snapshots, so a map summarizes its scenario for a situation report.
-- **Real and hypothetical**: affected areas from data are what is known (imported or live layers); what-ifs are what
-  people try. In focus both are on the person's draft until shared.
+Examples:
 
-## Data model and how it grows
+- **Situation report.** Seed: an event.
+- **Conflict explorer.** Seed: an area of interest.
+- **Historical hazard explorer.** Seeds: an area of interest, a hazard type and a year range. Not built yet.
 
-`scenario` is one optional field of the map, written whole by ops, like `layers`:
-`{ routes: [{ id, title, from, to, profile, color }], closures: [{ id, geometry, note?, off? }] }`, plus `blocks` on
-layers. Closures are not annotations: notes and shapes are drawings, closures change what routing does. Planned
-analyses join as new optional fields of `scenario`, each a recipe the browser computes, as routes are:
+In phase 1, the template fills its nodes one time from the seeds. The nodes do not stay linked to the seeds.
 
-- **Facilities**: a layer of the map (e.g. health facilities from OpenStreetMap, or an imported list) marked as
-  destinations.
-- **Access**: from hotspots (an event footprint's points, a layer, or places people pick) to the nearest facility, with
-  travel time, in the same graph and around the same closures (one Dijkstra from many sources).
-- **Reach**: the area within N minutes of each facility (Dijkstra up to a cost), drawn as a layer.
-- **Comparison**: the same analyses with and without closures, as routes already are.
+## 2. Decisions
 
-## Decisions
+| Question | Decision |
+| --- | --- |
+| Area across a border | One country: the country at the center of the area. |
+| How to give an area | A place name (geocoded), or "my view": the area of your most recent map view on the board. |
+| Selection | A selected event card gives the event seed its value. The template always adds a full new set. |
+| Who writes templates | Developers, in code. Keep the definition simple, so that it can become data (JSON) later. |
+| First delivery | The framework, the seed kinds `event` and `area`, the sit rep and the conflict explorer. |
+| Where to start a template | The command palette, and the Templates button in the toolbar (the palette with templates only). In the palette, "Insert template…" opens the list of templates. A template shows in the full palette only when you search for it. A new board can also start from one: the New board dialog on the landing page lists every template (PR #55). |
+| A seed left out | Allowed (PR #55): its nodes come empty when they have `blank` fields, to fill in on the board (§3.2). A seed that is given but lacks a fact still leaves its node out. |
+| Data access in an op | An optional `tools` (`ToolRunner`) on `OpContext`. Approved change to a shared contract. |
+| Text as a seed | Each seed also accepts `{ "text": "…" }`. The form shows candidates. The op uses the best match and tells which match it used. |
+| One text box for a full template | No. The chat agent does this with text seeds. |
 
-- **Our own A\*, not OSRM.** OSRM has no maintained WebAssembly build, and its speed comes from preprocessing
-  (contraction hierarchies, or MLD partitions) done on a server per region. A closure changes the graph, so it would
-  mean preprocessing again; contraction-hierarchy-js reports about 16 minutes for 135k nodes. Valhalla and GraphHopper
-  have the same constraint and no current browser build. At city scale plain A\* over typed arrays is fast enough
-  (measured below), and a closure only marks pieces in a mask. No new dependency.
-- **Overture transportation segments, not Layercake's OSM highways.** Overture connects segments only through shared
-  connectors (`connectors`: connector id and `at`, 0-1 along the segment), so a bridge over a road does not meet it.
-  Layercake's `highways.parquet` has OSM tags but no node ids: topology would be guessed from shared coordinates. We
-  read the segments with the Overture reader buildings use (`data/overtureRead.ts`), and need no connectors file.
-- **Routes are recipes, like layers.** The board stores each route's ends, vehicle, name and color, and the
-  closures (`scenario` on the map), and which layers block roads (`blocks`). Each browser finds the path. The
-  road network is read for an area derived from the route's ends alone (`routing/area.ts`: padded, snapped to a
-  0.05° grid), so every browser reads the same roads and finds the same path.
-- **Personal what-ifs are focus mode.** In focus, a map's changes are on the person's draft until they share or
-  discard them, so trying closures needs nothing new.
-- **Closures**: a Point closes the roads within 25 m (a collapsed bridge; also what the "Close road" tool places), a
-  LineString the roads that run along it (at least half their length, or 40 m, within 10 m), not those that cross it,
-  a Polygon every road with a point inside it. Features of a blocking layer count the same way. Pieces between
-  connectors are the unit closed, so a closure never closes a whole long road.
-- **Affected areas from files**: a GeoJSON file is uploaded to the board like an image (a `data` upload, recognized by
-  the Worker from its first 4 KB and served as `application/geo+json`, sandboxed), and shown as a layer whose recipe
-  keeps the file's id (`data.uploadFeatures`). Dropped on a map in Scenario mode it blocks roads and is drawn in red;
-  dropped on the canvas it becomes a new map.
-- **Profiles** (`routing/profiles.ts`): car and truck, speeds by road class below most limits, capped by
-  `speed_limits`. Access rules apply in order, the last matching one wins; rules with conditions we cannot know
-  (`using`, `recognized`, `during`, vehicle dimensions) are left out, so private roads stay closed. Trucks keep tracks
-  (at 10 km/h): in many response areas the last kilometres are on them. Under construction and abandoned parts are
-  closed.
+## 3. Design
 
-## Measured (Overture 2026-10-21.0)
+```
+seeds ──lookup──▶ seed values ──resolve──▶ facts ──build──▶ nodes, layout
+"Nepal floods 2026"  events.search   eventId    events.get   name, country, glides, area
+"Beira"              data.geocode    bbox       reverse geocode   area, country, name
+```
 
-| Area, 50 × 50 km | Row groups | Download | Read and decode | Road segments | Graph | Build | A\* (median / max) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Beira | 6 | 44 MB | 18 s | 16k | | | |
-| Kathmandu | 9 | 61 MB | 26 s | 84k | 76k nodes, 89k pieces | 193 ms | 2.5 / 46 ms |
+### 3.1 A template is an op
 
-Geometry is 43 of Kathmandu's 61 MB, so reading fewer columns would not help much. Closing a 2 km disc there took
-1.4 ms and routing again 2.9 ms. A route of a few km in Beira reads its area (0.2° × 0.15°) in about 10 s. Decoded
-rows take several hundred MB as objects, so the worker builds the graph one row group at a time
-(`GraphBuilder`) and keeps only the typed arrays.
+`defineTemplate` (`packages/plugins/src/templates/define.ts`) makes one op, `template.<id>`, on the canvas:
 
-## Limits and next steps
+- `args`: the seeds, plus optional `x` and `y`, the middle of the set.
+- `prepare` (async, read-only): resolve each seed to facts, complete the facts, keep the nodes whose `needs` are known, and lay them out. It checks each node against its type before the first write.
+- `apply`: add all nodes and a gray frame `box` under them, in one transaction. It also sets the runner's view of each new map to the area. Because the view is in the same transaction, it is there before the map shows.
+- `describePlan`: "Situation report for Flood in Nepal (gdacs-event-…)". `Runtime.invoke` puts this text in `InvocationRecord.summary`. The agent and the MCP companion get it in the result of the call.
 
-- Routes are at most 40 km between ends (`MAX_ROUTE_KM`), and an area may read at most 16 row groups.
-- The first route in an area waits for its roads (10–30 s); they are kept in memory for the page only. Keeping row
-  groups in the Cache API, as the World Bank boundaries do, would make reloads fast.
-- The room's agent can add routes and closures (ops) but cannot see results: the route tool needs the browser.
-  Browser agents (own key) and MCP clients can run `routing.route`. A tool to find a road by name, so the agent can
-  close "the N6 bridge", is not built (the worker's `nearRoad` finds one by place).
-- No turn restrictions (`prohibited_transitions`), and no time-dependent rules.
+Thus, the palette, the agent and the MCP companion get each template with no more code. One undo step removes the full set. No new stored object type is necessary.
+
+### 3.2 Seeds and facts
+
+`packages/plugins/src/templates/seeds.ts`. Facts are one flat record: `eventId`, `name`, `start`, `end`, `country`, `glides`, `area`. When two seeds give the same fact, the first seed in the template wins.
+
+| Kind | Value | Form widget | Facts |
+| --- | --- | --- | --- |
+| `event` | event id, or `{ text }` | `event` (the event picker) | eventId, name, start, end, country, glides, area (bbox of the hazard areas) |
+| `area` | `{ west, south, east, north, name? }`, `{ text }`, or `"my view"` | `area` (`apps/web/src/templates/`) | area, name, country |
+
+After the seeds, `complete` adds the facts that follow from other facts. An area without a country gets the country at its center (`data.reverseGeocode`). A country without an area gets the country's bbox (`data.geocode`). Areas smaller than 0.2° grow to 0.2°, so that a point does not zoom a map in fully.
+
+A node with a fact in `needs` that is not known is not added. An empty list is not known (an event with no GLIDE numbers gets no ReliefWeb feed). Every seed is optional (for the New board dialog's "Choose later", `agent-docs/tasks/board-templates.md`): when one is left out, a node whose facts are not known is added empty if it has `blank` fields (an event card with no event, a map with no layers, HAPI widgets with no country), to fill in on the board. A seed that is given but lacks a fact still leaves its node out. Without `tools`, the only facts are the ones in the seed values. For example, an event id gives the event card and its map, but no country context.
+
+### 3.3 Tools
+
+New read-only tool `events.get` (`packages/plugins/src/agentTools.ts`). It gives one event's name, dates, country, GLIDE numbers and the bbox of its hazard areas. The browser registry, the room's agent and the MCP executor give their `ToolRunner` to their runtime. The browser registry now has `events.search` and `events.get`, so the app no longer adds `eventsSearch` separately.
+
+### 3.4 Layout and placement
+
+There is a heading text at the top. Below it are columns from left to right, and the nodes of a column stack from top to bottom. The gap is 24 canvas units. Placement:
+
+- Palette: the middle of the view.
+- Agent: the middle of the asker's view (`callOp` sets `x` and `y` for `template.*` ops).
+- No `x` or `y`: to the right of all objects on the board.
+
+## 4. Templates in this delivery
+
+- **Situation report** (`template.sitrep`): heading, event card, country context, map with the event footprint, ReliefWeb feed, and notes "Key figures", "Needs", "Gaps".
+- **Conflict explorer** (`template.conflict`): heading, map with a choropleth of political violence events by province, the Conflict widget, Who's where, country context, and notes "Hotspots", "Access constraints".
+
+## 5. Not built
+
+- The historical hazard explorer. It needs a Montandon query for events in an area and a time range (see `packages/plugin-disasters/src/montyProvider.ts` on `experiment`), and maybe an event list node.
+- Seed kinds `country`, `hazard` and `years`.
+- Phase 2, linking: the frame becomes a `template` object with the template id, the seeds and the node ids. A change to a seed resolves the facts again and updates the nodes that people did not change. `needs` already tells which nodes use which facts.
+- Templates as data, and "save this board as a template".
+- The event widget does not send typed text as `{ text }`. You must select an event in the list.
+
+## 6. Verification
+
+- `packages/plugins/test/templates.test.ts`: each template with fake tools, from text and from values; one undo step; frame under and around the nodes; the runner's map view; no feed without GLIDE numbers; a seed left out gives empty nodes; seeds are optional with their picker widget; no tools; no match fails before a write; placement; the agent's placement and summary.
+- Manually, with `npm run sync` and `npm run dev`: Templates button → Situation report → "nepal flood"; Conflict explorer → "Cabo Delgado". Ask the agent for each. New board → From a template → Situation report with "Choose later": empty widgets.
