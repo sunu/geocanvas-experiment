@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Draft, type Chat, type Runtime, type TargetRef } from '@ttx/core'
+import type { ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
 import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
@@ -17,6 +18,9 @@ import { Links } from './Links'
 import { Peers } from './Peers'
 import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
+import { DropConfirm } from '../reports/DropConfirm'
+import { dropQuestion, idsAt, reportUnder } from '../reports/drop'
+import { titleOf } from '../reports/reports'
 import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
 import { publishViewState } from './viewState'
@@ -38,6 +42,27 @@ const objectsTarget = (ids: Iterable<string>): TargetRef => ({ kind: 'objects', 
  * In-focus mode (canvas/focus.ts): one object fills the screen, drawn from this person's draft of the
  * board, so what they change there reaches others only when they share it. Local, like the camera.
  */
+/** Objects dropped on a report, waiting for Add or Cancel (reports/DropConfirm.tsx). */
+interface PendingDrop {
+  reportId: string
+  /** What was dragged: the selection. A frame brings its contents through report.addItems. */
+  ids: string[]
+  /** Where everything that moved was before the drag, to put it back on Add. */
+  starts: { id: string; x: number; y: number }[]
+  /** The drop's screen point, in the canvas. */
+  at: { x: number; y: number }
+  question: string
+}
+
+/** The drop zone: the report under dragged objects, outlined, with where they will go. In screen space. */
+function DropZone({ rect: r, title }: { rect: Rect; title: string }) {
+  return (
+    <div className="ttx-dropzone" style={{ left: r.x, top: r.y, width: r.w, height: r.h }}>
+      <span className="ttx-dropzone__label">Drop to add to {title}</span>
+    </div>
+  )
+}
+
 interface Focus {
   id: string
   /** The camera to go back to. */
@@ -56,8 +81,8 @@ const noObjects = () => NO_OBJECTS
 /** Follow a press until release. onMove gets the screen distance from the press once it passes the threshold. */
 function trackDrag(
   e: ReactPointerEvent,
-  onMove: (dx: number, dy: number) => void,
-  onUp?: (moved: boolean) => void,
+  onMove: (dx: number, dy: number, e: PointerEvent) => void,
+  onUp?: (moved: boolean, e: PointerEvent) => void,
 ) {
   const sx = e.clientX
   const sy = e.clientY
@@ -65,12 +90,12 @@ function trackDrag(
   const move = (me: PointerEvent) => {
     if (!moved && Math.hypot(me.clientX - sx, me.clientY - sy) < DRAG_THRESHOLD) return
     moved = true
-    onMove(me.clientX - sx, me.clientY - sy)
+    onMove(me.clientX - sx, me.clientY - sy, me)
   }
-  const up = () => {
+  const up = (ue: PointerEvent) => {
     window.removeEventListener('pointermove', move)
     window.removeEventListener('pointerup', up)
-    onUp?.(moved)
+    onUp?.(moved, ue)
   }
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', up)
@@ -98,6 +123,9 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   /** Leaving focus with unshared changes: the Share / Discard / Keep editing dialog is open. */
   const [asking, setAsking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  /** Reports (agent-docs/tasks/reports.md §4): the report under objects being dragged, and a drop waiting for Add or Cancel. */
+  const [dropOn, setDropOn] = useState<{ report: string; dragged: Set<string> } | null>(null)
+  const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const cameraRef = useRef(camera)
   cameraRef.current = camera
@@ -175,6 +203,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   }
 
   function onPointerDown(e: ReactPointerEvent) {
+    // A press anywhere else answers a pending drop with Cancel: the objects stay where they were dropped.
+    if (pendingDrop) setPendingDrop(null)
     if (e.button === 2) return
     const target = e.target as HTMLElement
     const id = target.closest<HTMLElement>('[data-id]')?.dataset.id
@@ -254,13 +284,34 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       setSelection(moving)
       // A frame takes what is inside it along.
       const starts = withFramed(objects, moving)
-      trackDrag(e, (dx, dy) => {
-        const z = cameraRef.current.z
-        const alive = starts.filter((o) => board.get(o.id)) // someone else may delete one mid-drag
-        if (!alive.length) return
-        const rects = Object.fromEntries(alive.map((o) => [o.id, { x: o.x + dx / z, y: o.y + dy / z }]))
-        runtime.dispatch('core.object.setRect', objectsTarget(Object.keys(rects)), { rects })
-      })
+      // Dropping on a report asks to add what was dragged, unless it is all reports.
+      const dragged = new Set(starts.map((o) => o.id))
+      const droppable = [...moving].some((m) => board.get(m)?.type !== 'report')
+      const reportAt = (pe: PointerEvent) => (droppable ? reportUnder(idsAt(pe.clientX, pe.clientY), board, dragged) : undefined)
+      trackDrag(
+        e,
+        (dx, dy, me) => {
+          const z = cameraRef.current.z
+          const alive = starts.filter((o) => board.get(o.id)) // someone else may delete one mid-drag
+          if (!alive.length) return
+          const rects = Object.fromEntries(alive.map((o) => [o.id, { x: o.x + dx / z, y: o.y + dy / z }]))
+          runtime.dispatch('core.object.setRect', objectsTarget(Object.keys(rects)), { rects })
+          const over = reportAt(me)
+          setDropOn((d) => (over ? (d?.report === over.id ? d : { report: over.id, dragged }) : null))
+        },
+        (moved, ue) => {
+          setDropOn(null)
+          const report = moved ? reportAt(ue) : undefined
+          if (!report) return
+          setPendingDrop({
+            reportId: report.id,
+            ids: [...moving],
+            starts: starts.map(({ id, x, y }) => ({ id, x, y })),
+            at: screenPoint(ue),
+            question: dropQuestion(board, [...moving], titleOf(board, report)),
+          })
+        },
+      )
       return
     }
 
@@ -458,6 +509,18 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   const enterFocusRef = useRef(enterFocus)
   enterFocusRef.current = enterFocus
 
+  /**
+   * Add a drop to its report: the objects go back where they were, then are added, in the drag's own gesture, so
+   * one undo takes back both. Nothing calls beginGesture between the drag and this (DropConfirm keeps presses).
+   */
+  function addDrop(d: PendingDrop) {
+    setPendingDrop(null)
+    const alive = d.starts.filter((o) => board.get(o.id))
+    if (alive.length) runtime.dispatch('core.object.setRect', objectsTarget(alive.map((o) => o.id)), { rects: Object.fromEntries(alive.map(({ id, x, y }) => [id, { x, y }])) })
+    const r = runtime.dispatch('report.addItems', objectsTarget(d.ids.filter((id) => board.get(id))), { reportId: d.reportId })
+    setNotice(r.status === 'applied' ? (r.summary ?? 'Added to the report') : (r.error ?? 'Could not add to the report'))
+  }
+
   /** Send the draft's changes to everyone; the type may add its own first (a map shares its view). */
   function share(f: Focus) {
     const o = f.draft.runtime.board.get(f.id) as BoardObject | undefined
@@ -594,7 +657,9 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
               key={o.id}
               runtime={runtime}
               object={o}
-              layer={i}
+              // Dragged over a report: above everything, the report included.
+              layer={dropOn?.dragged.has(o.id) ? objects.length + 1 : i}
+              dropping={!!dropOn?.dragged.has(o.id)}
               editing={o.id === editingId}
               selected={selected.has(o.id)}
               onDone={() => setEditing(null)}
@@ -614,11 +679,13 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
         {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentTouched} />}
-        {!focus && [...selected].map((id) => {
+        {/* Not around objects dragged over a report: they are drawn smaller there (ObjectView `dropping`). */}
+        {!focus && [...selected].filter((id) => !dropOn?.dragged.has(id)).map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
         })}
         {single &&
+          !dropOn &&
           HANDLES.map((h) => {
             const r = toScreen(camera, single)
             const x = h.includes('w') ? r.x : r.x + r.w
@@ -626,7 +693,13 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
             return <div key={h} data-handle={h} className={`ttx-handle ttx-handle--${h}`} style={{ left: x, top: y }} />
           })}
         {marquee && <div className="ttx-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+        {dropOn && byId.get(dropOn.report) && (
+          <DropZone rect={toScreen(camera, byId.get(dropOn.report)!)} title={titleOf(board, byId.get(dropOn.report) as ReportBoardObject)} />
+        )}
       </div>
+      {pendingDrop && (
+        <DropConfirm at={pendingDrop.at} question={pendingDrop.question} onAdd={() => addDrop(pendingDrop)} onCancel={() => setPendingDrop(null)} />
+      )}
 
       {focus && focused && isFocusable(focusedUI) && (
         <OptionsPanel
