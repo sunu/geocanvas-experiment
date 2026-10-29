@@ -17,7 +17,8 @@ export function LayerList({ layers, states, onUseMyView, onRemove }: Props) {
   return (
     <div className="ttx-layers">
       {states.map((s, i) => {
-        const note = s.error ?? (s.loading ? 'Loading…' : [truncationOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
+        const tileStatus = s.output === 'geo.tiles' ? (s.value as { status?: string } | undefined)?.status : undefined
+        const note = s.error ?? (s.loading ? 'Loading…' : tileStatus === 'running' ? 'Waiting for openEO…' : [truncationOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
         return (
           <div key={s.id} className={`ttx-layers__item ${s.error ? 'is-error' : ''}`}>
             <div className="ttx-layers__text">

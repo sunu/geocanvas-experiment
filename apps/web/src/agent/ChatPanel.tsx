@@ -4,7 +4,7 @@ import type { AgentReply, Chat, OplogEntry, Runtime, UserMessage } from '@ttx/co
 import { OPENROUTER_URL } from '@ttx/plugins'
 import { useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { TAB_ID } from './browserAgent'
-import { DEFAULT_MODEL, forgetKey, loadKey, loadMode, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
+import { DEFAULT_MODEL, forgetKey, keyIsUsable, loadKey, loadMode, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
 
 /** A message for a browser agent with no reply after this long, and nobody thinking: its tab has closed. */
 const LOST_AFTER_MS = 120_000
@@ -23,7 +23,7 @@ export function ChatPanel({ runtime, chat, awareness, onClose }: { runtime: Runt
   const undone = useUndoneReplies(runtime)
   const [text, setText] = useState('')
   const [mode, setMode] = useState<AgentMode>(loadMode)
-  const [hasKey, setHasKey] = useState(() => loadKey() !== null)
+  const [hasKey, setHasKey] = useState(() => keyIsUsable(loadKey()))
   const [settingsOpen, setSettingsOpen] = useState(false)
   const pending = new Set(chat.pending().map((m) => m.id))
   const ownWithoutKey = mode === 'own' && !hasKey
@@ -78,7 +78,7 @@ export function ChatPanel({ runtime, chat, awareness, onClose }: { runtime: Runt
         <KeySettings
           onSave={(config) => {
             saveKey(config)
-            setHasKey(true)
+            setHasKey(keyIsUsable(config))
             setSettingsOpen(false)
           }}
           onForget={() => {
@@ -135,7 +135,7 @@ function KeySettings({ onSave, onForget }: { onSave: (config: KeyConfig) => void
   const [config, setConfig] = useState<KeyConfig>(() => loadKey() ?? { provider: 'openrouter', url: OPENROUTER_URL, model: DEFAULT_MODEL, apiKey: '' })
   const set = (fields: Partial<KeyConfig>) => setConfig((c) => ({ ...c, ...fields }))
   const url = config.provider === 'openrouter' ? OPENROUTER_URL : config.url
-  const valid = config.model.trim() && (config.provider === 'openrouter' ? config.apiKey.trim() : /^https?:\/\//.test(config.url))
+  const valid = keyIsUsable(config)
 
   function submit(e: FormEvent) {
     e.preventDefault()

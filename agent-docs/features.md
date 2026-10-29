@@ -13,6 +13,7 @@ The features we are adding are below.
   - There will be additional data source for analysis (ex. population, building data)
 - Prepopulate the widdgets depending on the template that users choose
 - Ability for agents to add/remove/edit widgets
+- Approved openEO map layers: the agent can propose a Sentinel-1 before/after change recipe, or any openEO process graph (Sentinel-1, -2, -3), after checking that EOPF has scenes for the area and dates; a user explicitly approves before the Worker creates an EOPF XYZ service and renders a test tile.
 - Ability for agent to sum up the current board and provide the report
 
 Related to LLM: reference agents.md from experiments branch, but reference only llm related part, not the application related part.
@@ -47,6 +48,7 @@ The specific features for each widgets is
   - Attribute panel to select/reselect data
   - Data filters
   - Legend formatting
+  - The openEO layers come from EOPF's staging collections, which are sparse: Sentinel-1 covers mostly western Europe up to about mid-July 2026, Sentinel-2 is broad (Rome works for both; Nepal has no Sentinel-1). Use the agent's coverage check, or Rome with the dates in the PR. The output is a candidate layer, not a validated flood boundary. Local secrets: plain values in ignored `apps/worker/.dev.vars`, or 1Password references in ignored `apps/worker/.dev.vars.tpl` (`KEY={{ op://vault/item/field }}`), which `npm run sync` resolves with `op inject`. Wrangler passes `.dev.vars` entries on only if they are in `secrets.required` or `vars`: `OPENEO_USER` and `OPENEO_PASS` are empty `vars` placeholders so they work locally without being required when deploying.
 
 ### Chart
 - It takes various types of data, and renders the data in chart type
@@ -65,4 +67,4 @@ The specific features for each widgets is
 
 Non functional requirements are like below
 - FPS on canvas should not drop below 30.
-- We are not considering small screen view for now. 
+- We are not considering small screen view for now.

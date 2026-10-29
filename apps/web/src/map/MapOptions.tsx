@@ -78,6 +78,19 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
   return (
     <>
       <section className="ttx-options__section">
+        <h3>openEO prototype</h3>
+        <p className="ttx-options__empty">Propose a Sentinel-1 VV before/after change layer for the area shown. It will not run until approved.</p>
+        <button
+          type="button"
+          onClick={() => {
+            const m = map()
+            if (m) void runtime.invoke('openeo.proposeSarChange', { kind: 'objects', ids: [o.id] }, { area: areaOf(m) })
+          }}
+        >
+          Propose SAR change layer
+        </button>
+      </section>
+      <section className="ttx-options__section">
         <h3>Go to place</h3>
         <PlaceSearch
           onGo={(place) => {

@@ -314,10 +314,10 @@ describe('Agent', () => {
 
 describe('chatCompletions', () => {
   function capture() {
-    const sent: { url: string; headers: Record<string, string> }[] = []
+    const sent: { url: string; headers: Headers }[] = []
     const original = globalThis.fetch
     globalThis.fetch = (async (url: string, init: RequestInit) => {
-      sent.push({ url, headers: init.headers as Record<string, string> })
+      sent.push({ url, headers: new Headers(init.headers) })
       return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'hi' } }] }))
     }) as typeof fetch
     return { sent, restore: () => (globalThis.fetch = original) }
@@ -326,12 +326,13 @@ describe('chatCompletions', () => {
   it('sends the key and x-title to OpenRouter', async () => {
     const { sent, restore } = capture()
     try {
-      await chatCompletions({ url: 'https://openrouter.ai/api/v1/', apiKey: 'sk-1', model: 'm' })([], [])
+      await chatCompletions({ url: 'https://openrouter.ai/api/v1/', apiKey: 'sk-or-1', model: 'm' })([], [])
     } finally {
       restore()
     }
     expect(sent[0]!.url).toBe('https://openrouter.ai/api/v1/chat/completions')
-    expect(sent[0]!.headers).toMatchObject({ authorization: 'Bearer sk-1', 'x-title': 'humanitarian-ttx' })
+    expect(sent[0]!.headers.get('authorization')).toBe('Bearer sk-or-1')
+    expect(sent[0]!.headers.get('x-title')).toBe('humanitarian-ttx')
   })
 
   it('sends no x-title to other servers, and no authorization without a key', async () => {
@@ -342,7 +343,7 @@ describe('chatCompletions', () => {
       restore()
     }
     expect(sent[0]!.url).toBe('http://localhost:11434/v1/chat/completions')
-    expect(Object.keys(sent[0]!.headers)).toEqual(['content-type'])
+    expect([...sent[0]!.headers.keys()]).toEqual(['content-type'])
   })
 })
 

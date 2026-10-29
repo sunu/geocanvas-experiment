@@ -17,7 +17,7 @@ export interface KeyConfig {
 export type AgentMode = 'room' | 'own'
 
 /** The room agent's model (AGENT_MODEL in apps/worker/wrangler.jsonc), as a start for OpenRouter. */
-export const DEFAULT_MODEL = 'z-ai/glm-5.3-flash'
+export const DEFAULT_MODEL = 'openai/gpt-6-luna'
 
 const KEY = 'ttx-agent-key'
 const MODE = 'ttx-agent-mode'
@@ -43,6 +43,14 @@ function write(name: string, value: unknown) {
 export const loadKey = (): KeyConfig | null => read<KeyConfig>(KEY)
 export const saveKey = (config: KeyConfig) => write(KEY, { ...config, url: config.provider === 'openrouter' ? OPENROUTER_URL : config.url })
 export const forgetKey = () => write(KEY, null)
+
+/** A saved OpenRouter endpoint is usable only when its key was saved too. */
+export function keyIsUsable(config: KeyConfig | null): boolean {
+  if (!config?.model.trim()) return false
+  const url = (config.provider === 'openrouter' ? OPENROUTER_URL : config.url).replace(/\/+$/, '')
+  if (!/^https?:\/\//.test(url)) return false
+  return url !== OPENROUTER_URL || !!config.apiKey.trim()
+}
 
 export const loadMode = (): AgentMode => (read<AgentMode>(MODE) === 'own' ? 'own' : 'room')
 export const saveMode = (mode: AgentMode) => write(MODE, mode)

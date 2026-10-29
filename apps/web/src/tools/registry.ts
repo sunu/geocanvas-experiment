@@ -10,6 +10,7 @@ import { boundariesTool } from '../map/adminAreas'
 import { notebookFactory } from '../notebooks/api'
 import { notebookArtifactTool } from '../notebooks/artifact'
 import { ToolRunner } from '@ttx/core'
+import { openEOTilesTool } from '@ttx/plugins'
 
 /** Every tool the app has, and the one runner for them, so all maps on the board share one cache. */
 export const tools = new ToolRunner([
@@ -22,4 +23,5 @@ export const tools = new ToolRunner([
   eventFootprintTool(monty),
   boundariesTool,
   choroplethTool,
+  openEOTilesTool,
 ])

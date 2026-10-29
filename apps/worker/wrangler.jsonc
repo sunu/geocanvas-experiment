@@ -15,8 +15,14 @@
   "vars": {
     "MONTANDON_BASE_URL": "https://montandon-eoapi-stage.ifrc.org/stac",
     "NOTEBOOK_FACTORY_URL": "https://notebook-factory-staging.montandondata.org",
+    "OPENEO_BASE_URL": "https://api.explorer.eopf.copernicus.eu/openeo",
+    // Empty on purpose: because of `secrets.required` below, Wrangler passes .dev.vars entries to the Worker only if
+    // they are listed there or declared here. openEO is optional, so these are not required (a required secret
+    // fails the first deploy of every branch Worker). Locally, .dev.vars overrides them; deployed, they stay empty.
+    "OPENEO_USER": "",
+    "OPENEO_PASS": "",
     // The board agent's model on OpenRouter: a low-cost model that can call tools (plans/plan-008.md).
-    "AGENT_MODEL": "z-ai/glm-5.3-flash"
+    "AGENT_MODEL": "openai/gpt-6-luna"
   },
   // OPENROUTER_API_KEY: without it, the agent answers that it is not configured. HAPI_APP_IDENTIFIER is
   // base64("app name:email") for HDX HAPI; not a key, but it carries the email (apps/worker/src/hapi.ts).

@@ -1397,6 +1397,39 @@ body:has(.ttx-canvas.is-focus) .ttx-boardbar {
   color: var(--ttx-muted);
 }
 
+.ttx-openeo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 8px;
+  background: var(--ttx-panel);
+  font-size: 12px;
+  overflow-y: auto;
+}
+
+.ttx-openeo__status { font-weight: 650; }
+.ttx-openeo__status.is-ready { color: #15803d; }
+.ttx-openeo__status.is-error, .ttx-openeo__error { color: #b91c1c; }
+.ttx-openeo small, .ttx-openeo__hint { color: var(--ttx-muted); }
+.ttx-openeo__graph { width: 100%; }
+.ttx-openeo__graph summary { color: var(--ttx-muted); cursor: pointer; }
+.ttx-openeo__graph pre { max-height: 140px; margin: 4px 0 0; padding: 6px; overflow: auto; border-radius: 4px; background: rgba(0, 0, 0, 0.05); font-size: 10px; user-select: text; }
+.ttx-openeo__steps { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.ttx-openeo__steps li::before { display: inline-block; width: 1.3em; content: '○'; }
+.ttx-openeo__steps li.is-done { color: #15803d; }
+.ttx-openeo__steps li.is-done::before { content: '✓'; }
+.ttx-openeo__steps li.is-active { font-weight: 650; }
+.ttx-openeo__steps li.is-active::before { content: '…'; }
+.ttx-openeo__steps li.is-failed { color: #b91c1c; font-weight: 650; }
+.ttx-openeo__steps li.is-failed::before { content: '✕'; }
+.ttx-openeo__steps li.is-todo { color: var(--ttx-muted); }
+
 .ttx-dialog__backdrop {
   position: absolute;
   inset: 0;

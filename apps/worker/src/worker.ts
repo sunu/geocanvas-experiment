@@ -11,9 +11,10 @@ import { notebooksProxy } from './notebooks'
 import { reliefwebUpdates } from './reliefweb'
 import { json, serveUpload, storeUpload } from './uploads'
 import { uploadUrl, Uploads } from '@ttx/core'
-import { Agent, AGENT, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
+import { Agent, AGENT, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openeoCollections, openeoCoverage, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
+import { OpenEOServiceManager } from './openeo'
 
 /**
  * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
@@ -88,7 +89,7 @@ export class Room extends DurableObject<Env> {
     })
 
     // After the listeners above, so the agent's writes are stored and sent like anyone's.
-    new Agent({
+    const agent = new Agent({
       doc: this.doc,
       complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
       accepts: forRoom,
@@ -96,11 +97,18 @@ export class Room extends DurableObject<Env> {
       tools: [
         ...(env.OPENCAGE_API_KEY ? geocodeTools(new OpenCageGeocoder({ url: OPENCAGE_URL, key: env.OPENCAGE_API_KEY })) : []),
         ...(env.MONTANDON_TOKEN ? [eventsSearch(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })))] : []),
+        // Anonymous reads of EOPF's catalog, so an agent checks for scenes before it proposes an openEO layer.
+        openeoCollections(env.OPENEO_BASE_URL),
+        openeoCoverage(env.OPENEO_BASE_URL),
       ],
       // The agent's presence: people see "Agent is thinking…" while it works.
       onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
       keepAlive: (work) => ctx.waitUntil(work),
     })
+    // openEO is optional in deployed previews. Local development supplies the user credentials
+    // through op run and apps/worker/.dev.vars; these are never bundled into browser assets.
+    const openEOBindings = env as Env & { OPENEO_BASE_URL?: string; OPENEO_USER?: string; OPENEO_PASS?: string }
+    new OpenEOServiceManager(agent.runtime, openEOBindings, (work) => ctx.waitUntil(work)).start()
   }
 
   private compact() {

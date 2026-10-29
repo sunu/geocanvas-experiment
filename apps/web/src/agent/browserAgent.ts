@@ -1,5 +1,5 @@
 import type * as Y from 'yjs'
-import { Agent, chatCompletions, eventsSearch } from '@ttx/plugins'
+import { Agent, chatCompletions, eventsSearch, openeoCollections, openeoCoverage } from '@ttx/plugins'
 import type { Awareness } from '../board/presence'
 import { monty } from '../events/monty'
 import { tools } from '../tools/registry'
@@ -23,7 +23,7 @@ export function startBrowserAgent(doc: Y.Doc, awareness: Awareness) {
       if (!config) throw new Error('No key is saved in this browser. Add one in the agent settings.')
       return chatCompletions({ url: config.url, apiKey: config.apiKey || undefined, model: config.model })(messages, defs)
     },
-    tools: [...tools.list().filter((t) => t.id === 'data.geocode' || t.id === 'data.reverseGeocode'), eventsSearch(monty)],
+    tools: [...tools.list().filter((t) => t.id === 'data.geocode' || t.id === 'data.reverseGeocode'), eventsSearch(monty), openeoCollections(), openeoCoverage()],
     accepts: (m) => m.browserTab === TAB_ID,
     // On the person's presence, so everyone sees "Agent is thinking…".
     onBusy: (busy) => awareness.setLocalStateField('status', busy ? 'thinking' : null),

@@ -99,7 +99,7 @@ const isArea = (f: GeoJSON.Feature) => f.geometry?.type === 'Polygon' || f.geome
 /** deck.gl layers for the layers that have a result, by kind of result. Rasters draw below features. */
 export function deckLayers(states: LayerState[]): Layer[] {
   const rasters = states.filter((s) => s.output === 'geo.raster')
-  const others = states.filter((s) => s.output !== 'geo.raster')
+  const others = states.filter((s) => s.output !== 'geo.raster' && s.output !== 'geo.tiles')
   return [...rasters, ...others].flatMap((s): Layer[] => {
     if (s.value === undefined) return []
     if (s.output === 'geo.raster') return rasterLayers(s.value, { id: `layer-${s.id}` })

@@ -11,6 +11,7 @@ import { tools } from '../tools/registry'
 import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
 import { basemapStyle } from './basemaps'
 import { attributionOf, boundsOf, deckLayers, useLayerStates } from './layers'
+import { syncTileLayers } from './tileLayers'
 import { registerLiveMap } from './live'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
@@ -119,6 +120,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     map.on('style.load', () => {
       styleReadyRef.current = true
       syncAdminLayers(map, statesRef.current)
+      syncTileLayers(map, statesRef.current)
     })
     map.on('mousemove', (e) => {
       const ids = fillLayerIds(map)
@@ -206,6 +208,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     overlayRef.current?.setProps({ layers: deckLayers(states) })
     statesRef.current = states
     if (mapRef.current && styleReadyRef.current) syncAdminLayers(mapRef.current, states)
+    if (mapRef.current && styleReadyRef.current) syncTileLayers(mapRef.current, states)
   }, [states])
 
   useEffect(() => {
