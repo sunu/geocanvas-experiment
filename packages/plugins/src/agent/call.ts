@@ -10,7 +10,7 @@ import { TEMPLATE_OP_PREFIX } from '../templates/define.js'
 /** The agent may add objects up to this many times their type's default size. People may draw any size. */
 export const MAX_SIZE_FACTOR = 4
 
-/** Space between objects that one turn adds side by side, in canvas units. */
+/** Space an agent leaves between an object it adds and the others, in canvas units. */
 export const GAP = 24
 
 /** What one agent turn wrote: the objects it added, and the others as they were before its first change. */
@@ -31,7 +31,7 @@ export type OpCall = Pick<InvocationRecord, 'opId' | 'status' | 'error' | 'creat
 
 /**
  * Run one op as a tool call (input { ids, args }) for an agent: refuse junk sizes, place an add without x and y,
- * keep what undo needs in `turn`, then Runtime.callTool as `actor`.
+ * move an add off the objects already there, keep what undo needs in `turn`, then Runtime.callTool as `actor`.
  */
 export async function callOp(
   runtime: Runtime,
@@ -68,7 +68,7 @@ function addedSize(runtime: Runtime, opId: string) {
 
 /**
  * An add without x or y, as the palette does it: the first in the middle of the person's view, each next one
- * to the right of `nextTo`.
+ * to the right of `nextTo`. Then, given or not, off the objects already there (freeSpot).
  */
 function place(runtime: Runtime, opId: string, args: unknown, center: { x: number; y: number } | undefined, nextTo: AnyObject | undefined) {
   // A template's x and y are the middle of its set: in the middle of the person's view.
@@ -78,12 +78,45 @@ function place(runtime: Runtime, opId: string, args: unknown, center: { x: numbe
     return
   }
   const def = addedSize(runtime, opId)
-  if (!def || !center || !args || typeof args !== 'object') return
+  if (!def || !args || typeof args !== 'object') return
   const a = args as { x?: unknown; y?: unknown; w?: unknown; h?: unknown }
   const w = typeof a.w === 'number' ? a.w : def.w
   const h = typeof a.h === 'number' ? a.h : def.h
-  a.x ??= Math.round(nextTo ? nextTo.x + nextTo.w + GAP : center.x - w / 2)
-  a.y ??= Math.round(center.y - h / 2)
+  // A frame given a place holds what is there.
+  if (opId === 'frame.add' && a.x !== undefined && a.y !== undefined) return
+  if (center) {
+    a.x ??= Math.round(nextTo ? nextTo.x + nextTo.w + GAP : center.x - w / 2)
+    a.y ??= Math.round(center.y - h / 2)
+  }
+  if (typeof a.x !== 'number' || typeof a.y !== 'number') return
+  // Frames are not in the way, as things are meant to go inside them; but a frame does not go on another.
+  const others = runtime.board.list().filter((o) => o.type !== 'frame' || opId === 'frame.add')
+  Object.assign(a, freeSpot({ x: a.x, y: a.y, w, h }, others))
+}
+
+type Rect = { x: number; y: number; w: number; h: number }
+
+/** How far right of where it was asked, in its own widths, an add may go before it tries the row below. */
+const MAX_COLUMNS = 4
+/** Rows tried before an add goes below everything. */
+const MAX_ROWS = 10
+
+/**
+ * The nearest place for `r` that keeps GAP from every object in `others`: where it is, else further right on its
+ * row, past what is in the way, else the same on the rows below; past MAX_ROWS, below everything.
+ */
+export function freeSpot(r: Rect, others: Rect[]): { x: number; y: number } {
+  const inTheWay = (x: number, y: number) =>
+    others.filter((o) => x < o.x + o.w + GAP && o.x < x + r.w + GAP && y < o.y + o.h + GAP && o.y < y + r.h + GAP)
+  for (let row = 0; row < MAX_ROWS; row++) {
+    const y = r.y + row * (r.h + GAP)
+    for (let x = r.x; x <= r.x + MAX_COLUMNS * (r.w + GAP); ) {
+      const hit = inTheWay(x, y)
+      if (!hit.length) return { x: Math.round(x), y: Math.round(y) }
+      x = Math.ceil(Math.max(...hit.map((o) => o.x + o.w))) + GAP
+    }
+  }
+  return { x: Math.round(r.x), y: Math.ceil(Math.max(...others.map((o) => o.y + o.h))) + GAP }
 }
 
 /**
