@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: step 2 built (the headless `reports` plugin); step 1 (PDF spike) waits on approvals; the UI starts with step 3. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: steps 2 and 3 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -142,7 +142,13 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 
 ## 4. On the canvas
 
-- **The widget** shows the report's first page, scaled down, with maps as pictures. Its header shows the name and the number of items. It looks like a page: white, square corners, no shadow (AGENTS.md "Corners and elevation").
+- **The widget** (`apps/web/src/reports/ReportObject.tsx`) shows the report's first page: laid out at the paper's real size in CSS px (`pageSize`) and scaled down to the object with one transform, centered in it, so it is the page report mode shows.
+  - At the top, the report's title. Then the blocks on the two-column grid.
+  - Until each widget type has its own report view (step 7), an item shows as a card: its type's icon and its name, and for a text, sticky note or area its text. A frame shows as a heading. A frozen item shows its copy, tagged Frozen. A removed source says so.
+  - Its corner reads "Page 1 of N · M items". N is an estimate from the content's height until report mode paginates (step 5).
+  - An empty report says "Drop objects here, or use Add to report".
+  - It looks like a page: white, square corners, no shadow (AGENTS.md "Corners and elevation").
+  - The Object panel shows its paper and its number of items.
 - **Toolbar:** a **Report** tool in the `MAP_AND_REPORT` group, with the key P (free on 2026-10-29). A new report opens in focus.
 - **Drag onto a report:**
   1. While objects are dragged, a report under the pointer shows a drop zone (an outline and "Drop to add to *Flood SitRep*").
@@ -158,11 +164,13 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   Frames keep no list of members, so what is inside is worked out once, when the frame is added, with the same containment rule as a frame drag. Objects moved into the frame later are not added. The containment test moves from `canvas/camera.ts` to a shared place, so the canvas and the op use one rule.
 - **Dragging a frame onto a report** moves its contents with it while dragging, as any frame drag does. On Add, everything goes back to where it was.
 - **Seeing what is in a report:** when a report is selected, its live sources get a light outline on the canvas. There are no permanent arrows: the canvas already draws link arrows, and report arrows would crowd it.
-- **Add to report…** from the right-click menu, the Object panel and ⌘K (`report.addItems`, which acts on the selection):
-  - a dropdown lists the board's reports by title, and **New report** (the `report` form widget, `apps/web/src/reports/ui.tsx`)
-  - with one report on the board, it is chosen already; with none or several, New report is
-  - New report makes a report to the right of the objects, top-aligned with them
-  - items always go at the end; move them afterwards in report mode
+- **Add to report…** (`report.addItems`, which acts on the selection), with the board's reports listed by title (`boardReports` in `apps/web/src/reports/reports.ts`) and **New report**:
+  - **Right-click menu:** an Add to report submenu after Duplicate; with no report on the board, one item, Add to new report. Not shown when only reports are selected.
+  - **Object panel:** an Add to report button beside Open, with the same choices (not for a report itself).
+  - **⌘K:** a dropdown (the `report` form widget, `apps/web/src/reports/ui.tsx`); with one report on the board, it is chosen already; with none or several, New report is.
+  - New report makes a report to the right of the objects, top-aligned with them, and the menus select it.
+  - The canvas's notice says what happened ("Added 4 items to a new report, titled after the frame"), or why nothing was added.
+  - Items always go at the end; move them afterwards in report mode.
 
 ## 5. Report mode
 
@@ -173,7 +181,25 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   - Each block has a drag handle. Dragging shows where it will go, in either column.
   - A toggle on each block switches it between one column and the full width.
   - An insert menu, between blocks and at the end, adds a heading, text, an image (upload, or from the board's uploads) or a divider.
-- **Edits are private until Share,** as in every focus mode (`Draft`).
+- **Every page, scrolling.** A report can run over several pages. Report mode shows them all, stacked top to bottom with a gap between, in a column that scrolls, as the PDF widget's focus view does. A new page starts when the content reaches the page's height; a block does not split between pages unless it is text (§3.2).
+- **Edits are live, with no private draft** (decided 2026-10-29). Unlike other focus modes, report mode writes straight to the shared report, as typing in a text on the canvas does:
+  - others and the agent see changes as they happen
+  - undo is per gesture
+  - there is no Share button and no exit dialog
+
+  Why: the agent edits the shared board and cannot see a private draft. With a draft, it would miss unshared edits, and Share could overwrite one side's changes, since `blocks` is replaced whole. `FocusableObjectUI` gets an option for this, for example `live: true`.
+
+### 5.1a Layout: the agent beside the report
+
+Report mode fills the screen with three parts:
+- **Left: the agent chat,** kept open so people can ask the agent to act on the report ("add the map", "write a summary of the key figures"). The agent's edits appear on the pages as it makes them.
+- **Middle: the pages,** scrolling.
+- **Right: the Options panel** (§5.2), with more in it than other widgets have.
+
+Today focus mode hides all the app's panels (`styles.css` hides `.ttx-shell` in focus) and keeps room for the Options panel on the right only (`focusArea` in `canvas/focus.ts`). Report mode needs:
+- a layout option on `FocusableObjectUI`, for example `keepChat: true`
+- `focusArea` that leaves room on the left as well
+- the chat panel shown in that mode
 
 ### 5.2 Options panel
 
@@ -281,7 +307,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
    - `report.addItems` from a selection, for several objects at once
    - a frame adds a heading and the objects inside it, in reading order, with nested frames
    - blocks that reference a removed object
-3. **The widget on the canvas:** the preview, the toolbar tool, and Add to report from the right-click menu, the Object panel and ⌘K, with the report picker.
+3. **The widget on the canvas** (built: `apps/web/src/reports/`, the Report tool on P in the toolbar's Map and report group, Add to report in the right-click menu and the Object panel, with the canvas's notice saying what it did): the preview, the toolbar tool, and Add to report from the right-click menu, the Object panel and ⌘K, with the report picker.
 4. **Drag onto a report:** the drop zone, the confirmation, objects back in place, one undo step.
 5. **Report mode:** pages, the two-column grid, reordering by drag, spans, paper and orientation, the insert menu, headings and plain text.
 6. **Rich text:** the editor (Tiptap, needs approval), `report.setText`.
@@ -313,6 +339,9 @@ Made (2026-10-29, from the product owner):
 14. **A frame added to an empty report is the report:** its title becomes the report's (live, until renamed) and no heading block is added. Into a report with content, it gets a heading block (2026-10-29).
 13. **A report's name** is the shared `name` field (`core.object.rename`), not a field of its own.
 
+15. **Report mode keeps the agent chat open** on the left, with the Options panel on the right, and shows every page in a scrolling column (§5.1, §5.1a). 2026-10-29.
+16. **Report mode edits live, without a private draft,** so the agent and people work on the same report (§5.1). 2026-10-29.
+
 Open:
 1. **The PDF approach:** decided by the spike (§7.4).
 2. **Rich text storage:** whole-block JSON first (recommended), or y-prosemirror for character-level co-editing from the start.
@@ -324,3 +353,4 @@ Open:
 8. **More than two columns:** later, if people ask.
 9. **Templates and reports:** whether a template can also add a report, filled from its frames.
 10. **New dependencies,** each approved in its step: Tiptap, `@cloudflare/puppeteer`, and possibly Paged.js or `@react-pdf/renderer`.
+11. **Versioning, or suggested edits** as in Google Docs (suggest, then accept or reject), so people can review changes, the agent's included, before they land. Too complex for now; live edits first (decision 16).

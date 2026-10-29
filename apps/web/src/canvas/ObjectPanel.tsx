@@ -1,10 +1,13 @@
 import { useSyncExternalStore } from 'react'
-import { ArrowsOutSimpleIcon } from '@phosphor-icons/react'
+import { ArrowsOutSimpleIcon, FileTextIcon } from '@phosphor-icons/react'
 import type { AgentReply, Chat, OplogEntry, Runtime } from '@ttx/core'
 import type { BoardObject } from '../board/board'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
+import type { Board } from '../board/board'
+import { addToReport, boardReports } from '../reports/reports'
 import type { PanelInfo } from './registry'
 
 /** What the board knows of an object's history: when anyone last changed it, and the request that made it. */
@@ -41,6 +44,8 @@ export function ObjectPanel({
   object,
   info,
   onOpen,
+  onSelect,
+  notify,
 }: {
   runtime: Runtime
   chat: Chat
@@ -48,6 +53,10 @@ export function ObjectPanel({
   info: PanelInfo
   /** Open it in focus mode. Absent for a type without one. */
   onOpen?: () => void
+  /** Select objects, e.g. the new report Add to report made. */
+  onSelect(ids: string[]): void
+  /** Say what an action did, or why it did nothing, in the canvas's notice. */
+  notify(text: string): void
 }) {
   const { updated, prompt } = useObjectHistory(runtime, chat, object.id)
   const rows = [...info.metadata, ...(updated ? ([['Updated', new Date(updated).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })]] as [string, string][]) : [])]
@@ -87,12 +96,50 @@ export function ObjectPanel({
         </>
       )}
       <Separator />
-      <div className="p-4">
-        <Button variant="secondary" className="w-full" disabled={!onOpen} onClick={onOpen}>
+      <div className="flex gap-2 p-4">
+        <Button variant="secondary" className="flex-1" disabled={!onOpen} onClick={onOpen}>
           <ArrowsOutSimpleIcon />
           Open
         </Button>
+        {object.type !== 'report' && <AddToReport runtime={runtime} id={object.id} onSelect={onSelect} notify={notify} />}
       </div>
     </aside>
+  )
+}
+
+/** Add the object to one of the board's reports, or to a new one (agent-docs/tasks/reports.md §4). */
+function AddToReport({ runtime, id, onSelect, notify }: { runtime: Runtime; id: string; onSelect(ids: string[]): void; notify(text: string): void }) {
+  const add = async (reportId?: string) => {
+    const r = await addToReport(runtime, [id], reportId)
+    notify(r.status === 'applied' ? (r.summary ?? 'Added to the report') : (r.error ?? 'Could not add to the report'))
+    if (!reportId && r.created?.length) onSelect(r.created)
+  }
+  const reports = boardReports(runtime.board as Board)
+  if (!reports.length) {
+    return (
+      <Button variant="secondary" className="flex-1" onClick={() => void add()}>
+        <FileTextIcon />
+        Add to new report
+      </Button>
+    )
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="secondary" className="flex-1">
+          <FileTextIcon />
+          Add to report
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {reports.map((r) => (
+          <DropdownMenuItem key={r.id} onSelect={() => void add(r.id)}>
+            {r.title}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void add()}>New report</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

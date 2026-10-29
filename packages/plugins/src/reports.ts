@@ -20,6 +20,12 @@ export type Orientation = (typeof ORIENTATIONS)[number]
 /** A page's size in CSS px at 96 per inch, portrait; landscape swaps the sides. */
 export const PAGE_SIZE: Record<Paper, { w: number; h: number }> = { a4: { w: 794, h: 1123 }, letter: { w: 816, h: 1056 } }
 
+/** A report page's size in CSS px, for its paper and orientation. */
+export function pageSize(paper: Paper, orientation: Orientation): { w: number; h: number } {
+  const { w, h } = PAGE_SIZE[paper]
+  return orientation === 'landscape' ? { w: h, h: w } : { w, h }
+}
+
 const span = z.union([z.literal(1), z.literal(2)]).describe('1: one of the two columns; 2: the full width')
 const blockId = z.string().min(1).describe("The block's id, from the report's summary")
 const imageId = z.string().regex(UPLOAD_ID).describe('Id of an uploaded image: the <id> in its link /uploads/<id>')
