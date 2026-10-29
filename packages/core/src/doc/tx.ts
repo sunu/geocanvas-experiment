@@ -67,6 +67,21 @@ export class BoardTx {
     }
   }
 
+  /**
+   * Remove optional fields of an object, e.g. a linked country card's country when the root has none
+   * (update leaves undefined fields as they are). Fails for a field the type requires.
+   */
+  clear(id: string, keys: string[]) {
+    const m = this.board.objects.get(id)
+    if (!m) return
+    const { type } = this.board.get(id)!
+    const shape = this.registry.objectSchema(type).shape
+    for (const k of keys) {
+      if (!(k in shape) || !shape[k]!.safeParse(undefined).success) throw new Error(`${type} cannot clear ${k}`)
+    }
+    for (const k of keys) m.delete(k)
+  }
+
   /** Also forgets their views (views.ts). */
   remove(ids: Iterable<string>) {
     const gone = [...ids]

@@ -35,11 +35,10 @@ export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewP
     return () => el.removeEventListener('wheel', stop)
   }, [editing])
 
+  // invoke, not dispatch: objects that follow this event re-render in the same step, which can need lookups.
   const pick = (eventId: string) => {
-    runtime.beginGesture()
-    runtime.dispatch('event.setEvent', { kind: 'objects', ids: [o.id] }, { eventId })
     onDone()
-    addFeedOnPick(eventId)
+    void runtime.invoke('event.setEvent', { kind: 'objects', ids: [o.id] }, { eventId }).then((r) => r.status === 'applied' && addFeedOnPick(eventId))
   }
 
   /** A ReliefWeb feed to the right of the event, for its GLIDE numbers, for everyone. */

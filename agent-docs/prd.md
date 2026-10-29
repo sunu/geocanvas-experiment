@@ -27,7 +27,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 
 ## 3. Status key
 
-**Built** is in `main`. **Planned (step N)** follows the step numbers in `agent-docs/tasks/in-focus-widgets.md`. **Not sequenced** is agreed scope with no step yet. **Stretch** is optional. **Out** is not in current scope.
+**Built** is in `main`. **Planned (step N)** follows the step numbers in `agent-docs/tasks/in-focus-widgets.md`. **Next** is the work being started now. **To do** is agreed work with no step yet, smaller than a feature. **Needs refinement** is built and usable, but its flow or details need more work. **Not sequenced** is agreed scope with no step yet. **Stretch** is optional. **Out** is not in current scope.
 
 ## 4. Features
 
@@ -42,7 +42,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Presence: cursors, selections, names, colors | Built | Collaborator avatar list is not built. |
 | Command palette (⌘K) with forms from op schemas | Built |  |
 | Undo and redo of your own edits, one step per gesture | Built |  |
-| Uploads to R2 and the uploads gallery | Built | Images up to 10 MB, PDFs up to 25 MB. Geospatial and tabular uploads: step 12. |
+| Uploads to R2 and the uploads gallery | Built | Images up to 10 MB, PDFs up to 25 MB. Geodata for map layers (GeoJSON, GeoParquet, zipped shapefile) is built but needs refinement (4.3, map to-dos). Tabular uploads come with the Table (step 12). |
 | Dark mode: system setting plus app toggle | Planned (step 11) | New CSS uses `--ttx-*` tokens only, so this step changes tokens and nothing else. |
 
 ### 4.2 Focus mode
@@ -55,13 +55,13 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Exit dialog: Share, Discard, Keep editing | Built | Only when there are unshared changes. |
 | Focused object deleted by someone else | Built | Focus ends with a notice. |
 | Full-screen view | Built | Decided: the focus button is the full-screen view. No browser Fullscreen API. |
-| Live-map cap and snapshots when zoomed out | Planned (step 7) | Each live map uses two WebGL contexts; browsers keep about 16. |
+| Live-map cap and snapshots when zoomed out | Built (step 7) | Each live map uses two WebGL contexts; browsers keep about 16. At most 4 maps are live; the others show a snapshot. |
 
 ### 4.3 Widgets
 
 | Widget | Status | Focus | Next work |
 | --- | --- | --- | --- |
-| **Map** | Built | Yes | Step 3: location on add (draw AOI, lat/lon, bbox, or describe it to the agent). Step 4: layers from a URL (GeoJSON, GeoParquet, COG, XYZ tiles, shapefile) and a legend per layer. Step 5: attributes, filters, legend formatting (`map.setLayerFilter`, `map.setLayerStyle`). Step 6: annotations, marker, polygon, circle. Step 7: snapshots and live-map cap. |
+| **Map** | Built | Yes | Steps 3–7 are built: location on add, layers from a URL, filters and styles, annotations (sticky notes and drawn shapes), snapshots and the live-map cap. What is left is under **Map to-dos** below. |
 | **Event** (Montandon) | Built | No | Related events near an event and impact tables are still on the `experiment` branch. |
 | **Notebook** | Built | Yes | Today: a published Notebook Factory run in a sandboxed iframe. Step 15: render any `.ipynb` from upload or URL, outputs included, never executed, sandboxed without scripts. |
 | **Table** | Planned (steps 8–10, 13) | Yes | CSV, Parquet, XLSX into a compact table. Source: upload, URL or STAC. Columns, filters, sort. Scrolls 100,000 rows in focus. |
@@ -71,6 +71,16 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Country context, Who's where, Conflict (HDX HAPI) | Built | No | Province and district tables are not built. |
 | Image, PDF | Built | PDF yes | From drops and the uploads gallery. |
 | Box, text, sticky note | Built | No |  |
+
+**Map to-dos.** Built features that need work, and what is missing:
+
+| To-do | Status | Notes |
+| --- | --- | --- |
+| Legend on the map | To do | Today each layer's colors are shown only in the layer list of the Options panel, so a map on the canvas has no key. Depends on the open decision on legend visibility (§7). |
+| Organize the Options panel by category | To do | Issue #71: the side panel of the map and the other focusable widgets, grouped as in the Figma wireframe. |
+| Adding data by upload | Built, needs refinement | Upload GeoJSON, GeoParquet or a zipped shapefile to a map (PR #70). Refine the flow. |
+| Annotations | Built, needs refinement | Sticky notes and the drawing box (arrow, line, rectangle, circle, polygon, pen). Not built: labels on shapes, selecting a shape to move or delete it, stroke widths. |
+| Scenario planning on the map | Needs refinement | In PR #58, not yet in `main`. |
 
 ### 4.4 Data
 
@@ -90,7 +100,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Bring your own key in the browser | Built | Key stays in localStorage and goes only to the provider. |
 | External agents through the MCP companion | Built | Local only. Tools are the tab's ops and read-only tools. |
 | Add, remove and edit every widget | Ongoing rule | Holds as long as every change is an op. Check it for each new widget. |
-| Summarize the board into a report | Not sequenced | `summarizeBoard` exists for prompts. Needs the report feature (4.6). |
+| Summarize the board into a report | Next (with reports) | `summarizeBoard` exists for prompts. Step 10 of `agent-docs/tasks/reports.md`. |
 | LLM behavior | Rule | Follow the LLM parts of `agents.md` on the `experiment` branch only. |
 
 ### 4.6 Templates and reports
@@ -98,14 +108,14 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Start a board from an event | Built | New board → Situation report with the event (`agent-docs/tasks/board-templates.md`). Picking an event on an event card also adds its ReliefWeb feed. Related events in its geography are not built. |
-| Templates that prepopulate widgets (SitRep first) | Built (plan-012) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives empty widgets. Historical hazard explorer next. |
-| Create and export reports | Not sequenced | Modeled on OCHA humanitarian snapshots. Design proposal in the design spec (reports and SitRep sections). |
+| Templates that prepopulate widgets (SitRep first) | Built (plan-012, plan-013) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives an empty root and blank widgets. Its objects follow the seed's root (the event card, an area input) and sit in a frame: change the root and they update. Historical hazard explorer next. |
+| Create and export reports | Next (design first) | A report is a widget on the canvas and a mode (focus): a document editor with two columns, A4 or Letter, rich text, items added from the board, live or frozen. PDF export and a report URL. Modeled on OCHA humanitarian snapshots. Spec and steps: `agent-docs/tasks/reports.md`. |
 
 ### 4.7 Non-functional requirements
 
 | Requirement | How it's held |
 | --- | --- |
-| Canvas never below 30 FPS | Hide other objects in focus; snapshots and live-map cap (step 7). Log FPS in PRs that touch rendering. |
+| Canvas never below 30 FPS | Hide other objects in focus; snapshots and the live-map cap (step 7, built). Log FPS in PRs that touch rendering. |
 | Desktop only | No small-screen layouts. |
 | Dark mode | Step 11. |
 | Cost-safe multiplayer | Hibernation API; cursor updates capped at 10 per second. |
@@ -113,10 +123,11 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 ## 5. Build order
 
 1. **Milestone 1, Map in focus:** done.
-2. **Milestone 2, Map features:** steps 3–7.
-3. **Milestone 3, Table:** steps 8–10.
-4. **Then:** dark mode (11), uploads for layers and tables (12), more table sources (13), Chart (14), Notebook `.ipynb` (15), Input (16, stretch).
-5. **Not sequenced yet:** reports, agent board summary, more templates (plan-012).
+2. **Milestone 2, Map features:** steps 3–7 done. The map to-dos (4.3) remain: legend on the map, Options panel organization (#71), and refining uploads, annotations and scenario planning.
+3. **Next: reports** (4.6) and the agent's board summary, starting with the design: the open decision in §7.
+4. **Milestone 3, Table:** steps 8–10.
+5. **Then:** dark mode (11), uploads for tables (12; uploads for map layers are built), more table sources (13), Chart (14), Notebook `.ipynb` (15), Input (16, stretch).
+6. **Not sequenced yet:** more templates (plan-012).
 
 One PR per step.
 
@@ -135,10 +146,10 @@ One PR per step.
 - **Uploads on R2:** bucket names, file size and count limits, cleanup for deleted branch previews.
 - **Live-map cap:** how many live maps at once.
 - **Legend visibility:** focus only, always, toggle, or by zoom.
-- **Reports:** a widget, a mode, or both; how report blocks stay in sync with canvas widgets.
+- **Reports:** decided: both a widget and a mode, with live or frozen items. Still open: the PDF approach (a spike decides), rich text storage, the report URL's expiry and permissions, and the others in `agent-docs/tasks/reports.md` §10.
 - **Templates:** which templates follow the situation report and conflict explorer, and when templates become data that facilitators can edit (plan-012).
 - **Collaboration scope:** comments, mentions and an avatar list are not in `features.md`. In or out?
-- **Design-spec proposals:** frame context, explicit links between widgets, version history and the docked accordion options panel are design proposals, not code. Ticket them before building.
+- **Design-spec proposals:** frame context, version history and the docked accordion options panel are design proposals, not code. Ticket them before building. Frames and links between widgets are built for templates (plan-013); links that people draw by hand are not.
 
 ## 8. References
 
@@ -146,5 +157,6 @@ One PR per step.
 - `agent-docs/features.md`: agreed scope.
 - `agent-docs/architect.md`: focus widgets extend the current widget; data in DuckDB-wasm; uploads on Cloudflare.
 - `agent-docs/tasks/in-focus-widgets.md`: focus mode design, widget fields and ops, steps 1–16, decisions.
-- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates.
+- `agent-docs/tasks/reports.md`: reports: the widget, report mode, live and frozen items, PDF export options, the report URL, steps 1–10.
+- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames.
 - Figma "Atlantis Pod Week Hack - AHD TTX": source of truth for chrome; wireframes for every feature.

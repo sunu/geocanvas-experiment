@@ -3,7 +3,9 @@ import {
   ArrowLineDownIcon,
   ArrowLineUpIcon,
   ArrowUpIcon,
+  ArrowsClockwiseIcon,
   CopyIcon,
+  LinkBreakIcon,
   TrashIcon,
 } from '@phosphor-icons/react'
 import type { Runtime, TargetRef } from '@ttx/core'
@@ -33,6 +35,10 @@ export function ObjectMenu({ runtime, ids, onSelect }: Props) {
     runtime.beginGesture()
     return runtime.dispatch(opId, target, args)
   }
+  // Links (plans/plan-013.md): the same ops as the palette, offered only where they apply.
+  const available = new Set(runtime.availableOps(target).map((op) => op.id))
+  const unlink = available.has('link.remove')
+  const refresh = available.has('link.refresh')
   const layer = (label: string, Icon: typeof ArrowUpIcon, opId: string, keys: string) => (
     <ContextMenuItem onSelect={() => run(opId)}>
       <Icon />
@@ -56,6 +62,19 @@ export function ObjectMenu({ runtime, ids, onSelect }: Props) {
       {layer('Bring forward', ArrowUpIcon, 'core.object.bringForward', `${MOD}]`)}
       {layer('Send backward', ArrowDownIcon, 'core.object.sendBackward', `${MOD}[`)}
       {layer('Send to back', ArrowLineDownIcon, 'core.object.sendToBack', '[')}
+      {(unlink || refresh) && <ContextMenuSeparator />}
+      {refresh && (
+        <ContextMenuItem onSelect={() => void runtime.invoke('link.refresh', target, {})}>
+          <ArrowsClockwiseIcon />
+          Refresh linked objects
+        </ContextMenuItem>
+      )}
+      {unlink && (
+        <ContextMenuItem onSelect={() => run('link.remove')}>
+          <LinkBreakIcon />
+          Unlink
+        </ContextMenuItem>
+      )}
       <ContextMenuSeparator />
       <ContextMenuItem variant="destructive" onSelect={() => run('core.object.delete')}>
         <TrashIcon />

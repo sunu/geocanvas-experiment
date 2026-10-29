@@ -5,8 +5,9 @@ import { BitmapLayer, GeoJsonLayer } from '@deck.gl/layers'
 import type { Tiles } from '../data/fromUrl'
 import { tools } from '../tools/registry'
 import { stableJson } from '@ttx/core'
+import { gridLayers } from './grid'
 import { rasterLayers } from './raster'
-import { bboxOf, SHAPE_COLORS, shapeFeatures, type Bbox, type LayerFilter, type LayerStyle, type MapAnnotation, type MapLayer, type ShapePart } from '@ttx/plugins'
+import { bboxOf, GRID_OUTPUT, SHAPE_COLORS, shapeFeatures, type Bbox, type LayerFilter, type LayerStyle, type MapAnnotation, type MapLayer, type ShapePart } from '@ttx/plugins'
 import { featurePaint, filterFeatures, hexToRgb } from './featureStyle'
 
 export type { MapLayer } from '@ttx/plugins'
@@ -131,10 +132,10 @@ export function geometryKinds(fc: GeoJSON.FeatureCollection): Set<'point' | 'lin
 const isArea = (f: GeoJSON.Feature) => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon'
 
 /** Drawing order by kind of result: tiles at the bottom, then rasters, then features. */
-const DRAW_ORDER: Record<string, number> = { 'geo.tiles': 0, 'geo.raster': 1 }
+const DRAW_ORDER: Record<string, number> = { 'geo.tiles': 0, 'geo.raster': 1, [GRID_OUTPUT]: 1 }
 const drawOrder = (s: LayerState) => DRAW_ORDER[s.output ?? ''] ?? 2
 
-/** deck.gl layers for the layers that have a result, by kind of result. Tiles and rasters draw below features. */
+/** deck.gl layers for the layers that have a result, by kind of result. Tiles, rasters and grids draw below features. */
 export function deckLayers(states: LayerState[]): Layer[] {
   // A stable sort: within a kind, the list's order.
   return [...states].sort((a, b) => drawOrder(a) - drawOrder(b)).flatMap((s): Layer[] => {
@@ -142,6 +143,7 @@ export function deckLayers(states: LayerState[]): Layer[] {
     const opacity = s.style?.opacity ?? 1
     if (s.output === 'geo.tiles') return [tileLayer(s.value as Tiles, `layer-${s.id}`, opacity)]
     if (s.output === 'geo.raster') return rasterLayers(s.value, { id: `layer-${s.id}`, opacity })
+    if (s.output === GRID_OUTPUT) return gridLayers(s.value, { id: `layer-${s.id}` })
     if (s.output === 'geo.features') {
       const all = s.value as GeoJSON.FeatureCollection
       const { colorOf } = featurePaint(all, s.style)
@@ -219,6 +221,12 @@ function tileLayer(t: Tiles, id: string, opacity: number): Layer {
 export function attributionOf(value: unknown): string | undefined {
   const a = (value as { attribution?: unknown } | undefined)?.attribution
   return typeof a === 'string' ? a : undefined
+}
+
+/** What a result says about itself beyond its source: for a forecast, the model, run and valid time, and that it is no warning. */
+export function captionOf(value: unknown): string | undefined {
+  const c = (value as { caption?: unknown } | undefined)?.caption
+  return typeof c === 'string' ? c : undefined
 }
 
 /** "Showing the first N features only" when a tool stopped at its cap (Overture buildings). */

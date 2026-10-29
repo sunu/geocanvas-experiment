@@ -6,6 +6,8 @@
   --ttx-panel: #ffffff;
   --ttx-border: rgb(0 0 0 / 0.12);
   --ttx-accent: #2563eb;
+  /* A frame's fill: light, so what it holds stands out. */
+  --ttx-frame-fill: rgb(255 255 255 / 0.6);
   --ttx-font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-family: var(--ttx-font);
   color: var(--ttx-ink);
@@ -364,6 +366,39 @@ body,
 }
 
 /* Other people and the agent: selections, cursors and name tags in their color (canvas/Peers.tsx, board/collaborators.ts). */
+/* Links from a root to what follows it (canvas/Links.tsx): arrows in the world, attached to the objects' sides. */
+.ttx-links {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ttx-links > path {
+  fill: none;
+  stroke: var(--ttx-muted);
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.ttx-links > path.is-on {
+  stroke: var(--canvas-accent); /* the selection outline's color */
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.ttx-links .ttx-links__head path {
+  fill: var(--ttx-muted);
+  stroke: none;
+}
+
+.ttx-links .ttx-links__head.is-on path {
+  fill: var(--canvas-accent);
+}
+
 .ttx-peer-selection {
   position: absolute;
   box-sizing: border-box;
@@ -1300,6 +1335,33 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   letter-spacing: 0.04em;
 }
 
+/* A section that opens and closes (MapOptions' Accordion): its heading is the toggle. */
+.ttx-options__accordion summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 14px 0 6px;
+  color: var(--ttx-muted);
+  list-style: none;
+  cursor: pointer;
+}
+
+.ttx-options__accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.ttx-options__accordion summary h3 {
+  margin: 0;
+}
+
+.ttx-options__accordion summary svg {
+  transition: transform 0.15s;
+}
+
+.ttx-options__accordion[open] summary svg {
+  transform: rotate(90deg);
+}
+
 .ttx-options__section select {
   width: 100%;
   font: inherit;
@@ -2155,6 +2217,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   text-align: center;
 }
 
+.ttx-input__error {
+  margin-top: 6px;
+  color: var(--destructive);
+}
+
 .ttx-country__details {
   display: flex;
   flex-direction: column;
@@ -2763,4 +2830,10 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   height: 10px;
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+/* A failed action in a map's Options panel (the weather forecast). */
+.ttx-options__error {
+  margin: 4px 0 0;
+  color: #dc2626;
 }

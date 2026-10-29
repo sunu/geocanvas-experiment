@@ -42,6 +42,17 @@ describe('uploads', () => {
     expect(await storeUpload(post(pdf), bucket, 'abc123')).toMatchObject({ kind: 'document', contentType: 'application/pdf' })
   })
 
+  it('keeps GeoJSON, GeoParquet and zipped shapefiles as map data, by their bytes', async () => {
+    const { bucket } = fakeBucket()
+    const bytes = (s: string) => new TextEncoder().encode(s)
+    expect(await storeUpload(post(bytes('\ufeff \n{"type":"FeatureCollection","features":[]}')), bucket, 'abc123')).toMatchObject({ kind: 'data', contentType: 'application/geo+json' })
+    expect(await storeUpload(post(bytes('PAR1\0\0')), bucket, 'abc123')).toMatchObject({ kind: 'data', contentType: 'application/vnd.apache.parquet' })
+    expect(await storeUpload(post(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0])), bucket, 'abc123')).toMatchObject({ kind: 'data', contentType: 'application/zip' })
+    // A JSON array, or HTML, is not GeoJSON.
+    expect(((await storeUpload(post(bytes('[1, 2]')), bucket, 'abc123')) as Response).status).toBe(415)
+    expect(((await storeUpload(post(bytes('<html>')), bucket, 'abc123')) as Response).status).toBe(415)
+  })
+
   it('refuses files that are too large for their kind or not a kept type, and ids it did not make', async () => {
     const { bucket, stored } = fakeBucket()
     const big = new Uint8Array(MAX_UPLOAD_BYTES.media + 1)
