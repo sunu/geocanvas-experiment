@@ -1,5 +1,6 @@
 import type { Runtime } from '@ttx/core'
-import { graphProblems, isActiveOpenEOAnalysis, MAX_AREA_SQ_DEG, OPENEO_BASE_URL, type OpenEOAnalysisObject, type OpenEOStatus } from '@ttx/plugins'
+import { graphProblems, isActiveOpenEOAnalysis, MAX_AREA_SQ_DEG, type OpenEOAnalysisObject, type OpenEOStatus, type ProcessGraph } from '@ttx/plugins'
+import type { OpenEOClient } from './openeoClient'
 
 interface OpenEOService {
   id: string
@@ -34,21 +35,16 @@ export class OpenEOServiceManager {
   private cleaned = new Set<string>()
   private known = new Map<string, OpenEOAnalysisObject>()
   private activeId?: string
-  private token?: { value: string; expiresAt: number }
-  private readonly baseUrl: string
   private runtime: Runtime
-  private credentials: { OPENEO_BASE_URL?: string; OPENEO_USER?: string; OPENEO_PASS?: string }
+  private client: OpenEOClient
   private keepAlive: (work: Promise<unknown>) => void
+  private readonly baseUrl: string
 
-  constructor(
-    runtime: Runtime,
-    credentials: { OPENEO_BASE_URL?: string; OPENEO_USER?: string; OPENEO_PASS?: string },
-    keepAlive: (work: Promise<unknown>) => void,
-  ) {
+  constructor(runtime: Runtime, client: OpenEOClient, keepAlive: (work: Promise<unknown>) => void) {
     this.runtime = runtime
-    this.credentials = credentials
+    this.client = client
     this.keepAlive = keepAlive
-    this.baseUrl = (credentials.OPENEO_BASE_URL ?? OPENEO_BASE_URL).replace(/\/$/, '')
+    this.baseUrl = client.baseUrl
   }
 
   start() {
@@ -172,14 +168,14 @@ export class OpenEOServiceManager {
   }
 
   private async deleteService(analysisId: string, serviceId: string) {
-    const response = await this.request(`/services/${encodeURIComponent(serviceId)}`, { method: 'DELETE' })
+    const response = await this.client.request(`/services/${encodeURIComponent(serviceId)}`, { method: 'DELETE' })
     if (!response.ok && response.status !== 404) throw new Error(await errorMessage(response))
     this.cleaned.add(analysisId)
   }
 
   private async validate(analysis: OpenEOAnalysisObject) {
     const graph = analysisGraph(analysis)
-    const response = await this.request('/validation', {
+    const response = await this.client.request('/validation', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ process_graph: graph, parameters: [] }),
@@ -191,7 +187,7 @@ export class OpenEOServiceManager {
 
   private async createService(analysis: OpenEOAnalysisObject): Promise<OpenEOService> {
     const graph = analysisGraph(analysis)
-    const response = await this.request('/services', {
+    const response = await this.client.request('/services', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -218,7 +214,7 @@ export class OpenEOServiceManager {
   }
 
   private async listServices(): Promise<OpenEOService[]> {
-    const response = await this.request('/services')
+    const response = await this.client.request('/services')
     if (!response.ok) throw new Error(await errorMessage(response))
     const body = await response.json() as { services?: OpenEOService[] }
     return body.services ?? []
@@ -226,7 +222,7 @@ export class OpenEOServiceManager {
 
   private async serviceDetails(service: OpenEOService): Promise<ServiceDetails> {
     const url = service.url ?? `${this.baseUrl}/services/${encodeURIComponent(service.id)}`
-    const response = await this.request(url)
+    const response = await this.client.request(url)
     if (!response.ok) throw new Error(await errorMessage(response))
     return response.json() as Promise<ServiceDetails>
   }
@@ -234,38 +230,11 @@ export class OpenEOServiceManager {
   private setStatus(id: string, status: OpenEOStatus, extra: { serviceId?: string; tileUrl?: string; error?: string }) {
     this.runtime.dispatch('openeo.setStatus', { kind: 'objects', ids: [id] }, { status, ...extra }, { actor: { kind: 'system', id: 'system', name: 'openEO service' } })
   }
-
-  private async request(path: string, init: RequestInit = {}) {
-    const token = await this.accessToken()
-    const url = path.startsWith('http')
-      ? new URL(path)
-      : new URL(`${this.baseUrl}/${path.replace(/^\/+/, '')}`)
-    if (url.origin !== new URL(this.baseUrl).origin) throw new Error('EOPF returned a service URL on an unexpected host')
-    // openEO's token format is "oidc/<provider id>/<token>"; EOPF lists one provider, "oidc" (its /credentials/oidc).
-    return fetch(url, { ...init, headers: { authorization: `Bearer oidc/oidc/${token}`, ...init.headers } })
-  }
-
-  private async accessToken(): Promise<string> {
-    if (this.token && this.token.expiresAt > Date.now() + 60_000) return this.token.value
-    const username = this.credentials.OPENEO_USER
-    const password = this.credentials.OPENEO_PASS
-    if (!username || !password) throw new Error('Set OPENEO_USER and OPENEO_PASS in apps/worker/.dev.vars')
-    const response = await fetch('https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: 'cdse-public', grant_type: 'password', username, password }),
-    })
-    if (!response.ok) throw new Error(`CDSE login failed (${response.status}): ${await response.text()}`)
-    const token = await response.json() as { access_token?: string; expires_in?: number }
-    if (!token.access_token) throw new Error('CDSE did not return an access token')
-    this.token = { value: token.access_token, expiresAt: Date.now() + (token.expires_in ?? 300) * 1000 }
-    return token.access_token
-  }
 }
 
 /** The graph to run: the one an agent proposed, else the Sentinel-1 change graph of the proposal's date windows. */
-function analysisGraph(analysis: OpenEOAnalysisObject) {
-  if (analysis.graph) return JSON.parse(analysis.graph) as Record<string, unknown>
+export function analysisGraph(analysis: OpenEOAnalysisObject): ProcessGraph {
+  if (analysis.graph) return JSON.parse(analysis.graph) as ProcessGraph
   const { area, preStart, preEnd, postStart, postEnd } = analysis
   if (!preStart || !preEnd || !postStart || !postEnd) throw new Error('This analysis has neither a process graph nor date windows')
   return sarChangeGraph({ area, preStart, preEnd, postStart, postEnd })
@@ -319,7 +288,7 @@ export function sarChangeGraph(analysis: Pick<OpenEOAnalysisObject, 'area'> & Re
 const serviceTitle = (id: string) => `humanitarian-ttx:${id}`
 
 /** Reject oversized requests before creating a billable remote service. */
-function validateAnalysis(analysis: OpenEOAnalysisObject) {
+export function validateAnalysis(analysis: OpenEOAnalysisObject) {
   const [west, south, east, north] = analysis.area
   if (![west, south, east, north].every(Number.isFinite) || west >= east || south >= north) throw new Error('The analysis area must be a non-empty WGS84 bounding box')
   if ((east - west) * (north - south) > MAX_AREA_SQ_DEG) throw new Error(`The analysis area is too large; draw a smaller AOI (maximum ${MAX_AREA_SQ_DEG} square degrees)`)

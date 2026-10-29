@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Runtime } from '@ttx/core'
 import { EXAMPLE_GRAPH, plugins, type MapBoardObject, type OpenEOAnalysisObject } from '@ttx/plugins'
 import { OpenEOServiceManager, sarChangeGraph, tileAt } from '../src/openeo'
+import { OpenEOClient } from '../src/openeoClient'
+import { previewOpenEOAnalysis } from '../src/openeoPreview'
 
 const objects = (ids: string[]) => ({ kind: 'objects' as const, ids })
 
@@ -23,7 +25,7 @@ describe('EOPF openEO service lifecycle', () => {
     })
     const analysisId = proposal.created![0]!
     const tasks: Promise<unknown>[] = []
-    const manager = new OpenEOServiceManager(runtime, { OPENEO_USER: 'test-user', OPENEO_PASS: 'test-pass' }, (work) => tasks.push(work))
+    const manager = new OpenEOServiceManager(runtime, new OpenEOClient({ OPENEO_USER: 'test-user', OPENEO_PASS: 'test-pass' }), (work) => tasks.push(work))
     manager.start()
 
     expect((runtime.board.get(analysisId) as OpenEOAnalysisObject).status).toBe('proposed')
@@ -61,7 +63,7 @@ describe('EOPF openEO graph proposals', () => {
     const mapId = runtime.dispatch('map.add', { kind: 'canvas' }, { x: 0, y: 0 }).created![0]!
     const analysisId = (await runtime.invoke('openeo.proposeGraph', objects([mapId]), { title: 'Rome NDVI', area: { west: 12.35, south: 41.75, east: 12.65, north: 42 }, processGraph: EXAMPLE_GRAPH })).created![0]!
     const tasks: Promise<unknown>[] = []
-    new OpenEOServiceManager(runtime, { OPENEO_USER: 'test-user', OPENEO_PASS: 'test-pass' }, (work) => tasks.push(work)).start()
+    new OpenEOServiceManager(runtime, new OpenEOClient({ OPENEO_USER: 'test-user', OPENEO_PASS: 'test-pass' }), (work) => tasks.push(work)).start()
     return { doc, runtime, analysisId, tasks }
   }
 
@@ -88,6 +90,30 @@ describe('EOPF openEO graph proposals', () => {
     expect(analysis.error).toMatch(/save_result/)
     expect(created).toHaveLength(0)
   })
+
+  it('previews the graph stored on a proposal without creating a service or changing the board', async () => {
+    requests.length = 0
+    created.length = 0
+    const doc = new Y.Doc()
+    const runtime = new Runtime({ doc, plugins, actor: { kind: 'user', id: 'u', name: 'User' } })
+    const mapId = runtime.dispatch('map.add', { kind: 'canvas' }, { x: 0, y: 0 }).created![0]!
+    const analysisId = (await runtime.invoke('openeo.proposeGraph', objects([mapId]), {
+      title: 'Rome NDVI',
+      area: { west: 12.35, south: 41.75, east: 12.65, north: 42 },
+      processGraph: EXAMPLE_GRAPH,
+    })).created![0]!
+
+    const response = await previewOpenEOAnalysis(runtime, new OpenEOClient({ OPENEO_USER: 'test-user', OPENEO_PASS: 'test-pass' }), analysisId)
+
+    expect(response.status).toBe(200)
+    expect(response.result).toMatch(/rendered an image, but its pixels could not be checked/i)
+    const previewRequest = requests.find((request) => new URL(request.url).pathname === '/openeo/result')
+    expect(previewRequest?.method).toBe('POST')
+    expect(previewRequest?.authorization).toBe('Bearer oidc/oidc/fake-access-token')
+    expect(created).toHaveLength(0)
+    expect((runtime.board.get(analysisId) as OpenEOAnalysisObject).status).toBe('proposed')
+    expect((runtime.board.get(mapId) as MapBoardObject).layers).toBeUndefined()
+  })
 })
 
 describe('EOPF openEO test tile', () => {
@@ -105,7 +131,7 @@ describe('EOPF openEO test tile', () => {
     })
     const analysisId = proposal.created![0]!
     const tasks: Promise<unknown>[] = []
-    new OpenEOServiceManager(runtime, { OPENEO_USER: 'test-user', OPENEO_PASS: 'test-pass' }, (work) => tasks.push(work)).start()
+    new OpenEOServiceManager(runtime, new OpenEOClient({ OPENEO_USER: 'test-user', OPENEO_PASS: 'test-pass' }), (work) => tasks.push(work)).start()
     await runtime.invoke('openeo.approveSarChange', objects([analysisId]), {})
     await Promise.all(tasks)
     return runtime.board.get(analysisId) as OpenEOAnalysisObject
@@ -183,6 +209,7 @@ async function mockFetch(input: RequestInfo | URL, init: RequestInit = {}) {
     return Response.json({ access_token: 'fake-access-token', expires_in: 3600 })
   }
   if (url.pathname === '/openeo/validation') return Response.json({ errors: [] })
+  if (url.pathname === '/openeo/result') return tile()
   if (url.pathname === '/openeo/services' && method === 'GET') return Response.json({ services: [] })
   if (url.pathname === '/openeo/services' && method === 'POST') {
     const body = JSON.parse(String(init.body)) as { process?: { process_graph?: Record<string, unknown> }; configuration?: { scope?: string } }

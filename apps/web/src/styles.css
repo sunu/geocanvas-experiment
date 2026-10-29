@@ -1253,6 +1253,8 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
 .ttx-openeo__status { font-weight: 650; }
 .ttx-openeo__status.is-ready { color: #15803d; }
 .ttx-openeo__status.is-error, .ttx-openeo__error { color: #b91c1c; }
+.ttx-openeo__preview-result { color: #b91c1c; }
+.ttx-openeo__preview-result.is-success { color: #15803d; }
 .ttx-openeo small, .ttx-openeo__hint { color: var(--ttx-muted); }
 .ttx-openeo__graph { width: 100%; }
 .ttx-openeo__graph summary { color: var(--ttx-muted); cursor: pointer; }
