@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { XIcon } from '@phosphor-icons/react'
+import { CaretRightIcon, XIcon } from '@phosphor-icons/react'
 import { Views, type Runtime } from '@ttx/core'
 import {
   ADMIN_LEVEL_NAME,
@@ -39,6 +39,19 @@ function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, un
 }
 
 const NO_LAYERS: MapLayer[] = []
+
+/** A section of the panel that opens and closes, closed at first. */
+function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details className="ttx-options__section ttx-options__accordion">
+      <summary>
+        <CaretRightIcon size={12} aria-hidden />
+        <h3>{title}</h3>
+      </summary>
+      {children}
+    </details>
+  )
+}
 
 /**
  * The map's contextual tools in focus mode: where everyone looks, go to a place, its data layers, add data for the area in view,
@@ -113,8 +126,7 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
         />
       </section>
       <Drawings annotations={o.annotations ?? []} onRemove={(annotationId) => mapOp(runtime, o.id, 'map.removeAnnotation', { annotationId })} />
-      <section className="ttx-options__section">
-        <h3>Add data for this area</h3>
+      <Accordion title="Add data for this area">
         <div className="ttx-options__list">
           {(Object.keys(DATA_LAYERS) as DataLayerKey[]).map((k) => (
             <button key={k} type="button" onClick={() => addDataLayer(k)}>
@@ -122,13 +134,11 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
             </button>
           ))}
         </div>
-      </section>
-      <section className="ttx-options__section">
-        <h3>Add from a URL</h3>
+      </Accordion>
+      <Accordion title="Add from a URL">
         <UrlLayerForm onAdd={addUrlLayer} />
-      </section>
-      <section className="ttx-options__section">
-        <h3>Boundaries</h3>
+      </Accordion>
+      <Accordion title="Boundaries">
         <div className="ttx-options__list">
           {ADMIN_LEVELS.map((level) => (
             <button key={level} type="button" onClick={() => mapOp(runtime, o.id, 'map.addBoundaries', { level })}>
@@ -136,7 +146,7 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
             </button>
           ))}
         </div>
-      </section>
+      </Accordion>
       <BoardEvents board={runtime.board as Board} onPick={(eventId, title) => addAndFit('map.addEventLayer', { eventId, title })} />
       <CountryData board={runtime.board as Board} onPick={addChoropleth} />
       <NotebookResults board={runtime.board as Board} onPick={(runId, name, title) => addAndFit('map.addNotebookResult', { runId, name, title })} />
