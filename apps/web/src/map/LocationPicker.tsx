@@ -3,7 +3,7 @@ import { SelectionPlusIcon } from '@phosphor-icons/react'
 import type { MapArea } from '@ttx/plugins'
 import type { Runtime } from '@ttx/core'
 import { askAgent, useAgentCanGeocode } from '../agent/ask'
-import { boxArea, drawBox } from './draw'
+import { drawBox } from './draw'
 import { liveMap } from './live'
 import { areaAround, parseBbox, parseLatLon } from './location'
 
@@ -30,9 +30,9 @@ export function LocationPicker({ runtime, mapId }: { runtime: Runtime; mapId: st
   const startDrawing = () => {
     const m = liveMap(mapId)
     if (!m || drawing) return
-    const cancel = drawBox(m, (box) => {
+    const cancel = drawBox(m, (area) => {
       setDrawing(undefined)
-      if (box) showArea(boxArea(box))
+      if (area) showArea(area)
     })
     setDrawing(() => cancel)
   }
