@@ -168,7 +168,7 @@ body,
   width: 100%;
   height: 100%;
   border: 2px solid;
-  border-radius: 6px;
+  border-radius: 0;
 }
 
 /* Fill color comes from the note's color; its text is always dark (objects/sticky.tsx). */
@@ -177,11 +177,7 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
-  /* Like a paper note: no outline, a darker lip along the bottom edge, and a soft cast shadow. */
-  box-shadow:
-    inset 0 -4px 0 rgb(0 0 0 / 0.08),
-    0 1px 2px rgb(0 0 0 / 0.2),
-    0 8px 18px rgb(0 0 0 / 0.2);
+  /* Flat, like everything on the canvas: its color is its edge. */
   font-family: var(--ttx-font);
   font-weight: 300;
   line-height: 1.3;
@@ -216,7 +212,7 @@ body,
   height: 100%;
   padding: 8px;
   border: 1px dashed var(--ttx-border);
-  border-radius: 6px;
+  border-radius: 0;
   color: var(--ttx-muted);
   font-size: 12px;
 }
@@ -399,9 +395,10 @@ body,
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
 }
 
@@ -440,9 +437,10 @@ body,
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
 }
 
@@ -1351,9 +1349,10 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
 }
 
@@ -1620,7 +1619,7 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   gap: 10px;
   padding: 16px;
   border: 1.5px dashed var(--ttx-accent);
-  border-radius: 8px;
+  border-radius: 0;
   background: color-mix(in srgb, var(--ttx-panel) 85%, var(--ttx-accent));
   color: var(--ttx-ink);
   font-size: 13px;
@@ -1697,9 +1696,10 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
 }
 
@@ -1740,7 +1740,7 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
 .ttx-pdf__slot {
   margin: 0 auto 16px;
   background: #fff;
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  box-shadow: 0 0 0 1px var(--ttx-border);
 }
 
 .ttx-pdfopts__pager {
@@ -1803,9 +1803,10 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
 }
 
@@ -1975,9 +1976,10 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
 }
 
@@ -2057,9 +2059,10 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
   font-size: 12px;
 }
 
