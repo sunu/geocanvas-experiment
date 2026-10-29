@@ -104,6 +104,8 @@ export class Runtime {
         const plan = op.prepare ? op.prepare(ctx!, parsed) : parsed
         if (plan instanceof Promise) throw new Error(`Op ${opId} prepares asynchronously: use invoke()`)
         this.apply(op, record, plan, target)
+        const summary = op.describePlan?.(plan)
+        if (summary) record.summary = summary
       } catch (err) {
         fail(record, err)
       }
