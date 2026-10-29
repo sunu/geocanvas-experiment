@@ -18,7 +18,7 @@ import {
   type MapLayer,
   type UrlFormat,
 } from './mapLayers.js'
-import { mapAnnotation, type MapAnnotation } from './mapAnnotations.js'
+import { mapAnnotation, SHAPE_COLORS, SHAPE_POINTS, SHAPES, type MapAnnotation, type MapShape, type ShapeColor } from './mapAnnotations.js'
 import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
 
 /** The map object type and its ops. No React here: the view is registered in apps/web/src/map/ui.ts. */
@@ -84,6 +84,15 @@ function changeAnnotation(map: MapBoardObject, annotationId: string, change: (a:
   return { id: map.id, annotations: annotations.flatMap((a) => (a.id === annotationId ? (change(a) ?? []) : [a])) }
 }
 
+/** Where a shape is, for the agent: an arrow's ends, a circle's center, or its first point and how many there are. */
+function describePoints({ shape, points }: MapShape) {
+  const at = (p: [number, number]) => p.map((v) => Math.round(v * 1e4) / 1e4).join(', ')
+  if (shape === 'arrow' || shape === 'line') return `from ${at(points[0]!)} to ${at(points[1]!)}`
+  if (shape === 'circle') return `around ${at(points[0]!)}`
+  if (shape === 'rectangle') return `from ${at(points[0]!)} to ${at(points[1]!)}`
+  return `of ${points.length} points from ${at(points[0]!)}`
+}
+
 const lng = z.number().min(-180).max(180).describe('Longitude')
 const lat = z.number().min(-90).max(90).describe('Latitude')
 const annotationId = z.string().describe("The annotation's id, from the map's annotations")
@@ -110,8 +119,9 @@ export const mapPlugin = definePlugin({
       layer: 'bottom',
       summarize: (o) => {
         const { basemap, layers, annotations } = o as MapBoardObject
-        const stickies = annotations?.map((a) => `${JSON.stringify(a.text.slice(0, 100))} at ${a.lngLat.join(', ')} (${a.id})`)
-        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''})`).join(', ')}` : ''}${stickies?.length ? `; sticky notes: ${stickies.join(', ')}` : ''}`
+        const stickies = annotations?.flatMap((a) => (a.kind === 'sticky' ? [`${JSON.stringify(a.text.slice(0, 100))} at ${a.lngLat.join(', ')} (${a.id})`] : []))
+        const shapes = annotations?.flatMap((a) => (a.kind === 'shape' ? [`${a.color} ${a.shape} ${describePoints(a)} (${a.id})`] : []))
+        return `basemap ${basemap}${layers?.length ? `; layers: ${layers.map((l) => `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''})`).join(', ')}` : ''}${stickies?.length ? `; sticky notes: ${stickies.join(', ')}` : ''}${shapes?.length ? `; shapes: ${shapes.join(', ')}` : ''}`
       },
     },
   ],
@@ -263,6 +273,25 @@ export const mapPlugin = definePlugin({
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),
     }),
     defineOp({
+      id: 'map.addShape',
+      title: 'Draw shape on map',
+      description: `Draw a shape on a map, for everyone, by its points [longitude, latitude]: ${SHAPES.join(', ')}. An arrow or a line takes 2 points (an arrow points from the first to the second), a rectangle 2 opposite corners, a circle its center and a point on its edge, a polygon 3 or more corners, freehand a path.`,
+      target: oneMap,
+      args: z.object({
+        shape: z.enum(SHAPES),
+        points: z.array(z.tuple([lng, lat])).min(2).max(2000),
+        color: z.enum(Object.keys(SHAPE_COLORS) as [ShapeColor, ...ShapeColor[]]).default('red'),
+      }),
+      prepare(ctx, { shape, points, color }) {
+        const [min, max] = SHAPE_POINTS[shape]
+        if (points.length < min || points.length > max) throw new Error(`A ${shape} takes ${min === max ? min : `${min} to ${max}`} points, not ${points.length}`)
+        const map = mapOf(ctx)
+        const added: MapShape = { id: newLayerId(), kind: 'shape', shape, points, color }
+        return { id: map.id, annotations: [...(map.annotations ?? []), added] }
+      },
+      apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
+    }),
+    defineOp({
       id: 'map.addSticky',
       title: 'Add sticky note on map',
       description: 'Pin a sticky note with text to a place on a map, for everyone. It stays on that place as people pan and zoom.',
@@ -289,10 +318,15 @@ export const mapPlugin = definePlugin({
     defineOp({
       id: 'map.moveAnnotation',
       title: 'Move annotation',
-      description: 'Move an annotation of a map to another place, for everyone.',
+      description: "Move an annotation of a map to another place, for everyone: a sticky note's place, or a shape's first point, with the rest of the shape following it.",
       target: oneMap,
       args: z.object({ annotationId, lng, lat }),
-      prepare: (ctx, { annotationId, lng, lat }) => changeAnnotation(mapOf(ctx), annotationId, (a) => ({ ...a, lngLat: [lng, lat] })),
+      prepare: (ctx, { annotationId, lng, lat }) =>
+        changeAnnotation(mapOf(ctx), annotationId, (a) => {
+          if (a.kind === 'sticky') return { ...a, lngLat: [lng, lat] }
+          const [dx, dy] = [lng - a.points[0]![0], lat - a.points[0]![1]]
+          return { ...a, points: a.points.map(([x, y]) => [Math.min(180, Math.max(-180, x + dx)), Math.min(90, Math.max(-90, y + dy))] as [number, number]) }
+        }),
       apply: (tx, { id, annotations }) => setAnnotations(tx, id, annotations),
     }),
     defineOp({
