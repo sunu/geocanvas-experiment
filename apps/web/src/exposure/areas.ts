@@ -1,7 +1,7 @@
 import type { Bbox } from '@ttx/plugins'
 
 /**
- * Flood areas and what is in them, for exposure counts (plans/plan-013.md). Pure, so the worker and tests use it:
+ * Flood areas and what is in them, for exposure counts (plans/plan-015.md). Pure, so the worker and tests use it:
  * the polygons of a scenario's flood areas, whether a point is in them, whether a row group's bbox can hold any,
  * and the counts of buildings by the center of their bbox.
  */

@@ -5,7 +5,7 @@ import type { MapBoardObject, MapLayer } from '@ttx/plugins'
 import { exposureLayers, useExposure, type ExposureState } from '../exposure/useExposure'
 import { drawShape } from '../map/draw'
 import type { LayerState } from '../map/layers'
-import { kindOf } from '../uploads/upload'
+import { isGeoJsonFile } from '../uploads/upload'
 import { importAffectedAreas } from './importArea'
 import { routing } from './routing'
 import { EndMarker, RouteMarkers } from './RouteMarkers'
@@ -168,7 +168,7 @@ export function ScenarioOnMap({
       const file = e.dataTransfer?.files[0]
       if (!isFiles(e) || !file) return
       e.preventDefault()
-      if (kindOf(file) === 'data') importRef.current(file)
+      if (isGeoJsonFile(file)) importRef.current(file)
       else setStatus({ text: `${file.name} is not a GeoJSON file`, error: true })
     }
     el.addEventListener('dragover', onOver)

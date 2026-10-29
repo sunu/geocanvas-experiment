@@ -2,7 +2,7 @@ import type { Runtime } from '@ttx/core'
 import type { MapBoardObject } from '@ttx/plugins'
 import { roomFromHash } from '../board/room'
 import { fitMapToLayer } from '../map/MapObject'
-import { kindOf, uploadFile } from '../uploads/upload'
+import { isGeoJsonFile, uploadFile } from '../uploads/upload'
 
 /** The red of closures (useRoutes.ts). */
 const AFFECTED_RED = '#dc2626'
@@ -13,7 +13,7 @@ const AFFECTED_RED = '#dc2626'
  * this person's view to it. In focus the layer goes on the draft, like every change there.
  */
 export async function importAffectedAreas(runtime: Runtime, mapId: string, file: File, onProgress?: (sent: number) => void) {
-  if (kindOf(file) !== 'data') throw new Error(`${file.name} is not a GeoJSON file`)
+  if (!isGeoJsonFile(file)) throw new Error(`${file.name} is not a GeoJSON file`)
   const room = roomFromHash(location.hash)
   if (!room) throw new Error('This board has no room to upload to')
   const fileId = await uploadFile(file, room, runtime.actor.id, onProgress)

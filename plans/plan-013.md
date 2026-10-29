@@ -1,123 +1,72 @@
-# Plan 013: flood exposure of buildings in Scenario mode
+# Plan 013 — Links and frames: templates that follow their seeds
 
-How many buildings are in a flood area, and how a what-if changes that: "if the river covers this area, how many
-houses are in the water, and are there schools or health facilities among them?" This is exposure (what is in the
-water), not damage or risk: no depth, no vulnerability. It runs fully in the browser, like routing (plan-012), and
-joins a map's Scenario mode as plan-012 planned: a new optional field of `scenario`, a recipe each browser computes.
+Date: 2026-10-29. Status: implemented on `feat/frames-and-links`. Follows plan-012 (templates, phase 1).
 
-Status: built on `feat/flood-exposure` (on `scenario-planning`); the spike's measurements are below, and what changed while building is under Decisions made while building.
+## 1. Outcome
 
-## What it works on
+In phase 1, a template fills its nodes one time. To use another event, you must make the set again. This plan adds two separate concepts:
 
-- **Flood areas are the scenario's affected areas.** The polygons of the layers marked `blocks` (an event footprint, an
-  uploaded GeoJSON file, a notebook result) and the Polygon closures that are on. One set of areas drives both
-  analyses: switching a what-if off changes the routes and the exposure together. Points and lines do not count.
-- **Buildings from Overture**, read with `readOverture` (`data/overtureRead.ts`, shared with buildings and routing),
-  only the columns `bbox`, `subtype` and `class`, never `geometry`. A building is exposed when the center of its bbox
-  is inside a flood polygon.
-- **Kinds of buildings from OpenStreetMap, not Overture.** Overture's `subtype` is empty for almost every building
-  outside cities (below), so it cannot say how many schools or clinics are in the water. Health facilities already
-  come from Layercake's `pois` (`data/health.ts`); schools are in the same file. Count those POIs inside the flood
-  areas, and give Overture's subtype only as "of which tagged residential, …" when it is there.
+- **Links.** A node can follow a root node. When the root changes, the linked part of each follower changes too. Example: pick another event on the sit rep's event card. The map footprint, the ReliefWeb feed, the country card and the frame title then show the new event.
+- **Frames.** A `frame` is a generic object that holds other objects together. When you drag a frame, the objects in it move with it. A frame is not a template. A template puts roots, nodes and one or more frames on the canvas. A frame only holds them.
 
-## Spike: reading the light columns (Overture 2026-10-21.0)
+## 2. Decisions
 
-Measured in headless Chrome on the dev server, with a throwaway module imported in the page (not committed): flood polygons from
-Montandon, the Overture files and footers they touch, the row groups whose `bbox` statistics meet the polygon (not
-only its bbox), then the light columns of those row groups, 4 at a time, counting buildings in the polygons.
+| Question | Decision |
+| --- | --- |
+| Root | A content node when one exists (the event card). An **input** node for a seed that has no content node (an area of interest now; a country or years later). Not the frame: a frame groups objects and holds no data. |
+| Link storage | A field on the linked node, `link: { from, recipe, args? }`. The canvas shows it as a dashed line. |
+| Edits by hand | Only the linked part changes (for example, the event footprint layer). Other changes stay (for example, a layer that a person added). Unlink a node to stop all changes. |
+| Missing facts | The node stays, but its linked part becomes blank. A feed never shows the old event's GLIDE numbers. |
+| Frames | A generic object type. A drag moves the objects that are fully in the frame. A template can make more than one frame. |
+| Where to change seeds | On the root (the event card's picker, the area input), or with the root's op from the palette or the agent. |
 
-| Flood polygon | Bbox (deg²) | Row groups: bbox / polygon | Rows read | Light / geometry / all columns | Read | Buildings: bbox / polygon |
-| --- | --- | --- | --- | --- | --- | --- |
-| CEMS EMSR857 aoi12, Mozambique | 0.004 | 2 / 2 | 43k | 0.6 / 2.7 / 4.6 MB | 9.2 s (cold) | 10,376 / 7,633 |
-| CEMS EMSR927 aoi05, Nepal | 0.012 | 2 / 2 | 72k | 0.9 / 4.2 / 7.3 MB | 3.4 s | 26,274 / 9,271 |
-| GDACS 1104124 (MultiPolygon), Nepal | 3.6 | 95 / 10 | 379k | 4.8 / 22 / 39 MB | 11.8 s | 216,658 / 20,920 |
-| CEMS EMSR838 aoi08, Pakistan | 0.48 | 34 / 17 | 680k | 7.5 / 45 / 71 MB | 7.5–12.3 s | 489,650 / 259,736 |
-| GFD 4439, Mozambique | 54 | 826 / 826 | 17.3M | 237 / 1,223 / 1,982 MB | not read | |
-| GDACS 1104136-2, Pakistan | 38 | 1,294 / 836 | 32.4M | 363 / 2,072 / 3,330 MB | not read | |
+## 3. Design
 
-Footers: 0.7–3.2 MB (1–5 files) for the first four; 7 MB (6 files, 18 s) and 9.5 MB (15 files, 41 s) for the
-country-scale two, before any row is read.
+### 3.1 Frame (core)
 
-What it shows:
+- Type `frame` in the core plugin (`packages/core/src/plugins/core.ts`). Field `title?`. Layer `bottom`. Default size 800×600. Op `frame.add`. Renaming a frame sets its `name` with `core.object.rename` (from main), not `title`, so the `frameTitle` link keeps writing `title` and a name someone gave wins.
+- View (`apps/web/src/canvas/coreUI.tsx`): a light fill (`--ttx-frame-fill`), with the title in the label row above it. Tool key **A**, in the Board section of the toolbar.
+- A drag moves the objects that are fully in a moved frame (`withFramed` in `apps/web/src/canvas/camera.ts`). Frames in the frame, and their contents, move too. The canvas finds the objects from their positions when the drag starts. Thus, a frame keeps no list of members, and this list cannot become incorrect between persons. The drag is one `core.object.setRect` gesture, so it is one undo step.
 
-- **The light columns are 10–13% of the bytes** (geometry alone is about 60%). Exposure needs no shapes.
-- **Testing row groups against the polygon, not its bbox, matters**: 95 to 10 row groups for Nepal's GDACS area, 34
-  to 17 for Pakistan's CEMS area. And within them, counting in the polygon instead of its bbox: 216,658 to 20,920.
-- **Counting is cheap**: 80 ms for 680k rows (point in polygon, no index). The time is round trips: each range request
-  to Overture's S3 (us-west-2) took 0.4–0.6 s from here, and hyparquet makes 3 per row group for these columns.
-  17 requests in flight instead of 4 gave 7.5 s instead of 8.8 s, so concurrency is not the lever; fewer, larger
-  requests might be (one range per row group spanning the three columns, if the columns between them are small).
-- **Country-scale polygons are out of reach**: GFD and the larger GDACS areas are country envelopes (19 to 56
-  vertices over 38–54 deg²), 17–32 million buildings and 240–360 MB of light columns. They need a cap with a clear
-  message, not a longer wait.
-- **Overture's `subtype` is nearly empty there**: 98–100% of exposed buildings have none (Pakistan: 46 of 259,736
-  have one). Hence the OpenStreetMap POIs above.
-- **Montandon's flood polygons are coarse.** CEMS items are titled "… flash flood hazard area" with 8–139 vertices,
-  simplified areas rather than mapped water; GDACS gives regions; GFD gives country envelopes. Counts over them are
-  "buildings in the hazard area", and the UI must say so. Drawn and uploaded areas can be as precise as people make
-  them.
+### 3.2 Input node
 
-## Design
+- Type `input` in the `inputs` plugin (`packages/plugins/src/inputs.ts`). Fields `kind: 'area'` and `value?: { west, south, east, north, name? }`. The value is kept as a resolved area, not as the text that a person typed. Thus, all persons see the same area.
+- Op `input.setArea`. It takes the area seed value (`{ text }`, an area, or `"my view"`), resolves it, writes it, and re-renders the followers.
+- View (`apps/web/src/inputs/`): "Area of interest" and the name. Double-click opens `AreaPicker`. Pick a place, or push Enter to use the best match.
 
-- **Board:** `scenario.exposure?: { buildings: true }`, written by an op (`map.setExposure`), so the agent can switch it
-  on and undo covers it. A recipe only: no counts on the board.
-- **Tool:** a browser tool `exposure.buildings` (output kind `exposure.counts`), input the flood polygons (as
-  `routing.route` takes closures), run in a worker (`exposure/exposure.worker.ts`) on `readOverture`. The tool runner
-  caches results by input, so a what-if switched off and on again costs nothing. Row groups are chosen by testing
-  their `bbox` statistics against the polygons (a new helper beside `rowGroupsInBbox` in `data/wkb.ts`, tested in
-  Node).
-- **Caps, checked before reading rows:** at most 8 files and 64 row groups (about 30 MB of light columns, roughly
-  30 s here); beyond that the panel says the area is too large to count in the browser and suggests a smaller area.
-  Also a cap on files, since footers alone took 41 s for 15 files.
-- **Baseline:** like routes, exposure is also counted for the areas from data alone, without the what-ifs, so the
-  panel shows what the what-ifs add.
-- **Panel:** an "Exposure" section in the Scenario tab: buildings in flood areas, health facilities and schools among
-  them (from OpenStreetMap), what the what-ifs add, and the caveats (exposure, not damage; the hazard area's source;
-  Overture's coverage). Loading while the first read runs; errors as the routes show them.
-- **Map:** exposed health facilities and schools as points; buildings as a count, not drawn (hundreds of thousands).
-  A line in the map's legend (`routing/RouteLegend.tsx`), so snapshots carry the figure into a situation report.
-- **Agent:** `summarize` says exposure is on; browser and MCP agents can run `exposure.buildings`; the room's agent
-  cannot see results, as with routes.
+### 3.3 Links
 
-## Decisions made while building
+- **Core.** Each object can have an optional `link` (`linkSchema` in `packages/core/src/plugins/registry.ts`), so no object type needs a change. `BoardTx.clear(id, keys)` removes optional fields, because `update` does not change a field that is `undefined`. `summarizeBoard` adds "linked to <id> (<recipe>)".
+- **Roots** (`packages/plugins/src/links/roots.ts`). `factsOf` gives the facts of a root: for an `event`, the facts of plan-012's event seed; for an `input`, its area. Then `complete` adds the country or the area.
+- **Recipes** (`links/recipes.ts`). A recipe writes only its part of a node, and makes that part blank when a fact is missing:
+  - `country` (country, presence, conflict): `country`, or clear it.
+  - `reliefweb`: `glides` and `title`, or `glides: []` and clear the title.
+  - `eventFootprint` and `conflictChoropleth` (map): the one layer with the id `link:<recipe>`. The recipe replaces this layer, adds it, or removes it. Other layers stay. The person who changed the root sees the new area on the map.
+  - `frameTitle` (frame): `args.prefix` + the name, or clear the title.
+- **Propagation** (`links/propagate.ts`). `planLinks` (read-only, in `prepare`) finds the followers of the root, gets the facts one time, and calculates the patches. `applyLinks` (in `apply`) writes them in the same transaction as the change to the root. Thus, a change and its effects are one undo step. Ops that do this: `event.setEvent` (now async, so the event card uses `invoke`), `input.setArea`, and `link.refresh` (no change to the root, for example when ReliefWeb gets a new GLIDE number). `link.remove` unlinks.
+- **Canvas** (`apps/web/src/canvas/Links.tsx`). An arrow goes from a root to each follower. It starts and ends at the sides that face each other (left and right, or top and bottom) and curves between them. The arrows are always visible, and they move with the objects. The arrows of the selection are highlighted. They are in the world, above frames and below all other objects. There is no arrow between an object and the frame around it. The right-click menu shows Unlink and "Refresh linked objects" when they apply.
 
-- **Country outlines are left out, by name.** A Montandon event footprint is not only flood areas: Nepal's flood
-  (gdacs-event-1104124-1) has 14 polygons, among them EM-DAT's hazard and event areas and IFRC's event area, each the
-  whole of Nepal (80–88° E). One of them made the count refuse (9 files). A single area larger than 4 deg² (about
-  200 × 200 km; `MAX_AREA_DEG2` in `exposure/areas.ts`) is left out, and the panel names it; GDACS's 3.6 deg² area and
-  the CEMS areas still count. Routing still treats those outlines as closures (it closes every road in Nepal): a
-  question for plan-012.
-- **Two columns, not three**: `bbox` and `subtype`. `class` was only for kinds of buildings, which come from
-  OpenStreetMap; one request fewer per row group.
-- **Facilities from the health facilities' Layercake worker** (`LayercakeHealth.facilities`, pick `facilities`):
-  health first, then `amenity` school, kindergarten, college or university. One worker, so the 5 MB footer is read
-  once per page. If they cannot be read (more than 12 row groups), the building count stands and the panel says why.
-- **The flood polygons are indexed** in a 64 × 64 grid over their bounds (`Flood`): an uploaded flood extent can have
-  thousands of polygons.
-- **Facilities are drawn on live maps only**, as rose (health) and teal (education) dots; the legend line is on
-  snapshots too.
+### 3.4 Templates
 
-Measured end to end (headless Chrome, dev server): the Nepal footprint plus a 0.07° × 0.06° what-if at Bharatpur,
-30 s for the first count: 119,605 buildings, 137 health facilities and 229 schools, of which the what-if adds 42,602
-buildings. Switching the what-if off gave 77,003 (the baseline) at once, from the tool cache.
+- Each seed kind makes a root (`SeedKind.root`: an `event` card, or an `input` for an area).
+- A content node can have `link: { recipe, args?, seed? }`. Its first values come from the recipes that update it later, so templates and links use the same rules.
+- A template has `frames: [{ prefix, seed? }]`. Each frame holds its columns, and the frame title follows the root. The gray box and the heading text of phase 1 are gone.
+- A node that has no facts stays, and is blank (a feed without GLIDE numbers). A later root can fill it.
+- Sets from phase 1 that are already on boards do not change.
 
-## Steps (done)
+## 4. Not built
 
-1. Pure code, tested in Node: point in polygon over the polygons (with holes), row groups meeting polygons, counting
-   rows, and the POI counts.
-2. The worker, the tool and its caps; reuse `readOverture`. Try one range per row group for the three columns.
-3. `scenario.exposure`, `map.setExposure`, tests beside `mapScenario.test.ts`.
-4. The panel section, the POI points, the legend line; check in headless Chrome with the polygons above.
-5. AGENTS.md.
+- Links that people make by hand (for example, the Connector tool, or an op that links two objects). Only templates make links now.
+- Other root kinds: a country input, a year-range input, a map as a root.
+- More than one root for each template node. A node follows one seed.
+- Templates as data, and "save this board as a template".
+- The event widget in the palette form does not send typed text as `{ text }`.
 
-## Later
+## 5. Verification
 
-- **Choosing areas within a layer**: a footprint's sources (CEMS, GDACS, EM-DAT, landslide areas) are one layer, so
-  people cannot leave out one of them; the size rule covers only the largest.
-
-- **People exposed**: sum WorldPop (already a COG layer, `data.population`) in the polygons, reading pixels rather
-  than drawing them.
-- **Depth and return periods**: counts by depth class from flood hazard maps would turn exposure into a first step
-  of risk. Candidates (JRC global river flood hazard maps, WRI Aqueduct) are not checked yet for COG and CORS.
-- **By district**: counts by COD-AB area need the boundary polygons in the tool, which are vector tiles today.
-- **Larger areas**: a precomputed building count grid would make country-scale areas possible; not looked for yet.
+- `packages/core/test/frames.test.ts`: frames, the `link` field, `BoardTx.clear`.
+- `apps/web/test/frames.test.ts`: `withFramed`.
+- `packages/plugins/test/links.test.ts`: a change to the event updates the followers in one undo step; a layer that a person added stays; missing facts make the parts blank; an unlinked node does not change; `link.refresh`; `input.setArea` from text; a node that is not a root cannot be followed.
+- `packages/plugins/test/templates.test.ts`: templates make roots, linked nodes and frames; a later change to the event updates the set.
+- A live test against Montandon and OpenCage: a sit rep for "nepal flood 2025", then a change to the 2019 Mozambique cyclone (the country, the footprint and the title change; the feed is blank, because that record has no GLIDE number); a conflict explorer for Cabo Delgado, then a change to Borno (all followers change to NGA).
+- Not done yet: a check in a browser of the frame drag, the lines, the area input and Unlink.

@@ -14,9 +14,9 @@ import { MAX_UPLOAD_BYTES, UPLOAD_ID, UPLOAD_TYPES, type Upload } from '@ttx/cor
  * accounts; then an account id the Worker checks). Access rules can be added to GET without changing links.
  *
  * The file's type is read from its first bytes, not from the request: media (PNG, JPEG, GIF, WebP, at most
- * 10 MB), documents (PDF, at most 25 MB) and data (GeoJSON, at most 20 MB, served as application/geo+json and
- * sandboxed like every type but PDF). Never SVG or HTML: served from the board's origin, they could run scripts
- * there.
+ * 10 MB), documents (PDF, at most 25 MB) and map data (GeoJSON, GeoParquet, a zipped shapefile, at most 50 MB,
+ * sandboxed like every type but PDF; GeoJSON served as application/geo+json). Never SVG or HTML: served from the
+ * board's origin, they could run scripts there.
  */
 
 /** The largest file of any kind: a larger request is refused before it is read. */
@@ -28,7 +28,7 @@ export async function storeUpload(request: Request, bucket: R2Bucket, room: stri
   if (Number(request.headers.get('content-length')) > MAX_BYTES) return tooLarge(MAX_BYTES)
   const bytes = new Uint8Array(await request.arrayBuffer())
   const contentType = fileType(bytes)
-  if (!contentType) return json(415, { error: 'Not a PNG, JPEG, GIF or WebP image, a PDF or a GeoJSON file' })
+  if (!contentType) return json(415, { error: 'Not a PNG, JPEG, GIF or WebP image, a PDF, or GeoJSON, GeoParquet or a zipped shapefile' })
   const kind = UPLOAD_TYPES[contentType]!
   if (bytes.byteLength > MAX_UPLOAD_BYTES[kind]) return tooLarge(MAX_UPLOAD_BYTES[kind])
 
@@ -77,6 +77,8 @@ function fileType(b: Uint8Array): string | undefined {
   if (starts(ascii('GIF87a')) || starts(ascii('GIF89a'))) return 'image/gif'
   if (starts(ascii('RIFF')) && starts(ascii('WEBP'), 8)) return 'image/webp'
   if (starts(ascii('%PDF-'))) return 'application/pdf'
+  if (starts(ascii('PAR1'))) return 'application/vnd.apache.parquet'
+  if (starts([0x50, 0x4b, 0x03, 0x04])) return 'application/zip'
   if (isGeoJson(b)) return 'application/geo+json'
   return undefined
 }

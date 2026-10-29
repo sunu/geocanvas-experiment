@@ -13,15 +13,19 @@ import { definePlugin, type ObjectTypeDef } from './types.js'
 // color and fontSize are optional: objects made before they existed use the defaults in style.ts.
 const colorField = z.enum(COLORS).optional()
 
+/** The shapes of a box. A box made before shapes existed has none: it is a rectangle. */
+export const BOX_SHAPES = ['rectangle', 'ellipse', 'line', 'arrow'] as const
+export type BoxShape = (typeof BOX_SHAPES)[number]
+
 export const boxType: ObjectTypeDef = {
   type: 'box',
   title: 'Box',
-  description: 'A colored rectangle, e.g. a background or a frame for other objects.',
-  fields: z.object({ color: colorField }),
+  description: 'A colored shape: a rectangle (the default), an ellipse (a circle when it is as wide as it is tall), or a line or an arrow along the diagonal of its area from top left to bottom right. A rectangle can be a background or a frame for other objects.',
+  fields: z.object({ color: colorField, shape: z.enum(BOX_SHAPES).optional().describe('Rectangle when left out') }),
   defaultSize: { w: 200, h: 120 },
   layer: 'bottom',
   defaultColor: DEFAULT_BOX_COLOR,
-  summarize: (o) => `${(o as BoxObject).color ?? DEFAULT_BOX_COLOR}`,
+  summarize: (o) => `${(o as BoxObject).shape ?? 'rectangle'}, ${(o as BoxObject).color ?? DEFAULT_BOX_COLOR}`,
 }
 
 export const textType: ObjectTypeDef = {
@@ -56,7 +60,18 @@ export const stickyType: ObjectTypeDef = {
   summarize: (o) => JSON.stringify((o as StickyObject).text.slice(0, 200)),
 }
 
-export type BoxObject = AnyObject & { type: 'box'; color?: ColorName }
+export const frameType: ObjectTypeDef = {
+  type: 'frame',
+  title: 'Frame',
+  description: 'A frame that holds other objects together: moving it moves the objects inside it. It has a title above it.',
+  fields: z.object({ title: z.string().optional().describe("The frame's own title, which a link may write. A name given with core.object.rename shows instead") }),
+  defaultSize: { w: 800, h: 600 },
+  layer: 'bottom',
+  summarize: (o) => JSON.stringify((o as FrameObject).title ?? ''),
+}
+
+export type FrameObject = AnyObject & { type: 'frame'; title?: string }
+export type BoxObject = AnyObject & { type: 'box'; color?: ColorName; shape?: BoxShape }
 export type TextObject = AnyObject & { type: 'text'; text: string; color?: ColorName; fontSize?: number }
 export type StickyObject = AnyObject & { type: 'sticky'; text: string; color?: ColorName; fontSize?: number }
 
@@ -90,6 +105,15 @@ const move = defineOp({
       return [id, { x: o.x + dx, y: o.y + dy }]
     })),
   apply: (tx, rects) => tx.update(rects),
+})
+
+const rename = defineOp({
+  id: 'core.object.rename',
+  title: 'Rename',
+  description: "Rename the selected object: the name shown above it on the canvas. An empty name goes back to the object's own.",
+  target: { kind: 'objects', min: 1, max: 1 },
+  args: z.object({ name: z.string().max(80).describe('The new name') }),
+  apply: (tx, { name }, target) => tx.update({ [idsOf(target)[0]!]: { name: name.trim() } }),
 })
 
 const remove = defineOp({
@@ -214,6 +238,16 @@ const stepSize = (dir: 1 | -1) =>
     apply: (tx, sizes) => tx.update(sizes),
   })
 
+const setTitle = defineOp({
+  id: 'board.setTitle',
+  title: 'Rename board',
+  description: 'Set the name of the board, for everyone. An empty name removes it. Undo does not cover it.',
+  target: { kind: 'canvas' },
+  args: z.object({ title: z.string().trim().max(80).describe('Board name') }),
+  nl: { aliases: ['name board', 'title board'] },
+  apply: (tx, { title }) => tx.setTitle(title),
+})
+
 const viewOps = [
   defineOp({
     id: 'core.view.fitAll',
@@ -252,6 +286,6 @@ const viewOps = [
 export const corePlugin = definePlugin({
   id: 'core',
   title: 'Core',
-  objectTypes: [boxType, textType, stickyType],
-  ops: [setRect, move, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), ...viewOps],
+  objectTypes: [boxType, textType, stickyType, frameType],
+  ops: [setRect, move, rename, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), setTitle, ...viewOps],
 })

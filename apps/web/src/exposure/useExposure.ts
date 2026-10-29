@@ -9,7 +9,7 @@ import { areasToCount } from './areas'
 import type { Exposure } from './exposure'
 
 /**
- * A map scenario's exposure as this browser has it (plans/plan-013.md): the buildings in its flood areas, the polygons
+ * A map scenario's exposure as this browser has it (plans/plan-015.md): the buildings in its flood areas, the polygons
  * of the closures that are on and of the layers that block roads; and, when what-ifs add polygons, the same count for
  * the areas from data alone (the baseline), so people see what the what-ifs add. Both go through the tool runner, so
  * the map and its Options panel share them, and a what-if switched off and on again costs nothing.

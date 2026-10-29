@@ -1,7 +1,7 @@
 /**
  * Counts Overture buildings in flood areas in a worker, so reading and decoding never block the canvas. Only the
  * `bbox` and `subtype` columns are read (areas.ts EXPOSURE_COLUMNS), of the files and row groups that meet the
- * polygons, not only their bbox; each row group's rows are counted and dropped. Measured in plans/plan-013.md.
+ * polygons, not only their bbox; each row group's rows are counted and dropped. Measured in plans/plan-015.md.
  */
 import { readOverture } from '../data/overtureRead'
 import { countBuildings, EXPOSURE_COLUMNS, Flood, floodPolygons, noBuildings, rectMeetsFlood, type BuildingCounts, type BuildingRow } from './areas'

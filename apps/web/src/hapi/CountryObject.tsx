@@ -1,13 +1,13 @@
-import { GlobeHemisphereWestIcon } from '@phosphor-icons/react'
 import type { CountryBoardObject } from '@ttx/plugins'
 import type { ObjectViewProps } from '../canvas/registry'
+import { COUNTRY_FACE } from '../canvas/widgetFaces'
 import { loadContext } from './context'
 import { compact, CountryWidget, errorText, Section, useCountryData } from './CountryWidget'
 
 /** A country's humanitarian context from HDX HAPI: a short summary of its risk, people, needs and funding. */
 export function CountryObject(props: ObjectViewProps<CountryBoardObject>) {
   return (
-    <CountryWidget {...props} title="Country context" Icon={GlobeHemisphereWestIcon}>
+    <CountryWidget {...props} title={COUNTRY_FACE.label} Icon={COUNTRY_FACE.Icon}>
       {(iso3) => <ContextDetails iso3={iso3} />}
     </CountryWidget>
   )

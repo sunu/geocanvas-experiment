@@ -10,10 +10,7 @@ import * as Y from 'yjs'
  * stay the same when uploads later belong to accounts.
  */
 
-/**
- * Media is shown on the board (images); documents are files such as PDF; data is read onto maps (GeoJSON, e.g. a
- * flood extent; later GeoParquet).
- */
+/** Media is shown on the board (images); documents are files such as PDF; data is a map layer's features (GeoJSON, GeoParquet, zipped shapefile). */
 export type UploadKind = 'media' | 'document' | 'data'
 
 export interface Upload {
@@ -37,10 +34,12 @@ export const UPLOAD_TYPES: Readonly<Record<string, UploadKind>> = {
   'image/webp': 'media',
   'application/pdf': 'document',
   'application/geo+json': 'data',
+  'application/vnd.apache.parquet': 'data',
+  'application/zip': 'data',
 }
 
-/** The largest file of each kind the room stores. Browsers check it too, before uploading. */
-export const MAX_UPLOAD_BYTES: Readonly<Record<UploadKind, number>> = { media: 10 * 1024 * 1024, document: 25 * 1024 * 1024, data: 20 * 1024 * 1024 }
+/** The largest file of each kind the room stores. Browsers check it too, before uploading. Data: what a map reads from a URL (MAX_URL_BYTES in apps/web/src/data/urlData.ts). */
+export const MAX_UPLOAD_BYTES: Readonly<Record<UploadKind, number>> = { media: 10 * 1024 * 1024, document: 25 * 1024 * 1024, data: 50 * 1024 * 1024 }
 
 /** Ids are random UUIDs made by the room: unguessable, so a link is the only way to a file. */
 export const UPLOAD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/

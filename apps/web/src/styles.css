@@ -6,6 +6,8 @@
   --ttx-panel: #ffffff;
   --ttx-border: rgb(0 0 0 / 0.12);
   --ttx-accent: #2563eb;
+  /* A frame's fill: light, so what it holds stands out. */
+  --ttx-frame-fill: rgb(255 255 255 / 0.6);
   --ttx-font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-family: var(--ttx-font);
   color: var(--ttx-ink);
@@ -100,6 +102,25 @@ body,
   min-width: 0;
 }
 
+.ttx-obj__name > input {
+  box-sizing: border-box;
+  min-width: 4ch;
+  /* Its width follows the name (canvas/ObjectHeader.tsx). */
+  height: 22px;
+  padding: 0 6px;
+  border: 2px solid var(--canvas-accent);
+  border-radius: 4px;
+  outline: 0;
+  background: #fff;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.ttx-obj__name > input::selection {
+  background: var(--canvas-accent);
+  color: #fff;
+}
+
 .ttx-obj__name > span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -169,6 +190,16 @@ body,
   height: 100%;
   border: 2px solid;
   border-radius: 0;
+}
+
+/* The stroke of a line or an arrow, corner to corner of its box (canvas/coreUI.tsx). */
+.ttx-box-stroke {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
 }
 
 /* Fill color comes from the note's color; its text is always dark (objects/sticky.tsx). */
@@ -305,6 +336,39 @@ body,
 }
 
 /* Other people and the agent: selections, cursors and name tags in their color (canvas/Peers.tsx, board/collaborators.ts). */
+/* Links from a root to what follows it (canvas/Links.tsx): arrows in the world, attached to the objects' sides. */
+.ttx-links {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ttx-links > path {
+  fill: none;
+  stroke: var(--ttx-muted);
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.ttx-links > path.is-on {
+  stroke: var(--canvas-accent); /* the selection outline's color */
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.ttx-links .ttx-links__head path {
+  fill: var(--ttx-muted);
+  stroke: none;
+}
+
+.ttx-links .ttx-links__head.is-on path {
+  fill: var(--canvas-accent);
+}
+
 .ttx-peer-selection {
   position: absolute;
   box-sizing: border-box;
@@ -314,37 +378,6 @@ body,
 /* The agent's marks are dashed, so they do not depend on color alone. */
 .ttx-peer-selection.is-agent {
   border-style: dashed;
-}
-
-/* Corner marks, as the handles of the Figma file. They are not draggable: only your own selection is. */
-.ttx-peer-handle {
-  position: absolute;
-  width: 9px;
-  height: 9px;
-  box-sizing: border-box;
-  border: 1.5px solid;
-  border-radius: 1px;
-  background: #fff;
-}
-
-.ttx-peer-handle--nw {
-  left: -5px;
-  top: -5px;
-}
-
-.ttx-peer-handle--ne {
-  right: -5px;
-  top: -5px;
-}
-
-.ttx-peer-handle--sw {
-  left: -5px;
-  bottom: -5px;
-}
-
-.ttx-peer-handle--se {
-  right: -5px;
-  bottom: -5px;
 }
 
 .ttx-cursor {
@@ -763,7 +796,8 @@ body,
 
 /* The same event search as the event object, at a fixed height in the form. */
 .ttx-field__event,
-.ttx-field__country {
+.ttx-field__country,
+.ttx-field__area {
   display: flex;
   height: 280px;
   border: 1px solid var(--ttx-border);
@@ -1223,6 +1257,33 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* A section that opens and closes (MapOptions' Accordion): its heading is the toggle. */
+.ttx-options__accordion summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 14px 0 6px;
+  color: var(--ttx-muted);
+  list-style: none;
+  cursor: pointer;
+}
+
+.ttx-options__accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.ttx-options__accordion summary h3 {
+  margin: 0;
+}
+
+.ttx-options__accordion summary svg {
+  transition: transform 0.15s;
+}
+
+.ttx-options__accordion[open] summary svg {
+  transform: rotate(90deg);
 }
 
 .ttx-options__section select {
@@ -2080,6 +2141,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   text-align: center;
 }
 
+.ttx-input__error {
+  margin-top: 6px;
+  color: var(--destructive);
+}
+
 .ttx-country__details {
   display: flex;
   flex-direction: column;
@@ -2795,4 +2861,10 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   height: 10px;
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+/* A failed action in a map's Options panel (the weather forecast). */
+.ttx-options__error {
+  margin: 4px 0 0;
+  color: #dc2626;
 }

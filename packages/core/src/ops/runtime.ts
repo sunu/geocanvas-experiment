@@ -4,6 +4,7 @@ import { Board } from '../doc/board.js'
 import { BoardTx } from '../doc/tx.js'
 import { Registry } from '../plugins/registry.js'
 import type { Plugin } from '../plugins/types.js'
+import type { ToolRunner } from '../tools/runner.js'
 import { opIdOf } from './tools.js'
 import type { Actor, InvocationRecord, OpContext, OpDef, OplogEntry, TargetRef, TargetSpec, ViewController } from './types.js'
 
@@ -23,6 +24,8 @@ export interface RuntimeOptions {
   plugins: Plugin[]
   actor: Actor
   view?: ViewController
+  /** Read-only tools that ops may use in prepare (OpContext.tools). */
+  tools?: ToolRunner
 }
 
 export interface DispatchOptions {
@@ -48,6 +51,7 @@ export class Runtime {
   readonly undoManager: Y.UndoManager
   readonly oplog: Y.Array<OplogEntry>
   view: ViewController | undefined
+  tools: ToolRunner | undefined
   // Per-runtime subclass, so two runtimes on one Y.Doc (or two tabs in one test) never undo each other.
   private readonly Origin = class extends InvocationOrigin {}
   /** Gesture ops dispatched since the last flush, by op and target: one log entry each, with the latest args. */
@@ -59,6 +63,7 @@ export class Runtime {
     this.registry = new Registry(opts.plugins)
     this.actor = opts.actor
     this.view = opts.view
+    this.tools = opts.tools
     this.oplog = opts.doc.getArray('oplog')
     this.undoManager = new Y.UndoManager(this.board.objects, {
       trackedOrigins: new Set([this.Origin]),
@@ -119,6 +124,8 @@ export class Runtime {
         this.beginGesture()
         this.apply(op, record, plan, target)
         this.undoManager.stopCapturing()
+        const summary = op.describePlan?.(plan)
+        if (summary) record.summary = summary
       } catch (err) {
         fail(record, err)
       }
@@ -234,7 +241,7 @@ export class Runtime {
   }
 
   private context(target: TargetRef, actor: Actor, signal?: AbortSignal): OpContext {
-    return { board: this.board, registry: this.registry, actor, target, signal: signal ?? new AbortController().signal }
+    return { board: this.board, registry: this.registry, actor, target, signal: signal ?? new AbortController().signal, ...(this.tools && { tools: this.tools }) }
   }
 
   private parseArgs(op: OpDef<any, any>, ctx: OpContext, args: unknown): unknown {

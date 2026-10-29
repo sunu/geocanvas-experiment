@@ -1,8 +1,11 @@
 export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
-export { boardGet, eventsSearch } from './agentTools.js'
-export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
+export { boardGet, bboxOfGeometries, eventsGet, eventsSearch, type EventFacts } from './agentTools.js'
+export { conflict, defineTemplate, MY_VIEW, sitrep, TEMPLATE_OP_PREFIX, templatesPlugin, type ContentNode, type Facts, type RootNode, type SeedKind, type TemplateDef, type TemplateNode } from './templates/index.js'
+export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, footprintParts, isWholeFootprint, type EventBoardObject, type FootprintPart } from './events.js'
 export { imagesPlugin, type ImageBoardObject } from './images.js'
+export { inputsPlugin, INPUT_KINDS, type InputBoardObject } from './inputs.js'
+export { applyLinks, factsOf, linkedLayerId, linksPlugin, personOf, planLinks, RECIPES, renderLinks, ROOT_TYPES, type LinkPatch, type LinkPlan, type Recipe, type Rendered } from './links/index.js'
 export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
 export { mapPlugin, BASEMAPS, UPLOAD_FEATURES_TOOL, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
@@ -61,6 +64,31 @@ export {
   type ScenarioClosure,
   type ScenarioRoute,
 } from './mapScenario.js'
+export {
+  checkArea,
+  FORECAST_TOOL,
+  FORECAST_VARIABLES,
+  forecastInput,
+  forecastLayer,
+  forecastTool,
+  GRID_OUTPUT,
+  gfs,
+  HORIZONS,
+  IcechunkGfs,
+  latestRun,
+  leadCount,
+  MAX_SPAN,
+  peakWind,
+  totalRain,
+  utc,
+  windowOf,
+  type ForecastAxes,
+  type ForecastGrid,
+  type ForecastSource,
+  type ForecastVariable,
+  type GridWindow,
+  type Horizon,
+} from './weather.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
 export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
 export { agentTools, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn } from './agent/loop.js'

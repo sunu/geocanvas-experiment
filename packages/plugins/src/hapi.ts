@@ -54,7 +54,7 @@ export const hapiPlugin = definePlugin({
   objectTypes: [
     {
       type: 'country',
-      title: 'Country context',
+      title: 'Country key figures',
       description: "A country's humanitarian context from HDX HAPI: INFORM risk, population, poverty, people in need, displacement and appeal funding.",
       fields: z.object({ country: iso3.meta({ widget: 'country' }).describe('Country').optional() }),
       defaultSize: { w: 380, h: 460 },
@@ -78,7 +78,7 @@ export const hapiPlugin = definePlugin({
     },
     {
       type: 'conflict',
-      title: 'Conflict',
+      title: 'Human conflicts',
       description: 'Political violence events and fatalities in a country over the last 12 months, by month and province (ACLED through HDX HAPI).',
       fields: z.object({ country: iso3.meta({ widget: 'country' }).describe('Country').optional() }),
       defaultSize: { w: 380, h: 420 },

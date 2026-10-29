@@ -8,7 +8,7 @@ import { fileLink } from './upload'
 const TABS: { kind: UploadKind; label: string; empty: string }[] = [
   { kind: 'media', label: 'Media', empty: 'Images uploaded to this board show here, also after they are deleted from it.' },
   { kind: 'document', label: 'Documents', empty: 'PDFs dropped on this board show here, also after they are deleted from it.' },
-  { kind: 'data', label: 'Data', empty: 'GeoJSON files dropped on this board or imported into a map show here.' },
+  { kind: 'data', label: 'Data', empty: 'Map data uploaded to this board shows here: GeoJSON, GeoParquet and zipped shapefiles.' },
 ]
 
 /**
@@ -41,7 +41,7 @@ export function UploadsPanel({ runtime, uploads, onClose }: { runtime: Runtime; 
       </div>
       <div className={`ttx-uploads__list ttx-uploads__list--${tab}`}>
         {!shown.length && <p className="ttx-chat__empty">{TABS.find((t) => t.kind === tab)!.empty}</p>}
-        {shown.map((u) => (tab === 'media' ? <MediaItem key={u.id} upload={u} onAdd={(picture) => addToBoard(u, picture)} /> : <FileItem key={u.id} upload={u} onAdd={() => addToBoard(u)} />))}
+        {shown.map((u) => (tab === 'media' ? <MediaItem key={u.id} upload={u} onAdd={(picture) => addToBoard(u, picture)} /> : <FileItem key={u.id} upload={u} onAdd={canPlace(u) ? () => addToBoard(u) : undefined} />))}
       </div>
     </aside>
   )
@@ -73,10 +73,13 @@ function MediaItem({ upload, onAdd }: { upload: Upload; onAdd(picture?: { w: num
   )
 }
 
+/** Data goes on a new map only as GeoJSON (data.uploadFeatures); GeoParquet and shapefiles are added from a map's Options, by link. */
+const canPlace = (u: Upload) => u.kind !== 'data' || u.contentType === 'application/geo+json'
+
 /** A file's icon by kind: a PDF, or data that goes on a map. */
 const FILE_ICON: Partial<Record<UploadKind, Icon>> = { document: FilePdfIcon, data: MapTrifoldIcon }
 
-function FileItem({ upload, onAdd }: { upload: Upload; onAdd(): void }) {
+function FileItem({ upload, onAdd }: { upload: Upload; onAdd?(): void }) {
   const FileIcon = FILE_ICON[upload.kind] ?? FilePdfIcon
   const add = upload.kind === 'data' ? 'Add to the board on a new map' : 'Add to the board'
   return (
@@ -87,9 +90,11 @@ function FileItem({ upload, onAdd }: { upload: Upload; onAdd(): void }) {
       </span>
       <span className="ttx-uploads__meta">{formatSize(upload.size)}</span>
       <span className="ttx-uploads__actions">
-        <button type="button" onClick={onAdd} title={add} aria-label={add}>
-          <PlusIcon size={14} />
-        </button>
+        {onAdd && (
+          <button type="button" onClick={onAdd} title={add} aria-label={add}>
+            <PlusIcon size={14} />
+          </button>
+        )}
         <Links upload={upload} />
       </span>
     </div>
