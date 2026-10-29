@@ -20,9 +20,10 @@ pointers are, and where the agent has worked. Design source: the "Collaborator s
   A stored color from outside the palette is replaced on load. Six is the Figma file's count; with more people than
   colors, two share one, and the name tag tells them apart.
 - **The agent is violet, and violet is not a person's color.** The Figma file gave violet to a person and black to the
-  agent; violet moved to the agent so that "violet means the agent" holds everywhere. The agent has no cursor or
-  selection of its own, so its work is marked by the objects it added or changed in the last 5 s
-  (`board/agentActivity.ts`, from the shared op log), as dashed violet outlines.
+  agent; violet moved to the agent so that "violet means the agent" holds everywhere. The agent has no selection of
+  its own, so its work is marked by the objects it added or changed in the last 5 s (`board/agentActivity.ts`, from
+  the shared op log), as dashed violet outlines. Its cursor, with a sparkle in its tag, comes from the same op log
+  (`canvas/agentCursor.ts`), not from presence.
 - **Color is never the only signal.** Solid means a person and dashed the agent; name tags carry the name; the agent
   has a sparkle and a square avatar, people a circle.
 

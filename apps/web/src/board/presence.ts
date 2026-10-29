@@ -10,7 +10,8 @@ export type Awareness = WebsocketProvider['awareness']
  * browsers re-send theirs every 15 s. Cursors are in world coordinates, so they land in the right
  * place whatever each person's camera. The room's agent is a peer too: it sets `status` while it
  * works (apps/worker/src/worker.ts), with no cursor or selection. A person's presence has `status`
- * while the agent in their browser works on their own key (agent/browserAgent.ts).
+ * while the agent in their browser works on their own key (agent/browserAgent.ts). An agent's cursor is
+ * worked out in each browser from the op log instead (canvas/agentCursor.ts).
  */
 
 /** One person's (or the agent's) shared state, as this browser receives it. */

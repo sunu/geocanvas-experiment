@@ -1,7 +1,9 @@
-import { SparkleIcon } from '@phosphor-icons/react'
+import { useEffect, useState, type RefObject } from 'react'
+import { ArrowUpIcon, SparkleIcon } from '@phosphor-icons/react'
 import type { BoardObject } from '../board/board'
 import { isAgent, onColor } from '../board/collaborators'
 import type { Peer } from '../board/presence'
+import type { AgentCursors, Point } from './agentCursor'
 import { toScreen, type Camera } from './camera'
 
 /** An outline in someone's color. No handles: only your own selection has them, as only yours can be resized. */
@@ -31,19 +33,81 @@ export function Peers({ peers, camera, byId, agentTouched }: { peers: Peer[]; ca
       {peers.map((p) => {
         if (!p.cursor) return null
         const at = toScreen(camera, { ...p.cursor, w: 0, h: 0 })
-        const agentCursor = isAgent(p.user)
-        return (
-          <div key={p.clientId} className="ttx-cursor" style={{ transform: `translate(${at.x}px, ${at.y}px)` }}>
-            <svg width="16" height="20" viewBox="0 0 16 20" aria-hidden>
-              <path d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z" fill={p.user.color} stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
-            </svg>
-            <span className="ttx-cursor__name" style={{ background: p.user.color, color: agentCursor ? '#fafafa' : onColor(p.user.color), fontWeight: agentCursor ? 500 : 600 }}>
-              {agentCursor && <SparkleIcon size={10} weight="fill" />}
-              {p.user.name}
-            </span>
-          </div>
-        )
+        return <Cursor key={p.clientId} at={at} name={p.user.name} color={p.user.color} agent={isAgent(p.user)} />
       })}
     </>
   )
+}
+
+/** A pointer and name tag at screen point `at`. The agent's has a sparkle, and a pulse while it waits to go on. */
+function Cursor({ at, name, color, agent, working, opacity }: { at: Point; name: string; color: string; agent: boolean; working?: boolean; opacity?: number }) {
+  return (
+    <div className={`ttx-cursor ${agent ? 'ttx-cursor--agent' : ''} ${working ? 'is-working' : ''}`} style={{ transform: `translate(${at.x}px, ${at.y}px)`, opacity }}>
+      <svg width="16" height="20" viewBox="0 0 16 20" aria-hidden>
+        <path d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z" fill={color} stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
+      </svg>
+      <span className="ttx-cursor__name" style={{ background: color, color: agent ? '#fafafa' : onColor(color), fontWeight: agent ? 500 : 600 }}>
+        {agent && <SparkleIcon size={10} weight="fill" />}
+        {name}
+      </span>
+    </div>
+  )
+}
+
+/** How far inside the canvas edge the marker of an off-screen agent sits (px): clear of the header and toolbar. */
+const EDGE_MARGIN = 64
+
+/**
+ * The agents' cursors (agentCursor.ts), moved every frame while any is shown. Only this layer renders each frame,
+ * not the canvas. A cursor outside the canvas shows as a marker on its edge, pointing at it; clicking it goes there.
+ */
+export function AgentCursorLayer({ cursors, version, camera, rootRef, onGoTo }: {
+  cursors: AgentCursors
+  /** Changes with each step the agents take, to start the animation again. */
+  version: number
+  camera: Camera
+  rootRef: RefObject<HTMLElement | null>
+  onGoTo(point: Point): void
+}) {
+  // Frames only ask for a render; each render reads the clock, so one between frames (a pan) is not behind.
+  const [, setFrame] = useState(0)
+  useEffect(() => {
+    let frame = 0
+    const step = (t: number) => {
+      setFrame(t)
+      if (cursors.active(Date.now())) frame = requestAnimationFrame(step)
+    }
+    frame = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frame)
+  }, [cursors, version])
+  const w = rootRef.current?.clientWidth ?? 0
+  const h = rootRef.current?.clientHeight ?? 0
+  return cursors.at(Date.now()).map((c) => {
+    const at = toScreen(camera, { x: c.x, y: c.y, w: 0, h: 0 })
+    if (at.x >= 0 && at.x <= w && at.y >= 0 && at.y <= h) {
+      return <Cursor key={c.key} at={at} name={c.name} color={c.color} agent working={c.working} opacity={c.opacity} />
+    }
+    const edge = { x: Math.min(w - EDGE_MARGIN, Math.max(EDGE_MARGIN, at.x)), y: Math.min(h - EDGE_MARGIN, Math.max(EDGE_MARGIN, at.y)) }
+    const angle = (Math.atan2(at.y - edge.y, at.x - edge.x) * 180) / Math.PI + 90
+    // Anchored on the side it points to, so it grows into the canvas whatever the length of the name.
+    const tx = at.x > w ? '-100%' : at.x < 0 ? '0%' : '-50%'
+    const ty = at.y > h ? '-100%' : at.y < 0 ? '0%' : '-50%'
+    const label = `Show where ${c.name} is working`
+    return (
+      <button
+        key={c.key}
+        type="button"
+        className="ttx-agent-edge"
+        style={{ left: edge.x, top: edge.y, transform: `translate(${tx}, ${ty})`, background: c.color, opacity: c.opacity }}
+        title={label}
+        aria-label={label}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => onGoTo(c)}
+      >
+        <ArrowUpIcon size={12} weight="bold" style={{ transform: `rotate(${angle}deg)` }} />
+        <SparkleIcon size={10} weight="fill" />
+        {c.name}
+      </button>
+    )
+  })
 }

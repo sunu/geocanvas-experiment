@@ -13,7 +13,8 @@ import { ObjectPanel } from './ObjectPanel'
 import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { useAgentTouched } from '../board/agentActivity'
-import { Peers } from './Peers'
+import { AgentCursorLayer, Peers } from './Peers'
+import { useAgentCursors, type Point } from './agentCursor'
 import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
 import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
@@ -84,6 +85,12 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   const objects = useObjects(board)
   const peers = usePeers(awareness)
   const agentTouched = useAgentTouched(runtime)
+  const agentCursors = useAgentCursors(runtime)
+  // What an agent added is outlined once its cursor gets there, when the object appears.
+  const agentMarked = useMemo(
+    () => (agentCursors.arriving.size ? new Set([...agentTouched].filter((id) => !agentCursors.arriving.has(id))) : agentTouched),
+    [agentTouched, agentCursors.arriving],
+  )
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, z: 1 })
   const [tool, setTool] = useState<Tool>('select')
   const [selection, setSelection] = useState<Set<string>>(() => new Set())
@@ -431,6 +438,14 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     }
   }, [runtime, editingId, selected, paletteOpen, focus])
 
+  /** Move the camera so world point `p` is in the middle, at the same zoom (an off-screen agent's marker). */
+  function goToPoint(p: Point) {
+    const el = rootRef.current!
+    const from = cameraRef.current
+    stopAnimation.current?.()
+    stopAnimation.current = animateCamera(from, { x: el.clientWidth / 2 - p.x * from.z, y: el.clientHeight / 2 - p.y * from.z, z: from.z }, setCamera)
+  }
+
   /** Open an object in focus mode: zoom until it fills the screen, then lay it out at that size, on a draft. */
   function enterFocus(id: string) {
     if (focusRef.current) return
@@ -592,6 +607,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
               layer={i}
               editing={o.id === editingId}
               selected={selected.has(o.id)}
+              arriving={agentCursors.arriving.has(o.id)}
               onDone={() => setEditing(null)}
               onFocus={isFocusable(objectUI(o.type)) ? () => enterFocus(o.id) : undefined}
             />
@@ -604,7 +620,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
-        {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentTouched} />}
+        {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentMarked} />}
+        {!focus && <AgentCursorLayer {...agentCursors} camera={camera} rootRef={rootRef} onGoTo={goToPoint} />}
         {!focus && [...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />

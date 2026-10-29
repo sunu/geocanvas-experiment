@@ -56,6 +56,13 @@ body,
 .ttx-obj {
   position: absolute;
   box-sizing: border-box;
+  /* Fades in what an agent added when its cursor gets there (canvas/agentCursor.ts). */
+  transition: opacity 200ms ease-out;
+}
+
+.ttx-obj.is-arriving {
+  opacity: 0;
+  transition: none;
 }
 
 /*
@@ -350,6 +357,52 @@ body,
   font-size: 12px;
   line-height: 16px;
   white-space: nowrap;
+}
+
+/* An agent's cursor is moved every frame (canvas/agentCursor.ts), so it needs no smoothing of its own. */
+.ttx-cursor--agent {
+  transition: none;
+}
+
+/* Waiting at its last place for the agent's next step. */
+.ttx-cursor--agent.is-working svg {
+  animation: ttx-agent-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ttx-agent-pulse {
+  50% {
+    transform: scale(0.85);
+  }
+}
+
+/* An agent working off-screen: a marker on the canvas edge, pointing at it. */
+.ttx-agent-edge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--agent-foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ttx-obj {
+    transition: none;
+  }
+
+  .ttx-cursor--agent.is-working svg {
+    animation: none;
+  }
 }
 
 /* The color swatches of the palette's color field (canvas/coreUI.tsx). */
