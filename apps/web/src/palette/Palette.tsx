@@ -4,6 +4,7 @@ import { Command } from 'cmdk'
 import { ArrowLeftIcon } from '@phosphor-icons/react'
 import { z } from 'zod'
 import type { InvocationRecord, OpDef, Runtime, TargetRef } from '@ttx/core'
+import { TEMPLATE_OP_PREFIX, type EventBoardObject } from '@ttx/plugins'
 import { mainFields, SchemaForm } from './SchemaForm'
 
 interface Props {
@@ -15,7 +16,13 @@ interface Props {
   /** Run an op; the canvas selects what it added. */
   run(opId: string, target: TargetRef, args: unknown): Promise<InvocationRecord>
   onClose(): void
+  /** Show only the templates (the toolbar's Templates button). */
+  templates?: boolean
 }
+
+const canvas: TargetRef = { kind: 'canvas' }
+
+const isTemplate = (op: OpDef) => op.id.startsWith(TEMPLATE_OP_PREFIX)
 
 const argsSchema = (op: OpDef) => z.toJSONSchema(op.args, { io: 'input', unrepresentable: 'any' }) as Record<string, any>
 
@@ -26,6 +33,8 @@ const argsSchema = (op: OpDef) => z.toJSONSchema(op.args, { io: 'input', unrepre
  */
 export function Palette(props: Props) {
   const [chosen, setChosen] = useState<{ op: OpDef; target: TargetRef }>()
+  // Templates only: from the toolbar's Templates button, or "Insert template…". Kept for Back from a template's form.
+  const [templates, setTemplates] = useState(!!props.templates)
   const onKeyDown = (e: KeyboardEvent) => {
     // The canvas listens on window: keep its keys (Delete, Escape, tools) out of the palette.
     e.stopPropagation()
@@ -37,7 +46,7 @@ export function Palette(props: Props) {
         {chosen ? (
           <ArgsStep {...props} op={chosen.op} target={chosen.target} onBack={() => setChosen(undefined)} />
         ) : (
-          <PickStep {...props} onChoose={(op, target) => setChosen({ op, target })} />
+          <PickStep {...props} templates={templates} onBrowseTemplates={() => setTemplates(true)} onChoose={(op, target) => setChosen({ op, target })} />
         )}
       </div>
     </div>,
@@ -45,16 +54,27 @@ export function Palette(props: Props) {
   )
 }
 
-function PickStep({ runtime, selection, onChoose, run }: Props & { onChoose(op: OpDef, target: TargetRef): void }) {
+function PickStep({
+  runtime,
+  selection,
+  onChoose,
+  onBrowseTemplates,
+  run,
+  templates,
+}: Props & { onChoose(op: OpDef, target: TargetRef): void; onBrowseTemplates(): void }) {
   const [error, setError] = useState<string>()
-  const groups = useMemo(() => {
-    const canvas: TargetRef = { kind: 'canvas' }
+  const [search, setSearch] = useState('')
+  const { groups, templateOps } = useMemo(() => {
     const selected: TargetRef = { kind: 'objects', ids: selection }
-    return [
+    const onCanvas = runtime.availableOps(canvas)
+    const templateOps = onCanvas.filter(isTemplate)
+    if (templates) return { groups: [{ heading: 'Templates', target: canvas, ops: templateOps }], templateOps }
+    const groups = [
       ...(selection.length ? [{ heading: `Selection (${selection.length})`, target: selected, ops: runtime.availableOps(selected) }] : []),
-      { heading: 'Canvas', target: canvas, ops: runtime.availableOps(canvas) },
+      { heading: 'Canvas', target: canvas, ops: onCanvas.filter((op) => !isTemplate(op)) },
     ]
-  }, [runtime, selection])
+    return { groups, templateOps }
+  }, [runtime, selection, templates])
 
   const choose = async (op: OpDef, target: TargetRef) => {
     // Nothing to fill in: run it now.
@@ -65,23 +85,32 @@ function PickStep({ runtime, selection, onChoose, run }: Props & { onChoose(op: 
 
   return (
     <Command label="Commands" loop>
-      <Command.Input autoFocus placeholder="Type a command…" />
+      <Command.Input autoFocus value={search} onValueChange={setSearch} placeholder={templates ? 'Type a template…' : 'Type a command…'} />
       {error && <div className="ttx-palette__error">{error}</div>}
       <Command.List>
         <Command.Empty>No command matches.</Command.Empty>
+        {!templates && templateOps.length > 0 && (
+          <Command.Group heading="Templates">
+            <Command.Item
+              value="Insert template"
+              keywords={['template', ...templateOps.map((op) => op.title)]}
+              onSelect={() => {
+                setSearch('')
+                onBrowseTemplates()
+              }}
+            >
+              <span className="ttx-op__title">Insert template…</span>
+              <span className="ttx-op__desc">A set of objects for a task: {templateOps.map((op) => op.title.toLowerCase()).join(', ')}</span>
+            </Command.Item>
+            {/* The templates themselves only while searching, so a growing list does not crowd the commands. */}
+            {search.trim() && templateOps.map((op) => <OpItem key={op.id} op={op} group="Templates" onSelect={() => void choose(op, canvas)} />)}
+          </Command.Group>
+        )}
         {groups.map((g) =>
           g.ops.length ? (
             <Command.Group key={g.heading} heading={g.heading}>
               {g.ops.map((op) => (
-                <Command.Item
-                  key={op.id}
-                  value={`${g.heading} ${op.id}`}
-                  keywords={[op.title, op.description, ...(op.nl?.aliases ?? [])]}
-                  onSelect={() => void choose(op, g.target)}
-                >
-                  <span className="ttx-op__title">{op.title}</span>
-                  <span className="ttx-op__desc">{op.description}</span>
-                </Command.Item>
+                <OpItem key={op.id} op={op} group={g.heading} onSelect={() => void choose(op, g.target)} />
               ))}
             </Command.Group>
           ) : null,
@@ -91,7 +120,16 @@ function PickStep({ runtime, selection, onChoose, run }: Props & { onChoose(op: 
   )
 }
 
-function ArgsStep({ runtime, op, target, center, run, onBack }: Props & { op: OpDef; target: TargetRef; onBack(): void }) {
+function OpItem({ op, group, onSelect }: { op: OpDef; group: string; onSelect(): void }) {
+  return (
+    <Command.Item value={`${group} ${op.id}`} keywords={[op.title, op.description, ...(op.nl?.aliases ?? []), ...(isTemplate(op) ? ['template'] : [])]} onSelect={onSelect}>
+      <span className="ttx-op__title">{op.title}</span>
+      <span className="ttx-op__desc">{op.description}</span>
+    </Command.Item>
+  )
+}
+
+function ArgsStep({ runtime, op, target, center, run, onBack, selection }: Props & { op: OpDef; target: TargetRef; onBack(): void }) {
   const schema = useMemo(() => argsSchema(op), [op])
   const [args, setArgs] = useState<Record<string, unknown>>(() => {
     const base = runtime.defaultsFor(op.id, target)
@@ -100,6 +138,13 @@ function ArgsStep({ runtime, op, target, center, run, onBack }: Props & { op: Op
     if (type) {
       const c = center()
       Object.assign(base, { x: Math.round(c.x - type.defaultSize.w / 2), y: Math.round(c.y - type.defaultSize.h / 2) })
+    }
+    // A template: its set goes in the middle of the view, and a selected event is its event seed.
+    if (isTemplate(op)) {
+      const c = center()
+      Object.assign(base, { x: Math.round(c.x), y: Math.round(c.y) })
+      const event = selection.map((id) => runtime.board.get(id)).find((o): o is EventBoardObject => o?.type === 'event' && !!(o as EventBoardObject).eventId)
+      if (event && 'event' in (schema.properties ?? {})) base.event = event.eventId
     }
     return base
   })
@@ -161,7 +206,7 @@ function ArgsStep({ runtime, op, target, center, run, onBack }: Props & { op: Op
           </button>
         )}
         <button type="submit" className="is-primary" disabled={busy}>
-          Run ↵
+          {busy ? (isTemplate(op) ? 'Building…' : 'Running…') : 'Run ↵'}
         </button>
       </div>
     </form>

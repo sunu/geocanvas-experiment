@@ -1,6 +1,6 @@
 import { adminBoundariesTool, WorldBankBoundaries } from '../data/boundaries'
 import { OvertureParquet, overtureTool } from '../data/buildings'
-import { geocodeTools, OpenCageGeocoder } from '@ttx/plugins'
+import { eventsGet, eventsSearch, geocodeTools, OpenCageGeocoder } from '@ttx/plugins'
 import { healthFacilitiesTool, LayercakeHealth } from '../data/health'
 import { populationTool, SourceCoopPopulation } from '../data/population'
 import { eventFootprintTool } from '../events/footprint'
@@ -22,6 +22,8 @@ export const tools = new ToolRunner([
   notebookArtifactTool(notebookFactory),
   notebookRunsTool(notebookFactory),
   eventFootprintTool(monty),
+  eventsSearch(monty),
+  eventsGet(monty),
   boundariesTool,
   choroplethTool,
 ])

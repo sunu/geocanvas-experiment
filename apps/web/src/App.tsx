@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { FolderOpenIcon, PlugsConnectedIcon, PlugsIcon, PlusIcon, RobotIcon } from '@phosphor-icons/react'
-import { eventsSearch } from '@ttx/plugins'
 import { startBrowserAgent } from './agent/browserAgent'
 import { ChatPanel } from './agent/ChatPanel'
 import { connect, useConnectionStatus } from './board/connect'
 import { newRoomId, roomFromHash, roomHash } from './board/room'
 import { Canvas } from './canvas/Canvas'
-import { monty } from './events/monty'
 import { startBridge, useBridgeStatus } from './mcp/bridge'
 import { Executor } from './mcp/executor'
 import { plugins } from './plugins'
@@ -34,7 +32,7 @@ void startBridge(
       person: runtime.actor,
       view: () => runtime.view,
       selection: () => (provider.awareness.getLocalState() as { selection?: string[] } | null)?.selection ?? [],
-      tools: [...tools.list(), eventsSearch(monty)],
+      tools: tools.list(),
     }),
   { room, person: runtime.actor },
 )

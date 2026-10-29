@@ -5,13 +5,14 @@ import { Chat, Runtime, Uploads } from '@ttx/core'
 import { plugins } from '../plugins'
 import type { Board, BoardObject } from './board'
 import { personActor } from './person'
+import { tools } from '../tools/registry'
 
 /** Join a room: the Worker routes /connect/<room> to that room's Durable Object. */
 export function connect(room: string) {
   const doc = new Y.Doc()
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/connect`
   const provider = new WebsocketProvider(url, room, doc)
-  const runtime = new Runtime({ doc, plugins, actor: personActor() })
+  const runtime = new Runtime({ doc, plugins, actor: personActor(), tools })
   provider.awareness.setLocalStateField('user', runtime.actor)
   // Merged gesture entries wait for the gesture to end; write them before the tab goes.
   addEventListener('pagehide', () => runtime.flush())

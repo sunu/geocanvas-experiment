@@ -7,6 +7,7 @@ import {
   ArrowUpIcon,
   CommandIcon,
   CursorIcon,
+  SquaresFourIcon,
   TrashIcon,
   type Icon,
 } from '@phosphor-icons/react'
@@ -40,9 +41,10 @@ interface Props {
   status: ConnectionStatus
   awareness: Awareness
   onPalette(): void
+  onTemplates(): void
 }
 
-export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, status, awareness, onPalette }: Props) {
+export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, status, awareness, onPalette, onTemplates }: Props) {
   const none = selection.size === 0
   // Each button press is its own undo step.
   const act = (opId: string) => () => {
@@ -87,6 +89,9 @@ export function Toolbar({ runtime, tool, onTool, selection, zoom, onResetZoom, s
         <TrashIcon size={ICON} />
       </button>
       <span className="ttx-toolbar__sep" />
+      <button title="Templates: a set of objects for a task, e.g. a situation report" aria-label="Templates" onClick={onTemplates}>
+        <SquaresFourIcon size={ICON} />
+      </button>
       <button title={`Commands (${MOD}K)`} aria-label="Commands" onClick={onPalette}>
         <CommandIcon size={ICON} />
       </button>

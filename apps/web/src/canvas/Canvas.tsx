@@ -81,7 +81,8 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   const [marquee, setMarquee] = useState<Rect | null>(null) // screen
   const [draft, setDraft] = useState<Rect | null>(null) // world, while drawing a new object
   const [spaceHeld, setSpaceHeld] = useState(false)
-  const [paletteOpen, setPaletteOpen] = useState(false)
+  /** 'templates': the palette shows only templates (the toolbar's Templates button). */
+  const [paletteOpen, setPaletteOpen] = useState<false | 'all' | 'templates'>(false)
   const [focus, setFocus] = useState<Focus | null>(null)
   /** Leaving focus with unshared changes: the Share / Discard / Keep editing dialog is open. */
   const [asking, setAsking] = useState(false)
@@ -347,7 +348,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       }
       if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setPaletteOpen((open) => !open)
+        setPaletteOpen((open) => (open ? false : 'all'))
         return
       }
       if (paletteOpen) {
@@ -602,11 +603,19 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         }}
         status={status}
         awareness={awareness}
-        onPalette={() => setPaletteOpen(true)}
+        onPalette={() => setPaletteOpen('all')}
+        onTemplates={() => setPaletteOpen('templates')}
       />}
 
       {paletteOpen && (
-        <Palette runtime={runtime} selection={[...selected]} center={viewCenter} run={runFromPalette} onClose={() => setPaletteOpen(false)} />
+        <Palette
+          runtime={runtime}
+          selection={[...selected]}
+          center={viewCenter}
+          run={runFromPalette}
+          onClose={() => setPaletteOpen(false)}
+          templates={paletteOpen === 'templates'}
+        />
       )}
     </div>
   )

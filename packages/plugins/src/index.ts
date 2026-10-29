@@ -1,6 +1,7 @@
 export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
-export { boardGet, eventsSearch } from './agentTools.js'
+export { boardGet, bboxOfGeometries, eventsGet, eventsSearch, type EventFacts } from './agentTools.js'
+export { conflict, defineTemplate, MY_VIEW, sitrep, TEMPLATE_OP_PREFIX, templatesPlugin, type Facts, type SeedKind, type TemplateDef, type TemplateNode } from './templates/index.js'
 export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
 export { imagesPlugin, type ImageBoardObject } from './images.js'
 export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
