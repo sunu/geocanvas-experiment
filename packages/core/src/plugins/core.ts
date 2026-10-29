@@ -60,6 +60,17 @@ export const stickyType: ObjectTypeDef = {
   summarize: (o) => JSON.stringify((o as StickyObject).text.slice(0, 200)),
 }
 
+export const frameType: ObjectTypeDef = {
+  type: 'frame',
+  title: 'Frame',
+  description: 'A frame that holds other objects together: moving it moves the objects inside it. It has a title above it.',
+  fields: z.object({ title: z.string().optional().describe('The title above the frame') }),
+  defaultSize: { w: 800, h: 600 },
+  layer: 'bottom',
+  summarize: (o) => JSON.stringify((o as FrameObject).title ?? ''),
+}
+
+export type FrameObject = AnyObject & { type: 'frame'; title?: string }
 export type BoxObject = AnyObject & { type: 'box'; color?: ColorName; shape?: BoxShape }
 export type TextObject = AnyObject & { type: 'text'; text: string; color?: ColorName; fontSize?: number }
 export type StickyObject = AnyObject & { type: 'sticky'; text: string; color?: ColorName; fontSize?: number }
@@ -188,6 +199,16 @@ const setText = defineOp({
   apply: (tx, { text }, target) => tx.update({ [idsOf(target)[0]!]: { text } }),
 })
 
+const setFrameTitle = defineOp({
+  id: 'frame.setTitle',
+  title: 'Rename frame',
+  description: 'Set the title of the selected frame.',
+  target: { kind: 'objects', types: ['frame'], max: 1 },
+  args: z.object({ title: z.string().describe('Title') }),
+  defaults: (ctx) => ({ title: (ctx.board.get(idsOf(ctx.target)[0] ?? '') as FrameObject | undefined)?.title ?? '' }),
+  apply: (tx, { title }, target) => tx.update({ [idsOf(target)[0]!]: { title } }),
+})
+
 const setFontSize = defineOp({
   id: 'text.setFontSize',
   title: 'Set text size',
@@ -256,6 +277,6 @@ const viewOps = [
 export const corePlugin = definePlugin({
   id: 'core',
   title: 'Core',
-  objectTypes: [boxType, textType, stickyType],
-  ops: [setRect, move, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), ...viewOps],
+  objectTypes: [boxType, textType, stickyType, frameType],
+  ops: [setRect, move, remove, duplicate, ...layerOps, setColor, setText, setFrameTitle, setFontSize, stepSize(1), stepSize(-1), ...viewOps],
 })

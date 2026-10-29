@@ -3,13 +3,25 @@ import { addOp } from '../ops/addOp.js'
 import type { OpDef } from '../ops/types.js'
 import type { ObjectTypeDef, Plugin } from './types.js'
 
-/** Placement fields that every object has, beside its type's own fields. */
+/**
+ * A node that follows another (plans/plan-013.md): when the root `from` changes, the recipe re-renders this
+ * node's linked part. The recipes are in @ttx/plugins (links/).
+ */
+export const linkSchema = z.object({
+  from: z.string().min(1).describe('Id of the root object this one follows'),
+  recipe: z.string().min(1).describe('What the link writes, e.g. "country"'),
+  args: z.record(z.string(), z.unknown()).optional(),
+})
+export type Link = z.infer<typeof linkSchema>
+
+/** Fields that every object has, beside its type's own fields: placement, and a link when it follows another. */
 const placement = z.object({
   x: z.number(),
   y: z.number(),
   w: z.number().positive(),
   h: z.number().positive(),
   z: z.number(),
+  link: linkSchema.optional(),
 })
 
 /**

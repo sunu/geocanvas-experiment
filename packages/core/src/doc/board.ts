@@ -18,6 +18,8 @@ export interface Placed {
   w: number
   h: number
   z: number
+  /** Set when it follows another object (plugins/registry.ts). */
+  link?: { from: string; recipe: string; args?: Record<string, unknown> }
 }
 
 /** Any object. The fields beside the placement come from its type (plugins/types.ts). */

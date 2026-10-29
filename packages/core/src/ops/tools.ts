@@ -61,7 +61,8 @@ export function summarizeBoard(board: Board, registry: Registry): string {
     .map((o) => {
       const extra = registry.objectType(o.type)?.summarize?.(o)
       const at = `at (${Math.round(o.x)}, ${Math.round(o.y)}) size ${Math.round(o.w)}×${Math.round(o.h)}`
-      return `- ${o.type} ${o.id} ${at}${extra ? `: ${extra}` : ''}`
+      const link = o.link ? `; linked to ${o.link.from} (${o.link.recipe})` : ''
+      return `- ${o.type} ${o.id} ${at}${extra ? `: ${extra}` : ''}${link}`
     })
     .join('\n')
 }
