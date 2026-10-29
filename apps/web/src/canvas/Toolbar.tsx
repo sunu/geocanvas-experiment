@@ -6,6 +6,7 @@ import {
   CursorIcon,
   FilePdfIcon,
   FlowArrowIcon,
+  FrameCornersIcon,
   HandIcon,
   ImageIcon,
   LineSegmentIcon,
@@ -70,6 +71,7 @@ const MAP_AND_REPORT: Item[] = [
 const BOARD_TOOLS: Item[] = [
   { label: 'Add text', text: 'Text', Icon: TextTIcon, tool: 'text', key: 'T' },
   { label: 'Add sticky note', text: 'Sticky', Icon: NoteIcon, tool: 'sticky', key: 'S' },
+  { label: 'Add frame: moving it moves what is inside', text: 'Frame', Icon: FrameCornersIcon, tool: 'frame', key: 'A' },
 ]
 /** The shapes, as in Figma: 'box:line' is the box tool drawing a line, and so on (Canvas.tsx). The rectangle is the box tool itself. */
 const SHAPES: Item[] = [

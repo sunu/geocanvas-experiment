@@ -1,4 +1,4 @@
-import type { Board as CoreBoard, BoxObject, StickyObject, TextObject } from '@ttx/core'
+import type { Board as CoreBoard, BoxObject, FrameObject, StickyObject, TextObject } from '@ttx/core'
 import type { ConflictBoardObject, CountryBoardObject, EventBoardObject, ImageBoardObject, MapBoardObject, NotebookBoardObject, PdfBoardObject, PresenceBoardObject, ReliefWebBoardObject } from '@ttx/plugins'
 
 /**
@@ -7,7 +7,7 @@ import type { ConflictBoardObject, CountryBoardObject, EventBoardObject, ImageBo
  *
  * Map views (center, zoom) are not on the board on purpose: each person pans their own maps.
  */
-export type BoardObject = BoxObject | TextObject | StickyObject | MapBoardObject | EventBoardObject | NotebookBoardObject | ReliefWebBoardObject | CountryBoardObject | PresenceBoardObject | ConflictBoardObject | ImageBoardObject | PdfBoardObject
+export type BoardObject = BoxObject | TextObject | StickyObject | FrameObject | MapBoardObject | EventBoardObject | NotebookBoardObject | ReliefWebBoardObject | CountryBoardObject | PresenceBoardObject | ConflictBoardObject | ImageBoardObject | PdfBoardObject
 
 export type ObjectType = BoardObject['type']
 

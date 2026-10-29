@@ -6,6 +6,8 @@
   --ttx-panel: #ffffff;
   --ttx-border: rgb(0 0 0 / 0.12);
   --ttx-accent: #2563eb;
+  /* A frame's fill: light, so what it holds stands out. */
+  --ttx-frame-fill: rgb(255 255 255 / 0.6);
   --ttx-font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-family: var(--ttx-font);
   color: var(--ttx-ink);

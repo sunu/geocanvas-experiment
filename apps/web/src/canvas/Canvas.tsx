@@ -4,7 +4,7 @@ import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
 import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
-import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
+import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
 import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -250,7 +250,8 @@ export function Canvas({ runtime, awareness }: { runtime: Runtime; awareness: Aw
       }
       const moving = selected.has(id) ? selected : new Set([id])
       setSelection(moving)
-      const starts = objects.filter((o) => moving.has(o.id))
+      // A frame takes what is inside it along.
+      const starts = withFramed(objects, moving)
       trackDrag(e, (dx, dy) => {
         const z = cameraRef.current.z
         const alive = starts.filter((o) => board.get(o.id)) // someone else may delete one mid-drag

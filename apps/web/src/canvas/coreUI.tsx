@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type CSSProperties } from 'react'
-import { NoteIcon, SquareIcon, TextTIcon } from '@phosphor-icons/react'
-import type { BoxObject, StickyObject, TextObject } from '@ttx/core'
+import { FrameCornersIcon, NoteIcon, SquareIcon, TextTIcon } from '@phosphor-icons/react'
+import type { BoxObject, FrameObject, StickyObject, TextObject } from '@ttx/core'
+import { ObjectHeader } from './ObjectHeader'
 import { registerObjectUI, registerWidget, type ObjectViewProps } from './registry'
 import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STICKY_COLOR, DEFAULT_TEXT_COLOR, PALETTE } from './style'
 
@@ -40,6 +41,17 @@ function BoxView({ object: o }: ObjectViewProps<BoxObject>) {
       <line x1="0" y1="0" x2="100%" y2="100%" stroke={ink} strokeWidth="3" strokeLinecap="round" markerEnd={o.shape === 'arrow' ? `url(#${head})` : undefined} />
     </svg>
   )
+}
+
+// A frame is drawn under what it holds (its type's layer is 'bottom'); its title is in the label row above it.
+registerObjectUI('frame', {
+  View: FrameView,
+  frameStyle: () => ({ background: 'var(--ttx-frame-fill)', borderColor: 'var(--ttx-border)' }),
+  tool: { key: 'A', label: 'Frame', Icon: FrameCornersIcon },
+})
+
+function FrameView({ object: o }: ObjectViewProps<FrameObject>) {
+  return <ObjectHeader icon={<FrameCornersIcon size={14} aria-hidden />} title={o.title || 'Frame'} />
 }
 
 registerObjectUI('text', {
