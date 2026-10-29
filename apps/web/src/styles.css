@@ -2263,3 +2263,73 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   border-radius: 2px;
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
 }
+
+/* A new map asks where to look (opens focus, with the map's Location tools). */
+.ttx-map__place {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ttx-accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* A map's Location tools in its Options panel (map/LocationPicker.tsx). */
+.ttx-location {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ttx-location form {
+  display: flex;
+  gap: 4px;
+}
+
+.ttx-location input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+}
+
+.ttx-location input[aria-invalid='true'] {
+  border-color: #dc2626;
+}
+
+.ttx-location button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttx-location button:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.04);
+}
+
+.ttx-location button:disabled {
+  color: var(--ttx-muted);
+  cursor: default;
+}
+
+.ttx-location button.is-active {
+  border-color: var(--ttx-accent);
+  color: var(--ttx-accent);
+}

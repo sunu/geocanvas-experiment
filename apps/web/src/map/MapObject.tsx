@@ -22,6 +22,12 @@ setWorkerUrl(workerUrl)
 
 /** Where a map starts for a person who has no view of it and nobody else has one either. */
 const WORLD = { center: [20, 10] as [number, number], zoom: 1, bearing: 0 }
+/**
+ * Still where a new map starts. The map saves its first view about a second after it appears (a resize ends a
+ * move), so "no view yet" does not last; the zoom does.
+ */
+const atStart = (view: { zoom: number } | undefined) => !view || view.zoom <= WORLD.zoom + 0.01
+
 /** A view is saved this long after the map stops moving, so a series of pans is one write. */
 const SAVE_AFTER_MS = 1000
 const NO_LAYERS: MapLayer[] = []
@@ -92,6 +98,8 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const styleReadyRef = useRef(false)
   /** The value under the pointer on a choropleth, while editing. */
   const [hover, setHover] = useState<{ text: string; x: number; y: number }>()
+  /** Nobody has moved this map from the whole world yet: a new map, which asks for its location. */
+  const [unplaced, setUnplaced] = useState(() => atStart(new Views(runtime.board.doc).latest(o.id)?.view))
 
   useEffect(() => {
     const views = new Views(runtimeRef.current.board.doc)
@@ -173,6 +181,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     map.on('movestart', onMoveStart)
     map.on('moveend', onMoveEnd)
     const unsubscribe = views.subscribe(() => {
+      setUnplaced(atStart(views.latest(o.id)?.view))
       const view = views.get(me, o.id)
       if (!view || view.at === shownAt) return
       shownAt = view.at
@@ -235,7 +244,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       </ObjectHeader>
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
-        {!editing && <div className="ttx-map__hint">Double-click to pan and zoom</div>}
+        {!editing && !focused && unplaced && onFocus ? (
+          <button type="button" className="ttx-map__place" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} onClick={onFocus}>
+            Choose a location
+          </button>
+        ) : (
+          !editing && <div className="ttx-map__hint">Double-click to pan and zoom</div>
+        )}
         {editing && hover && (
           <div className="ttx-map__hover" style={{ left: hover.x + 12, top: hover.y + 12 }}>
             {hover.text}

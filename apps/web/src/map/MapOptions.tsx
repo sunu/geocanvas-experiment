@@ -22,6 +22,7 @@ import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/ap
 import { LayerList } from './LayerList'
 import { useLayerStates } from './layers'
 import { areaOf, goTo, liveMap } from './live'
+import { LocationPicker } from './LocationPicker'
 import { fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
 
@@ -34,7 +35,7 @@ function mapOp(runtime: Runtime, id: string, op: string, args: Record<string, un
 const NO_LAYERS: MapLayer[] = []
 
 /**
- * The map's contextual tools in focus mode: go to a place, its data layers, add data for the area in view,
+ * The map's contextual tools in focus mode: where everyone looks, go to a place, its data layers, add data for the area in view,
  * admin boundaries, and the events, country figures and notebook results on the board, basemap.
  */
 export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObject>) {
@@ -77,6 +78,7 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
 
   return (
     <>
+      <LocationPicker runtime={runtime} mapId={o.id} />
       <section className="ttx-options__section">
         <h3>Go to place</h3>
         <PlaceSearch
