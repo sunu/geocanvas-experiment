@@ -808,6 +808,12 @@ body,
   font-size: 12px;
 }
 
+.ttx-chat__undo-error {
+  margin-top: 4px;
+  color: #dc2626;
+  font-size: 12px;
+}
+
 /* The mode switch takes the free space; the buttons after it sit next to it. */
 .ttx-chat__keys {
   display: grid;
@@ -1007,14 +1013,14 @@ body,
   color: var(--ttx-ink);
 }
 
-/* --- Focus mode: one object fills the screen, its Options panel on the right (canvas/focus.ts) --- */
+/* --- Focus mode: one object fills the screen, its Options panel on the right (canvas/focus.ts); the chrome steps aside --- */
 
 /* Only the focused object is drawn; the rest of the board waits behind it. */
 .ttx-canvas.is-focus .ttx-obj:not(.is-focused) {
   visibility: hidden;
 }
 
-body:has(.ttx-canvas.is-focus) .ttx-boardbar {
+body:has(.ttx-canvas.is-focus) .ttx-chrome {
   display: none;
 }
 
@@ -1492,6 +1498,267 @@ body:has(.ttx-canvas.is-focus) .ttx-boardbar {
   color: var(--ttx-ink);
 }
 
+/* --- Dropping files on the board ------------------------------------------ */
+
+/* Over the whole page while files are dragged in; drops are handled on the window (canvas/Canvas.tsx). */
+.ttx-dropzone {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  z-index: 1000010;
+}
+
+.ttx-dropzone__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 48px;
+  border: 2px dashed var(--ttx-accent);
+  border-radius: 14px;
+  background: var(--ttx-panel);
+  color: var(--ttx-accent);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.2);
+  text-align: center;
+}
+
+.ttx-dropzone__title {
+  color: var(--ttx-ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ttx-dropzone__sub {
+  color: var(--ttx-muted);
+  font-size: 13px;
+}
+
+/* A file uploading, where its object will go (world units, like objects). */
+.ttx-pending {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  border: 1.5px dashed var(--ttx-accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ttx-panel) 85%, var(--ttx-accent));
+  color: var(--ttx-ink);
+  font-size: 13px;
+  text-align: center;
+  z-index: 1000000;
+}
+
+.ttx-pending.is-error {
+  border-color: #dc2626;
+  background: color-mix(in srgb, var(--ttx-panel) 92%, #dc2626);
+  color: #b91c1c;
+}
+
+.ttx-pending__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid color-mix(in srgb, var(--ttx-accent) 25%, transparent);
+  border-top-color: var(--ttx-accent);
+  border-radius: 50%;
+  animation: ttx-spin 0.8s linear infinite;
+}
+
+@keyframes ttx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ttx-pending__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ttx-ink);
+}
+
+.ttx-pending__bar {
+  width: min(80%, 240px);
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ttx-accent) 20%, transparent);
+}
+
+.ttx-pending__bar > div {
+  height: 100%;
+  background: var(--ttx-accent);
+  transition: width 0.2s;
+}
+
+.ttx-pending__status {
+  color: var(--ttx-muted);
+}
+
+.ttx-pending.is-error .ttx-pending__status {
+  color: inherit;
+}
+
+.ttx-pending button {
+  padding: 4px 12px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* --- PDF ---------------------------------------------------------------- */
+
+.ttx-pdf {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+  font-size: 12px;
+}
+
+.ttx-pdf__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px;
+  flex: none;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-pdf__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.ttx-pdf__count {
+  flex: none;
+  color: var(--ttx-muted);
+}
+
+.ttx-pdf__header > button,
+.ttx-pdf__header > a {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ttx-muted);
+  cursor: pointer;
+}
+
+.ttx-pdf__header > button:hover,
+.ttx-pdf__header > a:hover {
+  color: var(--ttx-ink);
+}
+
+.ttx-pdf__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ttx-bg);
+}
+
+.ttx-pdf__page {
+  display: block;
+  width: 100%;
+  background: #fff;
+}
+
+.ttx-pdf__empty {
+  margin: auto;
+  padding: 12px;
+  color: var(--ttx-muted);
+  text-align: center;
+}
+
+/* Focus: every page, scrolling. */
+.ttx-pdf__pages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px max(16px, calc((100% - 900px) / 2));
+}
+
+.ttx-pdf__slot {
+  margin: 0 auto 16px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
+}
+
+.ttx-pdfopts__pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ttx-pdfopts__pager input {
+  width: 56px;
+  font: inherit;
+}
+
+.ttx-pdfopts__pager button,
+.ttx-pdfopts__file button {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  cursor: pointer;
+}
+
+.ttx-pdfopts__pager button:disabled {
+  color: var(--ttx-muted);
+  cursor: default;
+}
+
+.ttx-pdfopts__file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.ttx-pdfopts__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttx-options__list a {
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--ttx-ink);
+  text-decoration: none;
+}
+
+.ttx-options__list a:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
 /* --- Image -------------------------------------------------------------- */
 
 .ttx-image {
@@ -1584,6 +1851,13 @@ body:has(.ttx-canvas.is-focus) .ttx-boardbar {
   bottom: 8px;
   color: #dc2626;
   text-align: center;
+}
+
+/* The run picker in a notebook's Options panel, which scrolls: the list scrolls inside a fixed height. */
+.ttx-nbopts__picker {
+  display: flex;
+  height: 360px;
+  margin: 0 -8px;
 }
 
 .ttx-notebookpick {
