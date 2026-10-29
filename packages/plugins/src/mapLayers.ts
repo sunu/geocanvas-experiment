@@ -82,6 +82,14 @@ export const ADMIN_LEVEL_NAME: Record<AdminLevel, { one: string; many: string }>
 /** Id of a new layer. Unique within one map is enough. */
 export const newLayerId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 
+/** The tool that reads an event's footprint from Montandon in the browser (apps/web/src/events/footprint.ts). */
+export const EVENT_FOOTPRINT_TOOL = 'events.footprint'
+
+/** A map layer for where an event happened: the recipe names the event, and each browser asks Montandon. */
+export function eventLayer(eventId: string, title?: string): MapLayer {
+  return { id: newLayerId(), tool: EVENT_FOOTPRINT_TOOL, input: { eventId }, title: title ?? `Event ${eventId}` }
+}
+
 /** True when a layer works on an area, which can be reset to someone's view. */
 export const hasArea = (l: MapLayer) => Array.isArray(l.input.area)
 

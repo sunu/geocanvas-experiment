@@ -4,6 +4,8 @@ export { boardGet, bboxOfGeometries, eventsGet, eventsSearch, type EventFacts } 
 export { conflict, defineTemplate, MY_VIEW, sitrep, TEMPLATE_OP_PREFIX, templatesPlugin, type Facts, type SeedKind, type TemplateDef, type TemplateNode } from './templates/index.js'
 export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
 export { imagesPlugin, type ImageBoardObject } from './images.js'
+export { inputsPlugin, INPUT_KINDS, type InputBoardObject } from './inputs.js'
+export { applyLinks, factsOf, linkedLayerId, linksPlugin, personOf, planLinks, RECIPES, renderLinks, ROOT_TYPES, type LinkPatch, type LinkPlan, type Recipe, type Rendered } from './links/index.js'
 export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
 export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'

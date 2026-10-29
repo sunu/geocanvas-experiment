@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { defineOp, definePlugin, type AnyObject } from '@ttx/core'
 import type { MapBoardObject } from './map.js'
-import { newLayerId, type MapLayer } from './mapLayers.js'
+import { applyLinks, planLinks } from './links/propagate.js'
+import { eventLayer } from './mapLayers.js'
 
 /**
  * The event object type and its ops. No React here: the view is registered in apps/web/src/events/ui.ts.
@@ -11,13 +12,8 @@ import { newLayerId, type MapLayer } from './mapLayers.js'
 /** eventId is absent until someone picks an event. */
 export type EventBoardObject = AnyObject & { type: 'event'; eventId?: string }
 
-/** The tool that reads an event's footprint from Montandon in the browser (apps/web/src/events/footprint.ts). */
-export const EVENT_FOOTPRINT_TOOL = 'events.footprint'
-
-/** A map layer for where an event happened: the recipe names the event, and each browser asks Montandon. */
-export function eventLayer(eventId: string, title?: string): MapLayer {
-  return { id: newLayerId(), tool: EVENT_FOOTPRINT_TOOL, input: { eventId }, title: title ?? `Event ${eventId}` }
-}
+// In mapLayers.ts, so that the link recipes (links/) can use it without importing this plugin.
+export { EVENT_FOOTPRINT_TOOL, eventLayer } from './mapLayers.js'
 
 const eventId = z.string().min(1)
 
@@ -40,11 +36,19 @@ export const eventsPlugin = definePlugin({
     defineOp({
       id: 'event.setEvent',
       title: 'Pick event',
-      description: 'Show a Montandon event in the selected event object.',
+      description: 'Show a Montandon event in the selected event object. Objects that follow it (a map, a feed, a country card) show the new event too.',
       target: { kind: 'objects', types: ['event'], max: 1 },
       args: z.object({ eventId: eventId.meta({ widget: 'event' }).describe('Event') }),
       nl: { aliases: ['change event', 'select event'] },
-      apply: (tx, { eventId }, target) => target.kind === 'objects' && tx.update({ [target.ids[0]!]: { eventId } }),
+      // The followers re-render in the same transaction: picking an event and its effects are one undo step.
+      async prepare(ctx, { eventId }) {
+        const id = ctx.target.kind === 'objects' ? ctx.target.ids[0]! : ''
+        return { id, eventId, links: await planLinks(ctx, { ...ctx.board.get(id)!, eventId } as EventBoardObject) }
+      },
+      apply(tx, { id, eventId, links }) {
+        tx.update({ [id]: { eventId } })
+        applyLinks(tx, links)
+      },
     }),
     defineOp({
       id: 'map.addEventLayer',

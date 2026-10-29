@@ -18,14 +18,15 @@ describe('the app plugins', () => {
     expect(rt.board.list()[0]).toMatchObject({ type: 'map', basemap: 'light' })
   })
 
-  it('set the basemap and the event through ops, checked against their fields', () => {
+  it('set the basemap and the event through ops, checked against their fields', async () => {
     const rt = runtime()
     const map = rt.dispatch('map.add', canvas, {}).created![0]!
     const event = rt.dispatch('event.add', canvas, {}).created![0]!
     expect(rt.dispatch('map.setBasemap', { kind: 'objects', ids: [map] }, { basemap: 'satellite' }).status).toBe('applied')
     expect(rt.dispatch('map.setBasemap', { kind: 'objects', ids: [map] }, { basemap: 'moon' }).status).toBe('failed')
-    expect(rt.dispatch('event.setEvent', { kind: 'objects', ids: [event] }, { eventId: 'usgs-123' }).status).toBe('applied')
-    expect(rt.dispatch('event.setEvent', { kind: 'objects', ids: [map] }, { eventId: 'usgs-123' }).status).toBe('failed')
+    // Async: objects that follow the event re-render with it (links/).
+    expect((await rt.invoke('event.setEvent', { kind: 'objects', ids: [event] }, { eventId: 'usgs-123' })).status).toBe('applied')
+    expect((await rt.invoke('event.setEvent', { kind: 'objects', ids: [map] }, { eventId: 'usgs-123' })).status).toBe('failed')
     expect(rt.board.get(map)).toMatchObject({ basemap: 'satellite' })
     expect(rt.board.get(event)).toMatchObject({ eventId: 'usgs-123' })
   })
