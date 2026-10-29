@@ -86,7 +86,8 @@ export function AgentCursorLayer({ cursors, version, activities, camera, rootRef
   const w = rootRef.current?.clientWidth ?? 0
   const h = rootRef.current?.clientHeight ?? 0
   return cursors.at(Date.now(), activities).map((c) => {
-    const doing = c.label ?? activities.get(c.key)
+    // While it places objects, they say what it does; elsewhere its tag says what its presence says.
+    const doing = c.placing ? undefined : activities.get(c.key)
     const at = toScreen(camera, { x: c.x, y: c.y, w: 0, h: 0 })
     if (at.x >= 0 && at.x <= w && at.y >= 0 && at.y <= h) {
       // It hovers in screen pixels, on top of its moves, so it drifts as far at any zoom.

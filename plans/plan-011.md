@@ -22,7 +22,7 @@ pointers are, and where the agent has worked. Design source: the "Collaborator s
 - **The agent is violet, and violet is not a person's color.** The Figma file gave violet to a person and black to the
   agent; violet moved to the agent so that "violet means the agent" holds everywhere. The agent has no selection of
   its own, so its work is marked by the objects it added or changed in the last 5 s (`board/agentActivity.ts`, from
-  the shared op log), as dashed violet outlines; what it works on is busy (faded, a violet arc turning) until its data
+  the shared op log), as dashed violet outlines; what it works on is busy (a violet placeholder card, dashed, "Generating map…") until its data
   has loaded. Its cursor, with a sparkle and what it does in its tag, comes from the same op log
   (`canvas/agentCursor.ts`); presence only adds what it does (`activity`).
 - **Color is never the only signal.** Solid means a person and dashed the agent; name tags carry the name; the agent

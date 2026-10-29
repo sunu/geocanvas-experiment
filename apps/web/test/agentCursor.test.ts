@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OplogEntry } from '@ttx/core'
-import { agentStep, AgentCursors, askStep, DWELL_MS, hoverOffset, IDLE_MS, MAX_WAIT_MS, MIN_BUSY_MS, TRAVEL_MS, type AgentStep } from '../src/canvas/agentCursor'
+import { agentStep, AgentCursors, askStep, busyText, DWELL_MS, hoverOffset, IDLE_MS, MAX_WAIT_MS, MIN_BUSY_MS, TRAVEL_MS, type AgentStep } from '../src/canvas/agentCursor'
 
 const agent = { kind: 'agent' as const, id: 'agent', name: 'Agent', color: '#8e51ff', onBehalfOf: 'p1' }
 const rects: Record<string, { x: number; y: number; w: number; h: number }> = {
@@ -16,13 +16,13 @@ function entry(over: Partial<Extract<OplogEntry, { kind: 'invocation' }>> = {}):
 const step = (x: number, y: number, created: string[] = [], ids = created, label?: string): AgentStep => ({ key: 'agent:p1', name: 'Agent', color: '#8e51ff', point: { x, y }, created, ids, ...(label && { label }) })
 
 describe('agentStep', () => {
-  it('points at the middle of what an agent added', () => {
-    expect(agentStep(entry({ created: ['a'] }), rectOf, () => 'Add sticky note')).toMatchObject({ key: 'agent:p1', point: { x: 50, y: 50 }, created: ['a'], ids: ['a'], label: 'Add sticky note' })
+  it('points near the bottom-right corner of what an agent added', () => {
+    expect(agentStep(entry({ created: ['a'] }), rectOf, () => 'Generating sticky note…')).toMatchObject({ key: 'agent:p1', point: { x: 75, y: 75 }, created: ['a'], ids: ['a'], label: 'Generating sticky note…' })
   })
 
   it('points at the objects it changed when it added none', () => {
     const s = agentStep(entry({ opId: 'core.object.move', target: { kind: 'objects', ids: ['a', 'b'] } }), rectOf)
-    expect(s).toMatchObject({ point: { x: 150, y: 50 }, created: [], ids: ['a', 'b'] })
+    expect(s).toMatchObject({ point: { x: 252, y: 75 }, created: [], ids: ['a', 'b'] })
   })
 
   it('gives nothing for people, failed calls, or objects that are gone', () => {
@@ -34,6 +34,15 @@ describe('agentStep', () => {
   })
 })
 
+describe('busyText', () => {
+  it('says what the agent generates for an add, else the op', () => {
+    expect(busyText('Add map', 'Map')).toBe('Generating map…')
+    expect(busyText('Add sticky note', 'Sticky note')).toBe('Generating sticky note…')
+    expect(busyText('Add ReliefWeb updates', 'ReliefWeb updates')).toBe('Generating ReliefWeb updates…')
+    expect(busyText('Add data layer')).toBe('Add data layer…')
+  })
+})
+
 describe('askStep', () => {
   it("starts the agent's cursor for the asker, in the middle of their view", () => {
     const message = { kind: 'user' as const, id: 'm', actor: { kind: 'user' as const, id: 'p1' }, text: 'hi', selection: [], center: { x: 10, y: 20 }, at: 0 }
@@ -41,6 +50,8 @@ describe('askStep', () => {
     expect(askStep({ ...message, center: undefined })).toBeUndefined()
   })
 })
+
+const busyIds = (c: AgentCursors, t: number) => new Set(c.busy(t).keys())
 
 describe('AgentCursors', () => {
   /** Cursors that see these ids as loading. */
@@ -66,7 +77,7 @@ describe('AgentCursors', () => {
     expect(c.arriving(0)).toEqual(new Set(['a', 'b']))
     // The second move waits for the first to arrive and place its object: 'a' is busy for MIN_BUSY_MS.
     expect(c.at(TRAVEL_MS + MIN_BUSY_MS - 1)[0]).toMatchObject({ x: 100 })
-    expect(c.busy(TRAVEL_MS + MIN_BUSY_MS - 1)).toEqual(new Set(['a']))
+    expect(busyIds(c, TRAVEL_MS + MIN_BUSY_MS - 1)).toEqual(new Set(['a']))
     expect(c.arriving(TRAVEL_MS)).toEqual(new Set(['b']))
     const bArrives = 2 * TRAVEL_MS + MIN_BUSY_MS
     expect(c.at(bArrives)[0]).toMatchObject({ x: 500 })
@@ -84,7 +95,7 @@ describe('AgentCursors', () => {
     const { c, loading } = withLoading('a')
     c.add(step(100, 0, ['a'], ['a'], 'Add data layer'), 0)
     c.add(step(500, 0, ['b']), 0)
-    expect(c.at(2000)[0]).toMatchObject({ x: 100, label: 'Add data layer' })
+    expect(c.at(2000)[0]).toMatchObject({ x: 100, placing: true })
     expect(c.arriving(2000)).toEqual(new Set(['b']))
     loading.delete('a')
     // It leaves when it sees the data in.
@@ -95,9 +106,23 @@ describe('AgentCursors', () => {
 
   it('does not wait for loading when the next step is on the same object', () => {
     const { c } = withLoading('m')
-    c.add(step(100, 0, ['m'], ['m'], 'Add map'), 0)
-    c.add(step(100, 0, [], ['m'], 'Add data layer'), 0)
-    expect(c.at(TRAVEL_MS + DWELL_MS + 1)[0]!.label).toBe('Add data layer')
+    c.add(step(100, 0, ['m'], ['m'], 'Generating map…'), 0)
+    c.add(step(100, 0, [], ['m'], 'Add data layer…'), 0)
+    expect(c.busy(TRAVEL_MS).get('m')).toBe('Generating map…')
+    expect(c.busy(TRAVEL_MS + DWELL_MS + TRAVEL_MS).get('m')).toBe('Add data layer…')
+  })
+
+  it('glides to a step that comes in after a pause, from where it waited, and places it', () => {
+    const c = new AgentCursors()
+    c.add(step(100, 0, ['a']), 0)
+    const working = new Set(['agent:p1'])
+    // The model thinks for 5 s; the cursor waits at 'a'.
+    expect(c.at(5000, working)[0]).toMatchObject({ x: 100 })
+    c.add(step(500, 0, ['b']), 5000)
+    expect(c.arriving(5000)).toEqual(new Set(['b']))
+    expect(c.at(5000 + TRAVEL_MS / 2, working)[0]!.x).toBeGreaterThan(100)
+    expect(c.at(5000 + TRAVEL_MS / 2, working)[0]!.x).toBeLessThan(500)
+    expect(busyIds(c, 5000 + TRAVEL_MS)).toEqual(new Set(['b']))
   })
 
   it(`moves on after ${MAX_WAIT_MS} ms if the data is still loading`, () => {
@@ -146,12 +171,14 @@ describe('AgentCursors', () => {
     expect(c.at(later + IDLE_MS)).toEqual([])
   })
 
-  it('tags the cursor with the op while it moves there and places it, then lets presence say what it does', () => {
+  it('is placing while at its busy objects, which say what it does; then its tag can say it', () => {
     const c = new AgentCursors()
-    c.add(step(100, 0, ['a'], ['a'], 'Add map'), 0)
-    expect(c.at(TRAVEL_MS / 2)[0]!.label).toBe('Add map')
-    expect(c.at(TRAVEL_MS + MIN_BUSY_MS - 1)[0]!.label).toBe('Add map')
-    expect(c.at(TRAVEL_MS + MIN_BUSY_MS)[0]!.label).toBeUndefined()
+    c.add(step(100, 0, ['a'], ['a'], 'Generating map…'), 0)
+    expect(c.at(TRAVEL_MS / 2)[0]!.placing).toBe(false)
+    expect(c.at(TRAVEL_MS)[0]!.placing).toBe(true)
+    expect(c.busy(TRAVEL_MS)).toEqual(new Map([['a', 'Generating map…']]))
+    expect(c.at(TRAVEL_MS + MIN_BUSY_MS - 1)[0]!.placing).toBe(true)
+    expect(c.at(TRAVEL_MS + MIN_BUSY_MS)[0]!.placing).toBe(false)
   })
 
   it('keeps an object busy a moment once the cursor is there, and while it loads', () => {
@@ -159,18 +186,18 @@ describe('AgentCursors', () => {
     c.add(step(100, 0, ['a']), 0)
     c.add(step(500, 0, [], ['b']), 0)
     // Nothing is busy before its cursor arrives.
-    expect(c.busy(TRAVEL_MS - 1)).toEqual(new Set())
-    expect(c.busy(TRAVEL_MS)).toEqual(new Set(['a']))
+    expect(busyIds(c, TRAVEL_MS - 1)).toEqual(new Set())
+    expect(busyIds(c, TRAVEL_MS)).toEqual(new Set(['a']))
     // The cursor leaves 'a' as its busy minimum ends.
     const bArrives = 2 * TRAVEL_MS + MIN_BUSY_MS
-    expect(c.busy(bArrives)).toEqual(new Set(['b']))
+    expect(busyIds(c, bArrives)).toEqual(new Set(['b']))
     // 'b' stays busy while it loads.
-    expect(c.busy(bArrives + MIN_BUSY_MS)).toEqual(new Set(['b']))
+    expect(busyIds(c, bArrives + MIN_BUSY_MS)).toEqual(new Set(['b']))
     loading.delete('b')
-    expect(c.busy(bArrives + MIN_BUSY_MS)).toEqual(new Set())
+    expect(busyIds(c, bArrives + MIN_BUSY_MS)).toEqual(new Set())
     // Forgotten once done: loading later, not caused by the agent, does not show it busy again.
     loading.add('b')
-    expect(c.busy(bArrives + MIN_BUSY_MS + 1)).toEqual(new Set())
+    expect(busyIds(c, bArrives + MIN_BUSY_MS + 1)).toEqual(new Set())
   })
 })
 

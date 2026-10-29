@@ -614,7 +614,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
               editing={o.id === editingId}
               selected={selected.has(o.id)}
               arriving={agentCursors.arriving.has(o.id)}
-              busy={agentCursors.busy.has(o.id)}
+              busy={agentCursors.busy.get(o.id)}
               onDone={() => setEditing(null)}
               onFocus={isFocusable(objectUI(o.type)) ? () => enterFocus(o.id) : undefined}
             />

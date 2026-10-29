@@ -15,8 +15,8 @@ interface Props {
   selected?: boolean
   /** Added by an agent whose cursor has not got here yet (canvas/agentCursor.ts): not drawn until it does. */
   arriving?: boolean
-  /** An agent is working on it, or on its data (canvas/agentCursor.ts): faded, with a spinner. */
-  busy?: boolean
+  /** An agent is working on it, or on its data (canvas/agentCursor.ts): a placeholder card that says what it does. */
+  busy?: string
   /** The object is done editing, e.g. an event was picked. */
   onDone(): void
   /** In focus mode: drawn at `rect`, a local size that is never stored, so it lays out for the whole screen. */
@@ -39,7 +39,7 @@ export function ObjectView({ runtime, object: o, layer, editing, selected, arriv
   return (
     <div
       data-id={o.id}
-      className={`ttx-obj ttx-obj--${o.type} ${editing ? 'is-editing' : ''} ${selected ? 'is-selected' : ''} ${focused ? 'is-focused' : ''} ${arriving ? 'is-arriving' : ''} ${busy ? 'is-busy' : ''}`}
+      className={`ttx-obj ttx-obj--${o.type} ${editing ? 'is-editing' : ''} ${selected ? 'is-selected' : ''} ${focused ? 'is-focused' : ''} ${arriving ? 'is-arriving' : ''}`}
       style={{ left: r.x, top: r.y, width: r.w, height: r.h, zIndex: layer, ...ui?.frameStyle?.(o) }}
     >
       {/* The name above the object, outside its box; its views fill it through ObjectHeader. */}
@@ -56,6 +56,14 @@ export function ObjectView({ runtime, object: o, layer, editing, selected, arriv
             </ObjectNameContext.Provider>
           </ObjectLabelSlot.Provider>
         )
+      )}
+      {busy !== undefined && (
+        <div className="ttx-obj__busy" role="status">
+          <div className="ttx-obj__busy-label">
+            <span className="ttx-obj__busy-ring" aria-hidden />
+            {busy}
+          </div>
+        </div>
       )}
     </div>
   )

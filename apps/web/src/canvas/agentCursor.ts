@@ -13,10 +13,11 @@ import { isLoading, subscribeLoading } from './loading'
  * one through MCP), so each gets a cursor. The objects an agent adds are drawn only once its cursor reaches them,
  * as if it put them there; only the drawing waits, the board has them at once.
  *
- * A cursor appears when someone asks the agent, in the middle of their view, and stays while the agent works. Its
- * tag says what the agent does: the op it is doing there, else what its presence says (thinking, a search). An
- * object it worked on is busy (faded, with a spinner) for a moment, and for as long as its data is loading; the cursor
- * stays there while it is busy (at most MAX_WAIT_MS) before it moves on, and hovers all the time, moving or not.
+ * A cursor appears when someone asks the agent, in the middle of their view, and stays while the agent works. An
+ * object it works on is busy for a moment, and for as long as its data is loading: a placeholder card that says what
+ * the agent does there ("Generating map…"), with the cursor at its bottom-right corner, which stays while it is busy
+ * (at most MAX_WAIT_MS) before it moves on. Elsewhere its tag says what its presence says (thinking, a search). It
+ * hovers all the time, moving or not.
  */
 
 export interface Point {
@@ -35,7 +36,7 @@ export interface AgentStep {
   created: string[]
   /** The objects it worked on, busy once the cursor arrives. */
   ids: string[]
-  /** The op's title, for the cursor's tag. */
+  /** What the busy objects say the agent does there (busyText). */
   label?: string
 }
 
@@ -48,8 +49,8 @@ export interface AgentCursor extends Point {
   opacity: number
   /** How long it has been shown (ms), for its hover (hoverOffset), moving or not. Absent with reduced motion. */
   floating?: number
-  /** The op it is doing, while it moves there, stays, and waits for that object's data. */
-  label?: string
+  /** At objects it is placing, while they are busy: they say what it does, so its tag does not. */
+  placing: boolean
 }
 
 /** The agent's color (--agent) for an agent that has none. */
@@ -77,19 +78,35 @@ export const STALE_MS = 15_000
 /** An object the agent worked on is busy at least this long, even when it loads nothing. */
 export const MIN_BUSY_MS = 800
 
-/** Where an applied agent entry worked: the objects it added, else the ones it changed. Others give nothing. */
-export function agentStep(entry: OplogEntry, rectOf: (id: string) => Rect | undefined, titleOf: (opId: string) => string | undefined = () => undefined): AgentStep | undefined {
+/** How far inside an object's bottom-right corner the cursor points while it places it (canvas units). */
+const CORNER_X = 48
+const CORNER_Y = 36
+
+/**
+ * What a busy object says the agent does: for an add, "Generating" and the type ("Generating map…"; a title with
+ * capitals inside, such as "ReliefWeb updates", keeps them), else the op's title ("Add data layer…").
+ */
+export function busyText(opTitle: string, addedType?: string): string {
+  if (!addedType) return `${opTitle}…`
+  return `Generating ${/[A-Z]/.test(addedType.slice(1)) ? addedType : addedType.toLowerCase()}…`
+}
+
+/**
+ * Where an applied agent entry worked: the objects it added, else the ones it changed, with the cursor near their
+ * bottom-right corner. `labelOf` gives what they say while busy (busyText). Other entries give nothing.
+ */
+export function agentStep(entry: OplogEntry, rectOf: (id: string) => Rect | undefined, labelOf: (entry: Extract<OplogEntry, { kind: 'invocation' }>) => string | undefined = () => undefined): AgentStep | undefined {
   if (entry.kind !== 'invocation' || entry.actor.kind !== 'agent' || entry.status !== 'applied') return undefined
   const created = entry.created ?? []
   const ids = (created.length ? created : entry.target.kind === 'objects' ? entry.target.ids : []).filter((id) => rectOf(id))
   const r = bounds(ids.map((id) => rectOf(id)!))
   if (!r) return undefined
-  const label = titleOf(entry.opId)
+  const label = labelOf(entry)
   return {
     key: agentKey(entry.actor.id, entry.actor.onBehalfOf),
     name: entry.actor.name ?? 'Agent',
     color: entry.actor.color ?? AGENT_COLOR,
-    point: { x: r.x + r.w / 2, y: r.y + r.h / 2 },
+    point: { x: r.x + r.w - Math.min(CORNER_X, r.w / 4), y: r.y + r.h - Math.min(CORNER_Y, r.h / 4) },
     created,
     ids,
     ...(label && { label }),
@@ -104,6 +121,8 @@ export function askStep(entry: ChatEntry): AgentStep | undefined {
 
 interface Move {
   to: Point
+  /** When the step came in: the move never starts before, or the cursor would jump to where it should be by now. */
+  queued: number
   created: string[]
   ids: string[]
   label?: string
@@ -137,8 +156,8 @@ const started = (m: Move): m is Started => m.start !== undefined
 /** Every agent's cursor: steps go in as the op log grows, positions come out for any moment. Times are ms. */
 export class AgentCursors {
   private tracks = new Map<string, Track>()
-  /** Objects the agent worked on, with when its cursor got there. */
-  private worked = new Map<string, number>()
+  /** Objects the agent worked on, with when its cursor got there and what they say. */
+  private worked = new Map<string, { from: number; label: string }>()
   private reduced: boolean
   private loading: (id: string) => boolean
 
@@ -153,7 +172,7 @@ export class AgentCursors {
 
   add(step: AgentStep, now: number) {
     this.advance(now)
-    const move: Move = { to: step.point, created: step.created, ids: step.ids, ...(step.label && { label: step.label }) }
+    const move: Move = { to: step.point, queued: now, created: step.created, ids: step.ids, ...(step.label && { label: step.label }) }
     const track = this.tracks.get(step.key)
     if (track && now < hideAt(track)) {
       track.moves.push(move)
@@ -185,8 +204,9 @@ export class AgentCursors {
           prev.held = true
           break
         }
-        // A cursor that waited for loading leaves when it saw it end; one that did not, right after its dwell.
-        const start = prev.held ? Math.min(t, giveUp) : ready
+        // A cursor that waited for loading leaves when it saw it end; one that did not, right after its stay. Never
+        // before the step came in: after a pause (the model thinking), it glides from where it waited.
+        const start = Math.max(next.queued, prev.held ? Math.min(t, giveUp) : ready)
         const behind = track.moves.length - i - 1
         this.begin(track.moves[i]!, prev.to, start, this.reduced ? 0 : behind >= BACKLOG_MOVES ? QUICK_TRAVEL_MS : TRAVEL_MS)
       }
@@ -198,7 +218,7 @@ export class AgentCursors {
 
   private begin(move: Move, from: Point, start: number, travel: number) {
     Object.assign(move, { from, start, arrive: start + travel })
-    for (const id of move.ids) this.worked.set(id, start + travel)
+    for (const id of move.ids) this.worked.set(id, { from: start + travel, label: move.label ?? '' })
   }
 
   /** The cursors shown at `t`. Those in `working` (agents at work, by key) stay, however long since their last step. */
@@ -216,8 +236,8 @@ export class AgentCursors {
       const move = moves[0] as Started
       const k = t >= move.arrive ? 1 : ease(Math.max(0, (t - move.start) / (move.arrive - move.start)))
       const opacity = this.reduced ? 1 : Math.max(0, Math.min(1, (t - shown) / FADE_MS, (end - t) / FADE_MS))
-      // The op it did there, while it moves there and stays, and while that object's data loads.
-      const doing = move.label && (t < move.arrive + this.stay(move) || move.ids.some(this.loading)) ? move.label : undefined
+      // At its objects while they are busy, which say what it does there.
+      const placing = move.ids.length > 0 && t >= move.arrive && (t < move.arrive + this.stay(move) || move.ids.some(this.loading))
       cursors.push({
         key,
         name,
@@ -226,7 +246,7 @@ export class AgentCursors {
         y: move.from.y + (move.to.y - move.from.y) * k,
         opacity,
         ...(!this.reduced && { floating: t - shown }),
-        ...(doing && { label: doing }),
+        placing,
       })
     }
     return cursors
@@ -249,15 +269,15 @@ export class AgentCursors {
    * The objects busy at `t`: the cursor has got to them, and it was a moment ago or they are still loading. Once one
    * is not busy it is forgotten, so loading the agent did not cause (a person's later change) shows nothing.
    */
-  busy(t: number): Set<string> {
+  busy(t: number): Map<string, string> {
     this.advance(t)
-    const ids = new Set<string>()
-    for (const [id, from] of this.worked) {
+    const busy = new Map<string, string>()
+    for (const [id, { from, label }] of this.worked) {
       if (from > t) continue
-      if (t < from + MIN_BUSY_MS || this.loading(id)) ids.add(id)
+      if (t < from + MIN_BUSY_MS || this.loading(id)) busy.set(id, label)
       else this.worked.delete(id)
     }
-    return ids
+    return busy
   }
 
   /**
@@ -268,7 +288,7 @@ export class AgentCursors {
     this.advance(t)
     const times = [
       ...[...this.tracks.values()].flatMap((tr) => tr.moves.filter(started).flatMap((m) => [m.arrive, m.arrive + DWELL_MS, m.arrive + this.stay(m), m.arrive + MAX_WAIT_MS])),
-      ...[...this.worked.values()].flatMap((from) => [from, from + MIN_BUSY_MS]),
+      ...[...this.worked.values()].flatMap(({ from }) => [from, from + MIN_BUSY_MS]),
     ].filter((a) => a > t)
     return times.length ? Math.min(...times) : undefined
   }
@@ -295,19 +315,21 @@ const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
 const NONE = new Set<string>()
 
 const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((id) => b.has(id))
+const sameMap = (a: Map<string, string>, b: Map<string, string>) => a.size === b.size && [...a].every(([id, v]) => b.get(id) === v)
+const NOT_BUSY = new Map<string, string>()
 
 /**
  * The agents' cursors on this board, the added objects not to draw yet, and the objects busy. Only entries the op
  * log and the chat gain from now on count, never the history they load with. `version` changes with every step, to
  * restart the cursors' animation.
  */
-export function useAgentCursors(runtime: Runtime, chat: Chat): { cursors: AgentCursors; version: number; arriving: Set<string>; busy: Set<string> } {
+export function useAgentCursors(runtime: Runtime, chat: Chat): { cursors: AgentCursors; version: number; arriving: Set<string>; busy: Map<string, string> } {
   const [cursors] = useState(
     () => new AgentCursors({ reduced: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches, loading: isLoading }),
   )
   const [version, setVersion] = useState(0)
   const [arriving, setArriving] = useState(NONE)
-  const [busy, setBusy] = useState(NONE)
+  const [busy, setBusy] = useState(NOT_BUSY)
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
     // What to hold back and what is busy change only at a few moments, so the canvas renders then, not every frame.
@@ -317,7 +339,7 @@ export function useAgentCursors(runtime: Runtime, chat: Chat): { cursors: AgentC
       const held = cursors.arriving(now)
       const working = cursors.busy(now)
       setArriving((prev) => (sameSet(prev, held) ? prev : held.size ? held : NONE))
-      setBusy((prev) => (sameSet(prev, working) ? prev : working.size ? working : NONE))
+      setBusy((prev) => (sameMap(prev, working) ? prev : working.size ? working : NOT_BUSY))
       const next = cursors.nextChange(now)
       if (next !== undefined) timer = setTimeout(sync, next - now + 10)
     }
@@ -331,8 +353,12 @@ export function useAgentCursors(runtime: Runtime, chat: Chat): { cursors: AgentC
     }
     const inserted = <T extends { at: number }>(event: Y.YArrayEvent<T>) =>
       event.changes.delta.flatMap((change) => (change.insert ?? []) as T[]).filter((e) => Date.now() - e.at <= STALE_MS)
+    const labelOf = (e: Extract<OplogEntry, { kind: 'invocation' }>) => {
+      const added = e.created?.[0] && runtime.board.get(e.created[0])
+      return busyText(runtime.registry.op(e.opId)?.title ?? e.opId, added ? runtime.registry.objectType(added.type)?.title : undefined)
+    }
     const onLog = (event: Y.YArrayEvent<OplogEntry>) =>
-      take(inserted(event).map((e) => agentStep(e, (id) => runtime.board.get(id), (opId) => runtime.registry.op(opId)?.title)))
+      take(inserted(event).map((e) => agentStep(e, (id) => runtime.board.get(id), labelOf)))
     const onChat = (event: Y.YArrayEvent<ChatEntry>) => take(inserted(event).map(askStep))
     runtime.oplog.observe(onLog)
     chat.entries.observe(onChat)
