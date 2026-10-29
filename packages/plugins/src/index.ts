@@ -4,7 +4,7 @@ export { boardGet, eventsSearch } from './agentTools.js'
 export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, type EventBoardObject } from './events.js'
 export { imagesPlugin, type ImageBoardObject } from './images.js'
 export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
-export { mapPlugin, BASEMAPS, type Basemap, type MapArea, type MapBoardObject } from './map.js'
+export { mapPlugin, BASEMAPS, UPLOAD_FEATURES_TOOL, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
 export { CHOROPLETH_TOOL, choroplethLayer, hapiPlugin, INDICATORS, type Indicator, type ConflictBoardObject, type CountryBoardObject, type PresenceBoardObject } from './hapi.js'
 export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } from './reliefweb.js'
@@ -46,6 +46,20 @@ export {
   type ShapeColor,
   type ShapePart,
 } from './mapAnnotations.js'
+export {
+  closureGeometry,
+  mapScenario,
+  MAX_ROUTE_KM,
+  nextRouteColor,
+  ROUTE_COLORS,
+  ROUTE_PROFILES,
+  type ClosureGeometry,
+  type MapScenario,
+  type RouteColor,
+  type RouteProfile,
+  type ScenarioClosure,
+  type ScenarioRoute,
+} from './mapScenario.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
 export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
 export { agentTools, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn } from './agent/loop.js'

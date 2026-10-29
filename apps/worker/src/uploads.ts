@@ -14,8 +14,9 @@ import { MAX_UPLOAD_BYTES, UPLOAD_ID, UPLOAD_TYPES, type Upload } from '@ttx/cor
  * accounts; then an account id the Worker checks). Access rules can be added to GET without changing links.
  *
  * The file's type is read from its first bytes, not from the request: media (PNG, JPEG, GIF, WebP, at most
- * 10 MB) and documents (PDF, at most 25 MB). Never SVG or HTML: served from the board's origin, they could
- * run scripts there.
+ * 10 MB), documents (PDF, at most 25 MB) and data (GeoJSON, at most 20 MB, served as application/geo+json and
+ * sandboxed like every type but PDF). Never SVG or HTML: served from the board's origin, they could run scripts
+ * there.
  */
 
 /** The largest file of any kind: a larger request is refused before it is read. */
@@ -27,7 +28,7 @@ export async function storeUpload(request: Request, bucket: R2Bucket, room: stri
   if (Number(request.headers.get('content-length')) > MAX_BYTES) return tooLarge(MAX_BYTES)
   const bytes = new Uint8Array(await request.arrayBuffer())
   const contentType = fileType(bytes)
-  if (!contentType) return json(415, { error: 'Not a PNG, JPEG, GIF or WebP image, or a PDF' })
+  if (!contentType) return json(415, { error: 'Not a PNG, JPEG, GIF or WebP image, a PDF or a GeoJSON file' })
   const kind = UPLOAD_TYPES[contentType]!
   if (bytes.byteLength > MAX_UPLOAD_BYTES[kind]) return tooLarge(MAX_UPLOAD_BYTES[kind])
 
@@ -76,7 +77,22 @@ function fileType(b: Uint8Array): string | undefined {
   if (starts(ascii('GIF87a')) || starts(ascii('GIF89a'))) return 'image/gif'
   if (starts(ascii('RIFF')) && starts(ascii('WEBP'), 8)) return 'image/webp'
   if (starts(ascii('%PDF-'))) return 'application/pdf'
+  if (isGeoJson(b)) return 'application/geo+json'
   return undefined
+}
+
+/** The part of a file read to recognize GeoJSON: parsing a whole 20 MB file would cost more CPU than a request has. */
+const GEOJSON_HEAD = 4096
+
+/**
+ * GeoJSON by its start: a JSON object (after a byte order mark and white space) whose first part names a GeoJSON
+ * member. Writers put "type" first or last, so the members that hold the data count too.
+ */
+function isGeoJson(b: Uint8Array): boolean {
+  const head = new TextDecoder().decode(b.subarray(0, GEOJSON_HEAD)).replace(/^\uFEFF/, '').trimStart()
+  if (!head.startsWith('{')) return false
+  return /"type"\s*:\s*"(FeatureCollection|Feature|Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection)"/.test(head) ||
+    /"(features|geometry|coordinates)"\s*:/.test(head)
 }
 
 export function json(status: number, body: unknown): Response {

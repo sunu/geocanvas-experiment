@@ -5,10 +5,19 @@ export const typesOf = (kind: UploadKind) => Object.keys(UPLOAD_TYPES).filter((t
 
 export const maxMb = (kind: UploadKind) => MAX_UPLOAD_BYTES[kind] / 1024 / 1024
 
+/**
+ * The type a file is uploaded as. Browsers give GeoJSON files no type or application/json, so a .geojson or .json
+ * name counts as GeoJSON; the room checks the bytes either way (apps/worker/src/uploads.ts).
+ */
+export const uploadType = (file: File) => (UPLOAD_TYPES[file.type] || !/\.(geo)?json$/i.test(file.name) ? file.type : 'application/geo+json')
+
+/** The kind of a file (media, document, data), or undefined when the board does not keep its type. */
+export const kindOf = (file: File): UploadKind | undefined => UPLOAD_TYPES[uploadType(file)]
+
 /** Why a file cannot be uploaded (its type or size), checked before sending it; undefined if it can. */
 export function refusal(file: File): string | undefined {
-  const kind = UPLOAD_TYPES[file.type]
-  if (!kind) return 'Only PNG, JPEG, GIF and WebP images and PDFs can be added'
+  const kind = kindOf(file)
+  if (!kind) return 'Only PNG, JPEG, GIF and WebP images, PDFs and GeoJSON files can be added'
   if (file.size > MAX_UPLOAD_BYTES[kind]) return `This file can be at most ${maxMb(kind)} MB; it is ${(file.size / 1024 / 1024).toFixed(1)} MB`
   return undefined
 }
@@ -24,7 +33,7 @@ export function uploadFile(file: File, room: string, person: string, onProgress?
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `/uploads?${new URLSearchParams({ room, name: file.name })}`)
-    xhr.setRequestHeader('content-type', file.type)
+    xhr.setRequestHeader('content-type', uploadType(file))
     xhr.setRequestHeader('x-ttx-person', person)
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total)
     xhr.onload = () => {

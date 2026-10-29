@@ -2399,6 +2399,107 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   white-space: nowrap;
 }
 
+/* An end of a route, A or B, in its route's color (routing/RouteMarkers.tsx). z-index 3: above deck.gl's canvas (2). */
+.ttx-routeend {
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 0;
+  color: #fff;
+  font: 600 11px/1 var(--font-sans, system-ui), sans-serif;
+}
+
+.ttx-routeend.is-draggable {
+  cursor: grab;
+}
+
+/* The scenario toolbar's separator before Import (routing/ScenarioToolbar.tsx), and a hint that is an error. */
+.ttx-map__toolsep {
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 2px;
+  background: var(--ttx-border);
+}
+
+.ttx-map__toolhint.is-error {
+  color: #dc2626;
+}
+
+/*
+ * The scenario's routes on the map (routing/RouteLegend.tsx), top left. On the canvas, so square and flat: a border,
+ * no shadow. Above deck.gl's canvas (2); not in the way of the pointer.
+ */
+.ttx-routelegend {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: calc(100% - 16px);
+  margin: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font-size: 11px;
+  list-style: none;
+  pointer-events: none;
+}
+
+.ttx-routelegend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ttx-routelegend i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+}
+
+.ttx-routelegend__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttx-routelegend__time {
+  flex: none;
+  color: var(--ttx-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ttx-routelegend__extra {
+  flex: none;
+  color: #dc2626;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A GeoJSON file dragged over a map in Scenario mode (routing/ScenarioOnMap.tsx). */
+.ttx-map__dropnote {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  border: 2px dashed var(--ttx-accent);
+  background: rgb(255 255 255 / 0.6);
+  color: var(--ttx-ink);
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* A choropleth's classes in the map's layer list. */
 .ttx-layers__legend {
   display: flex;

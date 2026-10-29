@@ -358,8 +358,11 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
     const onKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
       if (focus) {
-        // In focus only Esc (leave) and undo, on the draft. The exit dialog handles its own Esc.
-        if (e.key === 'Escape') requestExit()
+        // In focus only Esc (leave) and undo, on the draft. The exit dialog handles its own Esc. An Esc that closed
+        // something else first (a select or menu in the Options panel: Radix prevents its default) does not leave.
+        if (e.key === 'Escape') {
+          if (!e.defaultPrevented) requestExit()
+        }
         else if (mod && e.key.toLowerCase() === 'z' && !(e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')) {
           e.preventDefault()
           if (e.shiftKey) focus.draft.runtime.redo()

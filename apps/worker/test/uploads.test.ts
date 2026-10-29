@@ -42,6 +42,19 @@ describe('uploads', () => {
     expect(await storeUpload(post(pdf), bucket, 'abc123')).toMatchObject({ kind: 'document', contentType: 'application/pdf' })
   })
 
+  it('keeps GeoJSON as data, served as GeoJSON and sandboxed, by its content not its name', async () => {
+    const { bucket } = fakeBucket()
+    const flood = '\uFEFF\n  {"features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[0,0],[1,0],[1,1],[0,0]]]}}], "type": "FeatureCollection"}'
+    const upload = (await storeUpload(post(flood, { 'content-type': 'text/plain' }), bucket, 'abc123')) as Upload
+    expect(upload).toMatchObject({ kind: 'data', contentType: 'application/geo+json' })
+    const got = await serveUpload(new Request(`https://board.example/uploads/${upload.id}`), bucket)
+    expect(got.headers.get('content-type')).toBe('application/geo+json')
+    expect(got.headers.get('content-security-policy')).toContain('sandbox')
+    // Other JSON, and HTML named .geojson, are not GeoJSON.
+    expect(((await storeUpload(post('{"name": "settings"}'), bucket, 'abc123')) as Response).status).toBe(415)
+    expect(((await storeUpload(post('<html><script>alert(1)</script>"features":</html>'), bucket, 'abc123')) as Response).status).toBe(415)
+  })
+
   it('refuses files that are too large for their kind or not a kept type, and ids it did not make', async () => {
     const { bucket, stored } = fakeBucket()
     const big = new Uint8Array(MAX_UPLOAD_BYTES.media + 1)

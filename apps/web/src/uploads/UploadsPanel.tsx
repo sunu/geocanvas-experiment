@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react'
-import { ArrowSquareOutIcon, FilePdfIcon, FolderOpenIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, FilePdfIcon, FolderOpenIcon, MapTrifoldIcon, PlusIcon, XIcon, type Icon } from '@phosphor-icons/react'
 import { uploadUrl, type Runtime, type Upload, type Uploads, type UploadKind } from '@ttx/core'
 import { CopyLinkButton } from './CopyLinkButton'
 import { placeUpload } from './drop'
@@ -8,6 +8,7 @@ import { fileLink } from './upload'
 const TABS: { kind: UploadKind; label: string; empty: string }[] = [
   { kind: 'media', label: 'Media', empty: 'Images uploaded to this board show here, also after they are deleted from it.' },
   { kind: 'document', label: 'Documents', empty: 'PDFs dropped on this board show here, also after they are deleted from it.' },
+  { kind: 'data', label: 'Data', empty: 'GeoJSON files dropped on this board or imported into a map show here.' },
 ]
 
 /**
@@ -40,7 +41,7 @@ export function UploadsPanel({ runtime, uploads, onClose }: { runtime: Runtime; 
       </div>
       <div className={`ttx-uploads__list ttx-uploads__list--${tab}`}>
         {!shown.length && <p className="ttx-chat__empty">{TABS.find((t) => t.kind === tab)!.empty}</p>}
-        {shown.map((u) => (tab === 'media' ? <MediaItem key={u.id} upload={u} onAdd={(picture) => addToBoard(u, picture)} /> : <DocumentItem key={u.id} upload={u} onAdd={() => addToBoard(u)} />))}
+        {shown.map((u) => (tab === 'media' ? <MediaItem key={u.id} upload={u} onAdd={(picture) => addToBoard(u, picture)} /> : <FileItem key={u.id} upload={u} onAdd={() => addToBoard(u)} />))}
       </div>
     </aside>
   )
@@ -72,16 +73,21 @@ function MediaItem({ upload, onAdd }: { upload: Upload; onAdd(picture?: { w: num
   )
 }
 
-function DocumentItem({ upload, onAdd }: { upload: Upload; onAdd(): void }) {
+/** A file's icon by kind: a PDF, or data that goes on a map. */
+const FILE_ICON: Partial<Record<UploadKind, Icon>> = { document: FilePdfIcon, data: MapTrifoldIcon }
+
+function FileItem({ upload, onAdd }: { upload: Upload; onAdd(): void }) {
+  const FileIcon = FILE_ICON[upload.kind] ?? FilePdfIcon
+  const add = upload.kind === 'data' ? 'Add to the board on a new map' : 'Add to the board'
   return (
     <div className="ttx-uploads__doc">
-      <FilePdfIcon size={16} aria-hidden />
+      <FileIcon size={16} aria-hidden />
       <span className="ttx-uploads__name" title={upload.name}>
         {upload.name}
       </span>
       <span className="ttx-uploads__meta">{formatSize(upload.size)}</span>
       <span className="ttx-uploads__actions">
-        <button type="button" onClick={onAdd} title="Add to the board" aria-label="Add to the board">
+        <button type="button" onClick={onAdd} title={add} aria-label={add}>
           <PlusIcon size={14} />
         </button>
         <Links upload={upload} />

@@ -10,8 +10,11 @@ import * as Y from 'yjs'
  * stay the same when uploads later belong to accounts.
  */
 
-/** Media is shown on the board (images); documents are files such as PDF (and later GeoParquet). */
-export type UploadKind = 'media' | 'document'
+/**
+ * Media is shown on the board (images); documents are files such as PDF; data is read onto maps (GeoJSON, e.g. a
+ * flood extent; later GeoParquet).
+ */
+export type UploadKind = 'media' | 'document' | 'data'
 
 export interface Upload {
   id: string
@@ -33,10 +36,11 @@ export const UPLOAD_TYPES: Readonly<Record<string, UploadKind>> = {
   'image/gif': 'media',
   'image/webp': 'media',
   'application/pdf': 'document',
+  'application/geo+json': 'data',
 }
 
 /** The largest file of each kind the room stores. Browsers check it too, before uploading. */
-export const MAX_UPLOAD_BYTES: Readonly<Record<UploadKind, number>> = { media: 10 * 1024 * 1024, document: 25 * 1024 * 1024 }
+export const MAX_UPLOAD_BYTES: Readonly<Record<UploadKind, number>> = { media: 10 * 1024 * 1024, document: 25 * 1024 * 1024, data: 20 * 1024 * 1024 }
 
 /** Ids are random UUIDs made by the room: unguessable, so a link is the only way to a file. */
 export const UPLOAD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
