@@ -69,7 +69,7 @@ export function App() {
   const [uploadsOpen, setUploadsOpen] = useState(false)
   return (
     <>
-      <Canvas runtime={runtime} awareness={provider.awareness} onUploads={() => setUploadsOpen(true)} />
+      <Canvas runtime={runtime} chat={chat} awareness={provider.awareness} onUploads={() => setUploadsOpen(true)} />
       <TitleBar runtime={runtime} />
       <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} />
       {/* The open gallery takes the user menu's corner and has its own close button. */}
