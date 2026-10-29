@@ -56,14 +56,14 @@ export function App() {
   const [uploadsOpen, setUploadsOpen] = useState(false)
   return (
     <>
-      <Canvas runtime={runtime} status={status} awareness={provider.awareness} />
+      <Canvas runtime={runtime} awareness={provider.awareness} />
       <TitleBar onNewBoard={newBoard} />
       <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} />
       {/* The open gallery takes the user menu's corner and has its own close button. */}
       {uploadsOpen ? (
         <UploadsPanel runtime={runtime} uploads={uploads} onClose={() => setUploadsOpen(false)} />
       ) : (
-        <UserMenu actor={runtime.actor} awareness={provider.awareness} bridge={bridge} onUploads={() => setUploadsOpen(true)} />
+        <UserMenu runtime={runtime} status={status} actor={runtime.actor} awareness={provider.awareness} bridge={bridge} />
       )}
     </>
   )

@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
-import { NoteIcon, ShapesIcon, TextTIcon } from '@phosphor-icons/react'
-import type { StickyObject, TextObject } from '@ttx/core'
+import { useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { NoteIcon, SquareIcon, TextTIcon } from '@phosphor-icons/react'
+import type { BoxObject, StickyObject, TextObject } from '@ttx/core'
 import { registerObjectUI, registerWidget, type ObjectViewProps } from './registry'
 import { COLORS, DEFAULT_BOX_COLOR, DEFAULT_FONT_SIZE, DEFAULT_STICKY_COLOR, DEFAULT_TEXT_COLOR, PALETTE } from './style'
 
@@ -13,12 +13,34 @@ const needsFit = new Set<string>()
 export const requestFit = (id: string) => needsFit.add(id)
 
 registerObjectUI('box', {
+  View: BoxView,
   frameStyle: (o) => {
     const color = PALETTE[o.color ?? DEFAULT_BOX_COLOR]
-    return { background: color.fill, borderColor: color.stroke }
+    // A line and an arrow are only a stroke (BoxView). The ellipse is the one exception to square corners on the canvas: it is its shape.
+    if (o.shape === 'line' || o.shape === 'arrow') return {}
+    return { background: color.fill, borderColor: color.stroke, ...(o.shape === 'ellipse' ? { borderRadius: '50%' } : {}) }
   },
-  tool: { key: 'R', label: 'Box', Icon: ShapesIcon },
+  tool: { key: 'R', label: 'Rectangle', Icon: SquareIcon },
 })
+
+/** A line or an arrow runs corner to corner of the box, top left to bottom right, so the box's handles drag its ends. */
+function BoxView({ object: o }: ObjectViewProps<BoxObject>) {
+  if (o.shape !== 'line' && o.shape !== 'arrow') return null
+  const ink = PALETTE[o.color ?? DEFAULT_BOX_COLOR].ink
+  const head = `ttx-arrowhead-${o.id}`
+  return (
+    <svg className="ttx-box-stroke" aria-hidden>
+      {o.shape === 'arrow' && (
+        <defs>
+          <marker id={head} markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+            <path d="M0,0 L5,2.5 L0,5 z" fill={ink} />
+          </marker>
+        </defs>
+      )}
+      <line x1="0" y1="0" x2="100%" y2="100%" stroke={ink} strokeWidth="3" strokeLinecap="round" markerEnd={o.shape === 'arrow' ? `url(#${head})` : undefined} />
+    </svg>
+  )
+}
 
 registerObjectUI('text', {
   View: TextView,
