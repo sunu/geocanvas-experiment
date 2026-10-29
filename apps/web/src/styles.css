@@ -317,21 +317,37 @@ body,
 }
 
 /* Other people and the agent: selections, cursors and name tags in their color (canvas/Peers.tsx, board/collaborators.ts). */
-/* Links from a root to what follows it (canvas/Links.tsx), under the selection outlines. */
+/* Links from a root to what follows it (canvas/Links.tsx): arrows in the world, attached to the objects' sides. */
 .ttx-links {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
   overflow: visible;
   pointer-events: none;
 }
 
-.ttx-links line {
-  stroke: var(--ttx-accent);
+.ttx-links > path {
+  fill: none;
+  stroke: var(--ttx-muted);
   stroke-width: 1.5;
-  stroke-dasharray: 6 4;
-  opacity: 0.7;
+  opacity: 0.6;
+}
+
+.ttx-links > path.is-on {
+  stroke: var(--ttx-accent);
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.ttx-links .ttx-links__head path {
+  fill: var(--ttx-muted);
+  stroke: none;
+}
+
+.ttx-links .ttx-links__head.is-on path {
+  fill: var(--ttx-accent);
 }
 
 .ttx-peer-selection {

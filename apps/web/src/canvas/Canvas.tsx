@@ -598,6 +598,10 @@ export function Canvas({ runtime, awareness, onUploads }: { runtime: Runtime; aw
             />
           ),
         )}
+        {/* After the objects, at the top frame's place: above frames, under everything else (-1: under all). */}
+        {!focus && (
+          <Links objects={objects} byId={byId} selected={selected} style={{ zIndex: objects.reduce((top, o, i) => (o.type === 'frame' ? i : top), -1) }} />
+        )}
         {draft && <div className="ttx-draft" style={{ left: draft.x, top: draft.y, width: draft.w, height: draft.h }} />}
         {!focus && <PendingUploads />}
       </div>
@@ -605,7 +609,6 @@ export function Canvas({ runtime, awareness, onUploads }: { runtime: Runtime; aw
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
-        {!focus && <Links objects={objects} byId={byId} selected={selected} camera={camera} />}
         {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentTouched} />}
         {!focus && [...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)

@@ -44,7 +44,7 @@ In phase 1, a template fills its nodes one time. To use another event, you must 
   - `eventFootprint` and `conflictChoropleth` (map): the one layer with the id `link:<recipe>`. The recipe replaces this layer, adds it, or removes it. Other layers stay. The person who changed the root sees the new area on the map.
   - `frameTitle` (frame): `args.prefix` + the name, or clear the title.
 - **Propagation** (`links/propagate.ts`). `planLinks` (read-only, in `prepare`) finds the followers of the root, gets the facts one time, and calculates the patches. `applyLinks` (in `apply`) writes them in the same transaction as the change to the root. Thus, a change and its effects are one undo step. Ops that do this: `event.setEvent` (now async, so the event card uses `invoke`), `input.setArea`, and `link.refresh` (no change to the root, for example when ReliefWeb gets a new GLIDE number). `link.remove` unlinks.
-- **Canvas** (`apps/web/src/canvas/Links.tsx`). A dashed line goes from a root to each follower. The canvas shows only the lines of the selection: a selected root's lines, and a selected follower's line to its root. The right-click menu shows Unlink and "Refresh linked objects" when they apply.
+- **Canvas** (`apps/web/src/canvas/Links.tsx`). An arrow goes from a root to each follower. It starts and ends at the sides that face each other (left and right, or top and bottom) and curves between them. The arrows are always visible, and they move with the objects. The arrows of the selection are highlighted. They are in the world, above frames and below all other objects. There is no arrow between an object and the frame around it. The right-click menu shows Unlink and "Refresh linked objects" when they apply.
 
 ### 3.4 Templates
 
