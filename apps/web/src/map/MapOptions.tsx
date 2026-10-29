@@ -30,6 +30,7 @@ import { areaOf, goTo, liveMap } from './live'
 import { LocationPicker } from './LocationPicker'
 import { fitMapToCountry, fitMapToLayer } from './MapObject'
 import { PlaceSearch } from './PlaceSearch'
+import { FileLayerButton } from './FileLayerButton'
 import { UrlLayerForm, type UrlLayerArgs } from './UrlLayerForm'
 
 /** A map op as its own undo step. In focus, `runtime` is the draft: others see it once shared. */
@@ -135,8 +136,9 @@ export function MapOptions({ runtime, object: o }: ObjectViewProps<MapBoardObjec
           ))}
         </div>
       </Accordion>
-      <Accordion title="Add from a URL">
+      <Accordion title="Add from a URL or a file">
         <UrlLayerForm onAdd={addUrlLayer} />
+        <FileLayerButton person={runtime.actor.id} onAdd={addUrlLayer} />
       </Accordion>
       <Accordion title="Boundaries">
         <div className="ttx-options__list">

@@ -7,6 +7,7 @@ export interface UrlLayerArgs {
   min?: number
   max?: number
   attribution?: string
+  title?: string
 }
 
 /** "Add from a URL" in a map's Options panel: the format comes from the URL's extension, and a COG asks for its value range. */
