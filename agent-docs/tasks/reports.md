@@ -36,12 +36,12 @@ Rules every feature follows (PRD §2): writes are ops, so the agent and the MCP 
   - Hit testing is through the DOM: `closest('[data-id]')`.
   - Dropping one object onto another does not exist yet. The only drops are files from the operating system (`uploads/drop.ts`, `images/ImageObject.tsx`).
 - **Menus:**
-  - The right-click menu (`canvas/ObjectMenu.tsx`) has Duplicate, layer order and Delete.
+  - The right-click menu (`canvas/ObjectMenu.tsx`) has Duplicate, layer order and Delete, plus Unlink and Refresh linked objects for linked objects.
   - The Object panel (`canvas/ObjectPanel.tsx`) shows for one selected object whose type has `panel`; today only the map has one.
   - Any op with an `objects` target is in ⌘K and is an agent tool.
 - **Toolbar** (`canvas/Toolbar.tsx`):
   - The groups are fixed arrays. `MAP_AND_REPORT` exists, but today holds only Map and Notebook.
-  - The keys R, T, S, E, M, N, I, L, O, V and H are taken.
+  - The keys A, R, T, S, E, M, N, I, L, O, V and H are taken.
 - **Text** on the canvas is a plain string, typed in a `<textarea>` and written whole by `text.setText`. No rich text library is installed.
 - **Map pictures** (`map/snapshots.ts`):
   - One hidden MapLibre map with its deck.gl overlay (`preserveDrawingBuffer`) draws a PNG of a map view.
@@ -61,19 +61,30 @@ Rules every feature follows (PRD §2): writes are ops, so the agent and the MCP 
   - The Room Durable Object holds the doc, so a read-only route is simple to add.
   - There is no Browser Rendering (`browser`) binding.
   - A new `/reports/*` route goes in `run_worker_first`; any other path falls back to the app.
-- **Frames and links** (`plans/plan-013.md` on `feat/frames-and-links`, not merged):
-  - A `link: { from, recipe }` on an object is the closest model for a report item that points at a widget.
-  - A frame could later be added to a report as a group.
+- **Names:** every object has an optional `name` (`core.object.rename`, a field shared by all types in `packages/core/src/plugins/registry.ts`). Menus and panels show it instead of the type's title.
+- **Frames** (`plans/plan-013.md`, core type `frame`, tool key A):
+  - A frame holds objects together. Dragging it moves the objects fully inside it (`withFramed` in `canvas/camera.ts`).
+  - It keeps **no list of its members**: they are found from positions when a drag starts.
+  - Its `title` can follow a root through a link; a `name` someone gives wins.
+  - Templates now put each seed's objects in a frame titled after the seed (for example, "Situation report: Flood in Nepal").
+- **Links** (`plans/plan-013.md`, `packages/plugins/src/links/`):
+  - An object can follow a **root** (an `event` card, or an `input` holding an area of interest) through its optional `link: { from, recipe, args? }` field.
+  - When the root changes, a **recipe** rewrites only the linked part of each follower, in the same undo step: the country of the HAPI widgets, a map's footprint layer, the ReliefWeb feed, a frame's title.
+  - Arrows on the canvas (`canvas/Links.tsx`) go from each root to its followers.
+  - Only templates make links; people cannot link objects by hand yet.
+- **Inputs** (`packages/plugins/src/inputs.ts`): an `input` object holds a seed that has no content widget, today an area of interest.
 
 ## 3. Concepts and data
 
 ### 3.1 The `report` type
 
-A headless plugin, `reports`, in `packages/plugins`, with its UI in `apps/web/src/reports/`. The fields are:
+A headless plugin, `reports`, in `packages/plugins`, with its UI in `apps/web/src/reports/`.
+
+- **Its name** is the `name` every object has, set with `core.object.rename`, as for frames. The widget, pickers and the PDF show it, and "Untitled report" without one. No `title` field of its own.
+- **Its fields:**
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `title` | string | The report's name. Shown on the widget and in pickers. |
 | `paper` | `'a4' \| 'letter'` | Default to decide (§10). |
 | `orientation` | `'portrait' \| 'landscape'` | Default portrait. |
 | `blocks` | `Block[]` | The report's content, in reading order. |
@@ -89,7 +100,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 | `item` | `{ sourceId, mode: 'live' \| 'frozen', frozen?: FrozenItem }`: an object on the board. |
 
 - **One write path:** `blocks` is written only by the report ops (§6), and replaced whole, as a map's `layers` are. Two people changing one report at the same moment can lose one change. Most report editing happens in focus, where edits are private until Share, which narrows this.
-- **`summarize`** gives the agent the title, the paper, and each block: its kind, its span, and for items the source object and the mode.
+- **`summarize`** gives the agent the name, the paper, and each block: its kind, its span, and for items the source object and the mode.
 
 ### 3.2 Layout and pages
 
@@ -106,7 +117,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 
 - **Live:** the item shows its source object as the object is now, through a report renderer for its type.
 - **Frozen:** the item keeps what its source showed when it was frozen, and never changes.
-- **Each type decides** what freezing means. It registers `report?: { View, freeze(object) }` beside its `ObjectUI`:
+- **Each type decides** how it shows in a report and what freezing means. It registers `report?: { View, freeze(object) }` beside its `ObjectUI`:
 
   | Source | Live | Frozen |
   | --- | --- | --- |
@@ -115,20 +126,36 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   | Event, ReliefWeb, HDX HAPI widgets | Their current data | The data they showed (JSON), with an "as of" date |
   | Image, PDF page | The picture or page | The same, since an upload never changes |
   | Notebook | A card with the run's title and a link | The same |
+  | Frame | A heading: the frame's name, or its title (which may follow a root) | The heading as it was |
+  | Input (area of interest) | "Area of interest: Cabo Delgado" | The same text |
 
+- **An item's label** in report mode and the Options panel is its source's `name`, or its type's title.
+- **Items are not links.** A report item keeps its own `sourceId`. It does not use the `link` field of plan-013, because they point in opposite directions:
+  - a link is a field on the follower, from one root; a recipe writes the follower's fields
+  - a report item only reads its source and writes nothing to it, and one object can be in several reports
+
+  So adding an object to a report never changes the object, and a linked object can be in a report too.
+- **Live items follow links for free.** When a root changes (another event on a SitRep's event card), its linked widgets update on the canvas, so their live items in a report update as well. Frozen items do not, by design.
 - **A removed source:** a live item whose source was deleted shows "The source was removed", and its last frozen copy if it has one.
 - **Freezing a map needs a browser:** the PNG is drawn by the hidden map. So the UI freezes first, then dispatches `report.setItemMode` with the result.
 
 ## 4. On the canvas
 
-- **The widget** shows the report's first page, scaled down, with maps as pictures. Its header shows the title and the number of items. It looks like a page: white, square corners, no shadow (AGENTS.md "Corners and elevation").
-- **Toolbar:** a **Report** tool in the `MAP_AND_REPORT` group, with a free key (P, if it is still free). A new report opens in focus.
+- **The widget** shows the report's first page, scaled down, with maps as pictures. Its header shows the name and the number of items. It looks like a page: white, square corners, no shadow (AGENTS.md "Corners and elevation").
+- **Toolbar:** a **Report** tool in the `MAP_AND_REPORT` group, with the key P (free on 2026-10-29). A new report opens in focus.
 - **Drag onto a report:**
   1. While objects are dragged, a report under the pointer shows a drop zone (an outline and "Drop to add to *Flood SitRep*").
   2. On release, a small confirmation appears by the report: "Add 2 objects to *Flood SitRep*?", with Add and Cancel.
   3. Add runs `report.addItems` and puts the dragged objects back where they were. Cancel leaves them where they were dropped, as a normal move.
   4. Either way it is one gesture, so one undo step.
   5. The objects stay on the canvas, and the report's preview updates.
+- **A frame adds a section.** Dropping a frame on a report, or Add to report on a frame, adds:
+  1. a heading item for the frame (its live name or title), then
+  2. an item for each object fully inside the frame, in reading order (top to bottom, then left to right). Frames inside it add their own heading and items after it.
+
+  Frames keep no list of members, so what is inside is worked out once, when the frame is added, with the same containment rule as a frame drag. Objects moved into the frame later are not added. The containment test moves from `canvas/camera.ts` to a shared place, so the canvas and the op use one rule.
+- **Dragging a frame onto a report** moves its contents with it while dragging, as any frame drag does. On Add, everything goes back to where it was.
+- **Seeing what is in a report:** when a report is selected, its live sources get a light outline on the canvas. There are no permanent arrows: the canvas already draws link arrows, and report arrows would crowd it.
 - **Add to report…** from the right-click menu, the Object panel and ⌘K (`report.addItems`, which acts on the selection):
   - with one report on the board, it adds directly
   - with several, a submenu lists the reports by name
@@ -147,7 +174,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 
 ### 5.2 Options panel
 
-- The report's **title**.
+- The report's **name** (`core.object.rename`).
 - **Paper** (A4 or Letter) and **orientation** (portrait or landscape).
 - **Items:** each item block, with its source's title, a **Live / Frozen** switch, **Go to source** (leaves focus and selects the object), and **Remove**.
 - **Export PDF** (§7).
@@ -167,14 +194,13 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 
 ## 6. Ops
 
-All with zod schemas, so they are in ⌘K, are agent tools, and are in the MCP manifest.
+All with zod schemas, so they are in ⌘K, are agent tools, and are in the MCP manifest. A report is named with `core.object.rename`, as any object.
 
 | Op | Target | Args |
 | --- | --- | --- |
 | `report.add` | canvas | the type's fields, as every `<type>.add` |
-| `report.setTitle` | one report | `title` |
 | `report.setPage` | one report | `paper`, `orientation` |
-| `report.addItems` | the selection | `reportId`, `mode` (default live) |
+| `report.addItems` | the selection | `reportId`, `mode` (default live). A frame in the selection adds a section (§4). |
 | `report.addBlock` | one report | `kind`, its content, `index` |
 | `report.removeBlock` | one report | `blockId` |
 | `report.moveBlock` | one report | `blockId`, `index` |
@@ -250,6 +276,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
 2. **`reports` plugin:** the type, blocks and ops (§3, §6), with `summarize`. Node tests:
    - each op, and one undo step for each
    - `report.addItems` from a selection, for several objects at once
+   - a frame adds a heading and the objects inside it, in reading order, with nested frames
    - blocks that reference a removed object
 3. **The widget on the canvas:** the preview, the toolbar tool, and Add to report from the right-click menu, the Object panel and ⌘K, with the report picker.
 4. **Drag onto a report:** the drop zone, the confirmation, objects back in place, one undo step.
@@ -279,6 +306,8 @@ Made (2026-10-29, from the product owner):
 9. **Rich text** in report mode.
 10. **PDF export**, reliable for maps, images, text and layout. Options are compared in a spike before choosing.
 11. A **report URL**, frozen or live, apart from the room.
+12. **Report items reference their source directly** (`sourceId`), not through plan-013's `link` field (§3.3), and **a frame adds a section** (§4). Decided after plan-013 merged (2026-10-29).
+13. **A report's name** is the shared `name` field (`core.object.rename`), not a field of its own.
 
 Open:
 1. **The PDF approach:** decided by the spike (§7.4).
@@ -289,5 +318,5 @@ Open:
 6. **Browser Rendering:** its cost and limits, before step 8.
 7. **The default paper:** A4, Letter, or by the browser's locale.
 8. **More than two columns:** later, if people ask.
-9. **Links and frames** (plan-013): whether report items use the same `link` model, and whether a frame can be added as a group.
+9. **Templates and reports:** whether a template can also add a report, filled with its frames as sections.
 10. **New dependencies,** each approved in its step: Tiptap, `@cloudflare/puppeteer`, and possibly Paged.js or `@react-pdf/renderer`.
