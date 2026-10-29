@@ -91,19 +91,19 @@ export function formatDuration(seconds: number): string {
 
 export const formatKm = (meters: number) => `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`
 
-/** The seconds the closures add to a route, when they add at least half a minute. */
-export function extraSeconds({ result: r, baseline: b }: RouteState): number | undefined {
-  if (!r?.ok || !b?.ok) return undefined
-  const dt = r.seconds - b.seconds
-  return dt >= 30 ? dt : undefined
-}
+/** "+3.4 km", "−0.4 km": a difference in length. */
+export const signedKm = (meters: number) => `${meters < 0 ? '−' : '+'}${formatKm(Math.abs(meters))}`
 
-/** How much longer the closures make a route, e.g. "+12 min, +3.4 km", or undefined when they change nothing. */
-export function detour(s: RouteState): string | undefined {
-  const dt = extraSeconds(s)
-  if (dt === undefined || !s.result?.ok || !s.baseline?.ok) return undefined
-  const dm = s.result.meters - s.baseline.meters
-  return `+${formatDuration(dt)}, ${dm >= 0 ? '+' : '−'}${formatKm(Math.abs(dm))}`
+/**
+ * What the closures change in a route: the metres and seconds they add (either can be negative: a detour can be
+ * shorter but slower), or undefined when the route is the same (within 50 m and half a minute). Lengths are what
+ * people should read: times are road-class guesses, and traffic after a disaster is anyone's guess.
+ */
+export function detour({ result: r, baseline: b }: RouteState): { meters: number; seconds: number } | undefined {
+  if (!r?.ok || !b?.ok) return undefined
+  const meters = r.meters - b.meters
+  const seconds = r.seconds - b.seconds
+  return Math.abs(meters) >= 50 || seconds >= 30 ? { meters, seconds } : undefined
 }
 
 const rgb = (hex: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number]
@@ -121,7 +121,7 @@ export function routingLayers(states: RouteState[], closures: ScenarioClosure[])
       return r?.ok ? [{ path: r.line, color: rgb(ROUTE_COLORS[s.route.color]) }] : []
     })
   const routes = paths((s) => s.result)
-  const baselines = paths((s) => (extraSeconds(s) !== undefined ? s.baseline : undefined))
+  const baselines = paths((s) => (detour(s) ? s.baseline : undefined))
   const path = { getPath: (d: { path: [number, number][] }) => d.path, widthUnits: 'pixels' as const, capRounded: true, jointRounded: true }
   return [
     new PathLayer({ id: 'routing-baselines', data: baselines, ...path, getColor: [...BASELINE_COLOR, 200], getWidth: 3 }),

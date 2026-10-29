@@ -5,7 +5,7 @@ import { buildGraph, metersBetween, type SegmentRow } from '../src/routing/graph
 import { PieceIndex } from '../src/routing/pieceIndex'
 import { speedOn } from '../src/routing/profiles'
 import { findRoute } from '../src/routing/route'
-import { detour, formatDuration } from '../src/routing/useRoutes'
+import { detour, formatDuration, signedKm } from '../src/routing/useRoutes'
 
 /**
  * A small network near the equator (0.01° is about 1.1 km):
@@ -207,10 +207,13 @@ describe('detour', () => {
   const ok = (seconds: number, meters: number) => ({ ok: true as const, line: [], seconds, meters, roads: [], offRoad: [0, 0] as [number, number] })
   const route = { id: 'r', title: 'Route 1', from: [0, 0] as [number, number], to: [1, 1] as [number, number], profile: 'car' as const, color: 'orange' as const }
 
-  it('says what the closures add, and nothing when they add nothing', () => {
-    expect(detour({ route, result: ok(3900, 25_000), baseline: ok(1200, 21_600) })).toBe('+45 min, +3.4 km')
-    expect(detour({ route, result: ok(1210, 21_600), baseline: ok(1200, 21_600) })).toBeUndefined()
+  it('says what the closures add, and nothing when they change nothing', () => {
+    expect(detour({ route, result: ok(3900, 25_000), baseline: ok(1200, 21_600) })).toEqual({ meters: 3400, seconds: 2700 })
+    // Shorter but slower: a detour all the same.
+    expect(detour({ route, result: ok(1500, 21_200), baseline: ok(1200, 21_600) })).toEqual({ meters: -400, seconds: 300 })
+    expect(detour({ route, result: ok(1210, 21_620), baseline: ok(1200, 21_600) })).toBeUndefined()
     expect(detour({ route, result: ok(1200, 21_600) })).toBeUndefined()
+    expect([signedKm(3400), signedKm(-400), signedKm(12_400)]).toEqual(['+3.4 km', '−0.4 km', '+12 km'])
     expect(formatDuration(3900)).toBe('1 h 05 min')
   })
 })

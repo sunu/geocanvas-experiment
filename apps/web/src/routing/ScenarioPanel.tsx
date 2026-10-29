@@ -10,7 +10,7 @@ import type { Board } from '../board/board'
 import { useLayerStates, type LayerState } from '../map/layers'
 import { useBoardEvents } from '../map/MapOptions'
 import { importAffectedAreas } from './importArea'
-import { extraSeconds, formatDuration, formatKm, useClosures, useRoutes, type RouteState } from './useRoutes'
+import { detour, formatDuration, formatKm, signedKm, useClosures, useRoutes, type RouteState } from './useRoutes'
 
 const PROFILE_LABEL: Record<RouteProfile, string> = { car: 'Car', truck: 'Truck' }
 const NO_LAYERS: MapLayer[] = []
@@ -74,7 +74,7 @@ export function ScenarioPanel({ runtime, object: o }: { runtime: Runtime; object
 
 function RouteCard({ state: s, onTitle, onProfile, onRemove }: { state: RouteState; onTitle(t: string): void; onProfile(p: RouteProfile): void; onRemove(): void }) {
   const r = s.result
-  const extra = extraSeconds(s)
+  const extra = detour(s)
   return (
     <div className="flex flex-col gap-1 rounded-md border p-2">
       <div className="flex items-center gap-2">
@@ -108,14 +108,16 @@ function RouteCard({ state: s, onTitle, onProfile, onRemove }: { state: RouteSta
       ) : (
         <>
           <p className="flex items-center gap-2 text-xs/4 text-muted-foreground">
-            <span>
-              {formatDuration(r.seconds)} · {formatKm(r.meters)}
-            </span>
-            {extra !== undefined && (
-              <span className="rounded-sm bg-destructive/10 px-1.5 font-medium text-destructive" title="What the closures add">
-                +{formatDuration(extra)}
+            <span className="font-medium text-foreground">{formatKm(r.meters)}</span>
+            {extra && (
+              <span className="rounded-sm bg-destructive/10 px-1.5 font-medium text-destructive" title="The length the closures add">
+                {signedKm(extra.meters)}
               </span>
             )}
+            <span title="From road classes and speed limits: real times depend on traffic and road conditions">
+              about {formatDuration(r.seconds)}
+              {extra && extra.seconds >= 30 && ` (+${formatDuration(extra.seconds)})`}
+            </span>
           </p>
           {r.roads.length > 0 && <p className="truncate text-xs/4 text-muted-foreground">Via {r.roads.slice(0, 3).map((x) => x.name).join(', ')}</p>}
           {r.offRoad.some((m) => m > 500) && <p className="text-xs/4 text-muted-foreground">Starts or ends {formatKm(Math.max(...r.offRoad))} from the nearest open road</p>}
