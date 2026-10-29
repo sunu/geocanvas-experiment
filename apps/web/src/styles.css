@@ -326,37 +326,6 @@ body,
   border-style: dashed;
 }
 
-/* Corner marks, as the handles of the Figma file. They are not draggable: only your own selection is. */
-.ttx-peer-handle {
-  position: absolute;
-  width: 9px;
-  height: 9px;
-  box-sizing: border-box;
-  border: 1.5px solid;
-  border-radius: 1px;
-  background: #fff;
-}
-
-.ttx-peer-handle--nw {
-  left: -5px;
-  top: -5px;
-}
-
-.ttx-peer-handle--ne {
-  right: -5px;
-  top: -5px;
-}
-
-.ttx-peer-handle--sw {
-  left: -5px;
-  bottom: -5px;
-}
-
-.ttx-peer-handle--se {
-  right: -5px;
-  bottom: -5px;
-}
-
 .ttx-cursor {
   position: absolute;
   left: 0;
