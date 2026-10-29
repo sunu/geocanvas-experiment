@@ -12,4 +12,4 @@ export { corePlugin, boxType, stickyType, textType, type BoxObject, type StickyO
 export * from './style.js'
 export { Chat, type AgentReply, type ChatEntry, type ToolCallRecord, type TurnUndo, type UserMessage } from './chat.js'
 export { Views, type SavedView } from './views.js'
-export { Uploads, MAX_UPLOAD_BYTES, UPLOAD_ID, uploadUrl, type Upload, type UploadKind } from './uploads.js'
+export { Uploads, MAX_UPLOAD_BYTES, UPLOAD_ID, UPLOAD_TYPES, uploadUrl, type Upload, type UploadKind } from './uploads.js'
