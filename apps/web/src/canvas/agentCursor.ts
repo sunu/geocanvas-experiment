@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type * as Y from 'yjs'
-import type { Chat, ChatEntry, OplogEntry, Runtime } from '@ttx/core'
-import { AGENT } from '@ttx/plugins'
+import type { AnyObject, Chat, ChatEntry, OplogEntry, Runtime } from '@ttx/core'
+import { AGENT, firstAddSpot } from '@ttx/plugins'
 import { agentKey } from '../board/presence'
 import { bounds, type Rect } from './camera'
 import { isLoading, subscribeLoading } from './loading'
@@ -17,7 +17,9 @@ import { isLoading, subscribeLoading } from './loading'
  * object it works on is busy for a moment, and for as long as its data is loading: a placeholder card that says what
  * the agent does there ("Generating map…"), with the cursor at its bottom-right corner, which stays while it is busy
  * (at most MAX_WAIT_MS) before it moves on. Elsewhere its tag says what its presence says (thinking, a search). It
- * hovers all the time, moving or not.
+ * hovers all the time, moving or not. While the agent thinks after a request with nothing selected, a placeholder card
+ * waits where its first add will land (firstAddSpot, the agent's own placement), and grows into that add when it
+ * comes; with a selection, the cursor waits at the selected objects, which the agent most likely changes.
  */
 
 export interface Point {
@@ -37,6 +39,19 @@ export interface AgentStep {
   /** The objects it worked on, busy once the cursor arrives. */
   ids: string[]
   /** What the busy objects say the agent does there (busyText). */
+  label?: string
+  /** Where those objects are, for a placeholder to grow into. */
+  rect?: Rect
+  /** Where someone asked with nothing selected: a placeholder waits where the agent's first add will land. */
+  placeholder?: Rect
+}
+
+/** A placeholder card at a moment, in canvas units. */
+export interface AgentPlaceholder {
+  key: string
+  rect: Rect
+  opacity: number
+  /** What it says once it grows into an add ("Generating map…"); until then, what the agent does. */
   label?: string
 }
 
@@ -81,6 +96,12 @@ export const MIN_BUSY_MS = 800
 /** How far inside an object's bottom-right corner the cursor points while it places it (canvas units). */
 const CORNER_X = 48
 const CORNER_Y = 36
+const corner = (r: Rect): Point => ({ x: r.x + r.w - Math.min(CORNER_X, r.w / 4), y: r.y + r.h - Math.min(CORNER_Y, r.h / 4) })
+
+/** The placeholder's size: what lands is not known until the model answers, so a neutral card. */
+export const PLACEHOLDER_SIZE = { w: 320, h: 200 }
+/** A placeholder stays this long even before the agent's presence says it works (it may come after the message). */
+const PLACEHOLDER_GRACE_MS = 3000
 
 /**
  * What a busy object says the agent does: for an add, "Generating" and the type ("Generating map…"; a title with
@@ -106,17 +127,32 @@ export function agentStep(entry: OplogEntry, rectOf: (id: string) => Rect | unde
     key: agentKey(entry.actor.id, entry.actor.onBehalfOf),
     name: entry.actor.name ?? 'Agent',
     color: entry.actor.color ?? AGENT_COLOR,
-    point: { x: r.x + r.w - Math.min(CORNER_X, r.w / 4), y: r.y + r.h - Math.min(CORNER_Y, r.h / 4) },
+    point: corner(r),
     created,
     ids,
+    rect: r,
     ...(label && { label }),
   }
 }
 
 /** Where someone asked the agent: its cursor starts in the middle of their view. Messages without one give nothing. */
-export function askStep(entry: ChatEntry): AgentStep | undefined {
+export function askStep(entry: ChatEntry, objects: readonly AnyObject[]): AgentStep | undefined {
   if (entry.kind !== 'user' || !entry.center) return undefined
-  return { key: agentKey(AGENT.id, entry.actor.id), name: AGENT.name ?? 'Agent', color: AGENT.color ?? AGENT_COLOR, point: entry.center, created: [], ids: [] }
+  const step = { key: agentKey(AGENT.id, entry.actor.id), name: AGENT.name ?? 'Agent', color: AGENT.color ?? AGENT_COLOR, created: [], ids: [] }
+  // With a selection, the agent most likely changes it: wait there.
+  const selected = bounds(objects.filter((o) => entry.selection.includes(o.id)))
+  if (selected) return { ...step, point: corner(selected) }
+  const placeholder = firstAddSpot([...objects], entry.center, PLACEHOLDER_SIZE)
+  return { ...step, point: corner(placeholder), placeholder }
+}
+
+interface Placeholder {
+  rect: Rect
+  shown: number
+  /** The add it grows into, as the cursor moves there. */
+  into?: { move: Move; rect: Rect; label?: string }
+  /** When it has faded: the agent did something else, or nothing. */
+  end?: number
 }
 
 interface Move {
@@ -156,6 +192,7 @@ const started = (m: Move): m is Started => m.start !== undefined
 /** Every agent's cursor: steps go in as the op log grows, positions come out for any moment. Times are ms. */
 export class AgentCursors {
   private tracks = new Map<string, Track>()
+  private placeholders = new Map<string, Placeholder>()
   /** Objects the agent worked on, with when its cursor got there and what they say. */
   private worked = new Map<string, { from: number; label: string }>()
   private reduced: boolean
@@ -173,6 +210,13 @@ export class AgentCursors {
   add(step: AgentStep, now: number) {
     this.advance(now)
     const move: Move = { to: step.point, queued: now, created: step.created, ids: step.ids, ...(step.label && { label: step.label }) }
+    // The first step after a placeholder: an add takes its place, anything else lets it fade.
+    const waiting = this.placeholders.get(step.key)
+    if (step.placeholder) this.placeholders.set(step.key, { rect: step.placeholder, shown: now })
+    else if (waiting && !waiting.into && waiting.end === undefined) {
+      if (step.created.length && step.rect) waiting.into = { move, rect: step.rect, ...(step.label && { label: step.label }) }
+      else waiting.end = now + FADE_MS
+    }
     const track = this.tracks.get(step.key)
     if (track && now < hideAt(track)) {
       track.moves.push(move)
@@ -230,6 +274,7 @@ export class AgentCursors {
       const end = hideAt(track)
       if (t >= end) {
         this.tracks.delete(key)
+        this.placeholders.delete(key)
         continue
       }
       const { name, color, shown, moves } = track
@@ -237,7 +282,10 @@ export class AgentCursors {
       const k = t >= move.arrive ? 1 : ease(Math.max(0, (t - move.start) / (move.arrive - move.start)))
       const opacity = this.reduced ? 1 : Math.max(0, Math.min(1, (t - shown) / FADE_MS, (end - t) / FADE_MS))
       // At its objects while they are busy, which say what it does there.
-      const placing = move.ids.length > 0 && t >= move.arrive && (t < move.arrive + this.stay(move) || move.ids.some(this.loading))
+      const waiting = this.placeholders.get(key)
+      const placing =
+        (waiting !== undefined && waiting.end === undefined) ||
+        (move.ids.length > 0 && t >= move.arrive && (t < move.arrive + this.stay(move) || move.ids.some(this.loading)))
       cursors.push({
         key,
         name,
@@ -250,6 +298,34 @@ export class AgentCursors {
       })
     }
     return cursors
+  }
+
+  /**
+   * The placeholders shown at `t`. One waits while its agent works (`working`), or for PLACEHOLDER_GRACE_MS before
+   * its presence says so; it grows into the first add as the cursor moves there, and goes when the cursor arrives.
+   */
+  placeholdersAt(t: number, working: ReadonlySet<string> | ReadonlyMap<string, unknown> = NONE): AgentPlaceholder[] {
+    this.advance(t)
+    const shown: AgentPlaceholder[] = []
+    for (const [key, p] of this.placeholders) {
+      const m = p.into?.move
+      if (p.end === undefined && !p.into && !working.has(key) && t >= p.shown + PLACEHOLDER_GRACE_MS) p.end = t + FADE_MS
+      const gone = !this.tracks.has(key) || (p.end !== undefined && t >= p.end) || (m !== undefined && started(m) && t >= m.arrive)
+      if (gone) {
+        this.placeholders.delete(key)
+        continue
+      }
+      let rect = p.rect
+      if (p.into && m && started(m) && t > m.start) {
+        const k = ease(Math.min(1, (t - m.start) / Math.max(1, m.arrive - m.start)))
+        const to = p.into.rect
+        rect = { x: lerp(rect.x, to.x, k), y: lerp(rect.y, to.y, k), w: lerp(rect.w, to.w, k), h: lerp(rect.h, to.h, k) }
+      }
+      const fadeIn = this.reduced ? 1 : Math.min(1, (t - p.shown) / FADE_MS)
+      const fadeOut = p.end === undefined ? 1 : Math.max(0, (p.end - t) / FADE_MS)
+      shown.push({ key, rect, opacity: Math.min(fadeIn, fadeOut), ...(p.into?.label && { label: p.into.label }) })
+    }
+    return shown
   }
 
   /** Whether any cursor is shown at `t`. */
@@ -309,6 +385,8 @@ export function hoverOffset(floating: number): Point {
   return { x: a * HOVER_PX * Math.sin(phase), y: (a * HOVER_PX * Math.sin(2 * phase)) / 2 }
 }
 
+const lerp = (a: number, b: number, k: number) => a + (b - a) * k
+
 /** The same ease in and out as the focus camera (canvas/focus.ts). */
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
 
@@ -359,7 +437,7 @@ export function useAgentCursors(runtime: Runtime, chat: Chat): { cursors: AgentC
     }
     const onLog = (event: Y.YArrayEvent<OplogEntry>) =>
       take(inserted(event).map((e) => agentStep(e, (id) => runtime.board.get(id), labelOf)))
-    const onChat = (event: Y.YArrayEvent<ChatEntry>) => take(inserted(event).map(askStep))
+    const onChat = (event: Y.YArrayEvent<ChatEntry>) => take(inserted(event).map((e) => askStep(e, runtime.board.list())))
     runtime.oplog.observe(onLog)
     chat.entries.observe(onChat)
     const stopLoading = subscribeLoading(sync)

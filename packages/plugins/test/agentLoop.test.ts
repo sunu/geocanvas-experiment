@@ -19,7 +19,7 @@ import {
   type Geocoder,
   type Message,
 } from '../src/index'
-import { freeSpot } from '../src/agent/call'
+import { firstAddSpot, freeSpot } from '../src/agent/call'
 import type { MontyClient } from '../src/monty/client'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
@@ -312,6 +312,16 @@ describe('placing what an agent adds', () => {
     // On the third box: the next free spot to its right is outside the frame's right edge.
     expect(moved).toMatchObject({ x: 800 + GAP, y: 0 })
     expect(overlaps(doc)).toEqual([])
+  })
+
+  it("predicts where a turn's first add lands, as browsers show its placeholder", async () => {
+    const { doc, chat, person: ada_ } = board()
+    const center = { x: 300, y: 50 }
+    const size = ada_.registry.objectType('sticky')!.defaultSize
+    const predicted = firstAddSpot(ada_.board.list(), center, size)
+    const message = chat.send({ actor: ada, text: 'add a note', selection: [], center })
+    await turn(agent(doc), message, scripted(tools(call('sticky__add', { args: { text: 'Note' } }))).complete)
+    expect(person(doc).board.list().find((o) => o.type === 'sticky')).toMatchObject(predicted)
   })
 
   it('goes below everything when no near row is free', () => {

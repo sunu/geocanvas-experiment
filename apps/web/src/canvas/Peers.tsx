@@ -3,6 +3,7 @@ import { ArrowUpIcon, SparkleIcon } from '@phosphor-icons/react'
 import type { BoardObject } from '../board/board'
 import { isAgent, onColor } from '../board/collaborators'
 import type { Peer } from '../board/presence'
+import { THINKING } from '@ttx/plugins'
 import { hoverOffset, type AgentCursors, type Point } from './agentCursor'
 import { toScreen, type Camera } from './camera'
 
@@ -85,7 +86,20 @@ export function AgentCursorLayer({ cursors, version, activities, camera, rootRef
   }, [cursors, version, activities])
   const w = rootRef.current?.clientWidth ?? 0
   const h = rootRef.current?.clientHeight ?? 0
-  return cursors.at(Date.now(), activities).map((c) => {
+  const now = Date.now()
+  // Placeholders first, under the cursors: in screen space, so their edge and label keep their size, like a busy card's.
+  const placeholders = cursors.placeholdersAt(now, activities).map((p) => {
+    const r = toScreen(camera, p.rect)
+    return (
+      <div key={`placeholder:${p.key}`} className="ttx-obj__busy ttx-agent-placeholder" role="status" style={{ left: r.x, top: r.y, width: r.w, height: r.h, opacity: p.opacity }}>
+        <div className="ttx-obj__busy-label">
+          <span className="ttx-obj__busy-ring" aria-hidden />
+          {p.label ?? `${activities.get(p.key) ?? THINKING}…`}
+        </div>
+      </div>
+    )
+  })
+  const shown = cursors.at(now, activities).map((c) => {
     // While it places objects, they say what it does; elsewhere its tag says what its presence says.
     const doing = c.placing ? undefined : activities.get(c.key)
     const at = toScreen(camera, { x: c.x, y: c.y, w: 0, h: 0 })
@@ -118,4 +132,10 @@ export function AgentCursorLayer({ cursors, version, activities, camera, rootRef
       </button>
     )
   })
+  return (
+    <>
+      {placeholders}
+      {shown}
+    </>
+  )
 }

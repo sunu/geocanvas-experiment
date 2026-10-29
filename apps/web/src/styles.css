@@ -88,6 +88,12 @@ body,
   }
 }
 
+/* Where the agent's first add will land, while it thinks (canvas/agentCursor.ts): a busy card on its own, in screen
+ * space, placed by its style. */
+.ttx-agent-placeholder {
+  inset: auto;
+}
+
 .ttx-obj__busy-label {
   position: absolute;
   left: 0;

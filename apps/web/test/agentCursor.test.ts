@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { OplogEntry } from '@ttx/core'
-import { agentStep, AgentCursors, askStep, busyText, DWELL_MS, hoverOffset, IDLE_MS, MAX_WAIT_MS, MIN_BUSY_MS, TRAVEL_MS, type AgentStep } from '../src/canvas/agentCursor'
+import type { AnyObject, OplogEntry } from '@ttx/core'
+import { firstAddSpot } from '@ttx/plugins'
+import { agentStep, AgentCursors, askStep, busyText, PLACEHOLDER_SIZE, DWELL_MS, hoverOffset, IDLE_MS, MAX_WAIT_MS, MIN_BUSY_MS, TRAVEL_MS, type AgentStep } from '../src/canvas/agentCursor'
 
 const agent = { kind: 'agent' as const, id: 'agent', name: 'Agent', color: '#8e51ff', onBehalfOf: 'p1' }
 const rects: Record<string, { x: number; y: number; w: number; h: number }> = {
@@ -44,10 +45,60 @@ describe('busyText', () => {
 })
 
 describe('askStep', () => {
-  it("starts the agent's cursor for the asker, in the middle of their view", () => {
-    const message = { kind: 'user' as const, id: 'm', actor: { kind: 'user' as const, id: 'p1' }, text: 'hi', selection: [], center: { x: 10, y: 20 }, at: 0 }
-    expect(askStep(message)).toMatchObject({ key: 'agent:p1', point: { x: 10, y: 20 }, ids: [] })
-    expect(askStep({ ...message, center: undefined })).toBeUndefined()
+  const message = { kind: 'user' as const, id: 'm', actor: { kind: 'user' as const, id: 'p1' }, text: 'hi', selection: [] as string[], center: { x: 1000, y: 1000 }, at: 0 }
+  const objects = [{ id: 'a', type: 'sticky', z: 0, ...rects.a! }, { id: 'b', type: 'sticky', z: 1, ...rects.b! }] as AnyObject[]
+
+  it("puts a placeholder where the agent's first add will land, with the cursor at its corner", () => {
+    const placeholder = firstAddSpot(objects, message.center, PLACEHOLDER_SIZE)
+    expect(askStep(message, objects)).toMatchObject({ key: 'agent:p1', placeholder, ids: [] })
+    expect(askStep(message, objects)!.point.x).toBeGreaterThan(placeholder.x + placeholder.w / 2)
+  })
+
+  it('waits at the selection, which the agent most likely changes, with no placeholder', () => {
+    const step = askStep({ ...message, selection: ['a'] }, objects)!
+    expect(step.placeholder).toBeUndefined()
+    expect(step.point).toEqual({ x: 75, y: 75 })
+  })
+
+  it('gives nothing for a message without a view center', () => {
+    expect(askStep({ ...message, center: undefined }, objects)).toBeUndefined()
+  })
+})
+
+describe('placeholders', () => {
+  const ask: AgentStep = { ...step(160, 100), placeholder: { x: 0, y: 0, w: 320, h: 200 } }
+  const working = new Set(['agent:p1'])
+
+  it('grow into the first add as the cursor moves there, and go when it arrives', () => {
+    const c = new AgentCursors()
+    c.add(ask, 0)
+    expect(c.placeholdersAt(1000, working)).toMatchObject([{ rect: { x: 0, y: 0, w: 320, h: 200 }, opacity: 1 }])
+    expect(c.at(1000, working)[0]!.placing).toBe(true)
+    c.add({ ...step(900, 300, ['m'], ['m'], 'Generating map…'), rect: { x: 500, y: 0, w: 520, h: 360 } }, 1000)
+    const [mid] = c.placeholdersAt(1000 + TRAVEL_MS / 2, working)
+    expect(mid!.label).toBe('Generating map…')
+    expect(mid!.rect.w).toBeGreaterThan(320)
+    expect(mid!.rect.w).toBeLessThan(520)
+    expect(c.placeholdersAt(1000 + TRAVEL_MS, working)).toEqual([])
+    expect(busyIds(c, 1000 + TRAVEL_MS)).toEqual(new Set(['m']))
+  })
+
+  it('fade when the first step is not an add', () => {
+    const c = new AgentCursors()
+    c.add(ask, 0)
+    c.add(step(500, 0, [], ['a']), 1000)
+    expect(c.placeholdersAt(1000 + 100, working)[0]!.opacity).toBeLessThan(1)
+    expect(c.placeholdersAt(1000 + 1000, working)).toEqual([])
+  })
+
+  it('fade when the agent stops without adding anything', () => {
+    const c = new AgentCursors()
+    c.add(ask, 0)
+    expect(c.placeholdersAt(2000)).toHaveLength(1)
+    // Past the grace, with no agent at work: it fades out.
+    expect(c.placeholdersAt(3000)[0]!.opacity).toBe(1)
+    expect(c.placeholdersAt(3200)[0]!.opacity).toBeLessThan(1)
+    expect(c.placeholdersAt(4000)).toEqual([])
   })
 })
 
