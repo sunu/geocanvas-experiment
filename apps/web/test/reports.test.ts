@@ -21,10 +21,29 @@ describe('the reports the menus offer', () => {
     rt.dispatch('core.object.rename', { kind: 'objects', ids: [named] }, { name: 'Briefing' })
     const untitled = add(rt, 'report', { x: 3000 })
     expect(boardReports(board)).toEqual([
-      { id: named, title: 'Briefing' },
-      { id: fromFrame, title: 'Situation report: Flood in Nepal' },
-      { id: untitled, title: 'Untitled report' },
+      { id: named, title: 'Briefing', added: false },
+      { id: fromFrame, title: 'Situation report: Flood in Nepal', added: false },
+      { id: untitled, title: 'Untitled report', added: false },
     ])
+  })
+})
+
+describe('which reports have the selection', () => {
+  it('check a report when every selected object is in it, the frame it was made from included', async () => {
+    const rt = setup()
+    const board = rt.board as Board
+    const frame = add(rt, 'frame', { w: 400, h: 400 })
+    const inside = add(rt, 'sticky', { x: 10, y: 10 })
+    const outside = add(rt, 'sticky', { x: 1000, y: 0 })
+    const r = (await addToReport(rt, [frame])).created![0]!
+    const added = (ids: string[]) => boardReports(board, ids).find((c) => c.id === r)!.added
+    expect(added([frame])).toBe(true)
+    expect(added([inside])).toBe(true)
+    expect(added([inside, outside])).toBe(false)
+    expect(added([outside])).toBe(false)
+    // A report in the selection is not asked about; a selection of reports only checks nothing.
+    expect(added([inside, r])).toBe(true)
+    expect(added([r])).toBe(false)
   })
 })
 

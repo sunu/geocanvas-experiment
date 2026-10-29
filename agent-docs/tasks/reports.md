@@ -167,6 +167,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 - **Add to report…** (`report.addItems`, which acts on the selection), with the board's reports listed by title (`boardReports` in `apps/web/src/reports/reports.ts`) and **New report**:
   - **Right-click menu:** an Add to report submenu after Duplicate; with no report on the board, one item, Add to new report. Not shown when only reports are selected.
   - **Object panel:** an Add to report button beside Open, with the same choices (not for a report itself).
+  - In both, a **check** marks each report that already has everything selected, as an item or as the frame it was made from (`holds` in `reports/reports.ts`). Choosing it again adds only what is missing, or the notice says it is all there.
   - **⌘K:** a dropdown (the `report` form widget, `apps/web/src/reports/ui.tsx`); with one report on the board, it is chosen already; with none or several, New report is.
   - New report makes a report to the right of the objects, top-aligned with them, and the menus select it.
   - The canvas's notice says what happened ("Added 4 items to a new report, titled after the frame"), or why nothing was added.

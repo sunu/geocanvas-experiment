@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react'
 import type { Runtime, TargetRef } from '@ttx/core'
 import {
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
@@ -50,7 +51,7 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
   // Reports (agent-docs/tasks/reports.md §4): not for a selection of reports only.
   const board = runtime.board as Board
   const canReport = ids.some((id) => board.get(id)?.type !== 'report')
-  const reports = canReport ? boardReports(board) : []
+  const reports = canReport ? boardReports(board, ids) : []
   const report = async (reportId?: string) => {
     const r = await addToReport(runtime, ids, reportId)
     notify(r.status === 'applied' ? (r.summary ?? 'Added to the report') : (r.error ?? 'Could not add to the report'))
@@ -83,10 +84,11 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
               Add to report
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="w-56">
+              {/* A check: the selection is in that report already. */}
               {reports.map((r) => (
-                <ContextMenuItem key={r.id} onSelect={() => void report(r.id)}>
+                <ContextMenuCheckboxItem key={r.id} checked={r.added} onSelect={() => void report(r.id)}>
                   {r.title}
-                </ContextMenuItem>
+                </ContextMenuCheckboxItem>
               ))}
               <ContextMenuSeparator />
               <ContextMenuItem onSelect={() => void report()}>New report</ContextMenuItem>

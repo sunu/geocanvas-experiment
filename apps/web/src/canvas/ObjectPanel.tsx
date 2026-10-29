@@ -4,7 +4,7 @@ import type { AgentReply, Chat, OplogEntry, Runtime } from '@ttx/core'
 import type { BoardObject } from '../board/board'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import type { Board } from '../board/board'
 import { addToReport, boardReports } from '../reports/reports'
@@ -114,7 +114,7 @@ function AddToReport({ runtime, id, onSelect, notify }: { runtime: Runtime; id: 
     notify(r.status === 'applied' ? (r.summary ?? 'Added to the report') : (r.error ?? 'Could not add to the report'))
     if (!reportId && r.created?.length) onSelect(r.created)
   }
-  const reports = boardReports(runtime.board as Board)
+  const reports = boardReports(runtime.board as Board, [id])
   if (!reports.length) {
     return (
       <Button variant="secondary" className="flex-1" onClick={() => void add()}>
@@ -132,10 +132,11 @@ function AddToReport({ runtime, id, onSelect, notify }: { runtime: Runtime; id: 
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
+        {/* A check: the object is in that report already. */}
         {reports.map((r) => (
-          <DropdownMenuItem key={r.id} onSelect={() => void add(r.id)}>
+          <DropdownMenuCheckboxItem key={r.id} checked={r.added} onSelect={() => void add(r.id)}>
             {r.title}
-          </DropdownMenuItem>
+          </DropdownMenuCheckboxItem>
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void add()}>New report</DropdownMenuItem>
