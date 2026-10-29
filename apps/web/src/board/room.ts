@@ -18,3 +18,14 @@ export function newRoomId(): string {
 export function roomHash(room: string): string {
   return `#room=${room}`
 }
+
+/** The room of a pasted board link, or of a bare room id. */
+export function roomFromLink(text: string): string | undefined {
+  const t = text.trim()
+  if (/^[\w-]{1,64}$/.test(t)) return t
+  try {
+    return roomFromHash(new URL(t).hash)
+  } catch {
+    return undefined
+  }
+}

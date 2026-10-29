@@ -23,6 +23,28 @@ export function useObjects(board: Board): BoardObject[] {
   return useSyncExternalStore(board.subscribe, board.snapshot)
 }
 
+/** The board's name (board.setTitle); re-renders when anyone renames it. */
+export function useBoardTitle(board: Pick<Board, 'meta' | 'title'>): string | undefined {
+  return useSyncExternalStore(
+    (onChange) => {
+      board.meta.observe(onChange)
+      return () => board.meta.unobserve(onChange)
+    },
+    () => board.title,
+  )
+}
+
+/** Run `fn` once the provider has the room's doc: at once if it has it already. */
+export function whenSynced(provider: WebsocketProvider, fn: () => void) {
+  if (provider.synced) return fn()
+  const onSync = (synced: boolean) => {
+    if (!synced) return
+    provider.off('sync', onSync)
+    fn()
+  }
+  provider.on('sync', onSync)
+}
+
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
 export function useConnectionStatus(provider: WebsocketProvider): ConnectionStatus {
