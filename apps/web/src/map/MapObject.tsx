@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
+import { MapTrifoldIcon } from '@phosphor-icons/react'
+import { ObjectHeader } from '../canvas/ObjectHeader'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { Views, type Runtime, type SavedView } from '@ttx/core'
@@ -228,10 +230,9 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
 
   return (
     <div className="ttx-map">
-      <div className="ttx-map__header">
-        <span className="ttx-map__title">Map</span>
+      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title="Map">
         {!focused && onFocus && <FocusButton onFocus={onFocus} />}
-      </div>
+      </ObjectHeader>
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {!editing && <div className="ttx-map__hint">Double-click to pan and zoom</div>}

@@ -58,6 +58,110 @@ body,
   box-sizing: border-box;
 }
 
+/*
+ * The name row above a widget, as Figma labels a frame (canvas/ObjectHeader.tsx): its icon and name, which is where it
+ * is grabbed and identified, and its actions, shown on hover or selection. It lives inside the world, so it is scaled
+ * back by the zoom to keep its size on screen, and widened by it to keep the object's width.
+ */
+.ttx-obj__label {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: calc(100% * var(--ttx-zoom, 1));
+  height: 24px;
+  padding-bottom: 4px;
+  transform: scale(calc(1 / var(--ttx-zoom, 1)));
+  transform-origin: 0 100%;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Boxes, texts and sticky notes have no name: no row, so no hit area above them. */
+.ttx-obj__label:empty {
+  display: none;
+}
+
+.ttx-obj.is-selected .ttx-obj__label {
+  color: var(--canvas-accent);
+}
+
+.ttx-obj__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ttx-obj__name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ttx-obj__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+
+.ttx-obj:hover .ttx-obj__actions,
+.ttx-obj.is-selected .ttx-obj__actions,
+.ttx-obj.is-editing .ttx-obj__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ttx-obj__actions button,
+.ttx-obj__actions a {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ttx-obj__actions button:hover:not(:disabled),
+.ttx-obj__actions a:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+/* In focus mode the object fills the screen: its row goes inside, at the top, as a bar. */
+.ttx-obj.is-focused {
+  padding-top: 32px;
+}
+
+.ttx-obj.is-focused .ttx-obj__label {
+  top: 0;
+  bottom: auto;
+  z-index: 1;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  transform: none;
+  border-bottom: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+}
+
+.ttx-obj.is-focused .ttx-obj__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* Fill and border color come from the object's color (canvas/style.ts). */
 .ttx-box {
   box-sizing: border-box;
@@ -301,24 +405,6 @@ body,
   font-size: 12px;
 }
 
-.ttx-map__header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-map__title {
-  font-weight: 600;
-}
-
-.ttx-map__header .ttx-focusbtn {
-  margin-left: auto;
-}
-
 .ttx-map__body {
   position: relative;
   flex: 1;
@@ -358,20 +444,6 @@ body,
   background: var(--ttx-panel);
   box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
   font-size: 12px;
-}
-
-.ttx-event__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-event__title {
-  font-weight: 600;
 }
 
 .ttx-event__body {
@@ -706,6 +778,46 @@ body,
 }
 
 /* --- Agent chat (right; outside the canvas, so clicks never reach it) ---- */
+
+/* The Uploads panel (uploads/UploadsPanel.tsx) takes the top-right corner, in the place of the user menu. */
+.ttx-chat {
+  position: fixed;
+  right: 8px;
+  top: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100% - 16px));
+  border-radius: 10px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.08);
+  font-size: 13px;
+  z-index: 1000003;
+}
+
+.ttx-chat__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 10px 14px;
+  border-bottom: 1px solid var(--ttx-border);
+  font-weight: 600;
+}
+
+.ttx-chat__close {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  cursor: pointer;
+}
+
+.ttx-chat__close:hover {
+  background: rgb(0 0 0 / 0.06);
+}
 
 .ttx-chat__list {
   flex: 1;
@@ -1245,34 +1357,6 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   font-size: 12px;
 }
 
-.ttx-notebook__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-notebook__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.ttx-notebook__header a {
-  display: inline-flex;
-  color: var(--ttx-muted);
-}
-
-.ttx-notebook__header a:hover {
-  color: var(--ttx-ink);
-}
-
 .ttx-notebook__views {
   display: inline-flex;
   flex: none;
@@ -1619,44 +1703,9 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   font-size: 12px;
 }
 
-.ttx-pdf__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  box-sizing: border-box;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-pdf__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
 .ttx-pdf__count {
   flex: none;
   color: var(--ttx-muted);
-}
-
-.ttx-pdf__header > button,
-.ttx-pdf__header > a {
-  display: inline-flex;
-  padding: 2px;
-  border: 0;
-  background: transparent;
-  color: var(--ttx-muted);
-  cursor: pointer;
-}
-
-.ttx-pdf__header > button:hover,
-.ttx-pdf__header > a:hover {
-  color: var(--ttx-ink);
 }
 
 .ttx-pdf__body {
@@ -1758,41 +1807,6 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   background: var(--ttx-panel);
   box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
   font-size: 12px;
-}
-
-.ttx-image__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  box-sizing: border-box;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-image__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.ttx-image__header button,
-.ttx-image__header a {
-  display: inline-flex;
-  padding: 2px;
-  border: 0;
-  background: transparent;
-  color: var(--ttx-muted);
-  cursor: pointer;
-}
-
-.ttx-image__header button:hover,
-.ttx-image__header a:hover {
-  color: var(--ttx-ink);
 }
 
 .ttx-image__body {
@@ -1967,42 +1981,6 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   font-size: 12px;
 }
 
-.ttx-relief__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-relief__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.ttx-relief__header button,
-.ttx-relief__header a {
-  display: inline-flex;
-  padding: 2px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--ttx-muted);
-  cursor: pointer;
-}
-
-.ttx-relief__header button:hover:not(:disabled),
-.ttx-relief__header a:hover {
-  color: var(--ttx-ink);
-  background: rgb(0 0 0 / 0.05);
-}
-
 .ttx-relief__list {
   flex: 1;
   min-height: 0;
@@ -2083,20 +2061,6 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   background: var(--ttx-panel);
   box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 8px rgb(0 0 0 / 0.08);
   font-size: 12px;
-}
-
-.ttx-country__header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  flex: none;
-  border-bottom: 1px solid var(--ttx-border);
-}
-
-.ttx-country__title {
-  font-weight: 600;
 }
 
 .ttx-country__body {

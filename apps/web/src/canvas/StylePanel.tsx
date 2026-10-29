@@ -17,7 +17,7 @@ const sizeOf = (o: BoardObject) => (o as Styleable).fontSize ?? DEFAULT_FONT_SIZ
 
 /** Space between the selection and the panel, and the least space kept to the window's edge (px). */
 const GAP = 12
-const MARGIN = 16
+const MARGIN = 8
 
 /**
  * Color and text size for the selected objects whose type has them: a pill floating above the selection (below it

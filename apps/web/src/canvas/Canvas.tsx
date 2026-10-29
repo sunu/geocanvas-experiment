@@ -531,7 +531,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       }}
       onPointerLeave={() => sendCursor(null)}
     >
-      <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})` }}>
+      <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})`, '--ttx-zoom': camera.z } as CSSProperties}>
         {objects.map((o, i) =>
           o.id === focus?.id ? (
             // Same key and place as when not focused, so the view is not remounted (a map keeps its WebGL contexts).
@@ -551,6 +551,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
               object={o}
               layer={i}
               editing={o.id === editingId}
+              selected={selected.has(o.id)}
               onDone={() => setEditing(null)}
               onFocus={isFocusable(objectUI(o.type)) ? () => enterFocus(o.id) : undefined}
             />

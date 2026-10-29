@@ -62,10 +62,10 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
 
   return (
     <aside
-      className="ttx-ui ttx-shell fixed top-[90px] left-4 z-[1000002] flex max-h-[calc(100%-106px)] w-[360px] max-w-[calc(100%-2rem)] flex-col rounded-xl border bg-card font-sans shadow-sm"
+      className="ttx-ui ttx-shell fixed top-[74px] left-2 z-[1000002] flex max-h-[calc(100%-82px)] w-[360px] max-w-[calc(100%-1rem)] flex-col rounded-xl border bg-card font-sans shadow-sm"
       aria-label="Agent chat"
     >
-      <header className="flex shrink-0 items-center px-4 pt-4 pb-2">
+      <header className="flex shrink-0 items-center px-4 pt-4 pb-1.5">
         <h2 className="font-heading text-lg font-[550] tracking-tight text-foreground">Describe</h2>
       </header>
       {settingsOpen && (
@@ -93,7 +93,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
           {thinking && <p className="ttx-chat__thinking">Agent is thinking…</p>}
         </div>
       )}
-      <form className="flex shrink-0 flex-col gap-3 px-4 pt-1 pb-4" onSubmit={send}>
+      <form className="flex shrink-0 flex-col gap-3 px-4 pt-0 pb-4" onSubmit={send}>
         <div className="flex h-[184px] flex-col justify-between rounded-lg border border-input bg-background p-4">
           <Textarea
             value={text}
