@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineOp, definePlugin, framedBy, readingOrder, UPLOAD_ID, type AnyObject, type OpContext } from '@ttx/core'
+import { contains, defineOp, definePlugin, framedBy, readingOrder, UPLOAD_ID, type AnyObject, type OpContext } from '@ttx/core'
 
 /**
  * Reports (agent-docs/tasks/reports.md): a document made from the board. A report is an object on the canvas
@@ -65,7 +65,16 @@ export type Block =
   | { id: string; span: 1 | 2; kind: 'divider' }
   | { id: string; span: 1 | 2; kind: 'item'; sourceId: string; mode: 'live' | 'frozen'; frozen?: Frozen }
 export type RichDoc = z.infer<typeof richDoc>
-export type ReportBoardObject = AnyObject & { type: 'report'; paper: Paper; orientation: Orientation; blocks: Block[] }
+export type ReportBoardObject = AnyObject & { type: 'report'; paper: Paper; orientation: Orientation; blocks: Block[]; titleFrom?: string }
+
+/**
+ * The report's title, on its page and in pickers: the name someone gave it, else the title of the frame it was
+ * made from (`titleFrom`, live: a template frame's title follows its event), else "Untitled report".
+ */
+export function reportTitle(report: ReportBoardObject, frame?: AnyObject): string {
+  const f = frame as (AnyObject & { title?: string }) | undefined
+  return report.name || f?.name || f?.title || 'Untitled report'
+}
 
 /** Plain text as a rich text document: one paragraph per blank-line-separated part. */
 export function textDoc(text: string): RichDoc {
@@ -83,7 +92,7 @@ export function docText(doc: RichDoc): string {
   return walk(doc).replace(/\s+/g, ' ').trim()
 }
 
-/** Headings, dividers, frames (they head a section) and maps take the full width; the rest one column. */
+/** Headings, dividers, frames (they show as a heading) and maps take the full width; the rest one column. */
 const FULL_WIDTH_SOURCES = new Set(['frame', 'map'])
 const spanFor = (kind: Block['kind'], sourceType?: string): 1 | 2 =>
   kind === 'heading' || kind === 'divider' || (kind === 'item' && FULL_WIDTH_SOURCES.has(sourceType ?? '')) ? 2 : 1
@@ -115,11 +124,12 @@ const insertAt = <T>(list: T[], items: T[], index?: number) => {
 }
 
 /**
- * The objects to add for a selection: each object, and for a frame a section: the frame (its heading), then the
- * objects directly in it in reading order, then each frame inside it as its own section. Reports are left out,
- * and so is anything already in the report or met twice.
+ * The objects to add for a selection, in report order: each object, and for a frame the frame itself (it shows as
+ * a heading), then the objects directly in it in reading order, then each frame inside it in the same way. The
+ * report stays a flat list: nothing in it is a container. Reports are left out, and so is anything already in the
+ * report or met twice.
  */
-export function sectionItems(selected: AnyObject[], board: AnyObject[], already: Set<string>): AnyObject[] {
+export function itemsToAdd(selected: AnyObject[], board: AnyObject[], already: Set<string>): AnyObject[] {
   const out: AnyObject[] = []
   const seen = new Set(already)
   const visit = (o: AnyObject) => {
@@ -182,12 +192,13 @@ export const reportsPlugin = definePlugin({
         paper: z.enum(PAPERS).default('a4').describe('Paper size'),
         orientation: z.enum(ORIENTATIONS).default('portrait').describe('Orientation'),
         blocks: z.array(block).default([]).meta({ advanced: true }).describe("The report's content, in reading order"),
+        titleFrom: z.string().optional().meta({ advanced: true }).describe("A frame whose title is the report's title, until the report is renamed"),
       }),
       defaultSize: { w: 300, h: 424 },
       layer: 'top',
       summarize: (o) => {
-        const { paper, orientation, blocks } = o as ReportBoardObject
-        const page = `${paper === 'a4' ? 'A4' : 'Letter'} ${orientation}`
+        const { paper, orientation, blocks, titleFrom, name } = o as ReportBoardObject
+        const page = `${paper === 'a4' ? 'A4' : 'Letter'} ${orientation}${titleFrom && !name ? `, titled after frame ${titleFrom}` : ''}`
         return blocks.length ? `${page}; ${blocks.length} blocks: ${blocks.map(describeBlock).join('; ')}` : `${page}; empty`
       },
     },
@@ -206,7 +217,8 @@ export const reportsPlugin = definePlugin({
       id: 'report.addItems',
       title: 'Add to report',
       description:
-        'Add the selected objects to a report, as live items. A frame adds a section: its title as a heading, then the objects inside it. ' +
+        'Add the selected objects to a report, as live items. A frame adds a heading (its title), then the objects inside it; ' +
+        'added to an empty report, a frame becomes the whole report instead: its title is the report\'s title, with no heading. ' +
         'The objects stay where they are on the board. Objects already in the report are skipped.',
       target: { kind: 'objects', min: 1 },
       args: z.object({ reportId: z.string().min(1).meta({ widget: 'report' }).describe('The report to add them to'), index: z.number().int().optional().describe('Where in the report. Default: at the end') }),
@@ -214,13 +226,23 @@ export const reportsPlugin = definePlugin({
         const report = reportOf(ctx, reportId)
         const already = new Set(report.blocks.flatMap((b) => (b.kind === 'item' ? [b.sourceId] : [])))
         const selected = (ctx.target.kind === 'objects' ? ctx.target.ids : []).flatMap((id) => ctx.board.get(id) ?? [])
-        const sources = sectionItems(selected, ctx.board.list(), already)
+        let sources = itemsToAdd(selected, ctx.board.list(), already)
         if (!sources.length) throw new Error('Nothing to add: the objects are already in the report, or are reports')
+        // One frame (with what is in it) into an empty report is the report: its title is the report's, not a heading.
+        const [first] = sources
+        const whole = !report.blocks.length && first!.type === 'frame' && sources.every((o) => o === first || contains(first!, o))
+        if (whole) sources = sources.slice(1)
         const added: Block[] = sources.map((o) => ({ id: newId(), kind: 'item', sourceId: o.id, mode: 'live', span: spanFor('item', o.type) }))
-        return { id: report.id, blocks: insertAt(report.blocks, added, index), count: added.length, name: report.name || 'the report' }
+        return {
+          id: report.id,
+          blocks: insertAt(report.blocks, added, index),
+          ...(whole && { titleFrom: first!.id }),
+          count: added.length,
+          name: report.name || 'the report',
+        }
       },
-      apply: (tx, { id, blocks }) => tx.update({ [id]: { blocks } }),
-      describePlan: ({ count, name }) => `Added ${count} item${count === 1 ? '' : 's'} to ${name}`,
+      apply: (tx, { id, blocks, titleFrom }) => tx.update({ [id]: { blocks, titleFrom } }),
+      describePlan: ({ count, name, titleFrom }) => `Added ${count} item${count === 1 ? '' : 's'} to ${name}${titleFrom ? ', titled after the frame' : ''}`,
     }),
     defineOp({
       id: 'report.addBlock',

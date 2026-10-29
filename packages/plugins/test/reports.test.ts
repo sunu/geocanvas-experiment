@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { exportTools, Runtime } from '@ttx/core'
-import { docText, plugins, textDoc, type Block, type ReportBoardObject } from '../src/index'
+import { docText, plugins, reportTitle, textDoc, type Block, type ReportBoardObject } from '../src/index'
 import { ada, agent, canvas } from './fakes'
 
 const setup = () => new Runtime({ doc: new Y.Doc(), plugins, actor: ada })
@@ -41,7 +41,7 @@ describe('reports', () => {
     expect(report(rt, r).blocks).toEqual([])
   })
 
-  it('add a frame as a section: its heading, the objects in it, then the frames inside it', async () => {
+  it('make an empty report from one frame: the frame titles the report, and what is in it is the report', async () => {
     const rt = setup()
     const r = add(rt, 'report', { x: 5000 })
     const frame = add(rt, 'frame', { x: 0, y: 0, w: 1000, h: 1000, title: 'Situation report: Flood in Nepal' })
@@ -50,9 +50,41 @@ describe('reports', () => {
     const map = add(rt, 'map', { x: 10, y: 100 })
     const note = add(rt, 'sticky', { x: 10, y: 10 })
     add(rt, 'sticky', { x: 3000, y: 0 }) // outside every frame
+    const res = await rt.invoke('report.addItems', one(frame), { reportId: r })
+    expect(res.summary).toBe('Added 4 items to the report, titled after the frame')
+    // No heading for the frame itself; a frame inside it still heads its own objects.
+    expect(items(rt, r)).toEqual([note, map, inner, nested])
+    expect(report(rt, r).titleFrom).toBe(frame)
+    // The title follows the frame (a template frame's title follows its event), until the report is renamed.
+    expect(reportTitle(report(rt, r), rt.board.get(frame))).toBe('Situation report: Flood in Nepal')
+    rt.dispatch('core.object.rename', one(r), { name: 'Nepal SitRep' })
+    expect(reportTitle(report(rt, r), rt.board.get(frame))).toBe('Nepal SitRep')
+    rt.undo()
+    rt.undo()
+    expect(report(rt, r)).toMatchObject({ blocks: [] })
+    expect(report(rt, r).titleFrom).toBeUndefined()
+  })
+
+  it('add a frame to a report with content as a heading, then the objects in it', async () => {
+    const rt = setup()
+    const r = add(rt, 'report', { x: 5000 })
+    await rt.invoke('report.addBlock', one(r), { block: { kind: 'heading', text: 'Overview' } })
+    const frame = add(rt, 'frame', { x: 0, y: 0, w: 1000, h: 1000, title: 'Conflict: Cabo Delgado' })
+    const map = add(rt, 'map', { x: 10, y: 100 })
     await rt.invoke('report.addItems', one(frame), { reportId: r })
-    expect(items(rt, r)).toEqual([frame, note, map, inner, nested])
-    expect(report(rt, r).blocks[0]).toMatchObject({ sourceId: frame, span: 2 })
+    expect(items(rt, r)).toEqual([frame, map])
+    expect(report(rt, r).blocks[1]).toMatchObject({ sourceId: frame, span: 2 })
+    expect(report(rt, r).titleFrom).toBeUndefined()
+  })
+
+  it('keep the heading when a frame comes with objects from outside it', async () => {
+    const rt = setup()
+    const r = add(rt, 'report', { x: 5000 })
+    const frame = add(rt, 'frame', { x: 0, y: 0, w: 500, h: 500 })
+    const outside = add(rt, 'sticky', { x: 0, y: 2000 })
+    await rt.invoke('report.addItems', { kind: 'objects', ids: [frame, outside] }, { reportId: r })
+    expect(items(rt, r)).toEqual([frame, outside])
+    expect(report(rt, r).titleFrom).toBeUndefined()
   })
 
   it('never put a report in a report', async () => {
