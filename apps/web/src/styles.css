@@ -6,7 +6,8 @@
   --ttx-panel: #ffffff;
   --ttx-border: rgb(0 0 0 / 0.12);
   --ttx-accent: #2563eb;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ttx-font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--ttx-font);
   color: var(--ttx-ink);
 }
 
@@ -24,7 +25,12 @@ body,
   inset: 0;
   overflow: hidden;
   background-color: var(--ttx-bg);
-  background-image: radial-gradient(circle, var(--ttx-grid) 1px, transparent 1px);
+  /* --ttx-dots (0 to 1) is the dots' opacity and --ttx-dot-r their radius in px, both from the zoom (Canvas.tsx). */
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--ttx-grid) calc(var(--ttx-dots, 1) * 100%), transparent) calc(var(--ttx-dot-r, 1) * 1px),
+    transparent calc(var(--ttx-dot-r, 1) * 1px)
+  );
   touch-action: none;
   user-select: none;
   cursor: default;
@@ -72,7 +78,7 @@ body,
     inset 0 -4px 0 rgb(0 0 0 / 0.08),
     0 1px 2px rgb(0 0 0 / 0.2),
     0 8px 18px rgb(0 0 0 / 0.2);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--ttx-font);
   font-weight: 300;
   line-height: 1.3;
 }
@@ -114,7 +120,7 @@ body,
 /* Font size and color come from the object. The plain div sets the height; the editor sits over it. */
 .ttx-text-wrap {
   position: relative;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--ttx-font);
   line-height: 1.4;
 }
 
@@ -145,7 +151,7 @@ body,
 .ttx-draft {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px dashed var(--ttx-accent);
+  border: 1.5px dashed var(--canvas-accent);
 }
 
 /*
@@ -168,12 +174,12 @@ body,
 }
 
 .ttx-selection {
-  border: 1.5px solid var(--ttx-accent);
+  border: 1.5px solid var(--canvas-accent);
 }
 
 .ttx-marquee {
-  border: 1px solid var(--ttx-accent);
-  background: rgb(37 99 235 / 0.08);
+  border: 1px solid var(--canvas-accent);
+  background: color-mix(in srgb, var(--canvas-accent) 8%, transparent);
 }
 
 .ttx-handle {
@@ -182,7 +188,7 @@ body,
   height: 10px;
   margin: -5px 0 0 -5px;
   box-sizing: border-box;
-  border: 1.5px solid var(--ttx-accent);
+  border: 1.5px solid var(--canvas-accent);
   border-radius: 2px;
   background: #fff;
   pointer-events: auto;
@@ -198,12 +204,47 @@ body,
   cursor: nesw-resize;
 }
 
-/* Other people: their cursors and selections, in their color (canvas/Peers.tsx). */
+/* Other people and the agent: selections, cursors and name tags in their color (canvas/Peers.tsx, board/collaborators.ts). */
 .ttx-peer-selection {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px dashed;
-  border-radius: 2px;
+  border: 1.5px solid;
+}
+
+/* The agent's marks are dashed, so they do not depend on color alone. */
+.ttx-peer-selection.is-agent {
+  border-style: dashed;
+}
+
+/* Corner marks, as the handles of the Figma file. They are not draggable: only your own selection is. */
+.ttx-peer-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  border: 1.5px solid;
+  border-radius: 1px;
+  background: #fff;
+}
+
+.ttx-peer-handle--nw {
+  left: -5px;
+  top: -5px;
+}
+
+.ttx-peer-handle--ne {
+  right: -5px;
+  top: -5px;
+}
+
+.ttx-peer-handle--sw {
+  left: -5px;
+  bottom: -5px;
+}
+
+.ttx-peer-handle--se {
+  right: -5px;
+  bottom: -5px;
 }
 
 .ttx-cursor {
@@ -220,33 +261,19 @@ body,
 
 .ttx-cursor__name {
   position: absolute;
-  left: 12px;
-  top: 16px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  color: #fff;
-  font-size: 11px;
+  left: 14px;
+  top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
   line-height: 16px;
   white-space: nowrap;
 }
 
-/* --- Style panel (left; shown for selected boxes and texts) ------------- */
-
-.ttx-style {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 6px;
-  border-radius: 10px;
-  background: var(--ttx-panel);
-  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.08);
-  z-index: 1000002;
-}
+/* The color swatches of the palette's color field (canvas/coreUI.tsx). */
 
 .ttx-swatch {
   width: 22px;
@@ -260,45 +287,6 @@ body,
 .ttx-swatch.is-on {
   box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 4px var(--ttx-accent);
 }
-
-.ttx-style__label {
-  color: var(--ttx-muted);
-}
-
-.ttx-style button:not(.ttx-swatch) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ttx-ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.ttx-style button:not(.ttx-swatch):hover {
-  background: rgb(0 0 0 / 0.06);
-}
-
-.ttx-style__sep {
-  width: 20px;
-  height: 1px;
-  margin: 2px 0;
-  background: var(--ttx-border);
-}
-
-.ttx-style__size {
-  font-size: 12px;
-  color: var(--ttx-muted);
-}
-
-/* --- Board actions (top left; outside the canvas, so clicks never reach it) --- */
 
 /* --- Map ---------------------------------------------------------------- */
 
@@ -746,7 +734,7 @@ body,
 }
 
 .ttx-chat__entry--agent .ttx-chat__who {
-  color: #7c3aed;
+  color: var(--agent);
 }
 
 .ttx-chat__chip {

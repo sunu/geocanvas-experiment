@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Draft, type Runtime, type TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects, type ConnectionStatus } from '../board/connect'
@@ -9,6 +9,7 @@ import { requestFit } from './coreUI'
 import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
 import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
+import { useAgentTouched } from '../board/agentActivity'
 import { Peers } from './Peers'
 import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
@@ -21,6 +22,9 @@ const MIN_SIZE = 16
 const DRAG_THRESHOLD = 3
 const HANDLES = ['nw', 'ne', 'sw', 'se'] as const
 const GRID = 24
+/** The dots are fully visible from this zoom up, fade out below it, and are gone at DOTS_GONE. */
+const DOTS_FULL = 0.4
+const DOTS_GONE = 0.15
 
 const objectsTarget = (ids: Iterable<string>): TargetRef => ({ kind: 'objects', ids: [...ids] })
 
@@ -74,6 +78,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
   const board = runtime.board as Board
   const objects = useObjects(board)
   const peers = usePeers(awareness)
+  const agentTouched = useAgentTouched(runtime)
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, z: 1 })
   const [tool, setTool] = useState<Tool>('select')
   const [selection, setSelection] = useState<Set<string>>(() => new Set())
@@ -509,12 +514,15 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
 
   const single = selected.size === 1 && !editingId && !focus ? byId.get([...selected][0]!) : undefined
   const grid = GRID * camera.z
+  // The dots' radius follows the zoom like their spacing does, but not below half a pixel, so they stay drawn while they fade.
+  const dotRadius = Math.max(0.5, camera.z)
+  const dots = Math.min(1, Math.max(0, (camera.z - DOTS_GONE) / (DOTS_FULL - DOTS_GONE)))
 
   return (
     <div
       ref={rootRef}
       className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''}`}
-      style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px` }}
+      style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius } as CSSProperties}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
       onPointerMove={(e) => {
@@ -555,7 +563,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
       {/* Selection chrome in screen space, so outlines and handles keep their size at any zoom. */}
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
-        {!focus && <Peers peers={peers} camera={camera} byId={byId} />}
+        {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentTouched} />}
         {!focus && [...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
@@ -588,7 +596,7 @@ export function Canvas({ runtime, status, awareness }: { runtime: Runtime; statu
         </div>
       )}
 
-      {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} />}
+      {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} camera={camera} />}
 
       {!focus && <Toolbar
         runtime={runtime}

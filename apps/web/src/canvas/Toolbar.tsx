@@ -11,6 +11,7 @@ import {
   NoteIcon,
   ScribbleLoopIcon,
   ShapesIcon,
+  TextTIcon,
   UploadSimpleIcon,
   type Icon,
 } from '@phosphor-icons/react'
@@ -33,9 +34,6 @@ export const tools = (): { tool: Tool; label: string; key: string; Icon: Icon }[
   ...toolTypes().map((t) => ({ tool: t.type, label: t.label, key: t.key, Icon: t.Icon })),
 ]
 
-/** Icon size (px) of the style panel. */
-export const ICON = 18
-
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
 
 interface Item {
@@ -55,6 +53,7 @@ const GROUPS: Item[][] = [
     { label: 'Select', Icon: CursorIcon, tool: 'select', key: 'V' },
     { label: 'Move', Icon: HandIcon, tool: 'hand', key: 'H' },
     { label: 'Add sticky note', Icon: NoteIcon, tool: 'sticky', key: 'S' },
+    { label: 'Add text', Icon: TextTIcon, tool: 'text', key: 'T' },
     { label: 'Draw', Icon: ScribbleLoopIcon },
     { label: 'Add shape', Icon: ShapesIcon, tool: 'box', key: 'R' },
     { label: 'Add connector', Icon: FlowArrowIcon },
@@ -92,8 +91,8 @@ function Hint({ label, keys, children }: { label: string; keys?: string; childre
 
 /**
  * The Canvas Toolbar of the Figma file: a pill of 36px round buttons with Phosphor icons at the regular
- * weight, the selected tool filled, each with a tooltip. Arrange, delete, text and the command palette have no
- * button here: they are on the keys (], [, Delete, T, ⌘K).
+ * weight, the selected tool filled, each with a tooltip. Arrange, delete and the command palette have no
+ * button here: they are on the keys (], [, Delete, ⌘K).
  */
 export function Toolbar({ runtime, tool, onTool, zoom, onResetZoom, status }: Props) {
   const separator = <Separator orientation="vertical" className="data-[orientation=vertical]:h-5" />
