@@ -50,7 +50,7 @@ The browser calls the provider directly, so the provider must allow CORS. OpenRo
 ### Risks
 
 - A script that runs on the app's origin can read localStorage, and thus the key. The app loads no third-party scripts at run time. A Content Security Policy with a `connect-src` list would decrease this risk more, but it would also block OpenAI-compatible URLs that we do not know. We did not add one.
-- A person's own agent has no turn limit. `MAX_STEPS` (8 model calls per turn) still applies.
+- A person's own agent has no turn limit. `MAX_STEPS` (12 model calls per turn) still applies.
 
 ## 5. Next step: the room agent for internal users only
 
