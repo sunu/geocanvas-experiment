@@ -29,7 +29,8 @@ export function LayerList({ layers, states, onUseMyView, onRemove, onFilter, onS
   return (
     <div className="ttx-layers">
       {states.map((s, i) => {
-        const note = s.error ?? (s.loading ? 'Loading…' : [truncationOf(s.value), captionOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
+        const tileStatus = s.output === 'geo.tiles' ? (s.value as { status?: string } | undefined)?.status : undefined
+        const note = s.error ?? (s.loading ? 'Loading…' : tileStatus === 'running' ? 'Waiting for openEO…' : [truncationOf(s.value), captionOf(s.value), attributionOf(s.value)].filter(Boolean).join(' · '))
         const styled = s.value !== undefined && STYLED.has(s.output ?? '')
         return (
           <div key={s.id} className="ttx-layers__entry">

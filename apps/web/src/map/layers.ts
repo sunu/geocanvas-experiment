@@ -141,7 +141,8 @@ export function deckLayers(states: LayerState[]): Layer[] {
   return [...states].sort((a, b) => drawOrder(a) - drawOrder(b)).flatMap((s): Layer[] => {
     if (s.value === undefined) return []
     const opacity = s.style?.opacity ?? 1
-    if (s.output === 'geo.tiles') return [tileLayer(s.value as Tiles, `layer-${s.id}`, opacity)]
+    // A tile result without a url is an openEO service that is still being created (openEOTilesTool).
+    if (s.output === 'geo.tiles') return (s.value as Tiles).url ? [tileLayer(s.value as Tiles, `layer-${s.id}`, opacity)] : []
     if (s.output === 'geo.raster') return rasterLayers(s.value, { id: `layer-${s.id}`, opacity })
     if (s.output === GRID_OUTPUT) return gridLayers(s.value, { id: `layer-${s.id}` })
     if (s.output === 'geo.features') {

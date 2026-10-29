@@ -29,12 +29,17 @@ export const OPENROUTER_URL = 'https://openrouter.ai/api/v1'
 export function chatCompletions({ url, apiKey, model }: { url: string; apiKey?: string; model: string }): Complete {
   const base = url.replace(/\/+$/, '')
   const name = base === OPENROUTER_URL ? 'OpenRouter' : base
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-    ...(apiKey && { authorization: `Bearer ${apiKey}` }),
-    ...(base === OPENROUTER_URL && { 'x-title': 'humanitarian-ttx' }),
-  }
+  const key = apiKey?.trim()
+  const headers = new Headers({ 'content-type': 'application/json' })
+  if (key) headers.set('Authorization', `Bearer ${key}`)
+  if (base === OPENROUTER_URL) headers.set('x-title', 'humanitarian-ttx')
   return async (messages, tools) => {
+    if (base === OPENROUTER_URL) {
+      if (!key) throw new Error('OpenRouter API key is missing. Open the agent settings, enter your key, and save it.')
+      // OpenRouter answers any malformed key (quotes from a .env line, an unresolved op:// reference) with
+      // 401 "Missing Authentication header", as if none was sent. Say what is wrong instead.
+      if (!/^sk-or-\S+$/.test(key)) throw new Error('The saved key does not look like an OpenRouter key (sk-or-…). Check for quotes or an unresolved op:// reference.')
+    }
     const res = await fetch(`${base}/chat/completions`, { method: 'POST', headers, body: JSON.stringify({ model, messages, tools }) })
     const text = await res.text()
     if (!res.ok) throw new Error(`${name} ${res.status}: ${text.slice(0, 300)}`)

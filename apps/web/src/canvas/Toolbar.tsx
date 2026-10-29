@@ -5,6 +5,7 @@ import {
   CodeIcon,
   CursorIcon,
   FilePdfIcon,
+  FileTextIcon,
   FolderOpenIcon,
   FrameCornersIcon,
   HandIcon,
@@ -65,6 +66,7 @@ const EVENT_CONTEXT: Item[] = [
 const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },
   { label: 'Add Jupyter notebook', text: 'Notebook', Icon: CodeIcon, tool: 'notebook', key: 'N' },
+  { label: 'Add report', text: 'Report', Icon: FileTextIcon, tool: 'report', key: 'P' },
 ]
 /** What you draw on the board yourself. */
 const BOARD_TOOLS: Item[] = [

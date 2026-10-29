@@ -1,3 +1,6 @@
 .wrangler
 .dev.vars
+.op.env
+.dev.vars.tpl
+.dev.vars.injected-*
 worker-configuration.d.ts

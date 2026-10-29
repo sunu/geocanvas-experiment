@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { exportTools, Runtime } from '@ttx/core'
-import { docText, plugins, reportTitle, textDoc, type Block, type ReportBoardObject } from '../src/index'
+import { docText, pageSize, plugins, reportTitle, textDoc, type Block, type ReportBoardObject } from '../src/index'
 import { ada, agent, canvas } from './fakes'
 
 const setup = () => new Runtime({ doc: new Y.Doc(), plugins, actor: ada })
@@ -9,6 +9,14 @@ const add = (rt: Runtime, type: string, fields: Record<string, unknown> = {}) =>
 const report = (rt: Runtime, id: string) => rt.board.get(id) as ReportBoardObject
 const one = (id: string) => ({ kind: 'objects' as const, ids: [id] })
 const items = (rt: Runtime, id: string) => report(rt, id).blocks.flatMap((b) => (b.kind === 'item' ? [b.sourceId] : []))
+
+describe('report pages', () => {
+  it('are A4 or Letter in CSS px, and turn for landscape', () => {
+    expect(pageSize('a4', 'portrait')).toEqual({ w: 794, h: 1123 })
+    expect(pageSize('a4', 'landscape')).toEqual({ w: 1123, h: 794 })
+    expect(pageSize('letter', 'portrait')).toEqual({ w: 816, h: 1056 })
+  })
+})
 
 describe('reports', () => {
   it('start empty on A4, portrait, and tell the agent their page and blocks', () => {
@@ -20,8 +28,11 @@ describe('reports', () => {
     // Forms fold the page away: a new report from the palette asks nothing, and its settings change the page.
     const addArgs = (exportTools(rt.availableOps(canvas)).find((t) => t.name === 'report__add')!.input_schema as any).properties.args.properties
     for (const k of ['paper', 'orientation', 'blocks', 'titleFrom']) expect(addArgs[k]).toMatchObject({ advanced: true })
+    // Its settings form starts from the report's own page.
+    expect(rt.defaultsFor('report.setPage', one(r))).toEqual({ paper: 'a4', orientation: 'portrait' })
     rt.dispatch('report.setPage', one(r), { paper: 'letter', orientation: 'landscape' })
     expect(report(rt, r)).toMatchObject({ paper: 'letter', orientation: 'landscape' })
+    expect(rt.defaultsFor('report.setPage', one(r))).toEqual({ paper: 'letter', orientation: 'landscape' })
   })
 
   it('add objects as live items, leave the objects as they were, and skip ones already in it', async () => {

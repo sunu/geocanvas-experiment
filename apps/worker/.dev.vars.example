@@ -1,0 +1,5 @@
+# Plain local Worker secrets. Do not put op:// references here: Wrangler reads
+# this file directly. Put 1Password references in ignored .dev.vars.tpl and
+# start with npm run sync; it resolves the template for Wrangler.
+OPENEO_BASE_URL=https://api.explorer.eopf.copernicus.eu/openeo
+OPENROUTER_API_KEY=

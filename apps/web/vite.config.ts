@@ -44,6 +44,7 @@ export default defineConfig({
       '/reliefweb': 'http://localhost:8787',
       '/hapi': 'http://localhost:8787',
       '/uploads': 'http://localhost:8787',
+      '/openeo': 'http://localhost:8787',
     },
   },
   // deck.gl-geotiff decodes COG tiles in a worker that uses top-level await.
