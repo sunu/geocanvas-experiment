@@ -46,13 +46,14 @@ export function useExposure(
   const areasKey = useMemo(() => stableJson(areas), [areas])
   const dataKey = useMemo(() => stableJson(dataAreas), [dataAreas])
   const whatIfs = areas.length > dataAreas.length
-  const key = on && !waiting && areas.length ? `${areasKey}|${whatIfs ? dataKey : ''}` : ''
+  const returnPeriod = scenario?.exposure?.returnPeriod
+  const key = on && !waiting && areas.length ? `${returnPeriod ?? ''}|${areasKey}|${whatIfs ? dataKey : ''}` : ''
   const [state, setState] = useState<{ key: string; result?: Exposure; baseline?: Exposure; error?: string }>({ key: '' })
 
   useEffect(() => {
     if (!key) return
     const abort = new AbortController()
-    const run = (input: GeoJSON.Geometry[]) => tools.run<Exposure>('exposure.buildings', { areas: input }, { signal: abort.signal })
+    const run = (input: GeoJSON.Geometry[]) => tools.run<Exposure>('exposure.buildings', { areas: input, ...(returnPeriod && { returnPeriod }) }, { signal: abort.signal })
     Promise.all([run(areas), whatIfs ? (dataAreas.length ? run(dataAreas) : NONE) : undefined]).then(
       ([result, baseline]) => setState({ key, result, ...(baseline && { baseline }) }),
       (err) => {
@@ -85,9 +86,29 @@ export function facilitiesBy(e: Exposure, category: FacilityCategory) {
 /** Colors of exposed facilities on the map and in the panel: not red (closures), not the routes' colors. */
 export const FACILITY_COLORS: Record<FacilityCategory, string> = { health: '#e11d48', education: '#0d9488' }
 
-const rgb = (hex: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number]
+/** Colors of the flooded buildings by depth class (DEPTH_CLASSES), light to dark blue, as GloFAS's own maps draw depth. */
+export const DEPTH_COLORS = ['#9ecae1', '#4292c6', '#08519c', '#08306b']
 
-/** The exposed health facilities and places of education as dots with a white ring, above the routes. */
+const rgb = (hex: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number]
+const DEPTH_RGB = DEPTH_COLORS.map(rgb)
+
+/** The flooded buildings as small dots by depth class, when there is a flood's depth: under the routes. */
+export function floodedLayers(s: ExposureState | undefined): Layer[] {
+  const flooded = s?.result?.inundation
+  if (!flooded?.classes.length) return []
+  return [
+    new ScatterplotLayer({
+      id: 'exposure-flooded',
+      data: { length: flooded.classes.length, attributes: { getPosition: { value: flooded.points, size: 2 } } },
+      getFillColor: (_: unknown, { index }: { index: number }) => DEPTH_RGB[flooded.classes[index]!]!,
+      radiusUnits: 'pixels',
+      getRadius: 2,
+      radiusMinPixels: 1,
+    }),
+  ]
+}
+
+/** The exposed health facilities and places of education as dots with a white ring: above the routes. */
 export function exposureLayers(s: ExposureState | undefined): Layer[] {
   if (!s?.result?.facilities.length) return []
   return [

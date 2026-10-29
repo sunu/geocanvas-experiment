@@ -132,4 +132,14 @@ describe('exposure in a scenario', () => {
     rt.undo()
     expect(mapOf().scenario!.exposure).toEqual({ buildings: true })
   })
+
+  it('keeps a flood of a GloFAS return period for depth and damage, and only those', () => {
+    const { rt, target, mapOf } = setup()
+    expect(rt.dispatch('map.setExposure', target, { buildings: true, returnPeriod: 100 }).status).toBe('applied')
+    expect(mapOf().scenario!.exposure).toEqual({ buildings: true, returnPeriod: 100 })
+    expect(summarizeBoard(rt.board, rt.registry)).toMatch(/depth and damage of a 100-year river flood/)
+    expect(rt.dispatch('map.setExposure', target, { buildings: true, returnPeriod: 30 }).status).toBe('failed')
+    rt.dispatch('map.setExposure', target, { buildings: true })
+    expect(mapOf().scenario!.exposure).toEqual({ buildings: true })
+  })
 })

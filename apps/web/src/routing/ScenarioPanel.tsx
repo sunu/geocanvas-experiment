@@ -72,7 +72,11 @@ export function ScenarioPanel({ runtime, object: o }: { runtime: Runtime; object
           ))}
         </div>
       </section>
-      <ExposureSection exposure={exposure} onSet={(buildings) => mapOp('map.setExposure', { buildings })} />
+      <ExposureSection
+        exposure={exposure}
+        returnPeriod={o.scenario?.exposure?.returnPeriod}
+        onSet={(buildings, returnPeriod) => mapOp('map.setExposure', { buildings, ...(returnPeriod && { returnPeriod }) })}
+      />
     </div>
   )
 }

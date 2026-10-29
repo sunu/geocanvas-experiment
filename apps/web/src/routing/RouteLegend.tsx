@@ -35,6 +35,13 @@ export function RouteLegend({ routes, exposure }: { routes: RouteState[]; exposu
           {!!added && <span className="ttx-routelegend__extra">{signedCount(added)}</span>}
         </li>
       )}
+      {exposure?.result?.inundation && (
+        <li>
+          <i className="ttx-routelegend__depth" aria-hidden />
+          <span className="ttx-routelegend__title">{exposure.result.inundation.returnPeriod}-year flood: destroyed, about</span>
+          <span className="ttx-routelegend__time">{Math.round(exposure.result.inundation.destroyed).toLocaleString('en-US')}</span>
+        </li>
+      )}
     </ul>
   )
 }
