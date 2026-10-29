@@ -229,7 +229,9 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     if (!map) return
     const control = new AttributionControl({ compact: true, ...(credits && { customAttribution: credits }) })
     map.addControl(control)
+    const keepClosed = startClosed(map.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-attrib'))
     return () => {
+      keepClosed()
       // On unmount the map is already gone, with its controls.
       if (mapRef.current === map) map.removeControl(control)
     }
@@ -271,7 +273,9 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
         {!live && snapshot && (
           <>
             <img className="ttx-map__snapshot" src={snapshot} alt="" draggable={false} />
-            <div className="ttx-map__credits">{[BASEMAP_CREDITS[o.basemap], credits].filter(Boolean).join(' · ')}</div>
+            <div className="ttx-map__credits" tabIndex={0} aria-label="Map credits">
+              <span>{[BASEMAP_CREDITS[o.basemap], credits].filter(Boolean).join(' · ')}</span>
+            </div>
           </>
         )}
         {!editing && !focused && unplaced && onFocus ? (
@@ -289,6 +293,25 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       </div>
     </div>
   )
+}
+
+/**
+ * A compact attribution starts as the ⓘ button, opened with a click. MapLibre opens it the first time it has text to
+ * show and closes it only on the first drag, which covers small maps with credits. Returns the function that stops
+ * watching.
+ */
+function startClosed(attribution: HTMLElement | null): () => void {
+  if (!attribution) return () => {}
+  const close = () => {
+    if (!attribution.classList.contains('maplibregl-compact-show')) return
+    attribution.classList.remove('maplibregl-compact-show')
+    // MapLibre opens a compact attribution only once; from here the button toggles it.
+    observer.disconnect()
+  }
+  const observer = new MutationObserver(close)
+  observer.observe(attribution, { attributeFilter: ['class'] })
+  close()
+  return () => observer.disconnect()
 }
 
 /** Views from before they were in the doc, kept in this browser's localStorage. Read once, to move them to the doc. */

@@ -2479,16 +2479,46 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   user-select: none;
 }
 
+/* Collapsed to an ⓘ like MapLibre's compact attribution; the credits show on hover or focus. */
 .ttx-map__credits {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  max-width: 100%;
-  overflow: hidden;
-  padding: 1px 4px;
-  background: rgb(255 255 255 / 0.7);
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  max-width: calc(100% - 8px);
+  min-height: 20px;
+  box-sizing: border-box;
+  padding: 0 20px 0 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.8);
   color: #333;
   font-size: 10px;
+  pointer-events: auto;
+}
+
+.ttx-map__credits::after {
+  content: 'i';
+  position: absolute;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #333;
+  color: #fff;
+  font: italic bold 9px/12px Georgia, serif;
+  text-align: center;
+}
+
+.ttx-map__credits span {
+  display: none;
+  overflow: hidden;
+  padding: 0 4px 0 8px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ttx-map__credits:hover span,
+.ttx-map__credits:focus span {
+  display: block;
 }
