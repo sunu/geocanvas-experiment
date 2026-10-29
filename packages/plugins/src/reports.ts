@@ -216,10 +216,16 @@ export const reportsPlugin = definePlugin({
   ops: [
     defineOp({
       id: 'report.setPage',
-      title: 'Set report page',
-      description: "Set the selected report's paper size (A4 or US Letter) and orientation.",
+      title: 'Report page settings',
+      description: "Set the selected report's paper size (A4 or US Letter) and orientation (portrait or landscape).",
       target: oneReport,
       args: z.object({ paper: z.enum(PAPERS).optional().describe('Paper size'), orientation: z.enum(ORIENTATIONS).optional().describe('Orientation') }),
+      nl: { aliases: ['page settings', 'paper size', 'orientation', 'landscape', 'portrait', 'A4', 'letter'] },
+      // The form starts from the report's own page.
+      defaults: (ctx) => {
+        const report = reportOf(ctx)
+        return { paper: report.paper, orientation: report.orientation }
+      },
       prepare: (ctx, args) => ({ id: reportOf(ctx).id, ...args }),
       apply: (tx, { id, paper, orientation }) => tx.update({ [id]: { paper, orientation } }),
     }),

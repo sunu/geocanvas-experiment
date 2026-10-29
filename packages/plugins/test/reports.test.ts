@@ -28,8 +28,11 @@ describe('reports', () => {
     // Forms fold the page away: a new report from the palette asks nothing, and its settings change the page.
     const addArgs = (exportTools(rt.availableOps(canvas)).find((t) => t.name === 'report__add')!.input_schema as any).properties.args.properties
     for (const k of ['paper', 'orientation', 'blocks', 'titleFrom']) expect(addArgs[k]).toMatchObject({ advanced: true })
+    // Its settings form starts from the report's own page.
+    expect(rt.defaultsFor('report.setPage', one(r))).toEqual({ paper: 'a4', orientation: 'portrait' })
     rt.dispatch('report.setPage', one(r), { paper: 'letter', orientation: 'landscape' })
     expect(report(rt, r)).toMatchObject({ paper: 'letter', orientation: 'landscape' })
+    expect(rt.defaultsFor('report.setPage', one(r))).toEqual({ paper: 'letter', orientation: 'landscape' })
   })
 
   it('add objects as live items, leave the objects as they were, and skip ones already in it', async () => {
