@@ -7,13 +7,11 @@ import {
   CursorIcon,
   FilePdfIcon,
   FolderOpenIcon,
-  FlowArrowIcon,
   HandIcon,
   ImageIcon,
   LineSegmentIcon,
   MapTrifoldIcon,
   NoteIcon,
-  ScribbleLoopIcon,
   SquareIcon,
   SquaresFourIcon,
   TextTIcon,
@@ -68,7 +66,7 @@ const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },
   { label: 'Add Jupyter notebook', text: 'Notebook', Icon: CodeIcon, tool: 'notebook', key: 'N' },
 ]
-/** What you draw on the board yourself. Draw and connector are not built yet. */
+/** What you draw on the board yourself. */
 const BOARD_TOOLS: Item[] = [
   { label: 'Add text', text: 'Text', Icon: TextTIcon, tool: 'text', key: 'T' },
   { label: 'Add sticky note', text: 'Sticky', Icon: NoteIcon, tool: 'sticky', key: 'S' },
@@ -81,10 +79,6 @@ const SHAPES: Item[] = [
   { label: 'Add ellipse', text: 'Ellipse', Icon: CircleIcon, tool: 'box:ellipse', key: 'O' },
 ]
 const IMAGE: Item = { label: 'Add image', text: 'Image', Icon: ImageIcon, tool: 'image', key: 'I' }
-const COMING_SOON = [
-  { label: 'Draw', Icon: ScribbleLoopIcon },
-  { label: 'Connector', Icon: FlowArrowIcon },
-]
 
 interface Props {
   tool: Tool
@@ -195,16 +189,6 @@ export function Toolbar({ tool, onTool, onFiles, onUploads, onPalette, onTemplat
       </Button>
     </Hint>
   )
-  // A disabled button gets no pointer events, so its tooltip hangs on a wrapper.
-  const comingSoon = (label: string, Icon: Icon) => (
-    <Hint key={label} label={`${label} (coming soon)`}>
-      <span tabIndex={0} className="rounded-md">
-        <Button variant="ghost" size="sm" className={BTN} aria-label={label} disabled>
-          <Face Icon={Icon} text={label} />
-        </Button>
-      </span>
-    </Hint>
-  )
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
       <div
@@ -232,7 +216,6 @@ export function Toolbar({ tool, onTool, onFiles, onUploads, onPalette, onTemplat
         <Section name="Board">
           {BOARD_TOOLS.map(button)}
           <ToolGroup name="Shapes" items={SHAPES} tool={tool} onTool={onTool} />
-          {COMING_SOON.map(({ label, Icon }) => comingSoon(label, Icon))}
         </Section>
         {separator}
         <Section name="Upload">
