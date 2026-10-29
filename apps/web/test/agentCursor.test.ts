@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OplogEntry } from '@ttx/core'
-import { agentStep, AgentCursors, askStep, DWELL_MS, IDLE_MS, MIN_BUSY_MS, TRAVEL_MS, type AgentStep } from '../src/canvas/agentCursor'
+import { agentStep, AgentCursors, askStep, DWELL_MS, hoverOffset, IDLE_MS, MAX_WAIT_MS, MIN_BUSY_MS, TRAVEL_MS, type AgentStep } from '../src/canvas/agentCursor'
 
 const agent = { kind: 'agent' as const, id: 'agent', name: 'Agent', color: '#8e51ff', onBehalfOf: 'p1' }
 const rects: Record<string, { x: number; y: number; w: number; h: number }> = {
@@ -43,13 +43,20 @@ describe('askStep', () => {
 })
 
 describe('AgentCursors', () => {
-  it('arrives at its place, then waits there', () => {
+  /** Cursors that see these ids as loading. */
+  const withLoading = (...ids: string[]) => {
+    const loading = new Set(ids)
+    return { loading, c: new AgentCursors({ loading: (id) => loading.has(id) }) }
+  }
+
+  it('arrives at its place, then rests and hovers there', () => {
     const c = new AgentCursors()
     c.add(step(100, 100), 0)
     const [moving] = c.at(TRAVEL_MS / 2)
-    expect(moving!.working).toBe(false)
     expect(moving!.x).toBeLessThan(100)
-    expect(c.at(TRAVEL_MS)[0]).toMatchObject({ x: 100, y: 100, working: true })
+    expect(moving!.resting).toBeUndefined()
+    expect(c.at(TRAVEL_MS)[0]).toMatchObject({ x: 100, y: 100 })
+    expect(c.at(TRAVEL_MS + DWELL_MS + 500)[0]!.resting).toBe(500)
   })
 
   it('plays a burst in order, one place after another', () => {
@@ -60,9 +67,39 @@ describe('AgentCursors', () => {
     // The second move waits for the first to arrive and dwell.
     expect(c.at(TRAVEL_MS + DWELL_MS / 2)[0]).toMatchObject({ x: 100 })
     expect(c.arriving(TRAVEL_MS)).toEqual(new Set(['b']))
-    expect(c.nextChange(TRAVEL_MS)).toBe(2 * TRAVEL_MS + DWELL_MS)
+    expect(c.nextChange(TRAVEL_MS)).toBe(TRAVEL_MS + DWELL_MS)
     expect(c.at(2 * TRAVEL_MS + DWELL_MS)[0]).toMatchObject({ x: 500 })
     expect(c.arriving(2 * TRAVEL_MS + DWELL_MS).size).toBe(0)
+  })
+
+  it('waits at an object while its data loads, then moves on', () => {
+    const { c, loading } = withLoading('a')
+    c.add(step(100, 0, ['a'], ['a'], 'Add data layer'), 0)
+    c.add(step(500, 0, ['b']), 0)
+    expect(c.at(2000)[0]).toMatchObject({ x: 100, label: 'Add data layer' })
+    expect(c.arriving(2000)).toEqual(new Set(['b']))
+    loading.delete('a')
+    // It leaves when it sees the data in.
+    expect(c.at(2000)[0]).toMatchObject({ x: 100 })
+    expect(c.at(2000 + TRAVEL_MS)[0]).toMatchObject({ x: 500 })
+    expect(c.arriving(2000 + TRAVEL_MS).size).toBe(0)
+  })
+
+  it('does not wait for loading when the next step is on the same object', () => {
+    const { c } = withLoading('m')
+    c.add(step(100, 0, ['m'], ['m'], 'Add map'), 0)
+    c.add(step(100, 0, [], ['m'], 'Add data layer'), 0)
+    expect(c.at(TRAVEL_MS + DWELL_MS + 1)[0]!.label).toBe('Add data layer')
+  })
+
+  it(`moves on after ${MAX_WAIT_MS} ms if the data is still loading`, () => {
+    const { c } = withLoading('a')
+    c.add(step(100, 0, ['a']), 0)
+    c.add(step(500, 0, ['b']), 0)
+    const leaves = TRAVEL_MS + MAX_WAIT_MS
+    expect(c.nextChange(TRAVEL_MS + MIN_BUSY_MS + 1)).toBe(leaves)
+    expect(c.at(leaves - 1)[0]).toMatchObject({ x: 100 })
+    expect(c.at(leaves + TRAVEL_MS)[0]).toMatchObject({ x: 500 })
   })
 
   it('fades out and goes once the agent stops', () => {
@@ -82,10 +119,11 @@ describe('AgentCursors', () => {
     expect(c.at(10)).toHaveLength(2)
   })
 
-  it('jumps and draws objects at once with reduced motion', () => {
-    const c = new AgentCursors(true)
+  it('jumps, draws objects at once and does not hover with reduced motion', () => {
+    const c = new AgentCursors({ reduced: true })
     c.add(step(100, 100, ['a']), 0)
     expect(c.at(0)[0]).toMatchObject({ x: 100, y: 100, opacity: 1 })
+    expect(c.at(5000)[0]!.resting).toBeUndefined()
     expect(c.arriving(0).size).toBe(0)
   })
 
@@ -100,7 +138,7 @@ describe('AgentCursors', () => {
     expect(c.at(later + IDLE_MS)).toEqual([])
   })
 
-  it("tags the cursor with the op while it moves there and stays, then lets presence say what it does", () => {
+  it('tags the cursor with the op while it moves there and stays, then lets presence say what it does', () => {
     const c = new AgentCursors()
     c.add(step(100, 0, ['a'], ['a'], 'Add map'), 0)
     expect(c.at(TRAVEL_MS / 2)[0]!.label).toBe('Add map')
@@ -108,23 +146,29 @@ describe('AgentCursors', () => {
   })
 
   it('keeps an object busy a moment once the cursor is there, and while it loads', () => {
-    const c = new AgentCursors()
+    const { c, loading } = withLoading('b')
     c.add(step(100, 0, ['a']), 0)
     c.add(step(500, 0, [], ['b']), 0)
-    const loading = new Set(['b'])
-    const isLoading = (id: string) => loading.has(id)
     // Nothing is busy before its cursor arrives.
-    expect(c.busy(TRAVEL_MS - 1, isLoading)).toEqual(new Set())
-    expect(c.busy(TRAVEL_MS, isLoading)).toEqual(new Set(['a']))
+    expect(c.busy(TRAVEL_MS - 1)).toEqual(new Set())
+    expect(c.busy(TRAVEL_MS)).toEqual(new Set(['a']))
     const bArrives = 2 * TRAVEL_MS + DWELL_MS
-    expect(c.busy(bArrives, isLoading)).toEqual(new Set(['a', 'b']))
-    expect(c.nextChange(bArrives)).toBe(TRAVEL_MS + MIN_BUSY_MS)
+    expect(c.busy(bArrives)).toEqual(new Set(['a', 'b']))
     // 'a' loads nothing: busy for the minimum only. 'b' stays busy while it loads.
-    expect(c.busy(bArrives + MIN_BUSY_MS, isLoading)).toEqual(new Set(['b']))
+    expect(c.busy(bArrives + MIN_BUSY_MS)).toEqual(new Set(['b']))
     loading.delete('b')
-    expect(c.busy(bArrives + MIN_BUSY_MS, isLoading)).toEqual(new Set())
+    expect(c.busy(bArrives + MIN_BUSY_MS)).toEqual(new Set())
     // Forgotten once done: loading later, not caused by the agent, does not show it busy again.
     loading.add('b')
-    expect(c.busy(bArrives + MIN_BUSY_MS + 1, isLoading)).toEqual(new Set())
+    expect(c.busy(bArrives + MIN_BUSY_MS + 1)).toEqual(new Set())
+  })
+})
+
+describe('hoverOffset', () => {
+  it('starts where the cursor stopped, eases in, and stays within a few pixels', () => {
+    expect(hoverOffset(0)).toEqual({ x: 0, y: 0 })
+    const drifts = Array.from({ length: 100 }, (_, i) => hoverOffset(i * 97))
+    expect(Math.max(...drifts.map((d) => Math.abs(d.x)))).toBeGreaterThan(3)
+    expect(drifts.every((d) => Math.abs(d.x) <= 6 && Math.abs(d.y) <= 3)).toBe(true)
   })
 })

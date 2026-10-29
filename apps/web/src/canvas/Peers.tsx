@@ -3,7 +3,7 @@ import { ArrowUpIcon, SparkleIcon } from '@phosphor-icons/react'
 import type { BoardObject } from '../board/board'
 import { isAgent, onColor } from '../board/collaborators'
 import type { Peer } from '../board/presence'
-import type { AgentCursors, Point } from './agentCursor'
+import { hoverOffset, type AgentCursors, type Point } from './agentCursor'
 import { toScreen, type Camera } from './camera'
 
 /** An outline in someone's color. No handles: only your own selection has them, as only yours can be resized. */
@@ -39,10 +39,10 @@ export function Peers({ peers, camera, byId, agentTouched }: { peers: Peer[]; ca
   )
 }
 
-/** A pointer and name tag at screen point `at`. The agent's has a sparkle, what it does, and a pulse while it waits to go on. */
-function Cursor({ at, name, color, agent, working, opacity, doing }: { at: Point; name: string; color: string; agent: boolean; working?: boolean; opacity?: number; doing?: string }) {
+/** A pointer and name tag at screen point `at`. The agent's has a sparkle and what it does, and is lifted while it hovers. */
+function Cursor({ at, name, color, agent, hovering, opacity, doing }: { at: Point; name: string; color: string; agent: boolean; hovering?: boolean; opacity?: number; doing?: string }) {
   return (
-    <div className={`ttx-cursor ${agent ? 'ttx-cursor--agent' : ''} ${working ? 'is-working' : ''}`} style={{ transform: `translate(${at.x}px, ${at.y}px)`, opacity }}>
+    <div className={`ttx-cursor ${agent ? 'ttx-cursor--agent' : ''} ${hovering ? 'is-hovering' : ''}`} style={{ transform: `translate(${at.x}px, ${at.y}px)`, opacity }}>
       <svg width="16" height="20" viewBox="0 0 16 20" aria-hidden>
         <path d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z" fill={color} stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
       </svg>
@@ -89,7 +89,9 @@ export function AgentCursorLayer({ cursors, version, activities, camera, rootRef
     const doing = c.label ?? activities.get(c.key)
     const at = toScreen(camera, { x: c.x, y: c.y, w: 0, h: 0 })
     if (at.x >= 0 && at.x <= w && at.y >= 0 && at.y <= h) {
-      return <Cursor key={c.key} at={at} name={c.name} color={c.color} agent working={c.working} opacity={c.opacity} doing={doing} />
+      // At rest, it hovers in screen pixels, so it drifts as far at any zoom.
+      const drift = c.resting === undefined ? { x: 0, y: 0 } : hoverOffset(c.resting)
+      return <Cursor key={c.key} at={{ x: at.x + drift.x, y: at.y + drift.y }} name={c.name} color={c.color} agent hovering={c.resting !== undefined} opacity={c.opacity} doing={doing} />
     }
     const edge = { x: Math.min(w - EDGE_MARGIN, Math.max(EDGE_MARGIN, at.x)), y: Math.min(h - EDGE_MARGIN, Math.max(EDGE_MARGIN, at.y)) }
     const angle = (Math.atan2(at.y - edge.y, at.x - edge.x) * 180) / Math.PI + 90

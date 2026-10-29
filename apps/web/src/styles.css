@@ -412,15 +412,14 @@ body,
   transition: none;
 }
 
-/* Waiting at its last place for the agent's next step. */
-.ttx-cursor--agent.is-working svg {
-  animation: ttx-agent-pulse 1.2s ease-in-out infinite;
+/* Hovering over the page while the agent thinks or waits for data (it drifts, canvas/agentCursor.ts): lifted, so its
+ * shadow falls further. */
+.ttx-cursor--agent svg {
+  transition: filter 300ms ease-out;
 }
 
-@keyframes ttx-agent-pulse {
-  50% {
-    transform: scale(0.85);
-  }
+.ttx-cursor--agent.is-hovering svg {
+  filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.22));
 }
 
 /* An agent working off-screen: a marker on the canvas edge, pointing at it. */
@@ -446,10 +445,6 @@ body,
 @media (prefers-reduced-motion: reduce) {
   .ttx-obj {
     transition: none;
-  }
-
-  .ttx-cursor--agent.is-working svg {
-    animation: none;
   }
 
   .ttx-obj.is-busy::after {
