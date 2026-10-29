@@ -37,6 +37,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Own infinite canvas: pan, zoom, select, layer order | Built | vsticky-style DOM world layer. Camera is local, never synced. |
 | Rooms by link, New board | Built | `#room=<id>` |
+| Landing page: boards this browser opened, New board dialog, board title | Built | Per browser until accounts exist. `agent-docs/tasks/board-templates.md`. |
 | Real-time sync | Built | Yjs over y-websocket to one Durable Object per room, Hibernation API. |
 | Presence: cursors, selections, names, colors | Built | Collaborator avatar list is not built. |
 | Command palette (⌘K) with forms from op schemas | Built |  |
@@ -97,7 +98,8 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Start a board from an event | Partial | Picking an event sets up the board with its data and a ReliefWeb feed. |
-| Templates that prepopulate widgets (SitRep first) | Not sequenced | Needs a template schema: layout, widgets, data recipes. |
+| SitRep template: event, feed, map, country context, who's where, conflict, report notes | Built | `board.applyTemplate`. Event and place optional. Schema in `agent-docs/tasks/board-templates.md`. |
+| More templates (event comparison, data explorer) | Not sequenced | One more entry in `TEMPLATES` each. |
 | Create and export reports | Not sequenced | Modeled on OCHA humanitarian snapshots. Design proposal in the design spec (reports and SitRep sections). |
 
 ### 4.7 Non-functional requirements
@@ -115,7 +117,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 2. **Milestone 2, Map features:** steps 3–7.
 3. **Milestone 3, Table:** steps 8–10.
 4. **Then:** dark mode (11), uploads for layers and tables (12), more table sources (13), Chart (14), Notebook `.ipynb` (15), Input (16, stretch).
-5. **Not sequenced yet:** templates, reports, agent board summary.
+5. **Not sequenced yet:** more templates, reports, agent board summary.
 
 One PR per step.
 
@@ -135,7 +137,7 @@ One PR per step.
 - **Live-map cap:** how many live maps at once.
 - **Legend visibility:** focus only, always, toggle, or by zoom.
 - **Reports:** a widget, a mode, or both; how report blocks stay in sync with canvas widgets.
-- **Templates:** the schema, and which templates follow SitRep.
+- **Templates:** which templates follow SitRep. (The schema is decided: `agent-docs/tasks/board-templates.md` §4.)
 - **Collaboration scope:** comments, mentions and an avatar list are not in `features.md`. In or out?
 - **Design-spec proposals:** frame context, explicit links between widgets, version history and the docked accordion options panel are design proposals, not code. Ticket them before building.
 

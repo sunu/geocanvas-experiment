@@ -1,6 +1,6 @@
 # Task: landing page, new board and templates
 
-Date: 2026-10-29. Status: planned, not started. Scope from `agent-docs/features.md` ("Prepopulate the widgets depending on the template that users choose") and PRD 4.6. Resolves the PRD §7 open decision "Templates: the schema".
+Date: 2026-10-29. Status: built in PR #55 (steps 1–6); browser check pending. Scope from `agent-docs/features.md` ("Prepopulate the widgets depending on the template that users choose") and PRD 4.6. Resolves the PRD §7 open decision "Templates: the schema".
 
 ## 1. Requirements
 
