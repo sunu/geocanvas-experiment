@@ -23,7 +23,9 @@ Checked 2026-10-28. Sources: https://dynamical.org, https://dynamical.org/licens
 - **Warranty and use.** The data is a model forecast: it is shown as context, never as a warning or a prediction of impact.
 - **Why not Open-Meteo.** A simple point API, but its free tier is for non-commercial use only, with 10,000 calls a day, and it does not return grids. Not chosen for a map layer.
 
-The libraries: `icechunk-js` 0.6.1 (read-only Icechunk reader, MIT, community) and `zarrita` 0.7.5 (Zarr, MIT). They add about 1.7 MB (0.5 MB gzipped) to the Worker bundle, mostly Zarr codecs.
+The libraries: `icechunk-js` 0.6.1 (read-only Icechunk reader, MIT, community), `zarrita` 0.7.5 (Zarr, MIT) and `fzstd` 0.1.1 (pure-JS zstd, MIT, already used by the app through hyparquet-compressors). They add about 1.7 MB (0.5 MB gzipped) to the Worker bundle, mostly zarrita's wasm codecs, which are bundled but unused.
+
+**Workers and Blosc.** Every array in the repository is Blosc (zstd, byte shuffle). zarrita's Blosc codec compiles WebAssembly from bytes, which Cloudflare Workers forbid, so the room agent could not add a forecast (found on a branch preview: "the forecast data service is returning an error"), although browsers worked. `packages/plugins/src/blosc.ts` decodes these frames in plain JS. It was checked against the wasm codec value by value on real chunks (coordinates and the 6 MB rain and wind chunks), and the real coordinate chunks are kept as test fixtures. No key is involved: nothing here needs a secret.
 
 ## What was built
 

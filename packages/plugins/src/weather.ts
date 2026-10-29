@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineTool } from '@ttx/core'
+import { BloscZstd } from './blosc.js'
 import { newLayerId, type Bbox, type MapLayer } from './mapLayers.js'
 
 /**
@@ -261,7 +262,9 @@ export class IcechunkGfs implements ForecastSource {
 
   private async openRepo() {
     try {
-      const [{ IcechunkStore }, { open, get, slice }] = await Promise.all([import('icechunk-js'), import('zarrita')])
+      const [{ IcechunkStore }, { open, get, slice, registry }] = await Promise.all([import('icechunk-js'), import('zarrita')])
+      // zarrita's Blosc needs wasm compiled from bytes, which Workers (the room's agent) forbid: use ours everywhere.
+      registry.set('blosc', async () => BloscZstd)
       const store = await IcechunkStore.open(GFS_URL)
       return { open: (name: string) => open(store.resolve(`/${name}`), { kind: 'array' }), get, slice }
     } catch (err) {
