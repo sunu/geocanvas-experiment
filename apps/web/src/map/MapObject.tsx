@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
@@ -11,9 +11,11 @@ import { MAP_HEADER_PX, viewOfArea, type Basemap, type Bbox, type MapBoardObject
 import { countryName } from '@ttx/plugins/monty/countries'
 import { tools } from '../tools/registry'
 import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
-import { basemapStyle } from './basemaps'
+import { BASEMAP_CREDITS, basemapStyle } from './basemaps'
 import { attributionOf, boundsOf, deckLayers, useLayerStates } from './layers'
 import { registerLiveMap } from './live'
+import { useLiveMap } from './pool'
+import { useSnapshot } from './snapshots'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
 // build the worker (?worker&url) and point MapLibre at it. MapLibre 6 also draws right-to-left
@@ -75,6 +77,9 @@ export function fitMapToLayer(runtime: Runtime, mapId: string, layer: MapLayer) 
  * person, kept in the doc (Views in @ttx/core): nobody's pan moves another person's map, but the
  * agent can move a person's map, and a person who has no view starts at the latest one anyone saved.
  *
+ * Only a few maps are live at a time (budget.ts): the others show a snapshot of this person's view (snapshots.ts),
+ * and get a live map again when they are on screen and large enough, edited or focused.
+ *
  * Its tools and its list of data layers are in its Options panel, in focus mode (MapOptions.tsx). The
  * map itself shows only the data; the layers' attributions, which their licenses require, join the
  * basemap's in MapLibre's attribution control.
@@ -98,10 +103,21 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const styleReadyRef = useRef(false)
   /** The value under the pointer on a choropleth, while editing. */
   const [hover, setHover] = useState<{ text: string; x: number; y: number }>()
-  /** Nobody has moved this map from the whole world yet: a new map, which asks for its location. */
-  const [unplaced, setUnplaced] = useState(() => atStart(new Views(runtime.board.doc).latest(o.id)?.view))
+  const views = useMemo(() => new Views(runtime.board.doc), [runtime])
+  const subscribeViews = useCallback((listener: () => void) => views.subscribe(listener), [views])
+  const latest = useSyncExternalStore(subscribeViews, () => views.latest(o.id)?.view)
+  const mine = useSyncExternalStore(subscribeViews, () => views.get(runtime.actor.id, o.id))
+  /** Nobody has moved this map from the whole world, and it has no data yet: a new map, which asks for its location. */
+  const unplaced = atStart(latest) && !layers.length
+  // The pool learns of editing and focus a render later, from the canvas; a map that has the pointer is live now.
+  const live = useLiveMap(o.id) || editing || focused
+  const view = mine ?? latest ?? WORLD
+  const snapshot = useSnapshot(
+    live ? undefined : { view: { center: view.center, zoom: view.zoom, bearing: view.bearing }, width: o.w, height: o.h - MAP_HEADER_PX, basemap: o.basemap, layers },
+  )
 
   useEffect(() => {
+    if (!live) return
     const views = new Views(runtimeRef.current.board.doc)
     const me = runtimeRef.current.actor.id
     const legacy = views.get(me, o.id) ? undefined : legacyView(o.id)
@@ -119,7 +135,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     // deck.gl data layers go here. Overlay mode (its own canvas above the map), not interleaved:
     // deck.gl 9.4's interleaved mode throws on every frame with MapLibre 6. The cost is a second
     // WebGL context per map, and deck.gl layers draw above the map's labels.
-    const overlay = new MapboxOverlay({ interleaved: false, layers: [] })
+    const overlay = new MapboxOverlay({ interleaved: false, layers: deckLayers(statesRef.current) })
     map.addControl(overlay as unknown as IControl)
     // The box changes size when resized, and in focus mode (a local size that is never stored).
     const resize = new ResizeObserver(() => map.resize())
@@ -150,13 +166,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       overlayRef.current = null
       styleReadyRef.current = false
     }
-  }, [o.id])
+  }, [o.id, live])
 
   // Save this person's pans as their view, in the doc the runtime has (a draft in focus mode), and follow
   // changes to their view from elsewhere (the agent, another tab).
   useEffect(() => {
-    const map = mapRef.current!
-    const views = new Views(runtime.board.doc)
+    const map = mapRef.current
+    if (!map) return
     const me = runtime.actor.id
     /** `at` of my view as this map last wrote or showed it: a change with another `at` came from elsewhere. */
     let shownAt = views.get(me, o.id)?.at
@@ -171,6 +187,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       views.set(me, o.id, pending)
       pending = undefined
     }
+    // Show this doc's view first. After leaving focus with Discard, the map still shows the draft's view, and the
+    // resize that ends focus would otherwise save it to the board as a pan.
+    const saved = views.get(me, o.id)
+    if (saved) {
+      const c = map.getCenter()
+      if (Math.abs(c.lng - saved.center[0]) > 1e-7 || Math.abs(c.lat - saved.center[1]) > 1e-7 || Math.abs(map.getZoom() - saved.zoom) > 1e-7)
+        map.jumpTo({ center: saved.center, zoom: saved.zoom, bearing: saved.bearing })
+    }
     const onMoveStart = () => clearTimeout(timer)
     const onMoveEnd = () => {
       if (moving) return void (moving = false)
@@ -181,7 +205,6 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     map.on('movestart', onMoveStart)
     map.on('moveend', onMoveEnd)
     const unsubscribe = views.subscribe(() => {
-      setUnplaced(atStart(views.latest(o.id)?.view))
       const view = views.get(me, o.id)
       if (!view || view.at === shownAt) return
       shownAt = view.at
@@ -197,19 +220,20 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       // A pan that has not been saved yet goes to the doc it was made in.
       save()
     }
-  }, [runtime, o.id])
+  }, [views, runtime, o.id, live])
 
   // The basemap's attribution and the data layers' in one control. MapLibre takes custom attributions
   // only when a control is made, so a new set of credits replaces the control.
   useEffect(() => {
-    const map = mapRef.current!
+    const map = mapRef.current
+    if (!map) return
     const control = new AttributionControl({ compact: true, ...(credits && { customAttribution: credits }) })
     map.addControl(control)
     return () => {
       // On unmount the map is already gone, with its controls.
       if (mapRef.current === map) map.removeControl(control)
     }
-  }, [credits])
+  }, [credits, live])
 
   // Only when a layer or its result changed: new deck.gl layers make deck.gl redraw all their data, and the canvas
   // re-renders the map on every camera move.
@@ -244,6 +268,12 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       </ObjectHeader>
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
+        {!live && snapshot && (
+          <>
+            <img className="ttx-map__snapshot" src={snapshot} alt="" draggable={false} />
+            <div className="ttx-map__credits">{[BASEMAP_CREDITS[o.basemap], credits].filter(Boolean).join(' · ')}</div>
+          </>
+        )}
         {!editing && !focused && unplaced && onFocus ? (
           <button type="button" className="ttx-map__place" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} onClick={onFocus}>
             Choose a location

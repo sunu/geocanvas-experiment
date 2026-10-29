@@ -2468,3 +2468,27 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* A map that is not live shows a picture of its view (map/snapshots.ts), with the credits its control would show. */
+.ttx-map__snapshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+.ttx-map__credits {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 1px 4px;
+  background: rgb(255 255 255 / 0.7);
+  color: #333;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

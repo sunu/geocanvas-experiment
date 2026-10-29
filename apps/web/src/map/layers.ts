@@ -51,6 +51,32 @@ export function viewArea([[west, south], [east, north]]: [[number, number], [num
 
 const recipeKey = (l: MapLayer) => stableJson([l.tool, l.input])
 
+/** A layer and its tool's result, if there is one yet. */
+function layerState(l: MapLayer, r: { value?: unknown; error?: string } | undefined): LayerState {
+  const output = tools.tool(l.tool)?.output
+  return {
+    id: l.id,
+    title: l.title,
+    ...(output && { output }),
+    loading: !r,
+    ...(r?.value !== undefined && { value: r.value }),
+    ...(r?.error !== undefined && { error: r.error }),
+    ...(l.filter && { filter: l.filter }),
+    ...(l.style && { style: l.style }),
+  }
+}
+
+/** The states of a map's layers once their tools have run (from the cache when a map already ran them), outside React. */
+export const loadLayerStates = (layers: MapLayer[], signal?: AbortSignal): Promise<LayerState[]> =>
+  Promise.all(
+    layers.map((l) =>
+      tools.run(l.tool, l.input, signal ? { signal } : {}).then(
+        (value) => layerState(l, { value }),
+        (err) => layerState(l, { error: String((err as Error)?.message ?? err) }),
+      ),
+    ),
+  )
+
 /** Runs the tools of a map's layers. One failing layer does not stop the others. */
 export function useLayerStates(layers: MapLayer[]): LayerState[] {
   const [results, setResults] = useState<Record<string, { key: string; value?: unknown; error?: string }>>({})
@@ -79,18 +105,7 @@ export function useLayerStates(layers: MapLayer[]): LayerState[] {
     () =>
       layers.map((l) => {
         const r = results[l.id]
-        const fresh = r?.key === recipeKey(l)
-        const output = tools.tool(l.tool)?.output
-        return {
-          id: l.id,
-          title: l.title,
-          ...(output && { output }),
-          loading: !fresh,
-          ...(fresh && r.value !== undefined && { value: r.value }),
-          ...(fresh && r.error !== undefined && { error: r.error }),
-          ...(l.filter && { filter: l.filter }),
-          ...(l.style && { style: l.style }),
-        }
+        return layerState(l, r?.key === recipeKey(l) ? r : undefined)
       }),
     // `shown` covers every field of `layers` read here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
