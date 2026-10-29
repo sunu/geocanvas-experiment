@@ -18,7 +18,7 @@ const INSTRUCTIONS = `Work on boards of the humanitarian TTX app (a shared infin
 - A board is named by its link, e.g. http://localhost:5173/#room=abc123. Pass it as "board" to every board tool. The person may give you several links: keep them apart.
 - ttx_boards lists the boards open in paired tabs. If a board is not open, ttx_open_board returns a link to give the person: opening it pairs their browser and shows the board. Their tab must stay open while you work.
 - Read the board with ttx_snapshot before you change it, and again after the person edits it. Objects have ids, types, positions (canvas units, x right, y down, top-left corner), sizes and their fields. "Selected" ids are what the person has selected now.
-- The other tools are the app's own: ops that change the board take { board, ids, args } (ids: the objects to act on), and read-only tools (geocoding, event search, data) take their own input. An add without x and y goes in the middle of the person's view; leave out w and h unless asked.
+- The other tools are the app's own: ops that change the board take { board, ids, args } (ids: the objects to act on), and read-only tools (geocoding, event search, data) take their own input. An add without x and y goes in the middle of the person's view; an add that would cover other objects is moved to the nearest free spot; leave out w and h unless asked.
 - To show a place on a map, find it with data__geocode first, then map__showArea. To add a disaster event, find it with events__search, then event__add.
 - ttx_undo undoes your last change in that tab. The person's own undo does not undo your changes.`
 
