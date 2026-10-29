@@ -5,7 +5,7 @@ import { plugins } from '../plugins.js'
 import { runTurn } from './loop.js'
 import type { Complete } from './complete.js'
 
-export const AGENT: Actor = { kind: 'agent', id: 'agent', name: 'Agent', color: '#7c3aed' }
+export const AGENT: Actor = { kind: 'agent', id: 'agent', name: 'Agent', color: '#8e51ff' }
 
 /** The room agent's turns per room per hour. Counted in memory, so it starts again when the room leaves memory. */
 export const TURNS_PER_HOUR = 20

@@ -7,6 +7,7 @@ import { boundsOf } from '../map/layers'
 import { fitMapTo } from '../map/MapObject'
 import { tools } from '../tools/registry'
 import { isGeoJson, notebookFactory, notebookResultTitle, type NotebookRun, type NotebookTemplate } from './api'
+import { ObjectHeader } from '../canvas/ObjectHeader'
 
 /** Gap between a notebook and a map made from its results (world units). */
 const GAP = 24
@@ -67,10 +68,7 @@ export function NotebookObject({ runtime, object: o, editing, onDone, focused, o
 
   return (
     <div className="ttx-notebook">
-      {/* The header takes the pointer without double-clicking: its buttons must not start a drag. */}
-      <div className="ttx-notebook__header" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-        <NotebookIcon size={14} aria-hidden />
-        <span className="ttx-notebook__title">{run.value?.title ?? 'Notebook'}</span>
+      <ObjectHeader icon={<NotebookIcon size={14} aria-hidden />} title={run.value?.title ?? 'Notebook'}>
         {run.value && (
           <>
             {/* In focus the Options panel switches the view. */}
@@ -81,7 +79,7 @@ export function NotebookObject({ runtime, object: o, editing, onDone, focused, o
           </>
         )}
         {!focused && onFocus && <FocusButton onFocus={onFocus} />}
-      </div>
+      </ObjectHeader>
       <div ref={bodyRef} className="ttx-notebook__body">
         {/* A focused notebook is always editing; its run is picked in the Options panel. */}
         {editing && !focused && (view === 'card' || !o.runId) ? (

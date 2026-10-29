@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath } from 'node:url'
 import { DEFAULT_PORT, TOKEN_FILE } from '../mcp/src/pairing.ts'
 
 /**
@@ -28,7 +30,8 @@ const mcpPairing: Plugin = {
 }
 
 export default defineConfig({
-  plugins: [react(), mcpPairing],
+  plugins: [react(), tailwindcss(), mcpPairing],
+  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     port: 5173,
     // The sync Worker (npm run sync), which also proxies Montandon searches, geocoding and Notebook Factory, and stores uploads.
