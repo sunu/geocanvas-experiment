@@ -49,6 +49,6 @@ export {
 } from './mapAnnotations.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
 export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
-export { agentTools, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn } from './agent/loop.js'
+export { agentTools, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn, THINKING } from './agent/loop.js'
 export { callOp, GAP, MAX_SIZE_FACTOR, TurnLog, type OpCall } from './agent/call.js'
 export { chatCompletions, openRouter, OPENROUTER_URL, type Complete, type FunctionTool, type Message, type ToolCall } from './agent/complete.js'

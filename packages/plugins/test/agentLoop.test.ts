@@ -12,6 +12,7 @@ import {
   MAX_STEPS,
   plugins,
   runTurn,
+  THINKING,
   TURNS_PER_HOUR,
   type Complete,
   type Geocoder,
@@ -132,6 +133,22 @@ describe('runTurn', () => {
     expect(reply.undo!.created).toHaveLength(1)
   })
 
+  it('says what it does next: thinking before each model call, the title before each tool call', async () => {
+    const { doc, chat } = board()
+    const monty = { findEvents: async () => [] } as unknown as MontyClient
+    const message = chat.send({ actor: ada, text: 'add a sticky about floods', selection: [] })
+    const model = scripted(
+      tools(call('events__search', { text: 'flood' })),
+      tools(call('sticky__add', { args: { text: 'Floods' } }), call('sticky__add', { args: { text: 'More' } })),
+      { role: 'assistant', content: 'Added it.' },
+    )
+    const runtime = new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } })
+    const activity: string[] = []
+    await runTurn(runtime, message, model.complete, new ToolRunner([boardGet(runtime), eventsSearch(monty)]), [], (title) => activity.push(title))
+    const sticky = runtime.registry.op('sticky.add')!.title
+    expect(activity).toEqual([THINKING, 'Search events', THINKING, sticky, sticky, THINKING])
+  })
+
   it("finds a place, adds a map, and shows the place in the asker's view only", async () => {
     const { doc, chat } = board()
     const india = { west: 67.9, south: 6.6, east: 97.4, north: 35.7 }
@@ -249,6 +266,15 @@ describe('Agent', () => {
     expect(replies(chat).map((r) => r.replyTo)).toEqual([first.id, second.id])
     expect(most).toBe(1)
     expect(busy).toEqual([true, false])
+  })
+
+  it('says for whom it works, and stops saying anything when it is done', async () => {
+    const { doc, chat } = board()
+    const activity: unknown[] = []
+    new Agent({ doc, complete: async () => ({ role: 'assistant', content: 'ok' }), onActivity: (a) => activity.push(a) })
+    chat.send({ actor: ada, text: 'one', selection: [] })
+    for (let i = 0; i < 10; i++) await settle()
+    expect(activity).toEqual([{ for: 'ada', title: THINKING }, null])
   })
 
   it('shows the earlier turns, so "the duplicate" can name an object that is not selected', async () => {

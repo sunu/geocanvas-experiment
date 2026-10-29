@@ -18,6 +18,9 @@ import { areaOfView, MAP_HEADER_PX } from '../mapView.js'
 import { callOp, TurnLog } from './call.js'
 import type { Complete, FunctionTool, Message } from './complete.js'
 
+/** The agent's activity while it waits for the model. */
+export const THINKING = 'Thinking'
+
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
 export const MAX_STEPS = 8
 
@@ -111,6 +114,8 @@ export async function runTurn(
   readTools: ToolRunner,
   /** The chat entries before `message`, oldest first. */
   history: ChatEntry[] = [],
+  /** Called with what the agent does next, so people see it (its cursor's tag): THINKING before each model call, a tool's title before each call. */
+  onActivity: (title: string) => void = () => {},
 ): Promise<Omit<AgentReply, 'kind' | 'id' | 'at'>> {
   const tools = agentTools(runtime, readTools)
   const messages: Message[] = [
@@ -126,6 +131,7 @@ export async function runTurn(
 
   try {
     for (let step = 0; step < MAX_STEPS; step++) {
+      onActivity(THINKING)
       const answer = await complete(messages, tools)
       messages.push({ role: 'assistant', content: answer.content ?? null, ...(answer.tool_calls?.length && { tool_calls: answer.tool_calls }) })
       if (!answer.tool_calls?.length) return result(answer.content?.trim() || 'Done.')
@@ -149,6 +155,7 @@ export async function runTurn(
     }
     const read = readTools.list().find((t) => toolNameOf(t.id) === name)
     if (read) {
+      onActivity(read.title)
       try {
         const out = await readTools.run(read.id, input)
         calls.push({ tool: name, title: read.title, status: 'applied' })
@@ -160,6 +167,7 @@ export async function runTurn(
       }
     }
     const ids = Array.isArray(input.ids) ? input.ids : undefined
+    onActivity(runtime.registry.op(opIdOf(name))?.title ?? opIdOf(name))
     // As the agent, for the person who asked: ops that act on "my" things (map.showArea) act on theirs.
     const record = await callOp(runtime, name, input, { actor: { ...runtime.actor, onBehalfOf: message.actor.id }, turn, center: message.center })
     calls.push({ tool: record.opId, ...(ids && { ids }), status: record.status, ...(record.error && { error: record.error }) })

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSPro
 import { Draft, type Chat, type Runtime, type TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
-import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
+import { cursorSender, publishSelection, useAgentActivities, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
@@ -85,7 +85,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   const objects = useObjects(board)
   const peers = usePeers(awareness)
   const agentTouched = useAgentTouched(runtime)
-  const agentCursors = useAgentCursors(runtime)
+  const agentCursors = useAgentCursors(runtime, chat)
+  const agentActivities = useAgentActivities(awareness)
   // What an agent added is outlined once its cursor gets there, when the object appears.
   const agentMarked = useMemo(
     () => (agentCursors.arriving.size ? new Set([...agentTouched].filter((id) => !agentCursors.arriving.has(id))) : agentTouched),
@@ -608,6 +609,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
               editing={o.id === editingId}
               selected={selected.has(o.id)}
               arriving={agentCursors.arriving.has(o.id)}
+              busy={agentCursors.busy.has(o.id)}
               onDone={() => setEditing(null)}
               onFocus={isFocusable(objectUI(o.type)) ? () => enterFocus(o.id) : undefined}
             />
@@ -621,7 +623,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
         {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentMarked} />}
-        {!focus && <AgentCursorLayer {...agentCursors} camera={camera} rootRef={rootRef} onGoTo={goToPoint} />}
+        {!focus && <AgentCursorLayer {...agentCursors} activities={agentActivities} camera={camera} rootRef={rootRef} onGoTo={goToPoint} />}
         {!focus && [...selected].map((id) => {
           const r = toScreen(camera, byId.get(id)!)
           return <div key={id} className="ttx-selection" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />

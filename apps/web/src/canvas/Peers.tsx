@@ -39,8 +39,8 @@ export function Peers({ peers, camera, byId, agentTouched }: { peers: Peer[]; ca
   )
 }
 
-/** A pointer and name tag at screen point `at`. The agent's has a sparkle, and a pulse while it waits to go on. */
-function Cursor({ at, name, color, agent, working, opacity }: { at: Point; name: string; color: string; agent: boolean; working?: boolean; opacity?: number }) {
+/** A pointer and name tag at screen point `at`. The agent's has a sparkle, what it does, and a pulse while it waits to go on. */
+function Cursor({ at, name, color, agent, working, opacity, doing }: { at: Point; name: string; color: string; agent: boolean; working?: boolean; opacity?: number; doing?: string }) {
   return (
     <div className={`ttx-cursor ${agent ? 'ttx-cursor--agent' : ''} ${working ? 'is-working' : ''}`} style={{ transform: `translate(${at.x}px, ${at.y}px)`, opacity }}>
       <svg width="16" height="20" viewBox="0 0 16 20" aria-hidden>
@@ -49,6 +49,7 @@ function Cursor({ at, name, color, agent, working, opacity }: { at: Point; name:
       <span className="ttx-cursor__name" style={{ background: color, color: agent ? '#fafafa' : onColor(color), fontWeight: agent ? 500 : 600 }}>
         {agent && <SparkleIcon size={10} weight="fill" />}
         {name}
+        {doing && <span className="ttx-cursor__doing">· {doing}</span>}
       </span>
     </div>
   )
@@ -61,10 +62,12 @@ const EDGE_MARGIN = 64
  * The agents' cursors (agentCursor.ts), moved every frame while any is shown. Only this layer renders each frame,
  * not the canvas. A cursor outside the canvas shows as a marker on its edge, pointing at it; clicking it goes there.
  */
-export function AgentCursorLayer({ cursors, version, camera, rootRef, onGoTo }: {
+export function AgentCursorLayer({ cursors, version, activities, camera, rootRef, onGoTo }: {
   cursors: AgentCursors
   /** Changes with each step the agents take, to start the animation again. */
   version: number
+  /** What each agent at work does now, by cursor key (board/presence.ts); their cursors stay while they work. */
+  activities: Map<string, string>
   camera: Camera
   rootRef: RefObject<HTMLElement | null>
   onGoTo(point: Point): void
@@ -75,17 +78,18 @@ export function AgentCursorLayer({ cursors, version, camera, rootRef, onGoTo }: 
     let frame = 0
     const step = (t: number) => {
       setFrame(t)
-      if (cursors.active(Date.now())) frame = requestAnimationFrame(step)
+      if (cursors.active(Date.now(), activities)) frame = requestAnimationFrame(step)
     }
     frame = requestAnimationFrame(step)
     return () => cancelAnimationFrame(frame)
-  }, [cursors, version])
+  }, [cursors, version, activities])
   const w = rootRef.current?.clientWidth ?? 0
   const h = rootRef.current?.clientHeight ?? 0
-  return cursors.at(Date.now()).map((c) => {
+  return cursors.at(Date.now(), activities).map((c) => {
+    const doing = c.label ?? activities.get(c.key)
     const at = toScreen(camera, { x: c.x, y: c.y, w: 0, h: 0 })
     if (at.x >= 0 && at.x <= w && at.y >= 0 && at.y <= h) {
-      return <Cursor key={c.key} at={at} name={c.name} color={c.color} agent working={c.working} opacity={c.opacity} />
+      return <Cursor key={c.key} at={at} name={c.name} color={c.color} agent working={c.working} opacity={c.opacity} doing={doing} />
     }
     const edge = { x: Math.min(w - EDGE_MARGIN, Math.max(EDGE_MARGIN, at.x)), y: Math.min(h - EDGE_MARGIN, Math.max(EDGE_MARGIN, at.y)) }
     const angle = (Math.atan2(at.y - edge.y, at.x - edge.x) * 180) / Math.PI + 90
@@ -107,6 +111,7 @@ export function AgentCursorLayer({ cursors, version, camera, rootRef, onGoTo }: 
         <ArrowUpIcon size={12} weight="bold" style={{ transform: `rotate(${angle}deg)` }} />
         <SparkleIcon size={10} weight="fill" />
         {c.name}
+        {doing && <span className="ttx-cursor__doing">· {doing}</span>}
       </button>
     )
   })

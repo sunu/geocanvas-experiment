@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { WebsocketProvider } from 'y-websocket'
 import type { Actor } from '@ttx/core'
+import { AGENT } from '@ttx/plugins'
 
 export type Awareness = WebsocketProvider['awareness']
 
@@ -11,7 +12,8 @@ export type Awareness = WebsocketProvider['awareness']
  * place whatever each person's camera. The room's agent is a peer too: it sets `status` while it
  * works (apps/worker/src/worker.ts), with no cursor or selection. A person's presence has `status`
  * while the agent in their browser works on their own key (agent/browserAgent.ts). An agent's cursor is
- * worked out in each browser from the op log instead (canvas/agentCursor.ts).
+ * worked out in each browser from the op log instead (canvas/agentCursor.ts); presence only says what the agent
+ * does now (`activity`: thinking, or a tool's title) and, for the room's agent, whom it works for (`for`).
  */
 
 /** One person's (or the agent's) shared state, as this browser receives it. */
@@ -38,6 +40,48 @@ export function peersFrom(states: Map<number, Record<string, unknown>>, selfId: 
     peers.push({ clientId, user, ...(cursor && { cursor }), selection, ...(status && { status }) })
   }
   return peers
+}
+
+/** The key of an agent's cursor (canvas/agentCursor.ts): one per agent and person it acts for. */
+export const agentKey = (agentId: string, person: string | undefined) => `${agentId}:${person ?? ''}`
+
+/**
+ * What each agent at work does now, by its cursor's key, from every presence including this tab's own: the room's
+ * agent says whom it works for, and an agent on a person's own key is on that person's presence.
+ */
+export function agentActivities(states: Map<number, Record<string, unknown>>): Map<string, string> {
+  const activities = new Map<string, string>()
+  for (const state of states.values()) {
+    const user = state.user as Peer['user'] | undefined
+    if (!user || state.status !== 'thinking' || typeof state.activity !== 'string') continue
+    const person = user.kind === 'agent' ? state.for : user.id
+    if (typeof person === 'string') activities.set(agentKey(user.kind === 'agent' ? user.id : AGENT.id, person), state.activity)
+  }
+  return activities
+}
+
+const activitiesCache = new WeakMap<Awareness, Map<string, string>>()
+
+/** agentActivities of this board, kept until presence changes. */
+export function useAgentActivities(awareness: Awareness): Map<string, string> {
+  return useSyncExternalStore(
+    (onChange) => {
+      const update = () => {
+        activitiesCache.delete(awareness)
+        onChange()
+      }
+      awareness.on('change', update)
+      return () => awareness.off('change', update)
+    },
+    () => {
+      let activities = activitiesCache.get(awareness)
+      if (!activities) {
+        activities = agentActivities(awareness.getStates() as Map<number, Record<string, unknown>>)
+        activitiesCache.set(awareness, activities)
+      }
+      return activities
+    },
+  )
 }
 
 /** The peers list of each awareness, kept until the next change (React needs the same array until then). */

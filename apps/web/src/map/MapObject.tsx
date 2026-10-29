@@ -5,6 +5,7 @@ import { MapboxOverlay } from '@deck.gl/mapbox'
 import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import type { ObjectViewProps } from '../canvas/registry'
+import { useReportLoading } from '../canvas/loading'
 import { stableJson, Views, type Runtime, type SavedView } from '@ttx/core'
 import { MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
@@ -101,6 +102,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   runtimeRef.current = runtime
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
+  useReportLoading(states.some((st) => st.loading))
   const credits = [...new Set(states.map((st) => attributionOf(st.value)).filter((a) => !!a))].join(' · ')
   /** The latest states, for map events. */
   const statesRef = useRef(states)

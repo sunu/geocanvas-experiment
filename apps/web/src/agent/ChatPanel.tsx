@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CheckIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
+import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
 import type { AgentReply, Chat, OplogEntry, Runtime, UserMessage } from '@ttx/core'
 import { OPENROUTER_URL } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
@@ -7,7 +7,7 @@ import { ModelPicker } from './ModelPicker'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
-import { useOwnSelection, usePeers, type Awareness } from '../board/presence'
+import { useAgentActivities, useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { TAB_ID } from './browserAgent'
 import { DEFAULT_MODEL, forgetKey, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
 
@@ -25,6 +25,8 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   // The room's agent, or a person whose browser agent works; or this tab's own.
   const peerThinking = usePeers(awareness).some((p) => p.status === 'thinking')
   const thinking = useOwnStatus(awareness) === 'thinking' || peerThinking
+  // What an agent does now (thinking, a search), as its cursor's tag says.
+  const activity = useAgentActivities(awareness).values().next().value
   const undone = useUndoneReplies(runtime)
   const [text, setText] = useState('')
   const dictation = useDictation((spoken) => setText((t) => (t && !/\s$/.test(t) ? `${t} ${spoken}` : t + spoken)))
@@ -85,7 +87,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
         {collapsed && thinking && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
             <span className="size-2 rounded-full bg-[var(--agent)]" aria-hidden />
-            Thinking…
+            {activity ?? 'Thinking'}…
           </span>
         )}
         <Button
@@ -124,7 +126,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
                   <AgentEntry key={e.id} reply={e} runtime={runtime} undone={undone.has(e.id)} />
                 ),
               )}
-              {thinking && <p className="ttx-chat__thinking">Agent is thinking…</p>}
+              {thinking && <p className="ttx-chat__thinking">{activity ? `Agent: ${activity}…` : 'Agent is thinking…'}</p>}
             </div>
           )}
           <form className="flex shrink-0 flex-col gap-3 px-4 pt-0 pb-4" onSubmit={send}>
@@ -253,6 +255,7 @@ function AgentEntry({ reply, runtime, undone }: { reply: AgentReply; runtime: Ru
     const record = await runtime.invoke('agent.undoTurn', { kind: 'canvas' }, { replyId: reply.id })
     setUndoError(record.error)
   }
+  const failed = reply.calls.filter((c) => c.status === 'failed')
   return (
     <div className="ttx-chat__entry ttx-chat__entry--agent">
       <div className="ttx-chat__who">
@@ -260,11 +263,12 @@ function AgentEntry({ reply, runtime, undone }: { reply: AgentReply; runtime: Ru
         Agent
       </div>
       <div className="ttx-chat__text">{reply.text}</div>
-      {reply.calls.length > 0 && (
+      {/* What went well shows on the canvas, on the agent's cursor and the objects it worked on; what failed has nowhere else to go. */}
+      {failed.length > 0 && (
         <ul className="ttx-chat__calls">
-          {reply.calls.map((c, i) => (
-            <li key={i} className={c.status === 'failed' ? 'is-failed' : ''} title={c.error}>
-              {c.status === 'applied' ? <CheckIcon size={12} /> : <WarningIcon size={12} />}
+          {failed.map((c, i) => (
+            <li key={i} className="is-failed" title={c.error}>
+              <WarningIcon size={12} />
               {c.title ?? runtime.registry.op(c.tool)?.title ?? c.tool}
               {c.ids?.length ? ` (${c.ids.length})` : ''}
             </li>

@@ -65,6 +65,29 @@ body,
   transition: none;
 }
 
+/* An agent working on it, or on its data (canvas/agentCursor.ts): the content fades and an arc turns in the middle,
+ * at the same size on screen at any zoom. The name above it stays readable. */
+.ttx-obj.is-busy > :not(.ttx-obj__label) {
+  opacity: 0.45;
+  transition: opacity 200ms ease-out;
+}
+
+.ttx-obj.is-busy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: calc(24px / var(--ttx-zoom, 1));
+  height: calc(24px / var(--ttx-zoom, 1));
+  margin: auto;
+  box-sizing: border-box;
+  border: calc(2.5px / var(--ttx-zoom, 1)) solid color-mix(in srgb, var(--agent) 25%, transparent);
+  border-top-color: var(--agent);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: ttx-spin 0.8s linear infinite;
+}
+
 /*
  * The name row above a widget, as Figma labels a frame (canvas/ObjectHeader.tsx): its icon and name, which is where it
  * is grabbed and identified, and its actions, shown on hover or selection. It lives inside the world, so it is scaled
@@ -378,6 +401,12 @@ body,
   white-space: nowrap;
 }
 
+/* What the agent does now, beside its name: an op, a search, or thinking. */
+.ttx-cursor__doing {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
 /* An agent's cursor is moved every frame (canvas/agentCursor.ts), so it needs no smoothing of its own. */
 .ttx-cursor--agent {
   transition: none;
@@ -420,6 +449,10 @@ body,
   }
 
   .ttx-cursor--agent.is-working svg {
+    animation: none;
+  }
+
+  .ttx-obj.is-busy::after {
     animation: none;
   }
 }
