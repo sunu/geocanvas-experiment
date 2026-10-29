@@ -4,7 +4,6 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
-import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { stableJson, Views, type Runtime, type SavedView } from '@ttx/core'
 import { MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
@@ -344,9 +343,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
 
   return (
     <div className="ttx-map">
-      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title="Map">
-        {!focused && onFocus && <FocusButton onFocus={onFocus} />}
-      </ObjectHeader>
+      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title="Map" />
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {liveMap && (

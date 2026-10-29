@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { Draft, type Runtime, type TargetRef } from '@ttx/core'
+import { Draft, type Chat, type Runtime, type TargetRef } from '@ttx/core'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
 import { cursorSender, publishSelection, usePeers, type Awareness } from '../board/presence'
@@ -9,6 +9,7 @@ import { requestFit } from './coreUI'
 import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { ObjectMenu } from './ObjectMenu'
+import { ObjectPanel } from './ObjectPanel'
 import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { useAgentTouched } from '../board/agentActivity'
@@ -78,7 +79,7 @@ function trackDrag(
  * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
  * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
  */
-export function Canvas({ runtime, awareness, onUploads }: { runtime: Runtime; awareness: Awareness; onUploads(): void }) {
+export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runtime; chat: Chat; awareness: Awareness; onUploads(): void }) {
   const board = runtime.board as Board
   const objects = useObjects(board)
   const peers = usePeers(awareness)
@@ -636,6 +637,10 @@ export function Canvas({ runtime, awareness, onUploads }: { runtime: Runtime; aw
         </div>
       )}
 
+      {single && objectUI(single.type)?.panel && (
+        <ObjectPanel runtime={runtime} chat={chat} object={single} info={objectUI(single.type)!.panel!(single)} onEdit={isFocusable(objectUI(single.type)) ? () => enterFocus(single.id) : undefined} />
+      )}
+
       {!focus && <StylePanel runtime={runtime} selected={objects.filter((o) => selected.has(o.id))} camera={camera} />}
 
       {!focus && <Toolbar
@@ -643,7 +648,6 @@ export function Canvas({ runtime, awareness, onUploads }: { runtime: Runtime; aw
         onTool={setTool}
         onFiles={(files) => placeFiles(runtime, files, viewCenter())}
         onUploads={onUploads}
-        onPalette={() => setPaletteOpen((open) => (open ? false : 'all'))}
         onTemplates={() => setPaletteOpen('templates')}
       />}
 
