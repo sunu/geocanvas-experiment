@@ -642,6 +642,7 @@ export function Canvas({ runtime, awareness, onUploads }: { runtime: Runtime; aw
         onTool={setTool}
         onFiles={(files) => placeFiles(runtime, files, viewCenter())}
         onUploads={onUploads}
+        onPalette={() => setPaletteOpen((open) => !open)}
       />}
 
       {paletteOpen && (
