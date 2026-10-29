@@ -18,6 +18,8 @@ export interface Placed {
   w: number
   h: number
   z: number
+  /** The name shown above a widget on the canvas. Absent or '': the widget's own (an update cannot clear a field, so '' means none). */
+  name?: string
 }
 
 /** Any object. The fields beside the placement come from its type (plugins/types.ts). */
