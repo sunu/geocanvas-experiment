@@ -61,7 +61,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 
 | Widget | Status | Focus | Next work |
 | --- | --- | --- | --- |
-| **Map** | Built | Yes | Step 3: location on add (draw AOI, lat/lon, bbox, or describe it to the agent). Step 4: layers from a URL (GeoJSON, GeoParquet, COG, XYZ tiles, shapefile) and a legend per layer. Step 5: attributes, filters, legend formatting (`map.setLayerFilter`, `map.setLayerStyle`). Step 6: annotations, marker, polygon, circle. Step 7: snapshots and live-map cap. |
+| **Map** | Built | Yes | Step 3: location on add (draw AOI, lat/lon, or describe it to the agent). Step 4: layers from a URL (GeoJSON, GeoParquet, COG, XYZ tiles, shapefile) and a legend per layer. Step 5: attributes, filters, legend formatting (`map.setLayerFilter`, `map.setLayerStyle`). Step 6: annotations, marker, polygon, circle. Step 7: snapshots and live-map cap. |
 | **Event** (Montandon) | Built | No | Related events near an event and impact tables are still on the `experiment` branch. |
 | **Notebook** | Built | Yes | Today: a published Notebook Factory run in a sandboxed iframe. Step 15: render any `.ipynb` from upload or URL, outputs included, never executed, sandboxed without scripts. |
 | **Table** | Planned (steps 8–10, 13) | Yes | CSV, Parquet, XLSX into a compact table. Source: upload, URL or STAC. Columns, filters, sort. Scrolls 100,000 rows in focus. |

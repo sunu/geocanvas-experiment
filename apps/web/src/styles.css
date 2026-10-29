@@ -1224,6 +1224,33 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   letter-spacing: 0.04em;
 }
 
+/* A section that opens and closes (MapOptions' Accordion): its heading is the toggle. */
+.ttx-options__accordion summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 14px 0 6px;
+  color: var(--ttx-muted);
+  list-style: none;
+  cursor: pointer;
+}
+
+.ttx-options__accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.ttx-options__accordion summary h3 {
+  margin: 0;
+}
+
+.ttx-options__accordion summary svg {
+  transition: transform 0.15s;
+}
+
+.ttx-options__accordion[open] summary svg {
+  transform: rotate(90deg);
+}
+
 .ttx-options__section select {
   width: 100%;
   font: inherit;
