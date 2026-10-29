@@ -22,6 +22,14 @@ const SATELLITE: StyleSpecification = {
   layers: [{ id: 'imagery', type: 'raster', source: 'imagery' }],
 }
 
+/** Each basemap's credit as its style gives it, shown under snapshots, which have no attribution control. */
+export const BASEMAP_CREDITS: Record<Basemap, string> = {
+  light: 'OpenFreeMap © OpenMapTiles, data from OpenStreetMap',
+  dark: 'OpenFreeMap © OpenMapTiles, data from OpenStreetMap',
+  streets: 'OpenFreeMap © OpenMapTiles, data from OpenStreetMap',
+  satellite: 'Esri, Maxar, Earthstar Geographics',
+}
+
 export function basemapStyle(name: Basemap): string | StyleSpecification {
   return name === 'satellite' ? SATELLITE : VECTOR_STYLES[name]
 }

@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { FolderOpenIcon, PlugsConnectedIcon, PlugsIcon, PlusIcon, RobotIcon } from '@phosphor-icons/react'
 import { eventsSearch } from '@ttx/plugins'
+import { setAgentChat } from './agent/ask'
 import { startBrowserAgent } from './agent/browserAgent'
 import { ChatPanel } from './agent/ChatPanel'
 import { connect, useConnectionStatus } from './board/connect'
 import { newRoomId, roomFromHash, roomHash } from './board/room'
 import { Canvas } from './canvas/Canvas'
+import { TitleBar } from './chrome/TitleBar'
+import { UserMenu } from './chrome/UserMenu'
 import { monty } from './events/monty'
 import { startBridge, useBridgeStatus } from './mcp/bridge'
 import { Executor } from './mcp/executor'
@@ -23,6 +25,8 @@ if (!room) {
 addEventListener('hashchange', () => location.reload())
 
 const { board, runtime, provider, chat, uploads } = connect(room)
+// Widgets ask the agent through the board's chat (agent/ask.ts).
+setAgentChat(chat)
 // Answers only the messages this tab sends on the person's own key; idle otherwise.
 startBrowserAgent(provider.doc, provider.awareness)
 // On a local app paired with the MCP companion (apps/mcp): an external agent works on this board through this tab.
@@ -46,43 +50,20 @@ function newBoard() {
   location.hash = roomHash(newRoomId())
 }
 
-const BRIDGE_LABEL = { connecting: 'Connecting to the MCP companion…', connected: 'An external agent can work on this board', disconnected: 'The MCP companion is not running' }
-
 export function App() {
   const status = useConnectionStatus(provider)
   const bridge = useBridgeStatus()
-  const [panel, setPanel] = useState<'agent' | 'uploads'>()
+  const [uploadsOpen, setUploadsOpen] = useState(false)
   return (
     <>
       <Canvas runtime={runtime} status={status} awareness={provider.awareness} />
-      <div className="ttx-boardbar">
-        <button title="Start a new, empty board with its own link" onClick={newBoard}>
-          <PlusIcon size={16} />
-          New board
-        </button>
-        {bridge !== 'off' && (
-          <span className={`ttx-boardbar__mcp is-${bridge}`} title={BRIDGE_LABEL[bridge]} aria-label={BRIDGE_LABEL[bridge]}>
-            {bridge === 'connected' ? <PlugsConnectedIcon size={16} /> : <PlugsIcon size={16} />}
-            MCP
-          </span>
-        )}
-      </div>
-      {/* The open panel takes this corner and has its own close button. */}
-      {panel === 'agent' ? (
-        <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} onClose={() => setPanel(undefined)} />
-      ) : panel === 'uploads' ? (
-        <UploadsPanel runtime={runtime} uploads={uploads} onClose={() => setPanel(undefined)} />
+      <TitleBar onNewBoard={newBoard} />
+      <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} />
+      {/* The open gallery takes the user menu's corner and has its own close button. */}
+      {uploadsOpen ? (
+        <UploadsPanel runtime={runtime} uploads={uploads} onClose={() => setUploadsOpen(false)} />
       ) : (
-        <div className="ttx-boardbar ttx-boardbar--right">
-          <button title="Files uploaded to this board, to put back or share" onClick={() => setPanel('uploads')}>
-            <FolderOpenIcon size={16} />
-            Uploads
-          </button>
-          <button title="Ask the board's agent to change the board" onClick={() => setPanel('agent')}>
-            <RobotIcon size={16} />
-            Agent
-          </button>
-        </div>
+        <UserMenu actor={runtime.actor} awareness={provider.awareness} bridge={bridge} onUploads={() => setUploadsOpen(true)} />
       )}
     </>
   )

@@ -201,6 +201,8 @@ export default {
     const path = new URL(request.url).pathname
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
     if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
+    // What the room's agent can do, so the app offers only what works (e.g. a map's "describe it in words").
+    if (path === '/agent/status') return json(200, { configured: !!env.OPENROUTER_API_KEY, geocode: !!env.OPENCAGE_API_KEY })
     if (path.startsWith('/notebooks/')) return notebooksProxy(request, env.NOTEBOOK_FACTORY_URL)
     if (path === '/reliefweb/updates') return reliefwebUpdates(request)
     if (path.startsWith('/hapi/')) return hapiProxy(request, env.HAPI_APP_IDENTIFIER)

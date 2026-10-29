@@ -3,6 +3,7 @@ import { ArrowClockwiseIcon, ArrowSquareOutIcon, FilePdfIcon, NewspaperIcon } fr
 import type { ReliefWebBoardObject } from '@ttx/plugins'
 import type { ObjectViewProps } from '../canvas/registry'
 import { disasterPage, loadUpdates, type ReliefWebUpdate } from './feed'
+import { ObjectHeader } from '../canvas/ObjectHeader'
 
 /**
  * The latest ReliefWeb updates for a disaster (by its GLIDE numbers): situation reports, maps, appeals.
@@ -45,11 +46,7 @@ export function ReliefWebObject({ object: o, editing }: ObjectViewProps<ReliefWe
   return (
     <div className="ttx-relief">
       {/* A press anywhere but on a button or link selects and drags the feed, like any object. */}
-      <div className="ttx-relief__header">
-        <NewspaperIcon size={14} aria-hidden />
-        <span className="ttx-relief__title" title={o.glides.join(', ')}>
-          {o.title ? `ReliefWeb · ${o.title}` : 'ReliefWeb updates'}
-        </span>
+      <ObjectHeader icon={<NewspaperIcon size={14} aria-hidden />} title={o.title ? `ReliefWeb · ${o.title}` : 'ReliefWeb updates'}>
         {o.glides.length > 0 && (
           <>
             <button type="button" title="Check for new updates" aria-label="Refresh" disabled={refreshing} onClick={() => load(true)} {...control}>
@@ -60,7 +57,7 @@ export function ReliefWebObject({ object: o, editing }: ObjectViewProps<ReliefWe
             </a>
           </>
         )}
-      </div>
+      </ObjectHeader>
       <div ref={listRef} className="ttx-relief__list" style={{ overflowY: editing ? 'auto' : 'hidden' }}>
         {!o.glides.length ? (
           <div className="ttx-relief__note">No disaster yet. Add a feed from an event's card.</div>
