@@ -42,6 +42,15 @@ export const mapLayer = z.object({
 })
 export type MapLayer = z.infer<typeof mapLayer>
 
+/** A MapLibre-rendered raster tile layer (unlike tool results rendered by deck.gl). */
+export interface TileRaster {
+  tiles?: string[]
+  attribution?: string
+  opacity?: number
+  bounds?: Bbox
+  status?: 'running' | 'ready'
+}
+
 /** An area as the data tools take it: [west, south, east, north] in degrees. */
 export type Bbox = [west: number, south: number, east: number, north: number]
 
