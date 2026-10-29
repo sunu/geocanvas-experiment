@@ -35,6 +35,8 @@ export interface Resolved {
 export interface SeedKind<V = any> {
   schema: z.ZodType<V>
   resolve(ctx: OpContext, value: V): Promise<Resolved>
+  /** The node a template puts on the canvas for this seed, which its other nodes follow (links/, plan-013). */
+  root(facts: Facts): { type: string; fields: Record<string, unknown> }
 }
 
 /** Areas smaller than this (degrees) are grown to it, so a point does not zoom a map to its last level. */
@@ -73,6 +75,7 @@ export const event: SeedKind<string | { text: string }> = {
       label: `${e.name} (${id})`,
     }
   },
+  root: (f) => ({ type: 'event', fields: { eventId: f.eventId } }),
 }
 
 /** "my view": what the runner (for an agent: the person it acts for) last looked at on a map of this board. */
@@ -105,6 +108,8 @@ export const area: SeedKind<string | { text: string } | z.infer<typeof box>> = {
     const { name, ...a } = value
     return { facts: { area: a, ...(name && { name }) }, label: name ?? 'the given area' }
   },
+  // The area as resolved, so the input shows what the template used.
+  root: (f) => ({ type: 'input', fields: { kind: 'area', ...(f.area && { value: { ...f.area, ...(f.name && { name: f.name }) } }) } }),
 }
 
 /** The area of the runner's most recent view of a map on the board. */
