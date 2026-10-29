@@ -49,27 +49,35 @@ describe('AgentCursors', () => {
     return { loading, c: new AgentCursors({ loading: (id) => loading.has(id) }) }
   }
 
-  it('arrives at its place, then rests and hovers there', () => {
+  it('arrives at its place, floating all along, moving or not', () => {
     const c = new AgentCursors()
     c.add(step(100, 100), 0)
     const [moving] = c.at(TRAVEL_MS / 2)
     expect(moving!.x).toBeLessThan(100)
-    expect(moving!.resting).toBeUndefined()
+    expect(moving!.floating).toBe(TRAVEL_MS / 2)
     expect(c.at(TRAVEL_MS)[0]).toMatchObject({ x: 100, y: 100 })
-    expect(c.at(TRAVEL_MS + DWELL_MS + 500)[0]!.resting).toBe(500)
+    expect(c.at(TRAVEL_MS + 500)[0]!.floating).toBe(TRAVEL_MS + 500)
   })
 
-  it('plays a burst in order, one place after another', () => {
+  it('plays a burst in order, staying at each object while it is busy', () => {
     const c = new AgentCursors()
     c.add(step(100, 0, ['a']), 0)
     c.add(step(500, 0, ['b']), 0)
     expect(c.arriving(0)).toEqual(new Set(['a', 'b']))
-    // The second move waits for the first to arrive and dwell.
-    expect(c.at(TRAVEL_MS + DWELL_MS / 2)[0]).toMatchObject({ x: 100 })
+    // The second move waits for the first to arrive and place its object: 'a' is busy for MIN_BUSY_MS.
+    expect(c.at(TRAVEL_MS + MIN_BUSY_MS - 1)[0]).toMatchObject({ x: 100 })
+    expect(c.busy(TRAVEL_MS + MIN_BUSY_MS - 1)).toEqual(new Set(['a']))
     expect(c.arriving(TRAVEL_MS)).toEqual(new Set(['b']))
-    expect(c.nextChange(TRAVEL_MS)).toBe(TRAVEL_MS + DWELL_MS)
-    expect(c.at(2 * TRAVEL_MS + DWELL_MS)[0]).toMatchObject({ x: 500 })
-    expect(c.arriving(2 * TRAVEL_MS + DWELL_MS).size).toBe(0)
+    const bArrives = 2 * TRAVEL_MS + MIN_BUSY_MS
+    expect(c.at(bArrives)[0]).toMatchObject({ x: 500 })
+    expect(c.arriving(bArrives).size).toBe(0)
+  })
+
+  it('goes on after a short pause from a step with no objects (where someone asked)', () => {
+    const c = new AgentCursors()
+    c.add(step(0, 0), 0)
+    c.add(step(500, 0, ['b']), 0)
+    expect(c.at(TRAVEL_MS + DWELL_MS + TRAVEL_MS)[0]).toMatchObject({ x: 500 })
   })
 
   it('waits at an object while its data loads, then moves on', () => {
@@ -123,7 +131,7 @@ describe('AgentCursors', () => {
     const c = new AgentCursors({ reduced: true })
     c.add(step(100, 100, ['a']), 0)
     expect(c.at(0)[0]).toMatchObject({ x: 100, y: 100, opacity: 1 })
-    expect(c.at(5000)[0]!.resting).toBeUndefined()
+    expect(c.at(5000)[0]!.floating).toBeUndefined()
     expect(c.arriving(0).size).toBe(0)
   })
 
@@ -138,11 +146,12 @@ describe('AgentCursors', () => {
     expect(c.at(later + IDLE_MS)).toEqual([])
   })
 
-  it('tags the cursor with the op while it moves there and stays, then lets presence say what it does', () => {
+  it('tags the cursor with the op while it moves there and places it, then lets presence say what it does', () => {
     const c = new AgentCursors()
     c.add(step(100, 0, ['a'], ['a'], 'Add map'), 0)
     expect(c.at(TRAVEL_MS / 2)[0]!.label).toBe('Add map')
-    expect(c.at(TRAVEL_MS + DWELL_MS)[0]!.label).toBeUndefined()
+    expect(c.at(TRAVEL_MS + MIN_BUSY_MS - 1)[0]!.label).toBe('Add map')
+    expect(c.at(TRAVEL_MS + MIN_BUSY_MS)[0]!.label).toBeUndefined()
   })
 
   it('keeps an object busy a moment once the cursor is there, and while it loads', () => {
@@ -152,9 +161,10 @@ describe('AgentCursors', () => {
     // Nothing is busy before its cursor arrives.
     expect(c.busy(TRAVEL_MS - 1)).toEqual(new Set())
     expect(c.busy(TRAVEL_MS)).toEqual(new Set(['a']))
-    const bArrives = 2 * TRAVEL_MS + DWELL_MS
-    expect(c.busy(bArrives)).toEqual(new Set(['a', 'b']))
-    // 'a' loads nothing: busy for the minimum only. 'b' stays busy while it loads.
+    // The cursor leaves 'a' as its busy minimum ends.
+    const bArrives = 2 * TRAVEL_MS + MIN_BUSY_MS
+    expect(c.busy(bArrives)).toEqual(new Set(['b']))
+    // 'b' stays busy while it loads.
     expect(c.busy(bArrives + MIN_BUSY_MS)).toEqual(new Set(['b']))
     loading.delete('b')
     expect(c.busy(bArrives + MIN_BUSY_MS)).toEqual(new Set())
@@ -165,7 +175,7 @@ describe('AgentCursors', () => {
 })
 
 describe('hoverOffset', () => {
-  it('starts where the cursor stopped, eases in, and stays within a few pixels', () => {
+  it('starts where the cursor appears, eases in, and stays within a few pixels', () => {
     expect(hoverOffset(0)).toEqual({ x: 0, y: 0 })
     const drifts = Array.from({ length: 100 }, (_, i) => hoverOffset(i * 97))
     expect(Math.max(...drifts.map((d) => Math.abs(d.x)))).toBeGreaterThan(3)

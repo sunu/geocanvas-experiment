@@ -16,7 +16,7 @@ import { isLoading, subscribeLoading } from './loading'
  * A cursor appears when someone asks the agent, in the middle of their view, and stays while the agent works. Its
  * tag says what the agent does: the op it is doing there, else what its presence says (thinking, a search). An
  * object it worked on is busy (faded, with a spinner) for a moment, and for as long as its data is loading; the cursor
- * waits there while it loads (at most MAX_WAIT_MS) before it moves on, and hovers wherever it rests.
+ * stays there while it is busy (at most MAX_WAIT_MS) before it moves on, and hovers all the time, moving or not.
  */
 
 export interface Point {
@@ -46,8 +46,8 @@ export interface AgentCursor extends Point {
   color: string
   /** 0 to 1: it fades in when a run starts and out when the agent has stopped. */
   opacity: number
-  /** How long it has rested at its place (ms): it hovers there. Absent while it moves, and with reduced motion. */
-  resting?: number
+  /** How long it has been shown (ms), for its hover (hoverOffset), moving or not. Absent with reduced motion. */
+  floating?: number
   /** The op it is doing, while it moves there, stays, and waits for that object's data. */
   label?: string
 }
@@ -63,7 +63,7 @@ const BACKLOG_MOVES = 3
 const QUICK_TRAVEL_MS = 250
 /** The longest it waits at an object for its data before it moves on (ms). */
 export const MAX_WAIT_MS = 3000
-/** The hover while it rests: how far it drifts (px), how long one figure of eight takes, and how long it eases in. */
+/** The hover: how far it drifts (px), how long one figure of eight takes, and how long it eases in. */
 const HOVER_PX = 6
 const HOVER_PERIOD_MS = 3200
 const HOVER_EASE_MS = 800
@@ -126,7 +126,8 @@ interface Track {
   alive: number
   /**
    * The current move and those queued after it. Only the first has started: the next starts once the cursor has
-   * stayed DWELL_MS, and its objects have loaded (or MAX_WAIT_MS has passed), so it does not rush past them.
+   * stayed while its objects are busy (MIN_BUSY_MS, and while they load, at most MAX_WAIT_MS), so it is seen placing
+   * each one, and a step with no objects for DWELL_MS.
    */
   moves: Move[]
 }
@@ -163,19 +164,23 @@ export class AgentCursors {
     this.tracks.set(step.key, { name: step.name, color: step.color, shown: now, alive: now, moves: [move] })
   }
 
+  /** How long the cursor stays at a move's place before the next move: through its objects' busy minimum. */
+  private stay(move: Move) {
+    return move.ids.length ? MIN_BUSY_MS : this.reduced ? 0 : DWELL_MS
+  }
+
   /** Starts each queued move whose turn has come by `t`, and drops the moves done with. */
   private advance(t: number) {
-    const dwell = this.reduced ? 0 : DWELL_MS
     for (const track of this.tracks.values()) {
       for (let i = 1; i < track.moves.length; i++) {
         if (started(track.moves[i]!)) continue
         const prev = track.moves[i - 1] as Started
-        const ready = prev.arrive + dwell
-        const giveUp = prev.arrive + MAX_WAIT_MS
-        if (t < ready) break
-        // The next move on the same object (a map, then its layer) goes on at once: what loads there is its own.
+        // The next move on the same object (a map, then its layer) goes on soon: it stays there, and what loads is its own.
         const next = track.moves[i]!
         const same = next.ids.some((id) => prev.ids.includes(id))
+        const ready = prev.arrive + (same ? (this.reduced ? 0 : DWELL_MS) : this.stay(prev))
+        const giveUp = prev.arrive + MAX_WAIT_MS
+        if (t < ready) break
         if (!same && t < giveUp && prev.ids.some(this.loading)) {
           prev.held = true
           break
@@ -211,9 +216,8 @@ export class AgentCursors {
       const move = moves[0] as Started
       const k = t >= move.arrive ? 1 : ease(Math.max(0, (t - move.start) / (move.arrive - move.start)))
       const opacity = this.reduced ? 1 : Math.max(0, Math.min(1, (t - shown) / FADE_MS, (end - t) / FADE_MS))
-      const rest = t - (move.arrive + DWELL_MS)
-      // The op it did there, while it moves, stays, and waits for that object's data.
-      const doing = move.label && (rest < 0 || move.ids.some(this.loading)) ? move.label : undefined
+      // The op it did there, while it moves there and stays, and while that object's data loads.
+      const doing = move.label && (t < move.arrive + this.stay(move) || move.ids.some(this.loading)) ? move.label : undefined
       cursors.push({
         key,
         name,
@@ -221,7 +225,7 @@ export class AgentCursors {
         x: move.from.x + (move.to.x - move.from.x) * k,
         y: move.from.y + (move.to.y - move.from.y) * k,
         opacity,
-        ...(rest >= 0 && !this.reduced && { resting: rest }),
+        ...(!this.reduced && { floating: t - shown }),
         ...(doing && { label: doing }),
       })
     }
@@ -263,7 +267,7 @@ export class AgentCursors {
   nextChange(t: number): number | undefined {
     this.advance(t)
     const times = [
-      ...[...this.tracks.values()].flatMap((tr) => tr.moves.filter(started).flatMap((m) => [m.arrive, m.arrive + DWELL_MS, m.arrive + MAX_WAIT_MS])),
+      ...[...this.tracks.values()].flatMap((tr) => tr.moves.filter(started).flatMap((m) => [m.arrive, m.arrive + DWELL_MS, m.arrive + this.stay(m), m.arrive + MAX_WAIT_MS])),
       ...[...this.worked.values()].flatMap((from) => [from, from + MIN_BUSY_MS]),
     ].filter((a) => a > t)
     return times.length ? Math.min(...times) : undefined
@@ -275,12 +279,13 @@ const hideAt = (track: Track) =>
   track.moves.some((m) => !started(m)) ? Infinity : Math.max((track.moves.at(-1) as Started).arrive, track.alive) + IDLE_MS
 
 /**
- * How far a resting cursor drifts from its place (screen px), `rest` ms after it stopped: a slow figure of eight, as
- * if it hovered over the page while the agent thinks or waits. It eases in, so the cursor does not jump.
+ * How far the cursor drifts from where it is (screen px), `floating` ms after it appeared: a slow figure of eight on
+ * top of its moves, all the time, so it seems to hover over the page, whether it glides, places or waits. It eases in
+ * as the cursor appears.
  */
-export function hoverOffset(rest: number): Point {
-  const a = Math.min(1, rest / HOVER_EASE_MS)
-  const phase = (2 * Math.PI * rest) / HOVER_PERIOD_MS
+export function hoverOffset(floating: number): Point {
+  const a = Math.min(1, floating / HOVER_EASE_MS)
+  const phase = (2 * Math.PI * floating) / HOVER_PERIOD_MS
   return { x: a * HOVER_PX * Math.sin(phase), y: (a * HOVER_PX * Math.sin(2 * phase)) / 2 }
 }
 

@@ -412,13 +412,8 @@ body,
   transition: none;
 }
 
-/* Hovering over the page while the agent thinks or waits for data (it drifts, canvas/agentCursor.ts): lifted, so its
- * shadow falls further. */
+/* The agent's cursor floats over the page (it drifts, canvas/agentCursor.ts): lifted, so its shadow falls further. */
 .ttx-cursor--agent svg {
-  transition: filter 300ms ease-out;
-}
-
-.ttx-cursor--agent.is-hovering svg {
   filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.22));
 }
 
