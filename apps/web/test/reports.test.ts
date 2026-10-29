@@ -54,7 +54,7 @@ describe('Add to report', () => {
     const note = add(rt, 'sticky')
     const done = await addToReport(rt, [note], r)
     expect(done).toMatchObject({ status: 'applied', summary: 'Added 1 item to the report' })
-    expect(await addToReport(rt, [note], r)).toMatchObject({ status: 'failed', error: expect.stringMatching(/already in the report/) })
+    expect(await addToReport(rt, [note], r)).toMatchObject({ status: 'failed', error: expect.stringMatching(/already in this report/) })
     rt.undo()
     expect((rt.board.get(r) as ReportBoardObject).blocks).toEqual([])
   })

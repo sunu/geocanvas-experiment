@@ -3146,3 +3146,43 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   color: var(--ttx-muted);
   font-size: 13px;
 }
+
+/*
+ * Objects dragged over a report (ObjectView `dropping`; the canvas raises their layer above everything): faded and a
+ * little smaller, so the report shows through as the place they go. Only a look while dragging; their stored layer
+ * and size do not change. No pointer events, so the report under them is what the pointer finds.
+ */
+.ttx-obj.is-dropping {
+  opacity: 0.6;
+  transform: scale(0.8);
+  transform-origin: center;
+  pointer-events: none;
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
+}
+
+/* The report under objects being dragged (Canvas.tsx DropZone): where a drop adds them. Screen space, like selections. */
+.ttx-dropzone {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed var(--canvas-accent);
+  background: color-mix(in srgb, var(--canvas-accent) 10%, transparent);
+}
+
+.ttx-dropzone__label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--canvas-accent);
+  /* Dark on cyan: white on cyan-500 is too faint for small text. */
+  color: var(--ttx-ink);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -55,7 +55,7 @@ describe('reports', () => {
     expect(report(rt, r).blocks).toEqual([])
   })
 
-  it('make an empty report from one frame: the frame titles the report, and what is in it is the report', async () => {
+  it('make an empty report from one frame: the frame titles the report, and all its contents are the report', async () => {
     const rt = setup()
     const r = add(rt, 'report', { x: 5000 })
     const frame = add(rt, 'frame', { x: 0, y: 0, w: 1000, h: 1000, title: 'Situation report: Flood in Nepal' })

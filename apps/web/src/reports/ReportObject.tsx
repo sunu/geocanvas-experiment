@@ -96,7 +96,7 @@ function ItemView({ block: b, source, runtime }: { block: Extract<Block, { kind:
       </div>
     )
   }
-  if (!source) return <div className="ttx-report__card is-gone">The source was removed</div>
+  if (!source) return <div className="ttx-report__card is-gone">The source object was removed.</div>
   const o = source as AnyObject & { text?: string; title?: string; value?: { name?: string } }
   if (source.type === 'frame') return <h2 className="ttx-report__heading ttx-report__heading--1">{o.name || o.title || 'Frame'}</h2>
   const Icon = objectUI(source.type)?.tool?.Icon ?? SquaresFourIcon

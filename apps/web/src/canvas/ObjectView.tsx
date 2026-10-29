@@ -22,10 +22,12 @@ interface Props {
   /** In focus mode: drawn at `rect`, a local size that is never stored, so it lays out for the whole screen. */
   focused?: { rect: Rect | null }
   onFocus?(): void
+  /** Dragged over a report, about to be dropped on it: drawn above everything, faded and smaller. Only a look; nothing is stored. */
+  dropping?: boolean
 }
 
 /** One object on the canvas, in world coordinates. `layer` is its place in the stacking order. Its type's UI fills it. */
-export function ObjectView({ runtime, object: o, layer, editing, selected, arriving, busy, onDone, focused, onFocus }: Props) {
+export function ObjectView({ runtime, object: o, layer, editing, selected, arriving, busy, onDone, focused, onFocus, dropping }: Props) {
   const [label, setLabel] = useState<HTMLElement | null>(null)
   // A board can hold objects of a type this build does not know, made by a newer version (e.g. a tab
   // opened before a deploy).
@@ -39,7 +41,7 @@ export function ObjectView({ runtime, object: o, layer, editing, selected, arriv
   return (
     <div
       data-id={o.id}
-      className={`ttx-obj ttx-obj--${o.type} ${editing ? 'is-editing' : ''} ${selected ? 'is-selected' : ''} ${focused ? 'is-focused' : ''} ${arriving ? 'is-arriving' : ''}`}
+      className={`ttx-obj ttx-obj--${o.type} ${editing ? 'is-editing' : ''} ${selected ? 'is-selected' : ''} ${focused ? 'is-focused' : ''} ${arriving ? 'is-arriving' : ''} ${dropping ? 'is-dropping' : ''}`}
       style={{ left: r.x, top: r.y, width: r.w, height: r.h, zIndex: layer, ...ui?.frameStyle?.(o) }}
     >
       {/* The name above the object, outside its box; its views fill it through ObjectHeader. */}
