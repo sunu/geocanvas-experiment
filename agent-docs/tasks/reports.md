@@ -191,6 +191,7 @@ Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ but
   - others and the agent see changes as they happen
   - undo is per gesture
   - there is no Share button and no exit dialog
+- **Undo in report mode** (decided 2026-10-30): ⌘Z undoes this person's latest change on the board, whether it was made in report mode or on the canvas before it opened, since report mode has no draft with its own history. It never undoes other people's or the agent's changes.
 
   Why: the agent edits the shared board and cannot see a private draft. With a draft, it would miss unshared edits, and Share could overwrite one side's changes, since `blocks` is replaced whole. `FocusableObjectUI` gets an option for this, for example `live: true`.
 
@@ -365,6 +366,7 @@ Made (2026-10-29, from the product owner):
 17. **Removing from a report happens only in report mode** (§5.2a). The canvas's Add to report menus only add, and their checks only show what is there. 2026-10-29.
 18. **Report mode is full screen,** on white with a border on each page, and **the chat is an overlay** at the top left that takes no room (5a, round 2). 2026-10-30.
 19. **Report tools go in a bottom report toolbar** that replaces the canvas toolbar in report mode; controls on a block sit on the block (§5.1b, 5b). 2026-10-30.
+20. **Undo in report mode is this person's latest change on the board,** wherever it was made (§5.1). 2026-10-30.
 
 Under discussion: **synced and detached items** (`plans/plan-015.md`), a proposal for colleagues' feedback, with its own questions (what "detached" means, pinning external data, deleting a source, edits, the words).
 
