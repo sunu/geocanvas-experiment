@@ -29,5 +29,7 @@ export function startBrowserAgent(doc: Y.Doc, awareness: Awareness) {
     accepts: (m) => m.browserTab === TAB_ID,
     // On the person's presence, so everyone sees "Agent is thinking…".
     onBusy: (busy) => awareness.setLocalStateField('status', busy ? 'thinking' : null),
+    // What it does now, on the same presence: the person it acts for is this one.
+    onActivity: (a) => awareness.setLocalStateField('activity', a?.title ?? null),
   })
 }

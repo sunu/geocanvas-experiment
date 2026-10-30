@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: steps 2 and 3 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: steps 2 to 4 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -137,7 +137,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 
   So adding an object to a report never changes the object, and a linked object can be in a report too.
 - **Live items follow links for free.** When a root changes (another event on a SitRep's event card), its linked widgets update on the canvas, so their live items in a report update as well. Frozen items do not, by design.
-- **A removed source:** a live item whose source was deleted shows "The source was removed", and its last frozen copy if it has one.
+- **A removed source:** a live item whose source was deleted shows "The source object was removed.", and its last frozen copy if it has one.
 - **Freezing a map needs a browser:** the PNG is drawn by the hidden map. So the UI freezes first, then dispatches `report.setItemMode` with the result.
 
 ## 4. On the canvas
@@ -151,12 +151,12 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   - The Object panel shows its paper and its number of items.
 - **Toolbar:** a **Report** tool in the `MAP_AND_REPORT` group, with the key P (free on 2026-10-29). A new report opens in focus.
 - **Drag onto a report:**
-  1. While objects are dragged, a report under the pointer shows a drop zone (an outline and "Drop to add to *Flood SitRep*").
-  2. On release, a small confirmation appears by the report: "Add 2 objects to *Flood SitRep*?", with Add and Cancel.
-  3. Add runs `report.addItems` and puts the dragged objects back where they were. Cancel leaves them where they were dropped, as a normal move.
-  4. Either way it is one gesture, so one undo step.
+  1. While objects are dragged, the report under the pointer (the topmost one that is not being dragged: `reportUnder` in `apps/web/src/reports/drop.ts`, from the DOM's `elementsFromPoint`) shows a drop zone: a dashed outline and "Drop to add to *Flood SitRep*" (`DropZone` in `Canvas.tsx`, screen space like selections). Dragging only reports shows none. Over the report, the dragged objects (with a frame's contents) are drawn above it, at 60% opacity and 80% size, without their selection outlines, so the report shows through as the place they go. This is only a look: their stored layer and size do not change.
+  2. On release over it, a small confirmation appears by the drop point (`reports/DropConfirm.tsx`): "Add 2 objects to *Flood SitRep*?", or "Add this frame and all its contents to *Flood SitRep*?" (several objects with frames: "Add 3 objects, including all frame contents, to …?"), with Add (focused, so Enter adds) and Cancel (or Esc, or a press anywhere else).
+  3. Add puts everything that moved back where it was, then runs `report.addItems` on the selection. Cancel leaves the objects where they were dropped, as a normal move.
+  4. Either way it is one undo step: Add dispatches both writes inside the drag's own gesture, and the confirmation keeps presses from reaching the canvas, which would start a new one. `Runtime.dispatch` now records an op's summary as `invoke` does, so the canvas's notice says what was added.
   5. The objects stay on the canvas, and the report's preview updates.
-- **Adding a frame adds what is in it.** Dropping a frame on a report, or Add to report on a frame, adds an item for each object fully inside the frame, in reading order (top to bottom, then left to right). Frames inside it follow, each as a heading and then its own objects. The report stays a flat list of blocks: the frame does not become a container in the report, and each block can be moved, removed or added to on its own.
+- **Adding a frame adds all its contents.** Dropping a frame on a report, or Add to report on a frame, adds an item for each object fully inside the frame, in reading order (top to bottom, then left to right). Frames inside it follow, each as a heading and then its own objects. The report stays a flat list of blocks: the frame does not become a container in the report, and each block can be moved, removed or added to on its own.
   - **Into an empty report, the frame becomes the report** (for example a Situation report template's frame). Its title becomes the report's title, shown at the top of the first page, and kept live (`titleFrom`): when the template's event changes, the report's title changes with the frame's, until someone renames the report. No heading block is added.
   - **Into a report with content, the frame adds a heading block first:** an item for the frame itself, showing its live title, then its objects. So a second frame (a conflict explorer next to a SitRep) stays readable.
   - **With objects from outside the frame in the same selection,** the frame is not the whole report, so it gets its heading block too.
@@ -318,7 +318,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
    - a frame adds a heading and the objects inside it, in reading order, with nested frames
    - blocks that reference a removed object
 3. **The widget on the canvas** (built: `apps/web/src/reports/`, the Report tool on P in the toolbar's Map and report group, Add to report in the right-click menu and the Object panel, with the canvas's notice saying what it did): the preview, the toolbar tool, and Add to report from the right-click menu, the Object panel and ⌘K, with the report picker.
-4. **Drag onto a report:** the drop zone, the confirmation, objects back in place, one undo step.
+4. **Drag onto a report** (built): the drop zone, the confirmation, objects back in place, one undo step.
 5. **Report mode:** pages, the two-column grid, reordering by drag, spans, paper and orientation, the insert menu, headings and plain text.
 6. **Rich text:** the editor (Tiptap, needs approval), `report.setText`.
 7. **Live and frozen:**

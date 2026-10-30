@@ -5,12 +5,12 @@ import { SHAPE_COLORS, type Shape, type ShapeColor } from '@ttx/plugins'
 export type DrawTool = 'note' | Shape
 
 const TOOLS: { tool: DrawTool; label: string; hint: string; Icon: Icon }[] = [
-  { tool: 'note', label: 'Sticky note', hint: 'Click on the map to place the note', Icon: NoteIcon },
+  { tool: 'note', label: 'Sticky note', hint: 'Click or tap on the map to place the note', Icon: NoteIcon },
   { tool: 'arrow', label: 'Arrow', hint: 'Drag from where the arrow starts to where it points', Icon: ArrowUpRightIcon },
   { tool: 'line', label: 'Line', hint: 'Drag from one end to the other', Icon: LineSegmentIcon },
   { tool: 'rectangle', label: 'Rectangle', hint: 'Drag from one corner to the opposite one', Icon: SquareIcon },
   { tool: 'circle', label: 'Circle', hint: 'Drag from the center to the edge', Icon: CircleIcon },
-  { tool: 'polygon', label: 'Polygon', hint: 'Click each corner; double-click or Enter to finish', Icon: PolygonIcon },
+  { tool: 'polygon', label: 'Polygon', hint: 'Click or tap each corner; double-click, Enter or Done to finish', Icon: PolygonIcon },
   { tool: 'freehand', label: 'Pen', hint: 'Drag to draw', Icon: ScribbleIcon },
 ]
 

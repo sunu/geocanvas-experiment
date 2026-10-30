@@ -114,13 +114,13 @@ const NEW_REPORT_GAP = 48
 function reportOf(ctx: OpContext, id?: string): ReportBoardObject {
   const rid = id ?? (ctx.target.kind === 'objects' ? ctx.target.ids[0] : undefined)
   const report = rid ? ctx.board.get(rid) : undefined
-  if (report?.type !== 'report') throw new Error(`No report ${rid ?? ''} on the board`)
+  if (report?.type !== 'report') throw new Error(rid ? `Report ${rid} was not found on the board.` : 'Choose a report.')
   return report as ReportBoardObject
 }
 
 function blockIn(report: ReportBoardObject, id: string): Block {
   const b = report.blocks.find((b) => b.id === id)
-  if (!b) throw new Error(`The report has no block ${id}`)
+  if (!b) throw new Error(`Block ${id} was not found in the report.`)
   return b
 }
 
@@ -196,7 +196,7 @@ export const reportsPlugin = definePlugin({
       type: 'report',
       title: 'Report',
       description:
-        'A report: a document made from the board, with a page size and blocks (headings, text, images, and items that show objects of the board, live or frozen). Name it with core.object.rename.',
+        'A report: a document made from the board, with a page size and blocks (headings, text, images, and items that show objects from the board, live or frozen). Name it with core.object.rename.',
       fields: z.object({
         // A new report starts on A4, portrait: forms fold these away, and report mode's Options panel changes them.
         paper: z.enum(PAPERS).default('a4').meta({ advanced: true }).describe('Paper size'),
@@ -233,9 +233,9 @@ export const reportsPlugin = definePlugin({
       id: 'report.addItems',
       title: 'Add to report',
       description:
-        'Add the selected objects to the end of a report, as live items, or to a new report beside them when no report is given. ' +
-        'A frame adds a heading (its title), then the objects inside it; added to an empty report, a frame becomes the whole report instead: ' +
-        "its title is the report's title, with no heading. The objects stay where they are on the board. Objects already in the report are skipped.",
+        'Add the selected objects to the end of a report as live items, or to a new report beside them when no report is given. ' +
+        'A frame adds a heading (its title) followed by all its contents. Added to an empty report, a frame becomes the whole report: ' +
+        "its title becomes the report's title and no heading is added. The objects remain on the board. Objects already in the report are skipped.",
       target: { kind: 'objects', min: 1 },
       args: z.object({
         reportId: z.string().min(1).optional().meta({ widget: 'report' }).describe('The report to add them to. Leave it out for a new report'),
@@ -251,8 +251,8 @@ export const reportsPlugin = definePlugin({
         const already = new Set(blocks.flatMap((b) => (b.kind === 'item' ? [b.sourceId] : [])))
         const selected = (ctx.target.kind === 'objects' ? ctx.target.ids : []).flatMap((id) => ctx.board.get(id) ?? [])
         let sources = itemsToAdd(selected, ctx.board.list(), already)
-        if (!sources.length) throw new Error('Nothing to add: the objects are already in the report, or are reports')
-        // One frame (with what is in it) into an empty report is the report: its title is the report's, not a heading.
+        if (!sources.length) throw new Error('Nothing to add. The selected objects are already in this report.')
+        // One frame (with all its contents) into an empty report is the report: its title is the report's, not a heading.
         const [first] = sources
         const whole = !blocks.length && first!.type === 'frame' && sources.every((o) => o === first || contains(first!, o))
         if (whole) sources = sources.slice(1)
@@ -289,7 +289,7 @@ export const reportsPlugin = definePlugin({
         const report = reportOf(ctx)
         let added: Block
         if (b.kind === 'text') {
-          if (!b.doc && b.text === undefined) throw new Error('Text needs text or doc')
+          if (!b.doc && b.text === undefined) throw new Error('A text block needs text or a document.')
           added = { id: newId(), kind: 'text', doc: b.doc ?? textDoc(b.text!), span: spanFor('text') }
         } else added = { ...b, id: newId(), span: spanFor(b.kind) } as Block
         return { id: report.id, blocks: insertAt(report.blocks, [added], index) }
@@ -299,7 +299,7 @@ export const reportsPlugin = definePlugin({
     defineOp({
       id: 'report.removeBlock',
       title: 'Remove from report',
-      description: 'Remove a block from the selected report. An item leaves its object on the board.',
+      description: 'Remove a block from the selected report. Removing an item leaves its object on the board.',
       target: oneReport,
       args: z.object({ blockId }),
       prepare(ctx, { blockId: b }) {
@@ -339,18 +339,18 @@ export const reportsPlugin = definePlugin({
       id: 'report.setItemMode',
       title: 'Freeze or unfreeze report item',
       description:
-        'Set an item of the selected report to live (it shows its object as it is now) or frozen (as it was). ' +
-        'Texts, sticky notes, frames and areas freeze here; a map or a data widget needs its frozen copy from the browser.',
+        'Set an item of the selected report to live (it shows its object as it is now) or frozen (as it was when frozen). ' +
+        'Text, sticky notes, frames and areas of interest can be frozen directly. Maps and data widgets can only be frozen from the browser, which creates their image or data.',
       target: oneReport,
       args: z.object({ blockId, mode: z.enum(['live', 'frozen']), frozen: frozen.optional().meta({ advanced: true }).describe('The frozen copy, made by the browser') }),
       prepare(ctx, { blockId: b, mode, frozen: given }) {
         const report = reportOf(ctx)
         const item = blockIn(report, b)
-        if (item.kind !== 'item') throw new Error(`Block ${b} is not an item`)
+        if (item.kind !== 'item') throw new Error(`Block ${b} is not an item, so it cannot be frozen.`)
         if (mode === 'live') return { id: report.id, blocks: withBlock(report, b, { mode }) }
         const source = ctx.board.get(item.sourceId)
         const copy = given ?? (source && freezeText(source))
-        if (!copy) throw new Error(source ? `A ${source.type} is frozen in the browser, which makes its picture or data` : 'Its object is gone: nothing to freeze')
+        if (!copy) throw new Error(source ? `A ${ctx.registry.objectType(source.type)?.title.toLowerCase() ?? source.type} can only be frozen from the browser, which creates its image or data.` : 'The source object was removed, so there is nothing to freeze.')
         return { id: report.id, blocks: withBlock(report, b, { mode, frozen: copy } as Partial<Block>) }
       },
       apply: (tx, { id, blocks }) => tx.update({ [id]: { blocks } }),
@@ -368,7 +368,7 @@ export const reportsPlugin = definePlugin({
         const target = blockIn(report, b)
         if (target.kind === 'heading' && text !== undefined) return { id: report.id, blocks: withBlock(report, b, { text } as Partial<Block>) }
         if (target.kind === 'text' && doc) return { id: report.id, blocks: withBlock(report, b, { doc } as Partial<Block>) }
-        throw new Error(`Block ${b} takes ${target.kind === 'heading' ? 'text' : target.kind === 'text' ? 'doc' : 'no text'}`)
+        throw new Error(target.kind === 'heading' ? `Block ${b} is a heading: give it text.` : target.kind === 'text' ? `Block ${b} is a text block: give it a document.` : `Block ${b} has no text to edit.`)
       },
       apply: (tx, { id, blocks }) => tx.update({ [id]: { blocks } }),
     }),

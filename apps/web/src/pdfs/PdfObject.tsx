@@ -10,6 +10,7 @@ import { fileLink } from '../uploads/upload'
 import { setPageInView } from './live'
 import { loadPdf, renderPage } from './pdf'
 import { ObjectHeader } from '../canvas/ObjectHeader'
+import { useReportLoading } from '../canvas/loading'
 
 /** Pages drawn ahead of the scroll position in focus, as a fraction of the view's height. */
 const AHEAD = '100%'
@@ -71,7 +72,9 @@ export function useDoc(fileId: string | undefined): { value?: PDFDocumentProxy; 
       current = false
     }
   }, [fileId])
-  return fileId && state?.fileId === fileId ? state : {}
+  const result: { value?: PDFDocumentProxy; error?: unknown } = fileId && state?.fileId === fileId ? state : {}
+  useReportLoading(!!fileId && result.value === undefined && result.error === undefined)
+  return result
 }
 
 /** One page, as wide as its box, drawn again when the box's width changes. A page that cannot be drawn says why. */

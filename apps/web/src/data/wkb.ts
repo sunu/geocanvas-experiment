@@ -73,9 +73,10 @@ export interface RowRange {
 
 /**
  * Row ranges of the row groups whose `bbox` column statistics intersect the query bbox. A row group
- * without usable statistics is kept (it may match).
+ * without usable statistics is kept (it may match). `keep` can drop more of them by the bbox their statistics
+ * give, e.g. those that miss a polygon inside the query bbox.
  */
-export function rowGroupsInBbox(rowGroups: RowGroupMeta[], bbox: Bbox): RowRange[] {
+export function rowGroupsInBbox(rowGroups: RowGroupMeta[], bbox: Bbox, keep?: (rowGroupBbox: Bbox) => boolean): RowRange[] {
   const out: RowRange[] = []
   let rowStart = 0
   for (const rg of rowGroups) {
@@ -89,7 +90,8 @@ export function rowGroupsInBbox(rowGroups: RowGroupMeta[], bbox: Bbox): RowRange
     const xmax = stat('bbox.xmax', 'max_value') ?? Infinity
     const ymin = stat('bbox.ymin', 'min_value') ?? -Infinity
     const ymax = stat('bbox.ymax', 'max_value') ?? Infinity
-    if (rowEnd > rowStart && bboxesIntersect([xmin, ymin, xmax, ymax], bbox)) out.push({ rowStart, rowEnd })
+    const rgBbox: Bbox = [xmin, ymin, xmax, ymax]
+    if (rowEnd > rowStart && bboxesIntersect(rgBbox, bbox) && (!keep || keep(rgBbox))) out.push({ rowStart, rowEnd })
     rowStart = rowEnd
   }
   return out

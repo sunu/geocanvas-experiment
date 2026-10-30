@@ -80,6 +80,9 @@ export {
   ROUTE_PROFILES,
   type ClosureGeometry,
   type MapScenario,
+  type ScenarioExposure,
+  RETURN_PERIODS,
+  type ReturnPeriod,
   type RouteColor,
   type RouteProfile,
   type ScenarioClosure,
@@ -112,7 +115,7 @@ export {
 } from './weather.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
 export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
-export { agentTools, availableSkills, coreToolNames, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn, SEARCH_RESULTS, searchTools } from './agent/loop.js'
+export { agentTools, availableSkills, coreToolNames, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn, SEARCH_RESULTS, searchTools, THINKING } from './agent/loop.js'
 export { parseSkill, SKILLS, type Skill } from './skills/index.js'
-export { callOp, GAP, MAX_SIZE_FACTOR, TurnLog, type OpCall } from './agent/call.js'
+export { callOp, firstAddSpot, GAP, MAX_SIZE_FACTOR, TurnLog, type OpCall } from './agent/call.js'
 export { chatCompletions, openRouter, OPENROUTER_URL, type Complete, type FunctionTool, type Message, type ToolCall } from './agent/complete.js'

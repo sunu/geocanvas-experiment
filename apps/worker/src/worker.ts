@@ -7,6 +7,7 @@ import * as decoding from 'lib0/decoding'
 import { geocode } from './geocode'
 import { hapiProxy } from './hapi'
 import { montySearch, stacSearch } from './monty'
+import { floodmapsProxy } from './floodmaps'
 import { notebooksProxy } from './notebooks'
 import { reliefwebUpdates } from './reliefweb'
 import { json, serveUpload, storeUpload } from './uploads'
@@ -25,7 +26,8 @@ import { previewOpenEOAnalysis } from './openeoPreview'
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
  * /monty/search proxies Montandon STAC searches with the token added (monty.ts),
  * /tools/geocode proxies OpenCage with the key added (geocode.ts), and /notebooks/* and
- * /reliefweb/updates read Notebook Factory and ReliefWeb, which send no CORS headers (notebooks.ts, reliefweb.ts),
+ * /reliefweb/updates read Notebook Factory and ReliefWeb, which send no CORS headers (notebooks.ts, reliefweb.ts), as
+ * /floodmaps/* reads the GloFAS flood hazard maps (floodmaps.ts),
  * and /hapi/* reads HDX HAPI with the app identifier added (hapi.ts).
  * POST /uploads goes to the room the file is for, which stores it in R2 and lists it on the board;
  * GET /uploads/<id> serves it (uploads.ts).
@@ -118,6 +120,8 @@ export class Room extends DurableObject<Env> {
       ],
       // The agent's presence: people see "Agent is thinking…" while it works.
       onBusy: (busy) => this.awareness.setLocalState(busy ? { user: AGENT, status: 'thinking' } : null),
+      // What it does now, and for whom, so browsers show it on its cursor: one presence update per step, during a turn.
+      onActivity: (a) => a && this.awareness.setLocalState({ user: AGENT, status: 'thinking', activity: a.title, for: a.for }),
       keepAlive: (work) => ctx.waitUntil(work),
     })
     this.runtime = agent.runtime
@@ -249,6 +253,7 @@ export default {
     if (path === '/agent/status') return json(200, { configured: !!env.OPENROUTER_API_KEY, geocode: !!env.OPENCAGE_API_KEY })
     if (path.startsWith('/notebooks/')) return notebooksProxy(request, env.NOTEBOOK_FACTORY_URL)
     if (path === '/reliefweb/updates') return reliefwebUpdates(request)
+    if (path.startsWith('/floodmaps/')) return floodmapsProxy(request)
     if (path.startsWith('/hapi/')) return hapiProxy(request, env.HAPI_APP_IDENTIFIER)
     if (path === '/uploads') {
       if (request.method !== 'POST') return json(405, { error: 'POST only' })

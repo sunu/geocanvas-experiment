@@ -9,7 +9,7 @@
   "assets": {
     "directory": "../web/dist",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/connect/*", "/agent/*", "/monty/*", "/tools/*", "/notebooks/*", "/reliefweb/*", "/hapi/*", "/openeo/*", "/uploads", "/uploads/*"]
+    "run_worker_first": ["/connect/*", "/agent/*", "/monty/*", "/tools/*", "/notebooks/*", "/reliefweb/*", "/floodmaps/*", "/hapi/*", "/openeo/*", "/uploads", "/uploads/*"]
   },
   // Montandon STAC API, the database agent-docs/features.md scopes us to, and Notebook Factory (published
   // notebook runs; read anonymously). API keys are secrets: apps/worker/.dev.vars locally, `wrangler secret`

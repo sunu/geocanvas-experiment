@@ -5,7 +5,7 @@ import satelliteImagery from './satellite-imagery.md'
 import showPlace from './show-place.md'
 
 /**
- * A skill: a workflow the agent reads only when a request needs it (plans/plan-015.md, after
+ * A skill: a workflow the agent reads only when a request needs it (plans/plan-017.md, after
  * wri/project-zeno's src/agent/skills). The system prompt lists each skill's name, description and
  * when_to_use; skills__read gives the body and loads the skill's tools for the rest of the turn.
  */

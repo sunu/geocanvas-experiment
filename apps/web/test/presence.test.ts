@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CURSOR_INTERVAL, cursorSender, peersFrom } from '../src/board/presence'
+import { agentActivities, CURSOR_INTERVAL, cursorSender, peersFrom } from '../src/board/presence'
 
 describe('peersFrom', () => {
   const user = { name: 'Heron', color: '#2f9e44' }
@@ -40,5 +40,20 @@ describe('cursorSender', () => {
     send(null) // pointer left the canvas
     vi.advanceTimersByTime(CURSOR_INTERVAL)
     expect(sent).toEqual([{ x: 1, y: 1 }, { x: 3, y: 3 }, null])
+  })
+})
+
+describe('agentActivities', () => {
+  it("keys each agent's activity by its cursor: the room's agent by whom it works for, a browser agent by its person", () => {
+    const states = new Map<number, Record<string, unknown>>([
+      [1, { user: { kind: 'agent', id: 'agent', name: 'Agent' }, status: 'thinking', activity: 'Search events', for: 'ada' }],
+      [2, { user: { kind: 'user', id: 'ben', name: 'Ben' }, status: 'thinking', activity: 'Thinking' }],
+      [3, { user: { kind: 'user', id: 'cy', name: 'Cy' }, cursor: { x: 1, y: 2 } }],
+      [4, { user: { kind: 'agent', id: 'agent', name: 'Agent' }, status: 'thinking' }], // between turns, no activity yet
+    ])
+    expect(agentActivities(states)).toEqual(new Map([
+      ['agent:ada', 'Search events'],
+      ['agent:ben', 'Thinking'],
+    ]))
   })
 })

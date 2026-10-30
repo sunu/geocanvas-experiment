@@ -7,7 +7,7 @@ export type ScenarioTool = 'route' | 'closeRoad' | 'closeArea'
 const TOOLS: { tool: ScenarioTool; label: string; hint: string; Icon: Icon }[] = [
   { tool: 'route', label: 'Route', hint: 'Click where the route starts, then where it ends', Icon: PathIcon },
   { tool: 'closeRoad', label: 'Close a road', hint: 'Click on a road to close it from one junction to the next', Icon: BarricadeIcon },
-  { tool: 'closeArea', label: 'Close an area', hint: 'Click each corner of the area; double-click or Enter to finish', Icon: PolygonIcon },
+  { tool: 'closeArea', label: 'Close an area', hint: 'Click or tap each corner of the area; double-click, Enter or Done to finish', Icon: PolygonIcon },
 ]
 
 /** Files the import takes: the room checks that they are GeoJSON. */

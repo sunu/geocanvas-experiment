@@ -19,6 +19,9 @@ import { SKILLS, type Skill } from '../skills/index.js'
 import { callOp, TurnLog } from './call.js'
 import type { Complete, FunctionTool, Message } from './complete.js'
 
+/** The agent's activity while it waits for the model. */
+export const THINKING = 'Thinking'
+
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
 export const MAX_STEPS = 12
 
@@ -146,6 +149,8 @@ export async function runTurn(
   readTools: ToolRunner,
   /** The chat entries before `message`, oldest first. */
   history: ChatEntry[] = [],
+  /** Called with what the agent does next, so people see it (its cursor's tag): THINKING before each model call, a tool's title before each call. */
+  onActivity: (title: string) => void = () => {},
 ): Promise<Omit<AgentReply, 'kind' | 'id' | 'at'>> {
   const tools = agentTools(runtime, readTools)
   const all = new Set(tools.map((t) => t.function.name))
@@ -184,6 +189,7 @@ export async function runTurn(
 
   try {
     for (let step = 0; step < MAX_STEPS; step++) {
+      onActivity(THINKING)
       const answer = await complete(messages, [...meta, ...tools.filter((t) => loaded.has(t.function.name))])
       messages.push({ role: 'assistant', content: answer.content ?? null, ...(answer.tool_calls?.length && { tool_calls: answer.tool_calls }) })
       if (!answer.tool_calls?.length) return result(answer.content?.trim() || 'Done.')
@@ -211,11 +217,14 @@ export async function runTurn(
         calls.push({ tool: name, title: 'Read a skill', status: 'failed', error: 'No such skill' })
         return JSON.stringify({ status: 'failed', error: `No such skill. Skills: ${skills.map((s) => s.name).join(', ')}` })
       }
+      const title = `Read the ${skill.name} skill`
+      onActivity(title)
       for (const id of [...skill.requires, ...skill.optional]) if (all.has(toolNameOf(id))) loaded.add(toolNameOf(id))
-      calls.push({ tool: name, title: `Read the ${skill.name} skill`, status: 'applied' })
+      calls.push({ tool: name, title, status: 'applied' })
       return skill.body
     }
     if (name === TOOLS_SEARCH) {
+      onActivity('Search tools')
       const query = String((input as { query?: unknown }).query ?? '')
       const found = searchTools(tools.filter((t) => !loaded.has(t.function.name)), query)
       for (const t of found) loaded.add(t.function.name)
@@ -224,6 +233,7 @@ export async function runTurn(
     }
     const read = readTools.list().find((t) => toolNameOf(t.id) === name)
     if (read) {
+      onActivity(read.title)
       try {
         const out = await readTools.run(read.id, input)
         calls.push({ tool: name, title: read.title, status: 'applied' })
@@ -235,6 +245,7 @@ export async function runTurn(
       }
     }
     const ids = Array.isArray(input.ids) ? input.ids : undefined
+    onActivity(runtime.registry.op(opIdOf(name))?.title ?? opIdOf(name))
     // As the agent, for the person who asked: ops that act on "my" things (map.showArea) act on theirs.
     const record = await callOp(runtime, name, input, { actor: { ...runtime.actor, onBehalfOf: message.actor.id }, turn, center: message.center })
     calls.push({ tool: record.opId, ...(ids && { ids }), status: record.status, ...(record.error && { error: record.error }) })

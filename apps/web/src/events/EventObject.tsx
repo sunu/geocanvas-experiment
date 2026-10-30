@@ -9,6 +9,7 @@ import { sourceLabel } from '@ttx/plugins/monty/sources'
 import { feedFor, glidesOf, type EventBoardObject } from '@ttx/plugins'
 import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from '@ttx/plugins/monty/types'
 import { ObjectHeader } from '../canvas/ObjectHeader'
+import { useReportLoading } from '../canvas/loading'
 
 /** Phosphor has no earthquake symbol; a seismograph pulse stands in (see AGENTS.md on hazard icons). */
 const TYPE_ICON: Record<DisasterType, Icon> = { cyclone: HurricaneIcon, flood: WavesIcon, earthquake: PulseIcon, drought: SunIcon }
@@ -200,7 +201,9 @@ function useEvent(eventId: string): { event?: DisasterEvent; error?: unknown } {
       current = false
     }
   }, [eventId])
-  return state?.eventId === eventId ? state : {}
+  const result: { event?: DisasterEvent; error?: unknown } = state?.eventId === eventId ? state : {}
+  useReportLoading(result.event === undefined && result.error === undefined)
+  return result
 }
 
 const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })

@@ -8,8 +8,8 @@ import type { MapSticky } from '@ttx/plugins'
 /**
  * A map's sticky notes, each pinned to its place with a MapLibre marker: it stays on that place as the map
  * pans and zooms, at the same size on screen. They are DOM, not deck.gl, so their text is sharp and editable,
- * and they sit above the data layers. While the map is edited, drag a note to move it, double-click it to
- * write, and remove it with its ×.
+ * and they sit above the data layers. While the map is edited, drag a note to move it (a mouse or a finger),
+ * double-click or double-tap it to write, and remove it with its ×.
  */
 export function MapStickies({
   runtime,
@@ -59,6 +59,10 @@ export function MapStickies({
   )
 }
 
+/** Two taps on a note this close in time (ms) write in it; a press that moves further than this (px) is a drag. */
+const DOUBLE_TAP_MS = 400
+const TAP_PX = 6
+
 interface MarkerProps {
   map: MapLibreMap
   sticky: MapSticky
@@ -90,22 +94,37 @@ function StickyMarker({ map, sticky, editable, writing, onWrite, onMove, onText,
       const p = marker.getLngLat().wrap()
       props.current.onMove([p.lng, p.lat])
     })
-    // MapLibre listens on its canvas container, which the note is in: it would zoom on a double-click in the note,
-    // and pan on a press in its text box. React's own handlers run later, at the root, so these are native.
-    const onDblClick = (e: MouseEvent) => {
-      if (!marker.isDraggable() && !props.current.writing) return
-      e.stopPropagation()
+    // A double-click or a double-tap writes: counted from pointer events, since phones send no dblclick reliably. A
+    // press that moved dragged the note and is no tap.
+    let press: { x: number; y: number } | undefined
+    let lastTap = 0
+    const onPointerDown = (e: PointerEvent) => void (press = { x: e.clientX, y: e.clientY })
+    const onPointerUp = (e: PointerEvent) => {
+      const tap = press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < TAP_PX
+      press = undefined
+      if (!tap || (!marker.isDraggable() && !props.current.writing)) return
+      if (e.timeStamp - lastTap > DOUBLE_TAP_MS) return void (lastTap = e.timeStamp)
+      lastTap = 0
       props.current.onWrite(true)
     }
-    const onDown = (e: MouseEvent) => {
+    // MapLibre listens on its canvas container, which the note is in: it would zoom on a double-click in the note,
+    // and pan on a press (or a touch) in its text box. React's own handlers run later, at the root, so these are native.
+    const onDblClick = (e: MouseEvent) => e.stopPropagation()
+    const onDown = (e: Event) => {
       if (props.current.writing) e.stopPropagation()
     }
+    el.addEventListener('pointerdown', onPointerDown)
+    el.addEventListener('pointerup', onPointerUp)
     el.addEventListener('dblclick', onDblClick)
     el.addEventListener('mousedown', onDown)
+    el.addEventListener('touchstart', onDown)
     markerRef.current = marker
     return () => {
+      el.removeEventListener('pointerdown', onPointerDown)
+      el.removeEventListener('pointerup', onPointerUp)
       el.removeEventListener('dblclick', onDblClick)
       el.removeEventListener('mousedown', onDown)
+      el.removeEventListener('touchstart', onDown)
       marker.remove()
       markerRef.current = null
     }
@@ -140,7 +159,7 @@ function StickyMarker({ map, sticky, editable, writing, onWrite, onMove, onText,
           onChange={(e) => onText(e.target.value)}
         />
       ) : (
-        <div className="ttx-mapsticky__text" title={editable ? 'Drag to move, double-click to write' : undefined}>
+        <div className="ttx-mapsticky__text" title={editable ? 'Drag to move, double-click or double-tap to write' : undefined}>
           {sticky.text || <span className="ttx-mapsticky__empty">Empty note</span>}
         </div>
       )}
