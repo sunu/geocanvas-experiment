@@ -59,7 +59,7 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
     // A new report: select it, so it is easy to find.
     if (!reportId && r.created?.length) onSelect(r.created)
   }
-  // A code cell's own entries (plan-021): Run, and Show output on.
+  // A code cell's own entries (plan-022): Run, and Show output on.
   const cell = ids.length === 1 && board.get(ids[0]!)?.type === 'code' ? board.get(ids[0]!) : undefined
   const layer = (label: string, Icon: typeof ArrowUpIcon, opId: string, keys: string) => (
     <ContextMenuItem onSelect={() => run(opId)}>

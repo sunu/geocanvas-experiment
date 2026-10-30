@@ -3,7 +3,7 @@ import { UPLOAD_ID } from '@ttx/core'
 import type { Bbox } from './mapLayers.js'
 
 /**
- * What a code cell's run gives (plans/plan-020.md): the kinds of output, how they are stored, and which other
+ * What a code cell's run gives (plans/plan-021.md): the kinds of output, how they are stored, and which other
  * objects can show them. No React and no Jupyter here: the browser runs code (apps/web/src/code/) and the
  * `code` plugin (code.ts) writes the result.
  */
@@ -170,7 +170,7 @@ export function summarize(kind: OutputKind, value: unknown, extra: { features?: 
 }
 
 /**
- * How a follower stands against its cell (plans/plan-020.md, "When the code changes"). Derived, never stored:
+ * How a follower stands against its cell (plans/plan-021.md, "When the code changes"). Derived, never stored:
  * `shown` is when the output it shows was made (a layer's upload id is matched to the cell's, a linked object's
  * `link.args.renderedAt`).
  */

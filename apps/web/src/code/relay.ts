@@ -5,7 +5,7 @@ import { tools } from '../tools/registry'
 import { hubState, subscribeHub } from './hub'
 
 /**
- * This tab's side of the tab relay (plans/plan-022.md): the room's agent, which has no JupyterHub login, asks the
+ * This tab's side of the tab relay (plans/plan-023.md): the room's agent, which has no JupyterHub login, asks the
  * asker's tab to run code.execute for it. The tab says on its presence that it can (`hub`: a flag, never the login),
  * and runs a request only for a tool on its list, for a chat message it sent itself, with a working login. There
  * are no accounts yet, so a message's person id is only what a browser claims: a message someone sent with another

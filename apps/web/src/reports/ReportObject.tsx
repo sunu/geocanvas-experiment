@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CheckIcon, FileTextIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -9,10 +10,12 @@ import { ObjectHeader } from '../canvas/ObjectHeader'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { ReportPages } from './ReportPages'
+import { ReportEditing, runReportOp, SHOW_BLOCK, useReportEditing, type ReportEditingState } from './editing'
+import { ReportToolbar } from './ReportToolbar'
 
 /** The phone's Reports tab reads a report as one flow (mobile/ReportsPage.tsx). */
 export { ReportContent } from './ReportPages'
-import { titleOf } from './reports'
+import { blockIcon, blockLabel, titleOf, useUploadName } from './reports'
 
 /** Space around and between the sheets in report mode, in px. */
 const SHEET_PAD = 32
@@ -80,6 +83,68 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   const scaleRef = useRef(scale)
   scaleRef.current = scale
 
+  // Editing on the page (step 5b): this person's selected block, the one they type in, and where a drag would drop.
+  const [selected, select] = useState<string | null>(null)
+  const [editing, setEditingState] = useState<{ id: string; at: number; caret?: number; draft?: string } | null>(null)
+  const [drop, setDrop] = useState<number | null>(null)
+  const [dragging, setDragging] = useState<ReportEditingState['dragging']>(null)
+  // A block someone else removed is no longer selected.
+  const live = selected && report.blocks.some((b) => b.id === selected) ? selected : null
+  const setEditing = (id: string | null, { at = 0, caret, draft }: { at?: number; caret?: number; draft?: string } = {}) => setEditingState(id ? { id, at, caret, draft } : null)
+  const editingState: ReportEditingState = {
+    report,
+    runtime,
+    selected: live,
+    select,
+    editing: editing?.id ?? null,
+    editingAt: editing?.at ?? 0,
+    caret: editing?.caret,
+    draft: editing?.draft,
+    setEditing,
+    drop,
+    setDrop,
+    dragging,
+    setDragging,
+  }
+  const stateRef = useRef(editingState)
+  stateRef.current = editingState
+
+  // Keys, before the canvas's (capture): Esc ends typing, then clears the selection, and only then leaves report mode;
+  // Delete or Backspace removes the selected block when not typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const st = stateRef.current
+      // An open menu, popover or dialog (the toolbar's) closes on Esc itself, and keeps the selection.
+      if (document.querySelector('[role="menu"], [data-radix-popper-content-wrapper], [role="dialog"]')) return
+      const typing = !!(e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')
+      if (e.key === 'Escape' && (st.editing || st.selected)) {
+        e.preventDefault()
+        if (st.editing) st.setEditing(null)
+        else st.select(null)
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && st.selected && !typing) {
+        e.preventDefault()
+        runReportOp(st.runtime, st.report.id, 'report.removeBlock', { blockId: st.selected })
+        st.select(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  // The Options panel's list goes to a block: select it and bring it into view (its first page, for a text over pages).
+  useEffect(() => {
+    const el = column.current
+    if (!el) return
+    const onShow = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail
+      setEditing(null)
+      select(id)
+      el.querySelector(`[data-block-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+    }
+    el.addEventListener(SHOW_BLOCK, onShow)
+    return () => el.removeEventListener(SHOW_BLOCK, onShow)
+  }, [])
+
   // ⌘/Ctrl + wheel and pinch zoom the report, not the browser page. Native, to prevent the browser's zoom.
   useEffect(() => {
     const el = column.current
@@ -94,12 +159,24 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   }, [])
 
   return (
-    <div className="ttx-reportview">
-      <div ref={column} className="ttx-reportmode">
-        <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} full footer={(n, count) => `Page ${n} of ${count}`} />
+    <ReportEditing.Provider value={editingState}>
+      <div className="ttx-reportview">
+        {/* A press on the page outside any block clears the selection (blocks stop their own presses). */}
+        <div
+          ref={column}
+          className="ttx-reportmode"
+          onPointerDown={() => {
+            select(null)
+            setEditing(null)
+          }}
+        >
+          <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} full footer={(n, count) => `Page ${n} of ${count}`} />
+        </div>
+        <ZoomControl scale={scale} fitted={zoom === 'fit'} onZoom={setZoom} />
+        <ReportToolbar />
+        <DragGhost />
       </div>
-      <ZoomControl scale={scale} fitted={zoom === 'fit'} onZoom={setZoom} />
-    </div>
+    </ReportEditing.Provider>
   )
 }
 
@@ -139,5 +216,27 @@ function ZoomControl({ scale, fitted, onZoom }: { scale: number; fitted: boolean
         <PlusIcon />
       </Button>
     </div>
+  )
+}
+
+/** What a dragged block shows beside the pointer: its icon and name, so it is clear what is moving. */
+function DragGhost() {
+  const ed = useReportEditing()!
+  const uploadName = useUploadName(ed.runtime)
+  const b = ed.dragging && ed.report.blocks.find((b) => b.id === ed.dragging!.id)
+  if (!ed.dragging || !b) return null
+  const board = ed.runtime.board as Board
+  const Icon = blockIcon(b, board)
+  // On the page's body: report mode sits in the canvas, whose transforms would move a fixed element.
+  return createPortal(
+    <div
+      className="ttx-ui pointer-events-none fixed z-50 flex max-w-64 items-center gap-2 rounded-md border bg-popover px-2 py-1.5 font-sans text-sm text-popover-foreground shadow-md"
+      style={{ left: ed.dragging.x + 12, top: ed.dragging.y + 12 }}
+      aria-hidden
+    >
+      <Icon className="size-4 shrink-0" />
+      <span className="truncate">{blockLabel(b, board, ed.runtime.registry, uploadName)}</span>
+    </div>,
+    document.body,
   )
 }

@@ -1,7 +1,7 @@
 import type { CodeError } from '@ttx/plugins'
 
 /**
- * A minimal client for a person's JupyterHub (plans/plan-020.md): the hub's REST API to find and start their
+ * A minimal client for a person's JupyterHub (plans/plan-021.md): the hub's REST API to find and start their
  * server, the server's REST API to start a kernel, and the Jupyter messaging protocol (v5) over the kernel's
  * WebSocket to run code, as MyST and thebe do. No @jupyterlab/services: we need one request and a few replies.
  * The hub and the server must allow CORS from the board's origin. The token goes only to the hub.

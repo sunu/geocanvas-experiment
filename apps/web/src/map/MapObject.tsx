@@ -175,7 +175,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     // deck.gl data layers go here. Overlay mode (its own canvas above the map), not interleaved:
     // deck.gl 9.4's interleaved mode throws on every frame with MapLibre 6. The cost is a second
     // WebGL context per map, and deck.gl layers draw above the map's labels.
-    // A code layer's feature (plan-021): hovering it opens its footnote's details, a click pins them.
+    // A code layer's feature (plan-022): hovering it opens its footnote's details, a click pins them.
     const codeElement = (info: PickingInfo) => {
       const s = info.picked ? statesRef.current.find((s) => `layer-${s.id}` === info.layer?.id) : undefined
       return s?.from ? { objectId: o.id, layerId: s.id, cellId: s.from } : undefined

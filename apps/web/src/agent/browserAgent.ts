@@ -5,7 +5,7 @@ import { tools } from '../tools/registry'
 import { loadKey } from './keys'
 
 /** The browser's tools the agent gets: the room agent's, and running code. */
-// code.execute runs on the person's own JupyterHub, from this tab (plans/plan-020.md); the room's agent has none.
+// code.execute runs on the person's own JupyterHub, from this tab (plans/plan-021.md); the room's agent has none.
 const AGENT_TOOLS = ['data.geocode', 'data.reverseGeocode', 'events.search', 'events.get', 'openeo.collections', 'openeo.coverage', 'code.execute']
 
 /** This page load. A message with this id in `browserTab` is answered here, and nowhere else. */

@@ -82,7 +82,7 @@ export class Room extends DurableObject<Env> {
   private runtime?: Runtime
   private openeo?: OpenEOClient
   private previewRunning = false
-  /** Tool calls the room's agent sent to a tab and waits for (plans/plan-022.md). */
+  /** Tool calls the room's agent sent to a tab and waits for (plans/plan-023.md). */
   private relay = new RelayCalls()
 
   constructor(ctx: DurableObjectState, env: Env) {

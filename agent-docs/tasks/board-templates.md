@@ -1,6 +1,6 @@
 # Task: landing page, new board and templates
 
-Date: 2026-10-29. Status: built in PR #55; browser check pending. Scope from `agent-docs/features.md` ("Prepopulate the widgets depending on the template that users choose") and PRD 4.6. The templates themselves are `plans/plan-012.md` (merged from `main` while this was built); this task adds the way into them from a new board.
+Date: 2026-10-29. Status: built, in `main` (PR #55; the landing page fixed in #83). Scope from `agent-docs/features.md` ("Prepopulate the widgets depending on the template that users choose") and PRD 4.6. The templates themselves are `plans/plan-012.md` (merged from `main` while this was built); this task adds the way into them from a new board.
 
 ## 1. Requirements
 

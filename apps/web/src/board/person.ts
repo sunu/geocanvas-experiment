@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { Actor } from '@ttx/core'
-import { isUserColor, USER_COLORS } from './collaborators'
+import { colorFor, isUserColor } from './collaborators'
 import type { Awareness } from './presence'
 
 const ANIMALS = ['Otter', 'Heron', 'Lynx', 'Ibex', 'Gecko', 'Puffin', 'Marten', 'Kestrel', 'Tapir', 'Wombat', 'Oryx', 'Quokka']
@@ -19,7 +19,10 @@ export const MAX_NAME = 32
  * own runtime, and a runtime undoes only its own writes.
  */
 export function personActor(): Actor {
-  const make = (): Person => ({ id: crypto.randomUUID(), name: pick(ANIMALS), color: pick(USER_COLORS).color })
+  const make = (): Person => {
+    const id = crypto.randomUUID()
+    return { id, name: pick(ANIMALS), color: colorFor(id) }
+  }
   try {
     const kept = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Person> | null
     // Records from before the id moved here have a name and color but no id.
@@ -48,14 +51,19 @@ export function rename(actor: Actor, awareness: Pick<Awareness, 'setLocalStateFi
   const name = cleanName(input)
   if (!name) return false
   actor.name = name
-  try {
-    const kept = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Person> | null
-    localStorage.setItem(KEY, JSON.stringify({ ...kept, id: actor.id, name, color: actor.color }))
-  } catch {
-    // Storage blocked: the name lasts until the page reloads.
-  }
+  savePerson(actor)
   awareness.setLocalStateField('user', { ...actor })
   return true
+}
+
+/** Keep the actor's name and color for the next visit. */
+export function savePerson(actor: Actor) {
+  try {
+    const kept = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Person> | null
+    localStorage.setItem(KEY, JSON.stringify({ ...kept, id: actor.id, name: actor.name, color: actor.color }))
+  } catch {
+    // Storage blocked: they last until the page reloads.
+  }
 }
 
 /** This person's name; re-renders when their presence changes (rename publishes it). */

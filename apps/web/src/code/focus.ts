@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { clearEmphasis, emphasize } from '../canvas/emphasis'
 
 /**
- * The code element this person looks at (plan-021): one object (or one of a map's layers) that shows a code
+ * The code element this person looks at (plan-022): one object (or one of a map's layers) that shows a code
  * cell's output. A footnote row or a feature on a map hovers it; a click pins it, until another click or Esc.
  * The footnote opens its details, the map highlights its layer, and the object and its cell are pointed out.
  * Local to this tab, never synced.

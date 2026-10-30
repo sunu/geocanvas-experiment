@@ -5,7 +5,7 @@ houses are in the water, and are there schools or health facilities among them?"
 water), not damage or risk: no depth, no vulnerability. It runs fully in the browser, like routing (plan-014), and
 joins a map's Scenario mode as plan-014 planned: a new optional field of `scenario`, a recipe each browser computes.
 
-Status: built on `feat/flood-exposure` (on `scenario-planning`, now in main); the spike's measurements are below, and what changed while building is under Decisions made while building.
+Status: built, in `main` (PR #69); the spike's measurements are below, and what changed while building is under Decisions made while building.
 
 ## What it works on
 

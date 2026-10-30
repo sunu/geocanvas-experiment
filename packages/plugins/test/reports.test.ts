@@ -126,6 +126,18 @@ describe('reports', () => {
     expect(defaults()).toEqual({})
   })
 
+  it('add at a place in the report when asked, which forms do not ask for', async () => {
+    const rt = setup()
+    const r = add(rt, 'report', { x: 5000 })
+    await rt.invoke('report.addBlock', one(r), { block: { kind: 'heading', text: 'A' } })
+    await rt.invoke('report.addBlock', one(r), { block: { kind: 'heading', text: 'B' } })
+    const note = add(rt, 'sticky')
+    await rt.invoke('report.addItems', one(note), { reportId: r, index: 1 })
+    expect(report(rt, r).blocks.map((b) => (b.kind === 'item' ? 'item' : b.kind === 'heading' ? b.text : b.kind))).toEqual(['A', 'item', 'B'])
+    const args = (exportTools(rt.availableOps(one(note))).find((t) => t.name === 'report__addItems')!.input_schema as any).properties.args.properties
+    expect(args.index).toMatchObject({ advanced: true })
+  })
+
   it('never put a report in a report', async () => {
     const rt = setup()
     const r = add(rt, 'report')
@@ -154,6 +166,13 @@ describe('reports', () => {
     rt.undo()
     expect(report(rt, r).blocks.map((b) => b.kind)).toEqual(['divider', 'heading', 'text'])
     expect((await rt.invoke('report.removeBlock', one(r), { blockId: 'nope' })).status).toBe('failed')
+  })
+
+  it('adds a page break, full width', async () => {
+    const rt = setup()
+    const r = add(rt, 'report')
+    await rt.invoke('report.addBlock', one(r), { block: { kind: 'pageBreak' } })
+    expect(report(rt, r).blocks[0]).toMatchObject({ kind: 'pageBreak', span: 2 })
   })
 
   it('edit the text of headings and text blocks only', () => {

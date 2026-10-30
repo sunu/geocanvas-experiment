@@ -455,9 +455,11 @@ body,
   transition: transform 100ms linear;
 }
 
+/* The pointer's tip is the cursor's point: the shape sits 1.25px inside its box (stroke and padding). */
 .ttx-cursor svg {
   display: block;
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+  margin: -1.25px 0 0 -1.25px;
+  filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.1)) drop-shadow(0 10px 15px rgb(0 0 0 / 0.1));
 }
 
 .ttx-cursor__name {
@@ -2108,7 +2110,7 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   text-align: center;
 }
 
-/* --- Code cell (plans/plan-020.md) ---------------------------------------- */
+/* --- Code cell (plans/plan-021.md) ---------------------------------------- */
 
 .ttx-code {
   display: flex;
@@ -2798,6 +2800,46 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
 
 .ttx-country__month.is-partial .ttx-country__monthbar span {
   opacity: 0.4;
+}
+
+/* The disaster history widget (history/HistoryObject.tsx): decade bars stacked by hazard, and lists with a color each. */
+.ttx-history__decades {
+  display: grid;
+  gap: 3px;
+}
+
+.ttx-history__stack {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-history__stack span {
+  width: 100%;
+  min-height: 1px;
+}
+
+.ttx-history__event {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ttx-history__event i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.ttx-history__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ttx-country__monthname {
@@ -3567,6 +3609,29 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   border-top: 1px solid var(--ttx-border);
 }
 
+/* A page break, in report mode only: where the page ends. */
+.ttx-report__break {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ttx-report__break::before,
+.ttx-report__break::after {
+  flex: 1;
+  border-top: 1px dashed var(--ttx-border);
+  content: '';
+}
+
+/* Part of a text that goes on over pages (ReportPages.tsx RowView): this page's lines of it. */
+.ttx-report__piece {
+  overflow: hidden;
+}
+
 .ttx-report__card {
   position: relative;
   padding: 12px 14px;
@@ -3721,6 +3786,14 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   color: var(--ttx-ink);
 }
 
+/* A block's name: goes to it on the page. */
+.ttx-reportopts__item button.ttx-reportopts__label {
+  display: block;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
 /* An item in full (reports/ReportPages.tsx ItemView): a caption, then the widget as it is. */
 .ttx-report__item {
   margin: 0;
@@ -3776,4 +3849,117 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
 .ttx-update {
   bottom: calc(88px + env(safe-area-inset-bottom));
   white-space: nowrap;
+}
+
+/* Editing in report mode (reports/editing.tsx): a block's selection, its controls, typing, and where a drag drops. */
+.ttx-report__editable {
+  position: relative;
+  outline: 1px solid transparent;
+  outline-offset: 4px;
+}
+
+.ttx-report__editable:hover {
+  outline-color: color-mix(in srgb, var(--canvas-accent) 40%, transparent);
+}
+
+.ttx-report__editable.is-selected {
+  outline: 1.5px solid var(--canvas-accent);
+}
+
+/* Beside the block, in the page's right margin (56px, room in either column), so they never cover its content. */
+.ttx-report__controls {
+  position: absolute;
+  top: -2px;
+  left: calc(100% + 8px);
+  z-index: 2;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+}
+
+.ttx-report__editable.controls-left > .ttx-report__controls {
+  right: calc(100% + 8px);
+  left: auto;
+}
+
+.ttx-report__editable:hover > .ttx-report__controls,
+.ttx-report__editable.is-selected > .ttx-report__controls {
+  display: flex;
+}
+
+.ttx-report__controls button {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ttx-muted);
+  cursor: pointer;
+}
+
+.ttx-report__controls button:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+.ttx-report__controls .is-handle {
+  cursor: grab;
+}
+
+/* The page's margin is out of sight (zoomed wider than the column): inside the block, at the top, where it is in
+   sight (its left is set in editing.tsx), over its content. */
+.ttx-report__editable > .ttx-report__controls.is-inside {
+  top: 4px;
+  right: auto;
+}
+
+/* While a block is dragged: it stays faded in its place, and the pointer holds it everywhere. */
+.ttx-report__editable.is-dragging {
+  opacity: 0.4;
+}
+
+.ttx-reportmode.is-dragging,
+.ttx-reportmode.is-dragging * {
+  cursor: grabbing !important;
+}
+
+/* The insertion line while a block is dragged: before this block, or after the last one. */
+.ttx-report__drop {
+  position: absolute;
+  top: -10px;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--canvas-accent);
+  pointer-events: none;
+}
+
+.ttx-report__drop.is-after {
+  top: auto;
+  bottom: -10px;
+}
+
+/* Typing in place: the same type as the block, no box of its own. */
+.ttx-report__editor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+}
+
+.ttx-report__placeholder {
+  color: var(--ttx-muted);
+  font-weight: 400;
 }

@@ -7,7 +7,7 @@ import { CodeSource, RunError, RunStatus, useRunCell } from './cell'
 import { Output } from './Output'
 
 /**
- * A code cell (plans/plan-020.md): its Python, its latest output and how its last run went. Double-click edits
+ * A code cell (plans/plan-021.md): its Python, its latest output and how its last run went. Double-click edits
  * the code; Run (or ⌘/Shift+Enter while editing) runs it on this person's JupyterHub. Anyone can read and edit
  * it; only a person with a hub login can run it. The output stays on the board for everyone.
  */

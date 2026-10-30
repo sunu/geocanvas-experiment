@@ -1,4 +1,4 @@
-# A local JupyterHub to run code cells against (plans/plan-020.md). For tests on your own machine only:
+# A local JupyterHub to run code cells against (plans/plan-021.md). For tests on your own machine only:
 # any user name signs in with the password below, and every user's server runs as you, with no isolation.
 # How to start it: extras/jupyterhub/README.md.
 import re

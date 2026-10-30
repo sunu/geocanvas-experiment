@@ -1,5 +1,5 @@
 import type { Board as CoreBoard, BoxObject, FrameObject, StickyObject, TextObject } from '@ttx/core'
-import type { CodeBoardObject, ConflictBoardObject, CountryBoardObject, EventBoardObject, ImageBoardObject, InputBoardObject, MapBoardObject, NotebookBoardObject, OpenEOAnalysisObject, PdfBoardObject, PresenceBoardObject, ReliefWebBoardObject, ReportBoardObject } from '@ttx/plugins'
+import type { CodeBoardObject, ConflictBoardObject, CountryBoardObject, EventBoardObject, HistoryBoardObject, ImageBoardObject, InputBoardObject, MapBoardObject, NotebookBoardObject, OpenEOAnalysisObject, PdfBoardObject, PresenceBoardObject, ReliefWebBoardObject, ReportBoardObject } from '@ttx/plugins'
 
 /**
  * The objects of this app's plugins (plugins.ts), for typed reads in the UI. The board itself and
@@ -7,7 +7,7 @@ import type { CodeBoardObject, ConflictBoardObject, CountryBoardObject, EventBoa
  *
  * Map views (center, zoom) are not on the board on purpose: each person pans their own maps.
  */
-export type BoardObject = BoxObject | TextObject | StickyObject | FrameObject | MapBoardObject | EventBoardObject | NotebookBoardObject | ReliefWebBoardObject | CountryBoardObject | PresenceBoardObject | ConflictBoardObject | ImageBoardObject | InputBoardObject | PdfBoardObject | OpenEOAnalysisObject | ReportBoardObject | CodeBoardObject
+export type BoardObject = BoxObject | TextObject | StickyObject | FrameObject | MapBoardObject | EventBoardObject | NotebookBoardObject | ReliefWebBoardObject | CountryBoardObject | PresenceBoardObject | ConflictBoardObject | HistoryBoardObject | ImageBoardObject | InputBoardObject | PdfBoardObject | OpenEOAnalysisObject | ReportBoardObject | CodeBoardObject
 
 export type ObjectType = BoardObject['type']
 

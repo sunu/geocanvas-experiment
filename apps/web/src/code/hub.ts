@@ -3,7 +3,7 @@ import { hubBase, JupyterSession, type HubLogin } from './kernel'
 import preamble from './ttx.py?raw'
 
 /**
- * This person's JupyterHub login (plans/plan-020.md). As with the agent key (agent/keys.ts), the token is kept in
+ * This person's JupyterHub login (plans/plan-021.md). As with the agent key (agent/keys.ts), the token is kept in
  * this browser's localStorage only and sent only to the hub: never to our Worker, the board doc, chat or presence.
  * Code runs as this person, in their own server, from this tab.
  */

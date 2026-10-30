@@ -18,7 +18,7 @@ export const { board, runtime, provider, chat, uploads } = connect(room)
 setAgentChat(chat)
 // Answers only the messages this tab sends on the person's own key; idle otherwise.
 startBrowserAgent(provider.doc, provider.awareness)
-// The room's agent runs code through this tab, on this person's own JupyterHub login (plans/plan-022.md).
+// The room's agent runs code through this tab, on this person's own JupyterHub login (plans/plan-023.md).
 startRelay(provider, chat)
 // In dev, run ops and tools from the console, e.g. runtime.callTool('box__add', { args: { x: 0, y: 0 } }).
 if (import.meta.env.DEV) Object.assign(window, { board, runtime, provider, chat, uploads })

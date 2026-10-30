@@ -36,6 +36,7 @@ export { applyLinks, factsOf, linkedLayerId, linksPlugin, personOf, planLinks, R
 export { pdfsPlugin, type PdfBoardObject } from './pdfs.js'
 export { mapPlugin, BASEMAPS, UPLOAD_FEATURES_TOOL, type Basemap, type MapArea, type MapBoardObject } from './map.js'
 export { notebooksPlugin, notebookResultLayer, NOTEBOOK_ARTIFACT_TOOL, type NotebookBoardObject } from './notebooks.js'
+export { HAZARD_FAMILIES, hazardFamily, historyPlugin, type HazardFamily, type HistoryBoardObject } from './history.js'
 export { CHOROPLETH_TOOL, choroplethLayer, hapiPlugin, INDICATORS, type Indicator, type ConflictBoardObject, type CountryBoardObject, type PresenceBoardObject } from './hapi.js'
 export {
   docText,

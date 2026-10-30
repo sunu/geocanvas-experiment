@@ -10,7 +10,7 @@ import { useRunCell } from './cell'
 const NEW_LABEL: Record<string, string> = { map: 'New map', image: 'New image', sticky: 'New sticky note' }
 
 /**
- * A code cell's entries in the right-click menu (canvas/ObjectMenu.tsx, plan-021): Run, and "Show output on" with
+ * A code cell's entries in the right-click menu (canvas/ObjectMenu.tsx, plan-022): Run, and "Show output on" with
  * the board's objects that can show the output and a new one. Hovering an object's entry points it out on the
  * canvas, since several maps may share a name.
  */

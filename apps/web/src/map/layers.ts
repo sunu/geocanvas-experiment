@@ -23,7 +23,7 @@ export interface LayerState {
   error?: string
   filter?: LayerFilter
   style?: LayerStyle
-  /** The code cell that made the layer (plan-020): its features can be hovered and clicked (code/focus.ts). */
+  /** The code cell that made the layer (plan-021): its features can be hovered and clicked (code/focus.ts). */
   from?: string
 }
 
@@ -143,7 +143,7 @@ const ACCENT: [number, number, number, number] = [6, 182, 212, 90]
 
 /**
  * deck.gl layers for the layers that have a result, by kind of result. Tiles, rasters and grids draw below features.
- * Layers made by code can be picked (hovered and clicked). With `highlight` (a layer id, plan-021), that layer is drawn
+ * Layers made by code can be picked (hovered and clicked). With `highlight` (a layer id, plan-022), that layer is drawn
  * stronger and the other feature layers fainter.
  */
 export function deckLayers(states: LayerState[], { highlight }: { highlight?: string } = {}): Layer[] {

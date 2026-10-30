@@ -2,7 +2,7 @@ import { defineTool, type ToolDef } from '@ttx/core'
 import type { z } from 'zod'
 
 /**
- * The tab relay (plans/plan-022.md): the room's agent asks the asker's open tab to run a browser-only tool, such as
+ * The tab relay (plans/plan-023.md): the room's agent asks the asker's open tab to run a browser-only tool, such as
  * code.execute, which needs the person's own JupyterHub login. Requests and replies are messages on the board's
  * socket, beside y-websocket's (types 0 to 3): one type byte, then the JSON. Nothing goes in the doc.
  */
