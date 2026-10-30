@@ -146,7 +146,7 @@ One PR per step.
 - **Uploads on R2:** bucket names, file size and count limits, cleanup for deleted branch previews.
 - **Live-map cap:** how many live maps at once.
 - **Legend visibility:** focus only, always, toggle, or by zoom.
-- **Reports:** decided: both a widget and a mode, with live or frozen items. Still open: the PDF approach (a spike decides), rich text storage, the report URL's expiry and permissions, and the others in `agent-docs/tasks/reports.md` §10.
+- **Reports:** decided: both a widget and a mode, with live or frozen items. Still open: the PDF approach (a spike decides), rich text storage, the report URL's expiry and permissions, and the others in `agent-docs/tasks/reports.md` §10. Under discussion: `plans/plan-015.md` proposes synced and detached items in place of live and frozen.
 - **Templates:** which templates follow the situation report and conflict explorer, and when templates become data that facilitators can edit (plan-012).
 - **Collaboration scope:** comments, mentions and an avatar list are not in `features.md`. In or out?
 - **Design-spec proposals:** frame context, version history and the docked accordion options panel are design proposals, not code. Ticket them before building. Frames and links between widgets are built for templates (plan-013); links that people draw by hand are not.
@@ -158,5 +158,5 @@ One PR per step.
 - `agent-docs/architect.md`: focus widgets extend the current widget; data in DuckDB-wasm; uploads on Cloudflare.
 - `agent-docs/tasks/in-focus-widgets.md`: focus mode design, widget fields and ops, steps 1–16, decisions.
 - `agent-docs/tasks/reports.md`: reports: the widget, report mode, live and frozen items, PDF export options, the report URL, steps 1–10.
-- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames, `plan-014.md` scenario routing.
+- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames, `plan-015.md` synced and detached report items (proposal), `plan-014.md` scenario routing.
 - Figma "Atlantis Pod Week Hack - AHD TTX": source of truth for chrome; wireframes for every feature.
