@@ -75,6 +75,24 @@ export class JupyterSession {
     }
   }
 
+  /**
+   * A request to the person's server. The browser hides why a request failed; with the hub reachable, the likely
+   * reason is that the server does not allow this site (its own CORS list, apart from the hub's).
+   */
+  private async serverFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    try {
+      return await fetch(url, { ...init, headers: { authorization: `token ${this.login.token}`, ...init.headers } })
+    } catch {
+      throw new HubError(`Your server on ${this.base} does not allow this site (${globalThis.location?.origin}). The hub's admin must add it to the servers' allowed origins (extras/jupyterhub/README.md), then restart your server.`)
+    }
+  }
+
+  /** Check that the person's server, if it runs, lets this site in: the hub can, while the server does not. */
+  async checkServer(): Promise<void> {
+    const user = await this.user()
+    if (user.server) await this.serverFetch(`${new URL(user.server, `${this.base}/`).href.replace(/\/+$/, '')}/api/status`)
+  }
+
   /** The person's server, started if it is not running. */
   private async server(onStatus?: (s: string) => void): Promise<string> {
     if (this.serverUrl) return this.serverUrl
@@ -97,9 +115,9 @@ export class JupyterSession {
   private async startKernel(onStatus?: (s: string) => void): Promise<KernelSocket> {
     const server = await this.server(onStatus)
     onStatus?.('Starting a kernel…')
-    const res = await fetch(`${server}/api/kernels`, {
+    const res = await this.serverFetch(`${server}/api/kernels`, {
       method: 'POST',
-      headers: { authorization: `token ${this.login.token}`, 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'python3' }),
     })
     if (res.status === 404 || res.status === 503) {

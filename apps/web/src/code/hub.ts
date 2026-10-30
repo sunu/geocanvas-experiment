@@ -51,6 +51,8 @@ async function check(login: HubLogin) {
   set({ login, status: 'checking' })
   try {
     const user = await session.user()
+    // The hub may allow this site while the person's server does not (each has its own CORS list).
+    await session.checkServer()
     if (state.login === login) set({ login, user: user.name, status: 'ready' })
   } catch (err) {
     if (state.login === login) set({ login, status: 'error', error: (err as Error).message })
