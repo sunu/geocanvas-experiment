@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, defineTool, Runtime, ToolRunner, type Actor } from '@ttx/core'
+import { Chat, defineTool, Runtime, ToolRunner, Views, type Actor } from '@ttx/core'
 import { z } from 'zod'
 import {
   AGENT,
@@ -142,6 +142,39 @@ describe('code cells', () => {
     const sticky = rt.dispatch('sticky.add', canvas, {}).created![0]!
     await rt.invoke('code.add', canvas, { title: 'Count', source: 'count', showOn: sticky })
     expect(rt.board.get(sticky)).toMatchObject({ text: '42', link: { recipe: 'code.sticky' } })
+  })
+})
+
+describe('show output on a new object', () => {
+  const show = (rt: Runtime, id: string, args: Record<string, unknown>) => rt.invoke('code.show', { kind: 'objects', ids: [id] }, args)
+
+  it('add a map beside the cell for features, fitted to them, in one undo step', async () => {
+    const { rt } = setup({ buffer: features(F1) })
+    const id = (await rt.invoke('code.add', canvas, { title: 'Buffer', source: 'buffer', x: 100, y: 50, w: 400 })).created![0]!
+    rt.beginGesture()
+    const r = await show(rt, id, { new: true })
+    expect(r.status, r.error).toBe('applied')
+    const map = rt.board.get(r.created![0]!) as MapBoardObject
+    expect(map).toMatchObject({ type: 'map', x: 524, y: 50 })
+    expect(map.layers).toEqual([expect.objectContaining({ input: { fileId: F1 }, from: id })])
+    expect(new Views(rt.board.doc).get('ada', map.id)).toBeDefined()
+    rt.undo()
+    expect(rt.board.get(map.id)).toBeUndefined()
+  })
+
+  it('add a sticky note for a number', async () => {
+    const { rt } = setup({ count: { ok: true, output: { kind: 'number', value: 7, summary: '7' }, stdout: '', ms: 1 } })
+    const id = (await rt.invoke('code.add', canvas, { title: 'Count', source: 'count' })).created![0]!
+    const r = await show(rt, id, { new: true })
+    expect(rt.board.get(r.created![0]!)).toMatchObject({ type: 'sticky', text: '7', link: { from: id, recipe: 'code.sticky' } })
+  })
+
+  it('refuse a table, which shows only in its cell, and both on and new', async () => {
+    const { rt } = setup({ rows: table })
+    const map = rt.dispatch('map.add', canvas, {}).created![0]!
+    const id = (await rt.invoke('code.add', canvas, { title: 'Rows', source: 'rows' })).created![0]!
+    expect((await show(rt, id, { new: true })).error).toContain('A table shows only in its cell')
+    expect((await show(rt, id, { new: true, on: map })).status).toBe('failed')
   })
 })
 

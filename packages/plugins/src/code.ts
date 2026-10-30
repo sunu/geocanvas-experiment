@@ -9,6 +9,7 @@ import {
   hashSource,
   KIND_NAMES,
   MAX_STDOUT,
+  NEW_FOLLOWER,
   stripAnsi,
   tail,
   type CodeOutput,
@@ -264,19 +265,41 @@ export const codePlugin = definePlugin({
     defineOp({
       id: 'code.show',
       title: 'Show code output on',
-      description: 'Show the selected code cell\'s output on another object: features on a map (a layer) or an input, an image on an image object, text on a text or sticky note.',
+      description:
+        "Show the selected code cell's output on another object: features on a map (a layer) or an input, an image on an image object, text on a text or sticky note. " +
+        'Give `on` for an object on the board, or `new: true` for a new one beside the cell (a map, an image or a sticky note, by the kind of output).',
       target: oneCell,
-      args: z.object({ on: z.string().describe('Id of the object to show the output on') }),
-      async prepare(ctx, { on }) {
+      args: z
+        .object({
+          on: z.string().optional().describe('Id of the object to show the output on'),
+          new: z.boolean().optional().describe('Add a new object for it beside the cell instead'),
+        })
+        .refine((a) => !!a.on !== !!a.new, 'Give either on or new'),
+      async prepare(ctx, args) {
         const cell = ctx.board.get(onlyId(ctx)) as CodeBoardObject
-        const follower = ctx.board.get(on)
-        if (!follower) throw new Error(`There is no object ${on}`)
+        if (args.new) {
+          if (!cell.output) throw new Error('The cell has no output yet: run it first.')
+          const type = NEW_FOLLOWER[cell.output.kind]
+          if (!type) throw new Error(`${KIND_NAMES[cell.output.kind].replace(/^./, (c) => c.toUpperCase())} shows only in its cell.`)
+          // Made here, so the show plan can name it; apply adds it first, in the same step.
+          const size = ctx.registry.objectType(type)!.defaultSize
+          const added = { id: crypto.randomUUID(), type, x: cell.x + cell.w + 24, y: cell.y, ...size }
+          return { added, links: await planShow(ctx, cell, added as AnyObject) }
+        }
+        const follower = ctx.board.get(args.on!)
+        if (!follower) throw new Error(`There is no object ${args.on}`)
         const why = mismatch(follower, cell.output)
         if (why) throw new Error(why)
         if (followersOf([follower], cell.id).length) throw new Error(`${follower.name ?? follower.type} already shows this cell`)
-        return planShow(ctx, cell, follower)
+        return { links: await planShow(ctx, cell, follower) }
       },
-      apply: (tx, plan) => applyLinks(tx, plan),
+      apply(tx, { added, links }) {
+        if (added) {
+          const { id, type, ...rect } = added
+          tx.add(type, rect, id)
+        }
+        applyLinks(tx, links)
+      },
     }),
   ],
 })

@@ -80,6 +80,9 @@ export const ACCEPTS: Record<string, readonly OutputKind[]> = {
   sticky: ['text', 'number'],
 }
 
+/** The object a new follower is, for each kind that has one ("Show output on" > "New map"). Tables and JSON have none. */
+export const NEW_FOLLOWER: Partial<Record<OutputKind, string>> = { 'geo.features': 'map', 'image.png': 'image', text: 'sticky', number: 'sticky' }
+
 export const accepts = (type: string, kind: OutputKind | undefined) => !!kind && !!ACCEPTS[type]?.includes(kind)
 
 /** A short, stable hash of a source (FNV-1a), to tell whether the output is from the code as it is now. */

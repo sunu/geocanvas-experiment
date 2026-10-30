@@ -12,6 +12,7 @@ export {
   hashSource,
   KIND_NAMES,
   MAX_INLINE_BYTES,
+  NEW_FOLLOWER,
   OUTPUT_KINDS,
   RUN_TIMEOUT_MS,
   stripAnsi,
