@@ -78,9 +78,9 @@ export class Executor {
     opts.doc.on('update', () => this.revision++)
   }
 
-  /** Every op an agent may run (not hidden, not only for people) and every read-only tool. */
+  /** Every op an agent may run (not hidden, not only for people, and with the tools it needs) and every read-only tool. */
   manifest(): Manifest {
-    const ops = this.runtime.registry.ops().filter((op) => !op.hidden && op.risk !== 'high')
+    const ops = this.runtime.registry.ops().filter((op) => !op.hidden && op.risk !== 'high' && (op.tools ?? []).every((id) => this.tools.tool(id)))
     const reads = exportToolDefs(this.tools.list()).map((t) => ({ ...t, annotations: { readOnlyHint: true as const } }))
     const tools = [...exportTools(ops), ...reads]
     return { fingerprint: hash(stableJson(tools)), tools }
