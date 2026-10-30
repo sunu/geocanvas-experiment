@@ -3,6 +3,7 @@ import { SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
 import { docText, MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject, type RichDoc } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
+import { ObjectLabelSlot, ObjectNameContext } from '../canvas/ObjectHeader'
 import { objectUI } from '../canvas/registry'
 import { useMapPicture } from '../map/picture'
 import { paginate, rowsOf, type Row } from './pages'
@@ -222,7 +223,14 @@ function EmbeddedView({ runtime, source, width, height }: { runtime: Runtime; so
     <div className="ttx-report__embed" style={{ width, height }}>
       {/* As the canvas frames it (a shape's fill and border), at its board size. */}
       <div className={`ttx-report__embedded ttx-obj--${source.type}`} style={{ width: source.w, height: source.h, transform: `scale(${width / source.w})`, ...ui.frameStyle?.(source as BoardObject) }}>
-        <View runtime={runtime} object={source as BoardObject} editing={false} onDone={() => {}} focused={false} />
+        {/* Content only. A widget's header (its title, rename and actions) goes in the label bar of the object around it,
+            here the report's own top bar, which is the report's alone: give it none. An item in a report is not the
+            object on the canvas, and is not renamed or acted on from here. */}
+        <ObjectLabelSlot.Provider value={null}>
+          <ObjectNameContext.Provider value={null}>
+            <View runtime={runtime} object={source as BoardObject} editing={false} onDone={() => {}} focused={false} />
+          </ObjectNameContext.Provider>
+        </ObjectLabelSlot.Provider>
       </div>
     </div>
   )

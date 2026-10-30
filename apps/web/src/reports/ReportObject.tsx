@@ -109,7 +109,7 @@ function ZoomControl({ scale, fitted, onZoom }: { scale: number; fitted: boolean
     onZoom(clampZoom(steps[0] ?? (dir === 1 ? MAX_ZOOM : MIN_ZOOM)))
   }
   return (
-    <div className="ttx-ui absolute right-4 bottom-4 z-10 flex items-center gap-0.5 rounded-lg border bg-card p-1 font-sans shadow-md" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+    <div className="ttx-ui absolute bottom-4 left-4 z-10 flex items-center gap-0.5 rounded-lg border bg-card p-1 font-sans shadow-md" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
       <Button variant="ghost" size="icon-sm" title="Zoom out" aria-label="Zoom out" disabled={scale <= MIN_ZOOM} onClick={() => next(-1)}>
         <MinusIcon />
       </Button>
@@ -119,7 +119,7 @@ function ZoomControl({ scale, fitted, onZoom }: { scale: number; fitted: boolean
             {Math.round(scale * 100)}%
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top">
+        <DropdownMenuContent align="start" side="top">
           <DropdownMenuItem onSelect={() => onZoom('fit')}>
             Fit width
             {fitted && <CheckIcon className="ml-auto" />}
