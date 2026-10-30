@@ -3,7 +3,7 @@ import { contains, defineOp, definePlugin, framedBy, readingOrder, UPLOAD_ID, ty
 
 /**
  * Reports (agent-docs/tasks/reports.md): a document made from the board. A report is an object on the canvas
- * with a page size and an ordered list of blocks: headings, rich text, images, dividers, and items that show an
+ * with a page size and an ordered list of blocks: headings, rich text, images, dividers, page breaks, and items that show an
  * object of the board, live or frozen. No React here: the widget and report mode are in apps/web/src/reports/.
  *
  * An item keeps its source's id (`sourceId`) and only reads the source; adding it never changes the source, and
@@ -47,6 +47,7 @@ const content = [
   z.object({ kind: z.literal('text'), doc: richDoc }),
   z.object({ kind: z.literal('image'), imageId }),
   z.object({ kind: z.literal('divider') }),
+  z.object({ kind: z.literal('pageBreak') }),
   z.object({
     kind: z.literal('item'),
     sourceId: z.string().min(1).describe('The object of the board it shows'),
@@ -69,6 +70,8 @@ export type Block =
   | { id: string; span: 1 | 2; kind: 'text'; doc: RichDoc }
   | { id: string; span: 1 | 2; kind: 'image'; imageId: string }
   | { id: string; span: 1 | 2; kind: 'divider' }
+  /** What follows starts a new page. */
+  | { id: string; span: 1 | 2; kind: 'pageBreak' }
   | { id: string; span: 1 | 2; kind: 'item'; sourceId: string; mode: 'live' | 'frozen'; frozen?: Frozen }
 export type RichDoc = z.infer<typeof richDoc>
 export type ReportBoardObject = AnyObject & { type: 'report'; paper: Paper; orientation: Orientation; blocks: Block[]; titleFrom?: string }
@@ -98,10 +101,10 @@ export function docText(doc: RichDoc): string {
   return walk(doc).replace(/\s+/g, ' ').trim()
 }
 
-/** Headings, dividers, frames (they show as a heading) and maps take the full width; the rest one column. */
+/** Headings, dividers, page breaks, frames (they show as a heading) and maps take the full width; the rest one column. */
 const FULL_WIDTH_SOURCES = new Set(['frame', 'map'])
 const spanFor = (kind: Block['kind'], sourceType?: string): 1 | 2 =>
-  kind === 'heading' || kind === 'divider' || (kind === 'item' && FULL_WIDTH_SOURCES.has(sourceType ?? '')) ? 2 : 1
+  kind === 'heading' || kind === 'divider' || kind === 'pageBreak' || (kind === 'item' && FULL_WIDTH_SOURCES.has(sourceType ?? '')) ? 2 : 1
 
 const newId = () => crypto.randomUUID().slice(0, 8)
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
@@ -174,6 +177,8 @@ function describeBlock(b: Block): string {
       return `${b.id} image ${b.imageId}${width}`
     case 'divider':
       return `${b.id} divider`
+    case 'pageBreak':
+      return `${b.id} page break`
     case 'item':
       return `${b.id} item: object ${b.sourceId}, ${b.mode}${b.mode === 'frozen' && !b.frozen ? ' (no copy yet)' : ''}${width}`
   }
@@ -185,6 +190,7 @@ const newBlock = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('text'), text: z.string().optional().describe('Plain text; blank lines separate paragraphs'), doc: richDoc.optional() }),
   z.object({ kind: z.literal('image'), imageId }),
   z.object({ kind: z.literal('divider') }),
+  z.object({ kind: z.literal('pageBreak').describe('What follows starts a new page') }),
 ])
 
 export const reportsPlugin = definePlugin({
@@ -284,7 +290,7 @@ export const reportsPlugin = definePlugin({
     defineOp({
       id: 'report.addBlock',
       title: 'Add to report page',
-      description: 'Add a heading, text, an image or a divider to the selected report.',
+      description: 'Add a heading, text, an image, a divider or a page break to the selected report.',
       target: oneReport,
       args: z.object({ block: newBlock.describe('What to add'), index: z.number().int().optional().describe('Where. Default: at the end') }),
       prepare(ctx, { block: b, index }) {

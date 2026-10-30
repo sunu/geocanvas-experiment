@@ -1,9 +1,10 @@
-import { ArrowSquareOutIcon, SquaresFourIcon, XIcon } from '@phosphor-icons/react'
-import { ORIENTATIONS, PAPERS, type Block, type Orientation, type Paper, type ReportBoardObject } from '@ttx/plugins'
+import { ArrowSquareOutIcon, XIcon } from '@phosphor-icons/react'
+import { ORIENTATIONS, PAPERS, type Orientation, type Paper, type ReportBoardObject } from '@ttx/plugins'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
-import { objectUI, type ObjectViewProps } from '../canvas/registry'
-import { labelOf, titleOf } from './reports'
+import type { ObjectViewProps } from '../canvas/registry'
+import { showBlock } from './editing'
+import { blockIcon, blockLabel, titleOf, useUploadName } from './reports'
 
 const PAPER_LABEL: Record<Paper, string> = { a4: 'A4', letter: 'US Letter' }
 const ORIENTATION_LABEL: Record<Orientation, string> = { portrait: 'Portrait', landscape: 'Landscape' }
@@ -22,7 +23,7 @@ export function ReportOptions({ runtime, object: r, onGoTo }: ObjectViewProps<Re
     runtime.beginGesture()
     return runtime.dispatch(opId, target, args)
   }
-  const items = r.blocks.filter((b): b is Extract<Block, { kind: 'item' }> => b.kind === 'item')
+  const uploadName = useUploadName(runtime)
 
   return (
     <>
@@ -60,35 +61,42 @@ export function ReportOptions({ runtime, object: r, onGoTo }: ObjectViewProps<Re
       </section>
       <section className="ttx-options__section">
         <h3>Items</h3>
-        {items.length ? (
+        {r.blocks.length ? (
           <ul className="ttx-reportopts__items">
-            {items.map((b) => {
-              const source = board.get(b.sourceId)
-              const Icon = (source && objectUI(source.type)?.tool?.Icon) || SquaresFourIcon
-              const label = source ? labelOf(source, runtime.registry, { withText: true }) : 'Removed object'
+            {r.blocks.map((b) => {
+              const Icon = blockIcon(b, board)
+              const label = blockLabel(b, board, runtime.registry, uploadName)
+              const source = b.kind === 'item' ? board.get(b.sourceId) : undefined
               const freezable = !!source && FREEZABLE.has(source.type)
               return (
                 <li key={b.id} className="ttx-reportopts__item">
                   <Icon size={14} aria-hidden />
-                  <span className="ttx-reportopts__label" title={label}>
+                  <button type="button" className="ttx-reportopts__label" title={`Go to ${label} in the report`} onClick={() => showBlock(b.id)}>
                     {label}
-                  </span>
-                  <select
-                    aria-label={`${label}: live or frozen`}
-                    value={b.mode}
-                    disabled={b.mode === 'live' && !freezable}
-                    title={b.mode === 'live' && !freezable ? 'Maps and data widgets can be frozen in a later version.' : 'Live: shows the object as it is now. Frozen: as it was.'}
-                    onChange={(e) => run('report.setItemMode', { blockId: b.id, mode: e.target.value })}
-                  >
-                    <option value="live">Live</option>
-                    <option value="frozen">Frozen</option>
-                  </select>
+                  </button>
+                  {b.kind === 'item' && (
+                    <select
+                      aria-label={`${label}: live or frozen`}
+                      value={b.mode}
+                      disabled={b.mode === 'live' && !freezable}
+                      title={b.mode === 'live' && !freezable ? 'Maps and data widgets can be frozen in a later version.' : 'Live: shows the object as it is now. Frozen: as it was.'}
+                      onChange={(e) => run('report.setItemMode', { blockId: b.id, mode: e.target.value })}
+                    >
+                      <option value="live">Live</option>
+                      <option value="frozen">Frozen</option>
+                    </select>
+                  )}
                   {source && onGoTo && (
                     <button type="button" title="Go to the object on the board" aria-label={`Go to ${label}`} onClick={() => onGoTo(source.id)}>
                       <ArrowSquareOutIcon size={14} />
                     </button>
                   )}
-                  <button type="button" title="Remove from the report. The object stays on the board." aria-label={`Remove ${label} from the report`} onClick={() => run('report.removeBlock', { blockId: b.id })}>
+                  <button
+                    type="button"
+                    title={b.kind === 'item' ? 'Remove from the report. The object stays on the board.' : 'Remove from the report'}
+                    aria-label={`Remove ${label} from the report`}
+                    onClick={() => run('report.removeBlock', { blockId: b.id })}
+                  >
                     <XIcon size={14} />
                   </button>
                 </li>
@@ -96,7 +104,7 @@ export function ReportOptions({ runtime, object: r, onGoTo }: ObjectViewProps<Re
             })}
           </ul>
         ) : (
-          <p className="ttx-options__empty">No items yet. Add objects from the board with Add to report, or by dropping them on the report.</p>
+          <p className="ttx-options__empty">Nothing yet. Add headings, text and images with the toolbar below the page, and objects from the board with From board, Add to report, or by dropping them on the report.</p>
         )}
       </section>
     </>

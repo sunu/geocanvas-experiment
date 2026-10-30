@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { Runtime, type Actor } from '@ttx/core'
-import { plugins, type ReportBoardObject } from '@ttx/plugins'
+import { plugins, textDoc, type ReportBoardObject } from '@ttx/plugins'
 import type { Board } from '../src/board/board'
-import { addToReport, boardReports } from '../src/reports/reports'
+import { addToReport, blockLabel, boardReports } from '../src/reports/reports'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
 const canvas = { kind: 'canvas' } as const
@@ -65,5 +65,24 @@ describe('Add to report', () => {
     const done = await addToReport(rt, [note])
     expect(done.created).toHaveLength(1)
     expect(rt.board.get(done.created![0]!)).toMatchObject({ type: 'report' })
+  })
+})
+
+describe('block labels', () => {
+  it('name every kind of block, for the items list and the block being dragged', () => {
+    const rt = setup()
+    const note = add(rt, 'sticky', { text: 'Roads closed' })
+    const board = rt.board as Board
+    const label = (b: Record<string, unknown>) => blockLabel({ id: 'b', span: 1, ...b } as never, board, rt.registry, (id) => (id === 'u1' ? 'flood.png' : undefined))
+    expect(label({ kind: 'heading', text: 'Overview', level: 1 })).toBe('Overview')
+    expect(label({ kind: 'heading', text: ' ', level: 1 })).toBe('Heading')
+    expect(label({ kind: 'text', doc: textDoc('First.\n\nSecond.') })).toBe('First. Second.')
+    expect(label({ kind: 'text', doc: textDoc('') })).toBe('Empty text')
+    expect(label({ kind: 'image', imageId: 'u1' })).toBe('flood.png')
+    expect(label({ kind: 'image', imageId: 'u2' })).toBe('Image')
+    expect(label({ kind: 'divider' })).toBe('Divider')
+    expect(label({ kind: 'pageBreak' })).toBe('Page break')
+    expect(label({ kind: 'item', sourceId: note, mode: 'live' })).toBe('Roads closed')
+    expect(label({ kind: 'item', sourceId: 'gone', mode: 'live' })).toBe('Removed object')
   })
 })

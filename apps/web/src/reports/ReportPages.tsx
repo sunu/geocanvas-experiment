@@ -1,13 +1,13 @@
 import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
-import { EditableBlock, useReportEditing } from './editing'
+import { EditableBlock, paragraphs, useReportEditing } from './editing'
 import { SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
-import { docText, MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject, type RichDoc } from '@ttx/plugins'
+import { MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { ObjectLabelSlot, ObjectNameContext } from '../canvas/ObjectHeader'
 import { objectUI } from '../canvas/registry'
 import { useMapPicture } from '../map/picture'
-import { fitItem, paginate, rowsOf, type Row } from './pages'
+import { fitItem, paginate, rowsOf, type Piece, type Row, type RowSize } from './pages'
 import { labelOf, titleOf } from './reports'
 
 /** A page's margin, the space between rows, and between the two columns, in CSS px (styles.css .ttx-report__*). */
@@ -46,15 +46,15 @@ export function ReportPages({
   const rows = rowsOf(r.blocks)
   const title = titleOf(board, r)
   const measure = useRef<HTMLDivElement>(null)
-  const [heights, setHeights] = useState<{ title: number; rows: number[] }>({ title: 0, rows: [] })
+  const [sizes, setSizes] = useState<{ title: number; rows: RowSize[] }>({ title: 0, rows: [] })
 
   useLayoutEffect(() => {
     const el = measure.current
     if (!el) return
     const read = () => {
-      const [t, ...rs] = [...el.children].map((c) => (c as HTMLElement).offsetHeight)
-      const next = { title: t ?? 0, rows: rs }
-      setHeights((h) => (h.title === next.title && h.rows.length === next.rows.length && h.rows.every((v, i) => v === next.rows[i]) ? h : next))
+      const [t, ...rs] = [...el.children] as HTMLElement[]
+      const next = { title: t?.offsetHeight ?? 0, rows: rs.map((row, i) => sizeOf(row, (rows[i] ?? []).map((b) => r.blocks[b]!))) }
+      setSizes((s) => (JSON.stringify(s) === JSON.stringify(next) ? s : next))
     }
     read()
     const observer = new ResizeObserver(read)
@@ -63,12 +63,29 @@ export function ReportPages({
   })
 
   const contentHeight = page.h - 2 * MARGIN - FOOTER
-  const pages = paginate(rows.map((_, i) => heights.rows[i] ?? 0), { contentHeight, firstPageTop: heights.title, gap: ROW_GAP })
+  const pages = paginate(
+    rows.map((_, i) => sizes.rows[i] ?? { height: 0 }),
+    { contentHeight, firstPageTop: sizes.title, gap: ROW_GAP },
+  )
   const shown = which === 'first' ? pages.slice(0, 1) : pages
   const contentWidth = page.w - 2 * MARGIN
-  const rowView = (row: Row, measuring = false) => (
-    <RowView key={row.join()} row={row} blocks={r.blocks} board={board} runtime={runtime} contentWidth={contentWidth} maxHeight={contentHeight} measuring={measuring} full={measuring || full} />
-  )
+  const rowView = (row: Row, piece?: Piece) => {
+    const height = piece ? (sizes.rows[piece.row]?.height ?? 0) : 0
+    return (
+      <RowView
+        key={piece ? `${row.join()}:${piece.from}` : row.join()}
+        row={row}
+        piece={piece && { from: piece.from, to: piece.to, height }}
+        blocks={r.blocks}
+        board={board}
+        runtime={runtime}
+        contentWidth={contentWidth}
+        maxHeight={contentHeight}
+        measuring={!piece}
+        full={!piece || full}
+      />
+    )
+  }
 
   return (
     <>
@@ -76,15 +93,15 @@ export function ReportPages({
           report mode's even where the canvas shows compact cards. Widgets are boxes of their height here, not drawn. */}
       <div ref={measure} className="ttx-report__measure" style={{ width: page.w - 2 * MARGIN }} aria-hidden>
         <h1 className="ttx-report__title">{title}</h1>
-        {rows.map((row) => rowView(row, true))}
+        {rows.map((row) => rowView(row))}
       </div>
-      {shown.map((rowIndexes, n) => (
+      {shown.map((pieces, n) => (
         <div key={n} className="ttx-report__sheet" style={{ width: page.w * scale, height: page.h * scale }}>
           <div className="ttx-report__page" style={{ width: page.w, height: page.h, transform: `scale(${scale})` }}>
             <div className="ttx-report__content">
               {n === 0 && <h1 className="ttx-report__title">{title}</h1>}
               {n === 0 && !r.blocks.length && <p className="ttx-report__empty">Drop objects here, or use Add to report</p>}
-              {rowIndexes.map((i) => rowView(rows[i]!))}
+              {pieces.map((piece) => rowView(rows[piece.row]!, piece))}
             </div>
             <div className="ttx-report__count">{footer(n + 1, pages.length)}</div>
           </div>
@@ -92,6 +109,28 @@ export function ReportPages({
       ))}
     </>
   )
+}
+
+/**
+ * A measured row's size: its height, where a text alone in its row may be cut between pages (between its lines, from
+ * each paragraph's top and line height), and whether it is a page break.
+ */
+function sizeOf(row: HTMLElement, blocks: Block[]): RowSize {
+  const height = row.offsetHeight
+  const [b] = blocks
+  if (blocks.length !== 1 || !b) return { height }
+  if (b.kind === 'pageBreak') return { height, breaks: true }
+  if (b.kind !== 'text') return { height }
+  const top = row.getBoundingClientRect().top
+  const cuts: number[] = []
+  for (const p of row.querySelectorAll<HTMLElement>('.ttx-report__text p')) {
+    const at = p.getBoundingClientRect().top - top
+    const line = parseFloat(getComputedStyle(p).lineHeight)
+    if (at > 0) cuts.push(Math.round(at))
+    if (!(line > 0)) continue
+    for (let k = 1; k < Math.round(p.offsetHeight / line); k++) cuts.push(Math.round(at + k * line))
+  }
+  return { height, cuts }
 }
 
 /**
@@ -119,20 +158,49 @@ export function ReportContent({ ref, runtime, report: r }: { ref?: Ref<HTMLDivEl
 }
 
 /** One row of the two-column grid: a full-width block, two one-column blocks, or one in the left column. */
-function RowView({ row, blocks, board, runtime, contentWidth, maxHeight, measuring, full }: { row: Row; blocks: Block[]; board: Board; runtime: Runtime; contentWidth: number; maxHeight: number; measuring: boolean; full: boolean }) {
+function RowView({
+  row,
+  piece,
+  blocks,
+  board,
+  runtime,
+  contentWidth,
+  maxHeight,
+  measuring,
+  full,
+}: {
+  row: Row
+  /** What of the row this page shows, when a text goes on over pages: px `from` to `to` of its `height`. */
+  piece?: { from: number; to: number; height: number }
+  blocks: Block[]
+  board: Board
+  runtime: Runtime
+  contentWidth: number
+  maxHeight: number
+  measuring: boolean
+  full: boolean
+}) {
   // In report mode (only there), each block on the page can be selected, moved, widened, removed and typed in.
   const editable = !!useReportEditing() && !measuring
+  const cut = !!piece && (piece.from > 0 || piece.to < piece.height)
   return (
     <div className="ttx-report__row">
       {row.map((i, n) => {
         const b = blocks[i]!
         const width = b.span === 2 ? contentWidth : (contentWidth - COLUMN_GAP) / 2
-        const view = <BlockView block={b} board={board} runtime={runtime} width={width} maxHeight={maxHeight} measuring={measuring} full={full} />
+        let view = <BlockView block={b} board={board} runtime={runtime} width={width} maxHeight={maxHeight} measuring={measuring} full={full} />
+        // Part of a text that goes on over pages: the whole text, shifted up and clipped to this page's lines.
+        if (cut)
+          view = (
+            <div className="ttx-report__piece" style={{ height: piece.to - piece.from }}>
+              <div style={{ marginTop: -piece.from }}>{view}</div>
+            </div>
+          )
         return (
           <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
             {editable ? (
               // A one-column block on the left keeps its controls in the page's left margin; others in the right one.
-              <EditableBlock block={b} index={i} count={blocks.length} controlsLeft={b.span === 1 && n === 0}>
+              <EditableBlock block={b} index={i} count={blocks.length} controlsLeft={b.span === 1 && n === 0} piece={cut ? piece : undefined}>
                 {view}
               </EditableBlock>
             ) : (
@@ -144,9 +212,6 @@ function RowView({ row, blocks, board, runtime, contentWidth, maxHeight, measuri
     </div>
   )
 }
-
-/** Paragraphs of a rich text block as plain text, until the editor comes (step 6). */
-const paragraphs = (doc: RichDoc) => (doc.content ?? []).map((p) => docText({ type: 'doc', content: [p] }))
 
 interface BlockProps {
   board: Board
@@ -174,10 +239,19 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
       )
     }
     case 'text': {
-      const ps = paragraphs(b.doc).filter((p, i, all) => p || all.length === 1)
+      // Each paragraph keeps its index (`data-p`), where a press puts the caret when typing starts.
+      const ps = paragraphs(b.doc)
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }, _, all) => p || all.length === 1)
       return (
         <div className="ttx-report__text">
-          {ps.some(Boolean) ? ps.map((p, i) => <p key={i}>{p}</p>) : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
+          {ps.some(({ p }) => p)
+            ? ps.map(({ p, i }) => (
+                <p key={i} data-p={i}>
+                  {p}
+                </p>
+              ))
+            : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
         </div>
       )
     }
@@ -185,6 +259,9 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
       return <img className="ttx-report__image" src={uploadUrl(b.imageId)} alt="" draggable={false} style={{ maxHeight: props.maxHeight }} />
     case 'divider':
       return <hr className="ttx-report__divider" />
+    case 'pageBreak':
+      // Where the page ends; seen only in report mode.
+      return editable ? <div className="ttx-report__break">Page break</div> : <div aria-hidden />
     case 'item':
       return <ItemView block={b} source={props.board.get(b.sourceId)} {...props} />
   }

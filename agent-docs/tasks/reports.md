@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: steps 2 to 5 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: steps 2 to 5 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder; text that goes on over pages, page breaks, every block in the Options panel's list); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -98,6 +98,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 | `text` | Rich text (§5.3). |
 | `image` | An upload id. |
 | `divider` | Nothing. |
+| `pageBreak` | Nothing. What follows starts a new page. |
 | `item` | `{ sourceId, mode: 'live' \| 'frozen', frozen?: FrozenItem }`: an object on the board. |
 
 - **One write path:** `blocks` is written only by the report ops (§6), and replaced whole, as a map's `layers` are. Two people changing one report at the same moment can lose one change. Most report editing happens in focus, where edits are private until Share, which narrows this.
@@ -112,7 +113,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   - Letter is 816 × 1056 px.
   - Landscape swaps the two sides.
   - Margins are fixed.
-- **Page breaks** (built in step 5a, `apps/web/src/reports/pages.ts` and `ReportPages.tsx`). The flow becomes rows: a full-width block is a row by itself, two one-column blocks in a row share it, and a one-column block before a full-width one sits alone in the left column. Every block is laid out once out of sight at the page's column widths to measure its row, and measured again when a row changes size (an image loads). Rows go on pages in order, page 1 under the report's title; a row that does not fit what is left starts the next page. An item or image never grows taller than a page's content area: one taller at the block's width shrinks, keeping its proportions, centered in its block (`fitItem` in `pages.ts`), so it always fits one page. Only a row of text taller than a page still gets a page of its own and is clipped; splitting text between pages comes later. Each page shows its number at the bottom.
+- **Page breaks** (built in step 5a, `apps/web/src/reports/pages.ts` and `ReportPages.tsx`). The flow becomes rows: a full-width block is a row by itself, two one-column blocks in a row share it, and a one-column block before a full-width one sits alone in the left column. Every block is laid out once out of sight at the page's column widths to measure its row, and measured again when a row changes size (an image loads). Rows go on pages in order, page 1 under the report's title; a row that does not fit what is left starts the next page. An item or image never grows taller than a page's content area: one taller at the block's width shrinks, keeping its proportions, centered in its block (`fitItem` in `pages.ts`), so it always fits one page. A **text alone in its row** (full width, or one column with nothing beside it) **goes on over pages**: measuring also gives where it may be cut, between its lines (each paragraph's top and line height), and a text that does not fit fills what is left of the page up to the last line that fits, then goes on at the top of the next page (`paginate` gives each page the **pieces** of rows it shows, px `from` to `to`). Each page shows the whole text shifted up and clipped to its lines, so no line is cut. A text beside another block in a row of two is not cut: taller than a page, it gets a page of its own and is clipped. After a **page break** block (`pageBreak`), the next row starts a new page; the break stays at the end of its page, and a break at the end of a report adds no page. Each page shows its number at the bottom.
 
 ### 3.3 Live and frozen items
 
@@ -186,7 +187,7 @@ Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ but
   - Each block has a drag handle. Dragging shows where it will go, in either column.
   - A toggle on each block switches it between one column and the full width.
   - An insert menu, between blocks and at the end, adds a heading, text, an image (upload, or from the board's uploads) or a divider.
-- **Every page, scrolling.** A report can run over several pages. Report mode shows them all, stacked top to bottom with a gap between, in a column that scrolls, as the PDF widget's focus view does. A new page starts when the content reaches the page's height; a block does not split between pages unless it is text (§3.2).
+- **Every page, scrolling.** A report can run over several pages. Report mode shows them all, stacked top to bottom with a gap between, in a column that scrolls, as the PDF widget's focus view does. A new page starts when the content reaches the page's height; a block does not split between pages unless it is a text alone in its row (§3.2), and a page break starts a new page.
 - **Edits are live, with no private draft** (decided 2026-10-29). Unlike other focus modes, report mode writes straight to the shared report, as typing in a text on the canvas does:
   - others and the agent see changes as they happen
   - undo is per gesture
@@ -205,7 +206,15 @@ Report mode is a view of its own, not the canvas (`FocusableObjectUI.fullScreen`
 
 ### 5.1b Tools in report mode (5b)
 
-Built in step 5b (`reports/ReportToolbar.tsx`, `reports/editing.tsx`): the toolbar and the controls below; a press selects a block (outlined in the canvas accent), a press on a selected heading or text, or a double-click, types in it (`report.setText`, one undo step per editing session; the editor keeps its own text while typing), Esc ends typing, then clears the selection, and only then leaves report mode (caught before the canvas's Esc); Delete or Backspace removes the selected block. Reordering drags a block's handle across pages, with an insertion line (`dropIndex` and `moveIndex` in `reports/pages.ts`), Esc cancels, and the column scrolls near its edges. Image uploads go through `uploadFile` (media only) or pick from the board's uploads. Empty headings and texts show a muted placeholder in report mode only. Every action starts its own gesture: one undo step each. A block's controls sit beside it in the page's margin, never over its content: the left margin for a one-column block on the left, the right margin for the others. Lists that must tell objects apart (From board, the Options panel's items) name a sticky note or text by the start of its text (`labelOf` with `withText`); captions and cards on the page use its name or type, since the page shows the text already. A toolbar menu leaves the focus with what it added (a new heading's editor), and Esc while a menu is open closes the menu only.
+Built in step 5b (`reports/ReportToolbar.tsx`, `reports/editing.tsx`): the toolbar and the controls below; a press selects a block (outlined in the canvas accent), a press on a selected heading or text, or a double-click, types in it (`report.setText`, one undo step per editing session; the editor keeps its own text while typing), Esc ends typing, then clears the selection, and only then leaves report mode (caught before the canvas's Esc); Delete or Backspace removes the selected block. Reordering drags a block's handle across pages, with an insertion line (`dropIndex` and `moveIndex` in `reports/pages.ts`), Esc cancels, and the column scrolls near its edges. Image uploads go through `uploadFile` (media only) or pick from the board's uploads. Empty headings and texts show a muted placeholder in report mode only. Every action starts its own gesture: one undo step each. A block's controls sit beside it in the page's margin, never over its content: the left margin for a one-column block on the left, the right margin for the others. Lists that must tell objects apart (From board, the Options panel's list) name a sticky note or text by the start of its text (`labelOf` with `withText`); captions and cards on the page use its name or type, since the page shows the text already. A toolbar menu leaves the focus with what it added (a new heading's editor), and Esc while a menu is open closes the menu only.
+
+Added after testing 5b (branch `feat/report-pages`):
+- **Page break** in the toolbar, after Divider: a `pageBreak` block, shown in report mode as a dashed line labelled "Page break" (nothing on the canvas preview or in print), selected, dragged and removed like any block; it has no width toggle.
+- **The caret goes where the text was pressed** (at the end of a new text), and a heading's text is selected to type over. Before, opening a text selected all of it, so the first key replaced the whole text.
+- **Typing in a text that goes on over pages:** each page's part of it is a block on that page, selected together; the first has the controls and is where a drop before it goes. Pressing a part types there: the editor is that part's height and scrolls inside itself; the other pages follow as it is typed.
+- **The caret follows the text over pages:** once what is typed runs past the part's page (or a text typed past its page's bottom is cut there), the editor moves to the part that now holds the caret, with the caret and the text as typed, in the same editing session (one undo step). Where the caret is in the text comes from the text as another page shows it (`caretY` in `reports/editing.tsx`).
+- **Dragging shows what moves:** the block's icon and name follow the pointer, the block stays faded in its place, and the pointer is a closed hand until the drop.
+- **Controls stay in sight when zoomed:** when the page's margin is out of sight (zoomed wider than the column, or under the Options panel), a block's controls go inside it, at the top, at the edge of what is in sight.
 
 Decided 2026-10-30: the tools for adding to a report are a **report toolbar at the bottom center**, in the canvas toolbar's style and place, replacing it in report mode (the canvas toolbar is hidden in focus already).
 - **Its tools:** Heading (levels 1 to 3 in its menu), Text, Image (upload a file, or pick from the board's uploads), Divider, and **Add from board** (a picker of the board's objects by type and name, which adds them as items, as Add to report does).
@@ -218,7 +227,7 @@ Decided 2026-10-30: the tools for adding to a report are a **report toolbar at t
 
 - The report's **name** (`core.object.rename`).
 - **Paper** (A4 or Letter) and **orientation** (portrait or landscape).
-- **Items:** each item block, with its source's title, a **Live / Frozen** switch, **Go to source** (leaves focus and selects the object), and **Remove**.
+- **Items:** every block, in report order, by icon and name (`blockLabel` and `blockIcon` in `reports/reports.ts`, which the dragged block uses too): a heading's or a text's words, an image's file name, Divider, Page break, an item's object. Its name goes to the block on the page (scrolled into view and selected; `showBlock` in `reports/editing.tsx`). Each has **Remove**; an item also has a **Live / Frozen** switch and **Go to source** (leaves focus and selects the object).
 - **Export PDF** (§7).
 - **Share link** (§8).
 
@@ -226,7 +235,7 @@ Decided 2026-10-30: the tools for adding to a report are a **report toolbar at t
 
 Removing happens **only in report mode**, where people see the whole report and what they take out of it. The canvas's menus (§4) only add.
 - **Each block** (an item, a heading, text, an image, a divider) has a **Remove** action: an × on the block's toolbar while it is hovered or selected, and the Delete key on a selected block.
-- **The Options panel's item list** has Remove on each item too (§5.2).
+- **The Options panel's list** has Remove on each block too (§5.2).
 - **Removing an item never touches its object** on the board: the object stays, and so do the other reports it is in.
 - A frame's heading item is one block like any other: removing it leaves the frame's objects in the report.
 - Each removal is one undo step (`report.removeBlock`). The agent removes blocks with the same op, for example "take the conflict map out of the report".
@@ -252,7 +261,7 @@ All with zod schemas, so they are in ⌘K, are agent tools, and are in the MCP m
 | `report.add` | canvas | the type's fields, as every `<type>.add` |
 | `report.setPage` | one report | `paper`, `orientation` |
 | `report.addItems` | the selection | `reportId`, optional: without it, a new report is made to the right of the objects. Its defaults choose the board's report when there is exactly one. Items go at the end, live; freeze them afterwards with `report.setItemMode`. A frame adds the objects in it; into an empty report, it also titles the report (§4). Objects already in the report, and reports, are skipped. Maps and frames take the full width, other items one column. |
-| `report.addBlock` | one report | `block` (a heading with its level, text as plain `text` or a rich `doc`, an image, or a divider), `index`. Headings and dividers take the full width. |
+| `report.addBlock` | one report | `block` (a heading with its level, text as plain `text` or a rich `doc`, an image, a divider, or a page break), `index`. Headings, dividers and page breaks take the full width. |
 | `report.removeBlock` | one report | `blockId` |
 | `report.moveBlock` | one report | `blockId`, `index` |
 | `report.setSpan` | one report | `blockId`, `span` |
@@ -333,7 +342,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
 4. **Drag onto a report** (built): the drop zone, the confirmation, objects back in place, one undo step.
 5. **Report mode,** in two PRs:
    - **5a** (built): report mode opens from ⤢, a double-click or the Object panel's Open; it is live (`FocusableObjectUI.live`: no draft, Share or exit dialog) and keeps the agent chat on the left (`keepChat`); every page scrolls in the middle, on real pages; the Options panel has the name, the page, and the items (Live or Frozen, Go to source, Remove).
-   - **5b** (built): editing on the page: the report toolbar (Heading, Text, Image, Divider, From board), block controls (drag to reorder, width, ×), Delete and Esc, typing headings and plain text.
+   - **5b** (built): editing on the page: the report toolbar (Heading, Text, Image, Divider, From board), block controls (drag to reorder, width, ×), Delete and Esc, typing headings and plain text. Then text that goes on over pages, page breaks, the dragged block following the pointer, every block in the Options panel's list, and controls in sight when zoomed.
 6. **Rich text:** the editor (Tiptap, needs approval), `report.setText`.
 7. **Live and frozen** (under discussion: `plans/plan-019.md` would replace this step with synced and detached items):
    - report renderers and `freeze` for each type
@@ -369,6 +378,7 @@ Made (2026-10-29, from the product owner):
 18. **Report mode is full screen,** on white with a border on each page, and **the chat is an overlay** at the top left that takes no room (5a, round 2). 2026-10-30.
 19. **Report tools go in a bottom report toolbar** that replaces the canvas toolbar in report mode; controls on a block sit on the block (§5.1b, 5b). 2026-10-30.
 20. **Undo in report mode is this person's latest change on the board,** wherever it was made (§5.1). 2026-10-30.
+21. **Long text goes on over pages,** cut between lines; **people move blocks to the next page with a Page break block,** and a dragged block shows beside the pointer (§3.2, §5.1b). 2026-10-30.
 
 Under discussion: **synced and detached items** (`plans/plan-019.md`), a proposal for colleagues' feedback, with its own questions (what "detached" means, pinning external data, deleting a source, edits, the words).
 
