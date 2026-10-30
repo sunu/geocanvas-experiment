@@ -21,6 +21,7 @@ import {
   ContextMenuSubTrigger,
 } from '@/components/ui/context-menu'
 import type { Board } from '../board/board'
+import { CodeMenu } from '../code/CodeMenu'
 import { addToReport, boardReports } from '../reports/reports'
 
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
@@ -58,6 +59,8 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
     // A new report: select it, so it is easy to find.
     if (!reportId && r.created?.length) onSelect(r.created)
   }
+  // A code cell's own entries (plan-019): Run, and Show output on.
+  const cell = ids.length === 1 && board.get(ids[0]!)?.type === 'code' ? board.get(ids[0]!) : undefined
   const layer = (label: string, Icon: typeof ArrowUpIcon, opId: string, keys: string) => (
     <ContextMenuItem onSelect={() => run(opId)}>
       <Icon />
@@ -67,6 +70,12 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
   )
   return (
     <ContextMenuContent className="w-52">
+      {cell?.type === 'code' && (
+        <>
+          <CodeMenu runtime={runtime} cell={cell} notify={notify} onSelect={onSelect} />
+          <ContextMenuSeparator />
+        </>
+      )}
       <ContextMenuItem
         onSelect={() => {
           const created = run('core.object.duplicate').created
