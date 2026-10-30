@@ -104,7 +104,7 @@ function Section({ name, children }: { name: string; children: ReactNode }) {
 }
 
 /** A tool's icon with its one-word name under it: a name you can read beats a tooltip you have to find. */
-function Face({ Icon, text }: { Icon: Icon; text: string }) {
+export function Face({ Icon, text }: { Icon: Icon; text: string }) {
   return (
     <>
       <Icon className="size-5" />
@@ -114,9 +114,9 @@ function Face({ Icon, text }: { Icon: Icon; text: string }) {
 }
 
 /** The look of the toolbar: rounded, bordered, a small shadow. */
-const PANEL = 'rounded-lg border bg-card p-1.5 shadow-[0_2px_2px_rgb(0_0_0/0.1),0_4px_3px_rgb(0_0_0/0.1)]'
+export const PANEL = 'rounded-lg border bg-card p-1.5 shadow-[0_2px_2px_rgb(0_0_0/0.1),0_4px_3px_rgb(0_0_0/0.1)]'
 
-const BTN = 'h-12 min-w-12 flex-col gap-0.5 rounded-md px-1.5 has-[>svg]:px-1.5'
+export const BTN = 'h-12 min-w-12 flex-col gap-0.5 rounded-md px-1.5 has-[>svg]:px-1.5'
 
 interface GroupProps {
   /** The tooltip of the arrow that opens the list. */

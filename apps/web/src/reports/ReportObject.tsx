@@ -9,6 +9,8 @@ import { ObjectHeader } from '../canvas/ObjectHeader'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { ReportPages } from './ReportPages'
+import { ReportEditing, runReportOp } from './editing'
+import { ReportToolbar } from './ReportToolbar'
 
 /** The phone's Reports tab reads a report as one flow (mobile/ReportsPage.tsx). */
 export { ReportContent } from './ReportPages'
@@ -80,6 +82,36 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   const scaleRef = useRef(scale)
   scaleRef.current = scale
 
+  // Editing on the page (step 5b): this person's selected block, the one they type in, and where a drag would drop.
+  const [selected, select] = useState<string | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [drop, setDrop] = useState<number | null>(null)
+  // A block someone else removed is no longer selected.
+  const live = selected && report.blocks.some((b) => b.id === selected) ? selected : null
+  const editingState = { report, runtime, selected: live, select, editing, setEditing, drop, setDrop }
+  const stateRef = useRef(editingState)
+  stateRef.current = editingState
+
+  // Keys, before the canvas's (capture): Esc ends typing, then clears the selection, and only then leaves report mode;
+  // Delete or Backspace removes the selected block when not typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const st = stateRef.current
+      const typing = !!(e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')
+      if (e.key === 'Escape' && (st.editing || st.selected)) {
+        e.preventDefault()
+        if (st.editing) st.setEditing(null)
+        else st.select(null)
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && st.selected && !typing) {
+        e.preventDefault()
+        runReportOp(st.runtime, st.report.id, 'report.removeBlock', { blockId: st.selected })
+        st.select(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
   // ⌘/Ctrl + wheel and pinch zoom the report, not the browser page. Native, to prevent the browser's zoom.
   useEffect(() => {
     const el = column.current
@@ -94,12 +126,23 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   }, [])
 
   return (
-    <div className="ttx-reportview">
-      <div ref={column} className="ttx-reportmode">
-        <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} full footer={(n, count) => `Page ${n} of ${count}`} />
+    <ReportEditing.Provider value={editingState}>
+      <div className="ttx-reportview">
+        {/* A press on the page outside any block clears the selection (blocks stop their own presses). */}
+        <div
+          ref={column}
+          className="ttx-reportmode"
+          onPointerDown={() => {
+            select(null)
+            setEditing(null)
+          }}
+        >
+          <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} full footer={(n, count) => `Page ${n} of ${count}`} />
+        </div>
+        <ZoomControl scale={scale} fitted={zoom === 'fit'} onZoom={setZoom} />
+        <ReportToolbar />
       </div>
-      <ZoomControl scale={scale} fitted={zoom === 'fit'} onZoom={setZoom} />
-    </div>
+    </ReportEditing.Provider>
   )
 }
 

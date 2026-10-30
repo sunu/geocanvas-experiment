@@ -57,3 +57,29 @@ export function fitItem(width: number, ratio: number, room: number): { width: nu
   const height = Math.round(Math.min(width * ratio, room))
   return { width: Math.round(height / ratio), height }
 }
+
+/** A block's place on screen, for reordering. */
+export interface BlockRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/**
+ * Where a dragged block would go, as an index in the report's blocks: before the first block the pointer is above the
+ * middle of, or, in a row of two blocks, left of the middle of. Past every block: the end. Rects are in the blocks'
+ * order, from the screen; pages stack top to bottom, so screen order is reading order.
+ */
+export function dropIndex(rects: BlockRect[], p: { x: number; y: number }): number {
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i]!
+    const paired = rects.some((o, j) => j !== i && Math.abs(o.y - r.y) < 2)
+    const inRow = p.y >= r.y && p.y <= r.y + r.h
+    if (paired && inRow ? p.x < r.x + r.w / 2 : p.y < r.y + r.h / 2) return i
+  }
+  return rects.length
+}
+
+/** report.moveBlock's index (in the blocks without the moved one) for a block at `from` dropped before `insertAt`. */
+export const moveIndex = (from: number, insertAt: number) => (insertAt > from ? insertAt - 1 : insertAt)

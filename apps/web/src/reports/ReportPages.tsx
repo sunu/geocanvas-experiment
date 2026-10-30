@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
+import { EditableBlock, useReportEditing } from './editing'
 import { SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
 import { docText, MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject, type RichDoc } from '@ttx/plugins'
@@ -119,14 +120,23 @@ export function ReportContent({ ref, runtime, report: r }: { ref?: Ref<HTMLDivEl
 
 /** One row of the two-column grid: a full-width block, two one-column blocks, or one in the left column. */
 function RowView({ row, blocks, board, runtime, contentWidth, maxHeight, measuring, full }: { row: Row; blocks: Block[]; board: Board; runtime: Runtime; contentWidth: number; maxHeight: number; measuring: boolean; full: boolean }) {
+  // In report mode (only there), each block on the page can be selected, moved, widened, removed and typed in.
+  const editable = !!useReportEditing() && !measuring
   return (
     <div className="ttx-report__row">
       {row.map((i) => {
         const b = blocks[i]!
         const width = b.span === 2 ? contentWidth : (contentWidth - COLUMN_GAP) / 2
+        const view = <BlockView block={b} board={board} runtime={runtime} width={width} maxHeight={maxHeight} measuring={measuring} full={full} />
         return (
           <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
-            <BlockView block={b} board={board} runtime={runtime} width={width} maxHeight={maxHeight} measuring={measuring} full={full} />
+            {editable ? (
+              <EditableBlock block={b} index={i} count={blocks.length}>
+                {view}
+              </EditableBlock>
+            ) : (
+              view
+            )}
           </div>
         )
       })}
@@ -151,19 +161,25 @@ interface BlockProps {
 }
 
 function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
+  // In report mode, an empty heading or text shows what it is for, muted; elsewhere (and in print) nothing.
+  const editable = !!useReportEditing()
   switch (b.kind) {
     case 'heading': {
       const H = (`h${b.level + 1}` as 'h2' | 'h3' | 'h4')
-      return <H className={`ttx-report__heading ttx-report__heading--${b.level}`}>{b.text}</H>
+      return (
+        <H className={`ttx-report__heading ttx-report__heading--${b.level}`}>
+          {b.text || (editable && <span className="ttx-report__placeholder">Heading</span>)}
+        </H>
+      )
     }
-    case 'text':
+    case 'text': {
+      const ps = paragraphs(b.doc).filter((p, i, all) => p || all.length === 1)
       return (
         <div className="ttx-report__text">
-          {paragraphs(b.doc).map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
+          {ps.some(Boolean) ? ps.map((p, i) => <p key={i}>{p}</p>) : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
         </div>
       )
+    }
     case 'image':
       return <img className="ttx-report__image" src={uploadUrl(b.imageId)} alt="" draggable={false} style={{ maxHeight: props.maxHeight }} />
     case 'divider':
