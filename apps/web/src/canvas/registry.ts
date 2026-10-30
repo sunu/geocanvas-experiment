@@ -53,6 +53,8 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
 export interface FocusableObjectUI<O extends BoardObject = BoardObject> extends ObjectUI<O> {
   /** Contextual tools, beside the object in focus. Every change is an op on `runtime` (the draft, or the board when `live`). */
   Options: ComponentType<ObjectViewProps<O>>
+  /** Actions at the foot of the Options panel, below its scrolling body: always in sight (a report's Export). */
+  OptionsFooter?: ComponentType<ObjectViewProps<O>>
   /** Ops to run on the draft just before it is shared, e.g. a map shares its view. */
   beforeShare?(runtime: Runtime, object: O): void
   /**

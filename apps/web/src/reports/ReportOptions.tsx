@@ -1,9 +1,10 @@
-import { ArrowSquareOutIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, PrinterIcon, XIcon } from '@phosphor-icons/react'
 import { ORIENTATIONS, PAPERS, type Orientation, type Paper, type ReportBoardObject } from '@ttx/plugins'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import type { ObjectViewProps } from '../canvas/registry'
 import { showBlock } from './editing'
+import { startPrint } from './ReportPrint'
 import { blockIcon, blockLabel, titleOf, useUploadName } from './reports'
 
 const PAPER_LABEL: Record<Paper, string> = { a4: 'A4', letter: 'US Letter' }
@@ -108,5 +109,15 @@ export function ReportOptions({ runtime, object: r, onGoTo }: ObjectViewProps<Re
         )}
       </section>
     </>
+  )
+}
+
+/** The foot of a report's Options panel: Export, always in sight below the items, however long the list. */
+export function ReportOptionsFooter() {
+  return (
+    <button type="button" className="ttx-reportopts__export" onClick={startPrint} title="Print the report, or save it as a PDF from the print dialog (⌘P)">
+      <PrinterIcon size={14} aria-hidden />
+      Print or save as PDF
+    </button>
   )
 }

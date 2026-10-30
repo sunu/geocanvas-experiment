@@ -27,12 +27,15 @@ export interface SnapshotRequest {
   /** The scenario's routes as found so far, and its closures (routing/). The ends' markers are DOM, and not drawn. */
   routes: RouteState[]
   closures: ScenarioClosure[]
+  /** Pixels per CSS px: more than the screen's for print (reports/print.ts), the same area, sharper. */
+  pixelRatio?: number
 }
 
 /** Snapshots kept, as object URLs (each a few hundred KB of PNG). */
 const MAX_SNAPSHOTS = 50
-/** Drawn at up to this pixel ratio: snapshots are shown at canvas zooms up to about 100%. */
+/** Drawn at up to this pixel ratio, unless a request asks for more: snapshots are shown at canvas zooms up to about 100%. */
 const MAX_PIXEL_RATIO = 2
+const screenRatio = () => Math.min(MAX_PIXEL_RATIO, devicePixelRatio)
 /** Data layers are done drawing when deck.gl has not drawn for this long after the map's last tile. */
 const SETTLE_MS = 300
 /** A snapshot is taken after this long even if tiles are still loading (a slow or failing tile server). */
@@ -85,7 +88,7 @@ function start(): Renderer {
     interactive: false,
     attributionControl: false,
     fadeDuration: 0,
-    pixelRatio: Math.min(MAX_PIXEL_RATIO, devicePixelRatio),
+    pixelRatio: screenRatio(),
     // So the frame can be read after it is drawn. deck.gl keeps its buffer by default.
     canvasContextAttributes: { preserveDrawingBuffer: true },
   })
@@ -103,6 +106,9 @@ async function draw(req: SnapshotRequest): Promise<string> {
   const { map, overlay } = r
   r.container.style.width = `${Math.max(1, Math.round(req.width))}px`
   r.container.style.height = `${Math.max(1, Math.round(req.height))}px`
+  const ratio = req.pixelRatio ?? screenRatio()
+  if (map.getPixelRatio() !== ratio) map.setPixelRatio(ratio)
+  overlay.setProps({ useDevicePixels: ratio })
   map.resize()
   if (r.basemap !== req.basemap) {
     const loaded = once(map, 'style.load')

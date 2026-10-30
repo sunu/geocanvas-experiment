@@ -11,6 +11,7 @@ import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { ReportPages } from './ReportPages'
 import { ReportEditing, runReportOp, SHOW_BLOCK, useReportEditing, type ReportEditingState } from './editing'
+import { ReportPrint, START_PRINT } from './ReportPrint'
 import { ReportToolbar } from './ReportToolbar'
 
 /** The phone's Reports tab reads a report as one flow (mobile/ReportsPage.tsx). */
@@ -88,6 +89,8 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   const [editing, setEditingState] = useState<{ id: string; at: number; caret?: number; draft?: string } | null>(null)
   const [drop, setDrop] = useState<number | null>(null)
   const [dragging, setDragging] = useState<ReportEditingState['dragging']>(null)
+  // Printing (ReportPrint.tsx): from the Options panel or ⌘P, never the browser's print of the app's screen.
+  const [printing, setPrinting] = useState(false)
   // A block someone else removed is no longer selected.
   const live = selected && report.blocks.some((b) => b.id === selected) ? selected : null
   const setEditing = (id: string | null, { at = 0, caret, draft }: { at?: number; caret?: number; draft?: string } = {}) => setEditingState(id ? { id, at, caret, draft } : null)
@@ -114,6 +117,11 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = stateRef.current
+      if (e.key === 'p' && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault()
+        setPrinting(true)
+        return
+      }
       // An open menu, popover or dialog (the toolbar's) closes on Esc itself, and keeps the selection.
       if (document.querySelector('[role="menu"], [data-radix-popper-content-wrapper], [role="dialog"]')) return
       const typing = !!(e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')
@@ -141,8 +149,13 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
       select(id)
       el.querySelector(`[data-block-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
     }
+    const onPrint = () => setPrinting(true)
     el.addEventListener(SHOW_BLOCK, onShow)
-    return () => el.removeEventListener(SHOW_BLOCK, onShow)
+    el.addEventListener(START_PRINT, onPrint)
+    return () => {
+      el.removeEventListener(SHOW_BLOCK, onShow)
+      el.removeEventListener(START_PRINT, onPrint)
+    }
   }, [])
 
   // ⌘/Ctrl + wheel and pinch zoom the report, not the browser page. Native, to prevent the browser's zoom.
@@ -175,6 +188,7 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
         <ZoomControl scale={scale} fitted={zoom === 'fit'} onZoom={setZoom} />
         <ReportToolbar />
         <DragGhost />
+        {printing && <ReportPrint report={report} runtime={runtime} onDone={() => setPrinting(false)} />}
       </div>
     </ReportEditing.Provider>
   )

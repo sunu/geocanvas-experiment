@@ -23,6 +23,7 @@ export function pictureRequest(
   layers: MapLayer[],
   shapes: MapAnnotation[],
   scenario: Pick<SnapshotRequest, 'routes' | 'closures'>,
+  pixelRatio?: number,
 ): SnapshotRequest {
   return {
     view: { center: view.center, zoom: view.zoom, bearing: view.bearing },
@@ -33,14 +34,16 @@ export function pictureRequest(
     shapes,
     routes: scenario.routes,
     closures: scenario.closures,
+    ...(pixelRatio && { pixelRatio }),
   }
 }
 
 /**
  * A picture of a map as this person sees it, with its credits (a picture has no attribution control): for a report,
- * which shows maps as pictures, never live maps (agent-docs/tasks/reports.md §3.3).
+ * which shows maps as pictures, never live maps (agent-docs/tasks/reports.md §3.3). `pixelRatio` draws it sharper for
+ * print, showing the same area.
  */
-export function useMapPicture(runtime: Runtime, o: MapBoardObject): { url?: string; credits: string } {
+export function useMapPicture(runtime: Runtime, o: MapBoardObject, { pixelRatio }: { pixelRatio?: number } = {}): { url?: string; credits: string } {
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
   const scenario = useScenario(o, layers, states)
@@ -51,7 +54,7 @@ export function useMapPicture(runtime: Runtime, o: MapBoardObject): { url?: stri
   const views = useMemo(() => new Views(runtime.board.doc), [runtime])
   const subscribe = useCallback((listener: () => void) => views.subscribe(listener), [views])
   const view = useSyncExternalStore(subscribe, () => views.get(runtime.actor.id, o.id) ?? views.latest(o.id)?.view) ?? WORLD
-  const url = useSnapshot(pictureRequest(o, view, layers, shapes, scenario))
+  const url = useSnapshot(pictureRequest(o, view, layers, shapes, scenario, pixelRatio))
   return { url, credits: [BASEMAP_CREDITS[o.basemap], creditsOf(states, scenario)].filter(Boolean).join(' · ') }
 }
 

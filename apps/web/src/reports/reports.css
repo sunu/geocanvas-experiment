@@ -506,3 +506,66 @@
   color: var(--ttx-muted);
   font-weight: 400;
 }
+
+/* Export at the foot of a report's Options panel (reports/ReportOptions.tsx ReportOptionsFooter). */
+.ttx-reportopts__export {
+  display: inline-flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttx-reportopts__export:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
+/* --- Print (reports/ReportPrint.tsx): every page at its real size; on screen out of sight, in print the only thing. */
+
+.ttx-print {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  pointer-events: none;
+}
+
+@media print {
+  html,
+  body,
+  #root {
+    height: auto;
+  }
+
+  body > :not(.ttx-print) {
+    display: none !important;
+  }
+
+  .ttx-print {
+    position: static;
+  }
+
+  /* One sheet of paper each, at the paper's physical size (print.ts): A4 in px would be half a pixel too tall and push
+     an empty page after every sheet. */
+  .ttx-print .ttx-report__sheet {
+    width: var(--ttx-print-w) !important;
+    height: var(--ttx-print-h) !important;
+    break-after: page;
+  }
+
+  .ttx-print .ttx-report__sheet:last-child {
+    break-after: auto;
+  }
+
+  .ttx-print,
+  .ttx-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
