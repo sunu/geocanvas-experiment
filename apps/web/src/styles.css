@@ -2457,6 +2457,46 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   opacity: 0.4;
 }
 
+/* The disaster history widget (history/HistoryObject.tsx): decade bars stacked by hazard, and lists with a color each. */
+.ttx-history__decades {
+  display: grid;
+  gap: 3px;
+}
+
+.ttx-history__stack {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-history__stack span {
+  width: 100%;
+  min-height: 1px;
+}
+
+.ttx-history__event {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ttx-history__event i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.ttx-history__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ttx-country__monthname {
   color: var(--ttx-muted);
   font-size: 10px;

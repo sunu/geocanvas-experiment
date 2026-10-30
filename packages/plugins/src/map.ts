@@ -239,7 +239,7 @@ export const mapPlugin = definePlugin({
       prepare(ctx, { layer, area }) {
         const map = mapOf(ctx)
         const d = DATA_LAYERS[layer]
-        const added: MapLayer = { id: newLayerId(), tool: d.tool, input: { ...d.input, area: areaFor(ctx, map, area) }, title: d.title }
+        const added: MapLayer = { id: newLayerId(), tool: d.tool, input: { ...d.input, area: areaFor(ctx, map, area) }, title: d.title, ...('style' in d && { style: d.style }) }
         return { id: map.id, layers: [...(map.layers ?? []), added] }
       },
       apply: (tx, { id, layers }) => setLayers(tx, id, layers),

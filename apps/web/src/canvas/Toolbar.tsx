@@ -27,7 +27,7 @@ import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Hint } from '@/components/Hint'
 import { toolTypes } from './registry'
-import { CONFLICT_FACE, COUNTRY_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
+import { CONFLICT_FACE, COUNTRY_FACE, HISTORY_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
 
 /** 'select', or the object type to draw. */
 export type Tool = string
@@ -61,6 +61,7 @@ const EVENT_CONTEXT: Item[] = [
   { ...COUNTRY_FACE, tool: 'country' },
   { ...PRESENCE_FACE, tool: 'presence' },
   { ...CONFLICT_FACE, tool: 'conflict' },
+  { ...HISTORY_FACE, tool: 'history' },
   { ...RELIEFWEB_FACE, tool: 'reliefweb' },
 ]
 const MAP_AND_REPORT: Item[] = [

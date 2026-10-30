@@ -1,7 +1,7 @@
 import { MontyClient, type StacSearch } from '@ttx/plugins/monty/client'
 
 /** Montandon needs a token, which never reaches the browser: post to the Worker, which adds it (apps/worker/src/monty.ts). */
-const postSearch: StacSearch = async (body) => {
+export const postSearch: StacSearch = async (body) => {
   const res = await fetch('/monty/search', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

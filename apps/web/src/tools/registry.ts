@@ -6,7 +6,8 @@ import { healthFacilitiesTool, LayercakeHealth } from '../data/health'
 import { populationTool, SourceCoopPopulation } from '../data/population'
 import { eventFootprintTool } from '../events/footprint'
 import { ExposureWorker, exposureTool } from '../exposure/exposure'
-import { monty } from '../events/monty'
+import { monty, postSearch } from '../events/monty'
+import { desinventarTool } from '../history/desinventar'
 import { choroplethTool } from '../hapi/choropleth'
 import { boundariesTool } from '../map/adminAreas'
 import { notebookFactory } from '../notebooks/api'
@@ -34,6 +35,7 @@ export const tools = new ToolRunner([
   notebookArtifactTool(notebookFactory),
   notebookRunsTool(notebookFactory),
   eventFootprintTool(monty),
+  desinventarTool(postSearch),
   forecastTool(gfs),
   eventsSearch(monty),
   eventsGet(monty),
