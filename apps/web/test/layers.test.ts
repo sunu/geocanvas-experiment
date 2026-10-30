@@ -71,4 +71,15 @@ describe('layer areas', () => {
     expect(hasArea({ id: 'a', tool: 'data.population', input: { area: [0, 0, 1, 1] }, title: 'x' })).toBe(true)
     expect(hasArea({ id: 'b', tool: 'data.geocode', input: { query: 'Beira' }, title: 'x' })).toBe(false)
   })
+
+  it('lets only layers made by code be picked, and draws the one in focus stronger', () => {
+    const code: LayerState = { id: 'buffer', title: 'Buffer', output: 'geo.features', loading: false, value: points, from: 'cell' }
+    const other: LayerState = { id: 'pin', title: 'Beira', output: 'geo.features', loading: false, value: points }
+    const [a, b] = deckLayers([code, other])
+    expect([a?.props.pickable, b?.props.pickable]).toEqual([true, false])
+    const [strong, faint] = deckLayers([code, other], { highlight: 'buffer' })
+    expect(strong?.props.opacity).toBe(1)
+    expect((strong?.props as { lineWidthMinPixels?: number }).lineWidthMinPixels).toBe(3)
+    expect(faint?.props.opacity).toBeCloseTo(0.35)
+  })
 })

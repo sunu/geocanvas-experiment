@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import type { PickingInfo } from '@deck.gl/core'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
@@ -20,6 +21,7 @@ import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
 import { useSnapshot } from './snapshots'
 import { setMapMode, useMapMode } from './mode'
+import { hover as hoverCode, pin as pinCode, useCodeFocus } from '../code/focus'
 import { ScenarioOnMap, useScenario } from '../routing/ScenarioOnMap'
 
 // MapLibre 6 finds its worker relative to its own module at runtime, which a bundle breaks: let Vite
@@ -122,6 +124,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const [liveMap, setLiveMap] = useState<MapLibreMap>()
   /** The drawing box's tool: the next click on the map adds a sticky there, or the next drag draws a shape. */
   const [tool, setTool] = useState<DrawTool>()
+  // A code layer's element in focus (code/focus.ts): its layer is drawn stronger. Clicks pick features only when no
+  // tool (drawing, a note, the scenario's) wants them.
+  const codeFocus = useCodeFocus(o.id)
+  const highlight = (codeFocus.hovered ?? codeFocus.open)?.layerId
+  const highlightRef = useRef(highlight)
+  const pickingRef = useRef(true)
+  pickingRef.current = !tool && !(focused && mode === 'scenario')
   const [shapeColor, setShapeColor] = useState<ShapeColor>('red')
   /** The sticky being written in. */
   const [writing, setWriting] = useState<string>()
@@ -175,7 +184,24 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     // deck.gl data layers go here. Overlay mode (its own canvas above the map), not interleaved:
     // deck.gl 9.4's interleaved mode throws on every frame with MapLibre 6. The cost is a second
     // WebGL context per map, and deck.gl layers draw above the map's labels.
-    const overlay = new MapboxOverlay({ interleaved: false, layers: [...deckLayers(statesRef.current), shapeLayer(shapesRef.current), ...scenarioRef.current] })
+    // A code layer's feature (plan-019): hovering it opens its footnote's details, a click pins them.
+    const codeElement = (info: PickingInfo) => {
+      const s = info.picked ? statesRef.current.find((s) => `layer-${s.id}` === info.layer?.id) : undefined
+      return s?.from ? { objectId: o.id, layerId: s.id, cellId: s.from } : undefined
+    }
+    const overlay = new MapboxOverlay({
+      interleaved: false,
+      layers: [...deckLayers(statesRef.current, { highlight: highlightRef.current }), shapeLayer(shapesRef.current), ...scenarioRef.current],
+      onHover: (info) => {
+        if (!pickingRef.current) return
+        const element = codeElement(info)
+        hoverCode(element, 'map')
+        map.getCanvas().style.cursor = element ? 'pointer' : ''
+      },
+      onClick: (info) => {
+        if (pickingRef.current) pinCode(codeElement(info))
+      },
+    })
     map.addControl(overlay as unknown as IControl)
     // The box changes size when resized, and in focus mode (a local size that is never stored).
     const resize = new ResizeObserver(() => map.resize())
@@ -195,7 +221,10 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       const v = a.values[f.properties[t.pcode]]
       setHover({ text: `${f.properties[t.name]}: ${v === undefined ? 'no data' : `${v.toLocaleString('en-US')} ${a.unit ?? ''}`}`, x: e.point.x, y: e.point.y })
     })
-    map.on('mouseout', () => setHover(undefined))
+    map.on('mouseout', () => {
+      setHover(undefined)
+      hoverCode(undefined, 'map')
+    })
     mapRef.current = map
     overlayRef.current = overlay
     setLiveMap(map)
@@ -343,12 +372,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Only when a layer or its result changed: new deck.gl layers make deck.gl redraw all their data, and the canvas
   // re-renders the map on every camera move.
   useEffect(() => {
-    overlayRef.current?.setProps({ layers: [...deckLayers(states), shapeLayer(shapes), ...scenario.deck] })
+    overlayRef.current?.setProps({ layers: [...deckLayers(states, { highlight }), shapeLayer(shapes), ...scenario.deck] })
+    highlightRef.current = highlight
     statesRef.current = states
     shapesRef.current = shapes
     scenarioRef.current = scenario.deck
     if (mapRef.current && styleReadyRef.current) syncAdminLayers(mapRef.current, states)
-  }, [states, shapes, scenario.deck])
+  }, [states, shapes, scenario.deck, highlight])
 
   useEffect(() => {
     if (styleRef.current === o.basemap) return
