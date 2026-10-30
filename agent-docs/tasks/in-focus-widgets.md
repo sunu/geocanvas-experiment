@@ -258,9 +258,10 @@ Made (2026-10-28):
 
    Their size and loading belong in each step's PR.
 5. **Map first** (2026-10-28): the Map is the first in-focus widget and is finished before the Table.
+6. **A type can be live in focus** (2026-10-29): focus stays private by default, but a type may set `live` (`FocusableObjectUI`) to edit the board directly, with no draft, Share or exit dialog, and `keepChat` to keep the agent chat open on the left. Reports are both, so the agent and people work on the same report (`agent-docs/tasks/reports.md` §5).
 
 Open:
-6. **Upload storage: R2** (in progress), not the room's Durable Object storage.
+7. **Upload storage: R2** (in progress), not the room's Durable Object storage.
    - Durable Object SQLite caps a row at 2 MB, so files would be split across rows.
    - It has no range reads; DuckDB-wasm and GeoParquet reads rely on them.
    - Every read would wake the room and bill Durable Object time.

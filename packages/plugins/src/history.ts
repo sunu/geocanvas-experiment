@@ -3,7 +3,7 @@ import { defineOp, definePlugin, type AnyObject } from '@ttx/core'
 import { countryName } from './monty/countries.js'
 
 /**
- * A country's disaster history from Montandon (plans/plan-019.md): EM-DAT's events since 1900 with their deaths and
+ * A country's disaster history from Montandon (plans/plan-020.md): EM-DAT's events since 1900 with their deaths and
  * people affected, by year and hazard. No React here: the view is in apps/web/src/history/. The board stores the
  * country's ISO3 code and a hazard filter; each browser reads the events.
  */

@@ -7,7 +7,7 @@ import { bboxAreaDeg2 } from '../data/overture'
 import { searchAll } from './history'
 
 /**
- * Local disaster losses from DesInventar through Montandon (plans/plan-019.md): one record per event and place (a
+ * Local disaster losses from DesInventar through Montandon (plans/plan-020.md): one record per event and place (a
  * ward, a municipality), each with its deaths, houses destroyed and other losses, as points on a map. DesInventar is
  * read by area, not by country: Nepal alone has tens of thousands of impact items, a district about 2,000 (5 s).
  * It covers some 30 countries, mostly up to about 2013. Pure apart from `search`.

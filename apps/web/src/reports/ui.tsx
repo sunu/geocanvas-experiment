@@ -2,16 +2,25 @@ import { FileTextIcon } from '@phosphor-icons/react'
 import type { Board } from '../board/board'
 import { registerObjectUI, registerWidget } from '../canvas/registry'
 import { ReportObject } from './ReportObject'
-import { boardReports } from './reports'
+import { ReportOptions } from './ReportOptions'
+import { boardReports, titleOf } from './reports'
 
-/** Reports (agent-docs/tasks/reports.md): the widget on the canvas. Report mode (focus) comes in step 5. */
+/**
+ * Reports (agent-docs/tasks/reports.md): the widget on the canvas, and report mode in focus. Report mode is live (no
+ * private draft: the agent edits reports too) and keeps the agent chat open on the left.
+ */
 registerObjectUI('report', {
   View: ReportObject,
+  Options: ReportOptions,
+  live: true,
+  keepChat: true,
+  fullScreen: true,
   tool: { key: 'P', label: 'Add report', Icon: FileTextIcon },
-  panel: (o) => {
+  panel: (o, board) => {
     const items = o.blocks.filter((b) => b.kind === 'item').length
     return {
-      title: 'Report',
+      // Its title, as everywhere: a name, else the frame it was made from, else "Untitled report". The badge says Report.
+      title: titleOf(board, o),
       description: 'A document made from the board. Add objects to it with Add to report.',
       metadata: [
         ['Paper', `${o.paper === 'a4' ? 'A4' : 'Letter'}, ${o.orientation}`],

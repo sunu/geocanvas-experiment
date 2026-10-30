@@ -4,7 +4,7 @@ import { postSearch } from '../events/monty'
 import type { Source } from '../hapi/api'
 
 /**
- * A country's disaster history from EM-DAT through Montandon (plans/plan-019.md): every event with its deaths and
+ * A country's disaster history from EM-DAT through Montandon (plans/plan-020.md): every event with its deaths and
  * people affected, read by country code without geometry (Nepal: 212 events and 551 impact items, about 2 s; by shape
  * it took 2 minutes and caught other countries' events). The summary is pure, for tests.
  */

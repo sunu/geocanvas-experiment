@@ -1,58 +1,82 @@
-# Plan 019: a place's disaster history from Montandon
+# Plan 019 — Proposal: synced and detached report items
 
-What has happened here before: a country's disasters since 1900, and the local losses of past disasters in an area,
-from Montandon's EM-DAT and DesInventar collections. Two parts: a widget for a country, and a map layer for an area.
+Date: 2026-10-30. Status: **proposed, for feedback.** Not decided, not scheduled, nothing built. Today's behavior (live and frozen items, `agent-docs/tasks/reports.md` §3.3) is unchanged until this is agreed.
 
-Status: built on `feat/area-history`.
+## 1. Why
 
-## Spike (2026-10-30, Montandon staging)
+A report item is **live** or **frozen** today. A frozen item keeps only a text, a picture upload or some data (`Frozen` in `packages/plugins/src/reports.ts`). Three problems follow:
+- **A frozen item shows as a small text card, not as the thing itself.** A sticky note is no longer a sticky note, and a map would be a bare picture.
+- **Most widgets cannot be frozen at all.** A map, an event or a country widget would need the browser to make its picture, so report mode disables the switch for them.
+- **"Frozen" reads as a lock,** not as a relationship to the board.
 
-| Source | Query | Nepal | Time | Notes |
-| --- | --- | --- | --- | --- |
-| EM-DAT events | by `monty:country_codes`, without geometry | 212 events, 1954–2026 | 0.8 s, 333 KB | with geometry 5.5 s and 5 MB (country outlines) |
-| EM-DAT events | by shape (a district's bbox) | 1,382 events | 122 s | catches every event whose region touches the box: unusable |
-| EM-DAT impacts | by country, without geometry | 551 items | 1.4 s | deaths, affected, injured, cost, displaced |
-| DesInventar impacts | by country | over 12,000 items, still going | over 22 s | too many to read whole |
-| DesInventar impacts | by shape (Chitwan, 0.4 deg²) | 1,775 items, 1971–2013 | 5 s | 553 flood, 413 fire, 272 landslide items; 1,465 deaths |
-| GDACS, IFRC, USGS, IDMC events | by shape | 10, 72, 3, 4 | under 4 s | points, or country and province outlines |
+## 2. The proposal
 
-- **EM-DAT items join by the id in their item id.** `emdat-event-2015-0114-NPL` and
-  `emdat-impact-2015-0114-NPL-total_deaths`: most items have no `monty:src_event_id` (only recent ones do), so a join
-  on it gave losses to 2026's events only.
-- **Hazards group by EM-DAT's classification code**, which every EM-DAT and DesInventar item carries in
-  `monty:hazard_codes` (`nat-hyd-flo-riv`, `nat-geo-ear-gro`): its first three parts. EM-DAT also records transport and
-  other technological accidents (`tec-…`; 78 of Nepal's 212 events), kept apart.
-- **DesInventar is one item per record, place and loss**: `desinventar-impact-<record>-<type>`, the place a simplified
-  polygon (a ward, a municipality) and named only in the title ("FLOOD in Ward no. 8 on 2013-12-30 …"), inconsistently
-  ("Ward No. 2", "Ward no 8", "None" for 835 of Chitwan's 1,775). No P-codes. So records are shown where they are, not
-  grouped by place name.
-- **DesInventar coverage**: 31 of 50 countries probed (Nepal, India, Mozambique, Kenya, Uganda, Ethiopia, Madagascar,
-  Malawi, Zambia, Senegal, Nigeria, Tunisia, Myanmar, Timor-Leste, Jamaica and most of Latin America); not Pakistan,
-  Bangladesh, Sri Lanka, Indonesia or the Philippines. Mostly up to about 2013.
-- Paging works through the Worker's proxy: Montandon's next link is a POST body with a token.
+Two ways for an item to relate to the object on the board it came from:
+- **Synced.** The item is linked to its object on the board, the original. It always shows that object as it is now. People can see the link, and change the object on the board, not in the report.
+- **Detached.** The item started as an object on the board but no longer follows it. It is the report's own copy, editable to a small extent in the report. People can see where it came from.
 
-## Built
+**Either way, the item is visible in full:** a detached sticky note is still a sticky note in its color, and a detached map still shows its picture. A report always reads complete, on screen and in print.
 
-- **Disaster history widget** (`history` type, `packages/plugins/src/history.ts`; view in `apps/web/src/history/`):
-  for a country (the HDX widgets' frame and country picker; op `history.setCountry`), EM-DAT's natural hazard
-  disasters since its first record: totals, disasters per decade stacked by hazard family, the five deadliest, and
-  events and deaths by family; a hazard filter shared on the board (`hazard`, op `history.setHazard`, `''` for every
-  natural hazard). Technological events are left out and counted. In the toolbar's event menu, the palette
-  (`history.add`) and for the agent.
-- **Past disasters (DesInventar)** map layer (`DATA_LAYERS.desinventar`, browser tool `history.desinventar`): for an
-  area up to 1 deg², one point per record at the center of its place's polygon, with its hazard family, DesInventar's
-  event type, place, date and losses (deaths, missing, injured, affected, relocated, evacuated, houses destroyed and
-  damaged), colored by hazard family. At most 10,000 impact items, then truncated. Where DesInventar has nothing,
-  the layer says so.
+### 2.1 A detached item keeps a copy of its object, not a picture
 
-Measured in headless Chrome: Nepal's widget in 1.1 s (134 natural hazard disasters 1954–2026, 29.6K deaths, 43.5M
-people affected; deadliest the 2015 earthquake, 8.8K); Chitwan's DesInventar layer in 3 s (894 records). Many records
-share a ward's polygon, so they share a point: 894 records draw as about 100 dots.
+- **The copy:** `{ type, fields, view?, at }`, the object's own fields at the moment it was detached. These are recipes and references (a map's layers, an event's id, a sticky note's text and color), with `w` and `h` for its proportions, but without `id`, `x`, `y`, `z` or `link`. A map's copy also keeps the view of the person who detached it.
+- **The same renderers:** the report draws a detached item from its copy, exactly as it draws a synced one from the board. It looks as the object did.
+- **No browser step:** detaching is a plain op. It copies the fields and, for a map, the runner's saved view (`Views`). The agent can detach anything, maps included.
+- **Detached from the board, not frozen in time:** a detached event card still fetches its event's details from Montandon, and a detached country widget fetches today's figures. Pinning external data "as of" a date would be a separate option. It matters most for a shared report link or a PDF (§4).
 
-## Later
+### 2.2 What people see
 
-- The layer's span and totals in the layer list ("1971–2013 · 553 floods · 1,465 deaths"), and records spread or sized
-  by deaths where they share a place.
-- Past events near an event (GDACS, IFRC, USGS points), and a link from an event on the board to its country's
-  history filtered to its hazard.
-- DesInventar by province: its places carry no P-codes, so they would be joined to COD-AB by location.
+- **In report mode, each item's caption row has a status chip:**
+  - **Synced:** a link icon. Tooltip: "Shows *name* on the board as it is now. Edit it on the board."
+  - **Detached:** a broken-link icon. Tooltip: "A copy of *name*, made *date*. It no longer follows the board."
+- **On the canvas,** the preview stays compact, with no chips.
+- **The Options panel's item row:**
+  - **Synced / Detached:** a select, for every type.
+  - **Go to source,** while the source exists.
+  - **Remove.**
+  - **A detached item's row also has:**
+    - its **Caption**, its own title in the report
+    - for a sticky note or a text, its **Text**
+    - **Sync again:** back to the board, which drops the copy and its edits, after a confirmation
+    - **Replace with the board's version:** detach again from the source as it is now, also after a confirmation
+
+  Editing on the page itself would come with the report's page tools (step 5b).
+- **Deleting a synced item's source:** the item says "The source object was removed", with Remove. A detached item keeps showing its copy.
+
+### 2.3 First edits on a detached item
+
+Small at first: the **text** of a detached sticky note or text, and the **caption** of any detached item. Widget-specific edits (a map's view or layers, an event's choice, a country) would come later.
+
+## 3. What would change
+
+**Stored names stay** (AGENTS.md: never rename stored fields or values):
+- `mode` keeps its stored values: `'live'` means **Synced** and `'frozen'` means **Detached**. Only the UI, the op descriptions and `summarize` use the new words.
+- New optional fields on an item block:
+  - `copy`: the detached copy
+  - `caption`: a detached item's own title; a synced item's caption is always its source's name
+- The existing optional `frozen` field stays readable. A block with `frozen` and no `copy` still shows its saved text or picture.
+
+**Plugin** (`packages/plugins/src/reports.ts`):
+- **`report.setItemMode`** (op id unchanged; title "Sync or detach report item"):
+  - `frozen` (Detached) makes the copy, checked against the type's schema (`registry.objectSchema`). It fails only when the source is gone and there is no copy.
+  - `live` (Synced) relinks and drops the copy and caption.
+  - The `frozen` argument stays accepted, but is ignored.
+- **New `report.editItem`** (an agent tool too): `blockId`, `caption?`, `text?`. Only for a detached item, and `text` only for a sticky note or a text. It is a gesture op, like `text.setText`.
+- **`summarize`:** "synced", or "detached (a copy of a *type*, made *date*)".
+- **`freezeText`** and its type list go: every type can be detached.
+
+**Web** (`apps/web/src/reports/`):
+- **`ItemView`** draws `board.get(sourceId)` when synced, or an object made from `copy` when detached (with `id` set to the block's id, so it never collides with a board object).
+- **`useMapPicture`** (`map/picture.ts`) takes an optional view, for a detached map's saved view.
+- **The chips and the Options panel rows** described in §2.2.
+
+**Steps:** this would replace step 7 of `agent-docs/tasks/reports.md` ("live and frozen, map pictures") with its own PR, before the report's page tools (step 5b).
+
+## 4. Questions for reviewers
+
+1. **What does "detached" mean?** Is a copy of the object (its fields, drawn as the object) the right meaning, rather than a picture of it?
+2. **External data.** Should a detached item also pin its external data "as of" a date: the event's details, the country's figures, ReliefWeb's updates? Always, as an option, or only for a shared link or a PDF?
+3. **Deleting a source.** What should happen when a synced item's source is deleted from the board: show "removed" (as proposed), detach it automatically, or ask first when deleting an object that is in a report?
+4. **Edits.** Which edits should a detached item allow, first and later?
+5. **Words.** Do "Synced" and "Detached" work for the people who will use reports? Other candidates: "Linked / Copy", "Live / Snapshot".
+6. **The board side.** Should an object on the board show that it is in a report (for example a small badge, "In 1 report")?
