@@ -35,7 +35,10 @@ The hub writes its state (`jupyterhub.sqlite`, `jupyterhub_cookie_secret`) to th
 ## Board addresses
 
 `BOARD_ORIGINS` in `jupyterhub_config.py` lists the board addresses that may run code: `localhost` ports 5173 to
-5175 (Vite takes the next port when one is in use) and 8787 (`npm run sync`). If your board has another address,
+5175 (Vite takes the next port when one is in use) and 8787 (`npm run sync`). `BOARD_ORIGIN_PATTERNS` adds the
+deployed boards: main's Worker and every branch's (`https://humanitarian-ttx-<branch>.development-seed.workers.dev`).
+A deployed (HTTPS) board can use this local hub: browsers let an HTTPS page call `127.0.0.1`. Chrome may first ask
+you to allow the site to reach devices on your local network. If your board has another address,
 for example `http://127.0.0.1:5173`, add it as the address bar shows it (scheme, host and port), then start the hub
 again and stop your server at http://127.0.0.1:8000/hub/home, so that it starts with the new list. If the board's
 address is not in the list, the user menu shows "Cannot reach the hub".

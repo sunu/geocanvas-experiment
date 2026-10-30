@@ -14,6 +14,10 @@ BOARD_ORIGINS = [
     'http://localhost:5175',
     'http://localhost:8787',
 ]
+# The deployed boards, as regular expressions: main's Worker and every branch's (.github/scripts/worker-name.sh).
+BOARD_ORIGIN_PATTERNS = [
+    r'https://humanitarian-ttx(-[a-z0-9-]+)?\.development-seed\.workers\.dev',
+]
 
 c.JupyterHub.bind_url = 'http://127.0.0.1:8000'
 
@@ -28,7 +32,7 @@ c.Spawner.cmd = [sys.executable, '-m', 'jupyterhub.singleuser']
 
 # The board calls the hub API and the user's server from the browser: both must allow its origin (CORS).
 # A user's server checks each request's origin against this list and answers with the one that matches.
-c.Spawner.args = ['--ServerApp.allow_origin_pat=^(' + '|'.join(re.escape(o) for o in BOARD_ORIGINS) + ')$']
+c.Spawner.args = ['--ServerApp.allow_origin_pat=^(' + '|'.join([*(re.escape(o) for o in BOARD_ORIGINS), *BOARD_ORIGIN_PATTERNS]) + ')$']
 # The hub sends fixed headers, so it cannot answer per origin: '*'. This is safe here because the board sends its
 # token in a header, and browsers send no cookies on a '*' answer. A hub on a server names its one board origin.
 c.JupyterHub.tornado_settings = {
