@@ -192,21 +192,22 @@ Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ but
 
   Why: the agent edits the shared board and cannot see a private draft. With a draft, it would miss unshared edits, and Share could overwrite one side's changes, since `blocks` is replaced whole. `FocusableObjectUI` gets an option for this, for example `live: true`.
 
-### 5.1a Layout: the agent beside the report
+### 5.1a Layout: full screen, with the agent as an overlay
 
-Report mode opens with the pages **fitted to the width** of the middle column, past 100% when there is room. A **zoom control** floats at the bottom left of the pages (zoom out, the percentage with Fit width and set steps from 50% to 200%, zoom in; 25% to 300% in all), and ⌘ or Ctrl with the wheel, or a trackpad pinch, zooms the report rather than the browser page. The zoom is this person's, and resets to Fit width each time report mode opens.
+Report mode is a view of its own, not the canvas (`FocusableObjectUI.fullScreen`, `keepChat` and `live`; round 2 of 5a, 2026-10-30):
+- **The document is the main page.** It fills the screen to its edges, beside the Options panel, on white, with no dotted canvas (the canvas carries `data-focus` with the type in focus; `styles.css`). Each page has a 1 px border, square and flat.
+- **The Options panel** is on the right (§5.2). Its header shows the report's title, as the Object panel does (`panel(object, board)`); the badge says Report.
+- **The agent chat is an overlay** at the top left, over the page. It takes no room from the layout, is capped in height, and collapses to uncover the page. People ask the agent to act on the report ("add the map", "write a summary of the key figures"), and its edits appear on the pages as it makes them.
+- **Zoom:** report mode opens with the pages **fitted to the width** of the screen left of the Options panel, past 100% when there is room. A **zoom control** floats at the bottom left (zoom out, the percentage with Fit width and set steps from 50% to 200%, zoom in; 25% to 300% in all), and ⌘ or Ctrl with the wheel, or a trackpad pinch, zooms the report rather than the browser page. The zoom is this person's, and resets to Fit width each time report mode opens.
 
-Report mode is a document view, not the canvas: the dotted canvas background is off around it (the canvas carries `data-focus` with the type in focus; `styles.css`).
+### 5.1b Tools in report mode (5b)
 
-Report mode fills the screen with three parts:
-- **Left: the agent chat,** kept open so people can ask the agent to act on the report ("add the map", "write a summary of the key figures"). The agent's edits appear on the pages as it makes them.
-- **Middle: the pages,** scrolling.
-- **Right: the Options panel** (§5.2), with more in it than other widgets have.
-
-Today focus mode hides all the app's panels (`styles.css` hides `.ttx-shell` in focus) and keeps room for the Options panel on the right only (`focusArea` in `canvas/focus.ts`). Report mode needs:
-- a layout option on `FocusableObjectUI`, for example `keepChat: true`
-- `focusArea` that leaves room on the left as well
-- the chat panel shown in that mode
+Decided 2026-10-30: the tools for adding to a report are a **report toolbar at the bottom center**, in the canvas toolbar's style and place, replacing it in report mode (the canvas toolbar is hidden in focus already).
+- **Its tools:** Heading (levels 1 to 3 in its menu), Text, Image (upload a file, or pick from the board's uploads), Divider, and **Add from board** (a picker of the board's objects by type and name, which adds them as items, as Add to report does).
+- **Where a new block goes:** after the selected block, or at the end of the report when nothing is selected (`report.addBlock` with `index`).
+- **Controls on a block,** while it is hovered or selected: a drag handle to reorder (`report.moveBlock`), a one or two column toggle (`report.setSpan`), and × to remove (`report.removeBlock`; Delete removes a selected block).
+- **The Options panel** stays for the report's settings (name, page, items); later it also shows the selected block's (a heading's level, an item's live or frozen).
+- **The whole layout:** the chat overlay at the top left; the pages in the middle, white, a border on each; the zoom control at the bottom left; the report toolbar at the bottom center; the Options panel on the right.
 
 ### 5.2 Options panel
 
@@ -360,6 +361,8 @@ Made (2026-10-29, from the product owner):
 15. **Report mode keeps the agent chat open** on the left, with the Options panel on the right, and shows every page in a scrolling column (§5.1, §5.1a). 2026-10-29.
 16. **Report mode edits live, without a private draft,** so the agent and people work on the same report (§5.1). 2026-10-29.
 17. **Removing from a report happens only in report mode** (§5.2a). The canvas's Add to report menus only add, and their checks only show what is there. 2026-10-29.
+18. **Report mode is full screen,** on white with a border on each page, and **the chat is an overlay** at the top left that takes no room (5a, round 2). 2026-10-30.
+19. **Report tools go in a bottom report toolbar** that replaces the canvas toolbar in report mode; controls on a block sit on the block (§5.1b, 5b). 2026-10-30.
 
 Open:
 1. **The PDF approach:** decided by the spike (§7.4).

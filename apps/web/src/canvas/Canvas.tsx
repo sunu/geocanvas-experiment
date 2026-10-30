@@ -7,7 +7,7 @@ import { cursorSender, publishSelection, usePeers, type Awareness } from '../boa
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
-import { animateCamera, CHAT_INSET, fillCamera, focusArea, focusedLayout } from './focus'
+import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { ObjectMenu } from './ObjectMenu'
 import { ObjectPanel } from './ObjectPanel'
@@ -71,6 +71,8 @@ interface Focus {
   draft: Draft | null
   /** The type keeps the agent chat open on the left (canvas/registry.ts FocusableObjectUI). */
   keepChat: boolean
+  /** The type fills the screen to its edges (canvas/registry.ts FocusableObjectUI). */
+  fullScreen: boolean
   /** The screen area the object fills. */
   area: Rect
   /** The object's local rectangle once the zoom-in ends; null while it animates. */
@@ -502,12 +504,13 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     if (!o || !isFocusable(ui)) throw new Error(`${o ? runtime.registry.objectType(o.type)?.title : 'This object'} has no focus mode`)
     const el = rootRef.current!
     const keepChat = !!ui.keepChat
-    const area = focusArea(el.clientWidth, el.clientHeight, { left: keepChat ? CHAT_INSET : 0 })
+    const fullScreen = !!ui.fullScreen
+    const area = focusArea(el.clientWidth, el.clientHeight, { full: fullScreen })
     const saved = cameraRef.current
     setEditing(null)
     setPaletteOpen(false)
     setSelection(new Set([id]))
-    setFocus({ id, saved, draft: ui.live ? null : new Draft(runtime), keepChat, area, rect: null })
+    setFocus({ id, saved, draft: ui.live ? null : new Draft(runtime), keepChat, fullScreen, area, rect: null })
     stopAnimation.current?.()
     stopAnimation.current = animateCamera(saved, fillCamera(o, area), setCamera, () => {
       const layout = focusedLayout(o, area)
@@ -601,7 +604,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       const el = rootRef.current
       const f = focusRef.current
       if (!el || !f?.rect) return
-      const area = focusArea(el.clientWidth, el.clientHeight, { left: f.keepChat ? CHAT_INSET : 0 })
+      const area = focusArea(el.clientWidth, el.clientHeight, { full: f.fullScreen })
       const layout = focusedLayout(f.rect, area)
       setFocus({ ...f, area, rect: layout.rect })
       setCamera(layout.camera)
@@ -731,7 +734,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
           draft={focus.draft ?? undefined}
           object={focused}
           ui={focusedUI}
-          title={runtime.registry.objectType(focused.type)?.title ?? focused.type}
+          // The object's own title: its name, else what its type's panel calls it (a report's frame title), else its type.
+          title={focused.name || focusedUI.panel?.(focused, board).title || (runtime.registry.objectType(focused.type)?.title ?? focused.type)}
           onShare={() => share(focus)}
           onExit={requestExit}
           onGoTo={goTo}
@@ -750,7 +754,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
           runtime={runtime}
           chat={chat}
           object={single}
-          info={objectUI(single.type)!.panel!(single)}
+          info={objectUI(single.type)!.panel!(single, board)}
           onOpen={isFocusable(objectUI(single.type)) ? () => enterFocus(single.id) : undefined}
           onSelect={(ids) => setSelection(new Set(ids))}
           notify={setNotice}

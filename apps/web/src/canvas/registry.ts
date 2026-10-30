@@ -1,7 +1,7 @@
 import type { ComponentType, CSSProperties } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
-import type { BoardObject } from '../board/board'
+import type { Board, BoardObject } from '../board/board'
 
 export interface ObjectViewProps<O extends BoardObject = BoardObject> {
   runtime: Runtime
@@ -42,7 +42,7 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
   /** Removed when editing ends with nothing in it. */
   isEmpty?(object: O): boolean
   /** What the object panel (canvas/ObjectPanel.tsx) says about one of them when it is the only selection. A type without it has no panel. */
-  panel?(object: O): PanelInfo
+  panel?(object: O, board: Board): PanelInfo
 }
 
 /**
@@ -60,8 +60,10 @@ export interface FocusableObjectUI<O extends BoardObject = BoardObject> extends 
    * they happen. For a report, which the agent edits too, and which a draft's Share could overwrite.
    */
   live?: true
-  /** The agent chat stays open on the left in focus, so people can ask it to work on the object. */
+  /** The agent chat stays open in focus, as an overlay at the top left, so people can ask it to work on the object. */
   keepChat?: true
+  /** Focus fills the whole screen, to its edges, beside the Options panel: a view of its own (a report's document). */
+  fullScreen?: true
 }
 
 export const isFocusable = (ui: ObjectUI | undefined): ui is FocusableObjectUI => !!ui && 'Options' in ui

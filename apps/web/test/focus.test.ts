@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { toScreen } from '../src/canvas/camera'
-import { CHAT_INSET, fillCamera, focusArea, focusedLayout, PANEL_W } from '../src/canvas/focus'
+import { fillCamera, focusArea, focusedLayout, PANEL_W } from '../src/canvas/focus'
 
 describe('focus geometry', () => {
   const area = focusArea(1600, 900)
@@ -11,12 +11,12 @@ describe('focus geometry', () => {
     expect(area.h).toBeLessThan(900)
   })
 
-  it('leaves room for the agent chat on the left too, for a type that keeps it (a report)', () => {
-    const withChat = focusArea(1600, 900, { left: CHAT_INSET })
-    expect(withChat.x).toBeGreaterThan(CHAT_INSET)
-    expect(withChat.x + withChat.w).toBe(area.x + area.w)
-    expect(withChat.y).toBe(area.y)
-    expect(withChat.h).toBe(area.h)
+  it('fills the screen to its edges for a full-screen type (a report), still left of the Options panel', () => {
+    const full = focusArea(1600, 900, { full: true })
+    expect(full).toMatchObject({ x: 0, y: 0, h: 900 })
+    // Both stop one gap short of the Options panel.
+    expect(full.x + full.w).toBe(area.x + area.w)
+    expect(full.x + full.w).toBeLessThan(1600 - PANEL_W)
   })
 
   it('zooms an object until it fills the area, centered', () => {
