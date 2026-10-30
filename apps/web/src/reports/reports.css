@@ -507,9 +507,11 @@
   font-weight: 400;
 }
 
-/* The Options panel's Export button (reports/ReportOptions.tsx). */
+/* Export at the foot of a report's Options panel (reports/ReportOptions.tsx ReportOptionsFooter). */
 .ttx-reportopts__export {
   display: inline-flex;
+  flex: 1;
+  justify-content: center;
   align-items: center;
   gap: 6px;
   padding: 6px 10px;

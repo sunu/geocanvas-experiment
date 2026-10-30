@@ -61,13 +61,6 @@ export function ReportOptions({ runtime, object: r, onGoTo }: ObjectViewProps<Re
         </div>
       </section>
       <section className="ttx-options__section">
-        <h3>Export</h3>
-        <button type="button" className="ttx-reportopts__export" onClick={startPrint} title="Print the report, or save it as a PDF from the print dialog (⌘P)">
-          <PrinterIcon size={14} aria-hidden />
-          Print or save as PDF
-        </button>
-      </section>
-      <section className="ttx-options__section">
         <h3>Items</h3>
         {r.blocks.length ? (
           <ul className="ttx-reportopts__items">
@@ -116,5 +109,15 @@ export function ReportOptions({ runtime, object: r, onGoTo }: ObjectViewProps<Re
         )}
       </section>
     </>
+  )
+}
+
+/** The foot of a report's Options panel: Export, always in sight below the items, however long the list. */
+export function ReportOptionsFooter() {
+  return (
+    <button type="button" className="ttx-reportopts__export" onClick={startPrint} title="Print the report, or save it as a PDF from the print dialog (⌘P)">
+      <PrinterIcon size={14} aria-hidden />
+      Print or save as PDF
+    </button>
   )
 }

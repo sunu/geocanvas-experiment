@@ -2,7 +2,7 @@ import { FileTextIcon } from '@phosphor-icons/react'
 import type { Board } from '../board/board'
 import { registerObjectUI, registerWidget } from '../canvas/registry'
 import { ReportObject } from './ReportObject'
-import { ReportOptions } from './ReportOptions'
+import { ReportOptions, ReportOptionsFooter } from './ReportOptions'
 import { boardReports, titleOf } from './reports'
 
 /**
@@ -12,6 +12,7 @@ import { boardReports, titleOf } from './reports'
 registerObjectUI('report', {
   View: ReportObject,
   Options: ReportOptions,
+  OptionsFooter: ReportOptionsFooter,
   live: true,
   keepChat: true,
   fullScreen: true,

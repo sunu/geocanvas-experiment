@@ -228,7 +228,7 @@ Decided 2026-10-30: the tools for adding to a report are a **report toolbar at t
 - The report's **name** (`core.object.rename`).
 - **Paper** (A4 or Letter) and **orientation** (portrait or landscape).
 - **Items:** every block, in report order, by icon and name (`blockLabel` and `blockIcon` in `reports/reports.ts`, which the dragged block uses too): a heading's or a text's words, an image's file name, Divider, Page break, an item's object. Its name goes to the block on the page (scrolled into view and selected; `showBlock` in `reports/editing.tsx`). Each has **Remove**; an item also has a **Live / Frozen** switch and **Go to source** (leaves focus and selects the object).
-- **Export:** Print or save as PDF (§7.5), also ⌘P in report mode.
+- **Export,** at the foot of the panel, always in sight below the items: Print or save as PDF (§7.5), also ⌘P in report mode.
 - **Share link** (§8).
 
 ### 5.2a Removing from a report
@@ -323,7 +323,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
 ### 7.5 Print and save as PDF (built, option 1)
 
 Built on `feat/report-print` (`reports/ReportPrint.tsx`, `reports/print.ts`, print rules in `reports/reports.css`):
-- **Where:** the Options panel's **Print or save as PDF**, or ⌘P in report mode, which no longer prints the app's screen. People pick "Save as PDF" in the dialog for a file.
+- **Where:** **Print or save as PDF** at the foot of the Options panel, or ⌘P in report mode, which no longer prints the app's screen. People pick "Save as PDF" in the dialog for a file.
 - **The print view:** every page at scale 1, portaled into the body, out of sight on screen and the only thing shown in print. It is read-only: report mode's editing context is cut off, since context passes through the portal, so no controls, placeholders or page break labels print.
   - **Paper:** `@page` takes the report's paper at its physical size (210 × 297 mm, 8.5 × 11 in, turned for landscape) with no margin. The pages carry their own margins, and the browser's header and footer go.
   - **Sheets:** each sheet is that size too, so A4's 1122.5 px does not push an empty page after every sheet.

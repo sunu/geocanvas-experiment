@@ -120,6 +120,14 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   padding: 4px 14px 14px;
 }
 
+/* Actions at the foot of the panel, below the body that scrolls (registry.ts OptionsFooter). */
+.ttx-options__footer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--ttx-border);
+}
+
 .ttx-options__section h3 {
   margin: 14px 0 6px;
   color: var(--ttx-muted);
