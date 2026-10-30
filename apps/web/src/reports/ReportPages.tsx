@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { EditableBlock, paragraphs, useReportEditing } from './editing'
 import { SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
@@ -8,7 +8,14 @@ import { ObjectLabelSlot, ObjectNameContext } from '../canvas/ObjectHeader'
 import { objectUI } from '../canvas/registry'
 import { useMapPicture } from '../map/picture'
 import { fitItem, paginate, rowsOf, type Piece, type Row, type RowSize } from './pages'
+import { printRatio } from './print'
 import { labelOf, titleOf } from './reports'
+
+/**
+ * True inside the print view (ReportPrint.tsx): maps are drawn at print resolution, and a notebook shows its summary
+ * card, since the page it embeds does not print.
+ */
+export const Printing = createContext(false)
 
 /** A page's margin, the space between rows, and between the two columns, in CSS px (reports/reports.css .ttx-report__*). */
 const MARGIN = 56
@@ -273,6 +280,7 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
  * the block and read-only. A caption names it. A removed source says so.
  */
 function ItemView({ block: b, source, runtime, width, maxHeight, measuring, full }: BlockProps & { block: Extract<Block, { kind: 'item' }>; source: AnyObject | undefined }) {
+  const printing = useContext(Printing)
   if (b.mode === 'frozen' && b.frozen) {
     const f = b.frozen
     return (
@@ -319,7 +327,7 @@ function ItemView({ block: b, source, runtime, width, maxHeight, measuring, full
       ) : isMap ? (
         <MapPicture runtime={runtime} map={source as MapBoardObject} width={shownWidth} height={height} />
       ) : (
-        <EmbeddedView runtime={runtime} source={source} width={shownWidth} height={height} />
+        <EmbeddedView runtime={runtime} source={printing && source.type === 'notebook' ? ({ ...source, view: 'card' } as AnyObject) : source} width={shownWidth} height={height} />
       )}
     </figure>
   )
@@ -334,7 +342,9 @@ const FROZEN_CHROME_H = 64
 
 /** A map in a report: a picture of it as this person sees it, and its credits, which a picture does not carry. */
 function MapPicture({ runtime, map, width, height }: { runtime: Runtime; map: MapBoardObject; width: number; height: number }) {
-  const { url, credits } = useMapPicture(runtime, map)
+  // For print, the same picture drawn sharper: about 300 dpi at the width it is printed.
+  const print = useContext(Printing)
+  const { url, credits } = useMapPicture(runtime, map, print ? { pixelRatio: printRatio(map.w, map.h - MAP_HEADER_PX, width) } : {})
   return (
     <>
       {url ? <img className="ttx-report__map" src={url} alt="" draggable={false} style={{ width, height }} /> : <div className="ttx-report__map is-loading" style={{ width, height }} />}

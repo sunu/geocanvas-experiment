@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: steps 2 to 5 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder; text that goes on over pages, page breaks, every block in the Options panel's list); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: steps 2 to 5 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder; text that goes on over pages, page breaks, every block in the Options panel's list), and step 8's first part: print and save as PDF through the browser's print dialog (§7.5). The rest of step 1 (PDF spike: options 2–4) waits on approvals and a cost decision. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -228,7 +228,7 @@ Decided 2026-10-30: the tools for adding to a report are a **report toolbar at t
 - The report's **name** (`core.object.rename`).
 - **Paper** (A4 or Letter) and **orientation** (portrait or landscape).
 - **Items:** every block, in report order, by icon and name (`blockLabel` and `blockIcon` in `reports/reports.ts`, which the dragged block uses too): a heading's or a text's words, an image's file name, Divider, Page break, an item's object. Its name goes to the block on the page (scrolled into view and selected; `showBlock` in `reports/editing.tsx`). Each has **Remove**; an item also has a **Live / Frozen** switch and **Go to source** (leaves focus and selects the object).
-- **Export PDF** (§7).
+- **Export:** Print or save as PDF (§7.5), also ⌘P in report mode.
 - **Share link** (§8).
 
 ### 5.2a Removing from a report
@@ -316,7 +316,32 @@ Export must be reliable: what prints is what the report shows.
 
 ### 7.4 The spike (step 1)
 
+Partly answered by building option 1 (§7.5): our own pagination (`reports/pages.ts`) puts every block on real pages, so page breaks did not need Paged.js, and Chrome's print gives the report as on screen. Still to compare: option 2 (a download with no dialog, which needs the Workers paid plan) and Safari's print.
+
 Make one test report: a map, an image, rich text, two columns with one full-width block, two pages, and a landscape version. Export it with options 1, 2, 3 and 4 (react-pdf). Compare the results against §7.1, record them here with the PDFs, and decide.
+
+### 7.5 Print and save as PDF (built, option 1)
+
+Built on `feat/report-print` (`reports/ReportPrint.tsx`, `reports/print.ts`, print rules in `reports/reports.css`):
+- **Where:** the Options panel's **Print or save as PDF**, or ⌘P in report mode, which no longer prints the app's screen. People pick "Save as PDF" in the dialog for a file.
+- **The print view:** every page at scale 1, portaled into the body, out of sight on screen and the only thing shown in print. It is read-only: report mode's editing context is cut off, since context passes through the portal, so no controls, placeholders or page break labels print.
+  - **Paper:** `@page` takes the report's paper at its physical size (210 × 297 mm, 8.5 × 11 in, turned for landscape) with no margin. The pages carry their own margins, and the browser's header and footer go.
+  - **Sheets:** each sheet is that size too, so A4's 1122.5 px does not push an empty page after every sheet.
+  - **Colors:** they print as on screen (`print-color-adjust: exact`).
+- **Maps are drawn again for print.** The same area as the report shows, at about 300 dpi of their printed width (`printRatio`), within 4096 px a side and at least 2×. The snapshot renderer takes a `pixelRatio` per request (MapLibre's `setPixelRatio` and deck.gl's `useDevicePixels`); screen pictures are unchanged.
+- **Waiting:** the print dialog opens once every map picture is drawn, every image has loaded, and no item's source is loading (`isLoading`), twice in a row. A status says what it waits for, with Cancel.
+  - After 60 s it prints what there is and says how many maps were not ready.
+  - A board map of 600 px wide printed full width took under a second once its tiles were cached.
+- **Notebooks print their summary card** (title, template, files): the notebook page they embed does not print.
+- **Checked** with Chromium's PDF output (the dialog's engine), for A4 portrait, A4 landscape and Letter:
+  - as many pages as report mode, each at the paper's size, no empty page
+  - real text, page numbers
+  - the map at more than 3× its CSS width
+  - nothing from editing printed
+- **Not done:**
+  - a download with no dialog (option 2)
+  - a check in Safari and Firefox
+  - maps whose tiles never load print as blank areas after the 60 s limit
 
 ## 8. The report URL
 
@@ -348,7 +373,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
    - report renderers and `freeze` for each type
    - the high-resolution map PNG export
    - keeping report pictures out of the Uploads gallery (a new upload kind, or a flag)
-8. **PDF export,** as the spike decided.
+8. **PDF export:** print and save as PDF built (§7.5); a download with no dialog (option 2) waits on the spike and a cost decision.
 9. **The report URL:** publish, frozen and live, unpublish.
 10. **The agent drafts a report:** from the board (`summarizeBoard`) with the report ops. This is PRD 4.5, "Summarize the board into a report".
 
