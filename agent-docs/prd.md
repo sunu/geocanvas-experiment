@@ -98,6 +98,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Room agent in the Durable Object | Built | OpenRouter tool loop, 12 model calls per turn, 20 turns per room per hour. Undo per turn. |
 | Bring your own key in the browser | Built | Key stays in localStorage and goes only to the provider. |
+| Phone layout: Ask, the board as a list, widgets full screen, reports; installable (PWA) | Experiment (plan-018) | Same ops, widgets and focus drafts as the canvas. Not yet checked on real phones. |
 | External agents through the MCP companion | Built | Local only. Tools are the tab's ops and read-only tools. |
 | Add, remove and edit every widget | Ongoing rule | Holds as long as every change is an op. Check it for each new widget. |
 | Summarize the board into a report | Next (with reports) | `summarizeBoard` exists for prompts. Step 10 of `agent-docs/tasks/reports.md`. |

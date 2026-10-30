@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import { DEFAULT_PORT, TOKEN_FILE } from '../mcp/src/pairing.ts'
 import { mdText } from '../../packages/plugins/mdText.ts'
+import { buildVersion, precacheList, type BundleFile } from './src/pwa/precache.ts'
 
 /**
  * In dev, hands the app's own pages the MCP companion's saved pairing token (apps/mcp/src/pairing.ts), so a tab pairs
@@ -30,8 +31,22 @@ const mcpPairing: Plugin = {
   },
 }
 
+/**
+ * The service worker (src/pwa/sw.js), written into the build as /sw.js with the build's version and the files to cache
+ * when it installs (src/pwa/precache.ts). Not in dev: it is registered in production builds only.
+ */
+const serviceWorker: Plugin = {
+  name: 'ttx-service-worker',
+  apply: 'build',
+  generateBundle(_options, bundle) {
+    const files = bundle as unknown as Record<string, BundleFile>
+    const head = `const VERSION = ${JSON.stringify(buildVersion(files))}\nconst PRECACHE = ${JSON.stringify(precacheList(files))}\n`
+    this.emitFile({ type: 'asset', fileName: 'sw.js', source: head + readFileSync(new URL('./src/pwa/sw.js', import.meta.url), 'utf8') })
+  },
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), mcpPairing, mdText],
+  plugins: [react(), tailwindcss(), mcpPairing, mdText, serviceWorker],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     port: 5173,

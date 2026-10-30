@@ -65,6 +65,9 @@ export function registerObjectUI<T extends BoardObject['type']>(type: T, ui: Obj
 
 export const objectUI = (type: string): ObjectUI | undefined => uis.get(type)
 
+/** What to call an object where its view is not there to show it: its name, else its type's. */
+export const objectName = (runtime: Runtime, o: { name?: string; type: string }) => o.name || runtime.registry.objectType(o.type)?.title || o.type
+
 /** Types with a tool, in the order they registered. */
 export const toolTypes = () => [...uis].filter(([, ui]) => ui.tool).map(([type, ui]) => ({ type, ...ui.tool! }))
 

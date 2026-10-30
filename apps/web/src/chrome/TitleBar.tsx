@@ -10,7 +10,7 @@ import { useBoardTitle } from '../board/connect'
 const MAX_TITLE = 80
 
 /** The board's name, for everyone. Click to rename it (board.setTitle). */
-function BoardTitle({ runtime }: { runtime: Runtime }) {
+export function BoardTitle({ runtime }: { runtime: Runtime }) {
   const title = useBoardTitle(runtime.board)
   const [editing, setEditing] = useState(false)
   if (!editing) {
