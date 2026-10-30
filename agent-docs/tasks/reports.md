@@ -333,6 +333,7 @@ Built on `feat/report-print` (`reports/ReportPrint.tsx`, `reports/print.ts`, pri
   - After 60 s it prints what there is and says how many maps were not ready.
   - A board map of 600 px wide printed full width took under a second once its tiles were cached.
 - **Notebooks print their summary card** (title, template, files): the notebook page they embed does not print.
+- **No widget captions or frame headings in print** (decided 2026-10-30): the icon and name above each item, and the heading a frame's item shows, name things on the board, which a reader of the page does not need. They stay in report mode. Without them a printed report can take less room, so it can have fewer pages than report mode shows. People add their own headings where a section needs one.
 - **Checked** with Chromium's PDF output (the dialog's engine), for A4 portrait, A4 landscape and Letter:
   - as many pages as report mode, each at the paper's size, no empty page
   - real text, page numbers

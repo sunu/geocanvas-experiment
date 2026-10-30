@@ -50,7 +50,10 @@ export function ReportPages({
   footer(page: number, count: number): ReactNode
 }) {
   const page = pageSize(r.paper, r.orientation)
-  const rows = rowsOf(r.blocks)
+  // In print, a frame's heading is left out with the widgets' captions: the page reads as a document, not the board.
+  const printing = useContext(Printing)
+  const blocks = printing ? r.blocks.filter((b) => !(b.kind === 'item' && board.get(b.sourceId)?.type === 'frame')) : r.blocks
+  const rows = rowsOf(blocks)
   const title = titleOf(board, r)
   const measure = useRef<HTMLDivElement>(null)
   const [sizes, setSizes] = useState<{ title: number; rows: RowSize[] }>({ title: 0, rows: [] })
@@ -60,7 +63,7 @@ export function ReportPages({
     if (!el) return
     const read = () => {
       const [t, ...rs] = [...el.children] as HTMLElement[]
-      const next = { title: t?.offsetHeight ?? 0, rows: rs.map((row, i) => sizeOf(row, (rows[i] ?? []).map((b) => r.blocks[b]!))) }
+      const next = { title: t?.offsetHeight ?? 0, rows: rs.map((row, i) => sizeOf(row, (rows[i] ?? []).map((b) => blocks[b]!))) }
       setSizes((s) => (JSON.stringify(s) === JSON.stringify(next) ? s : next))
     }
     read()
@@ -83,7 +86,7 @@ export function ReportPages({
         key={piece ? `${row.join()}:${piece.from}` : row.join()}
         row={row}
         piece={piece && { from: piece.from, to: piece.to, height }}
-        blocks={r.blocks}
+        blocks={blocks}
         board={board}
         runtime={runtime}
         contentWidth={contentWidth}
@@ -107,7 +110,7 @@ export function ReportPages({
           <div className="ttx-report__page" style={{ width: page.w, height: page.h, transform: `scale(${scale})` }}>
             <div className="ttx-report__content">
               {n === 0 && <h1 className="ttx-report__title">{title}</h1>}
-              {n === 0 && !r.blocks.length && <p className="ttx-report__empty">Drop objects here, or use Add to report</p>}
+              {n === 0 && !blocks.length && <p className="ttx-report__empty">Drop objects here, or use Add to report</p>}
               {pieces.map((piece) => rowView(rows[piece.row]!, piece))}
             </div>
             <div className="ttx-report__count">{footer(n + 1, pages.length)}</div>
@@ -313,15 +316,18 @@ function ItemView({ block: b, source, runtime, width, maxHeight, measuring, full
   const isMap = source.type === 'map'
   // The widget's own proportions (a map's picture leaves out its header), to the block's width; but never taller than
   // a page has room for, under the caption (and a map's credits): then smaller, centered in the block, still in proportion.
+  // A printed report has no captions: they name the widget on the board, which a reader of the page does not need.
   const ratio = (isMap ? source.h - MAP_HEADER_PX : source.h) / source.w
-  const room = maxHeight - CAPTION_H - (isMap ? CREDITS_H : 0)
+  const room = maxHeight - (printing ? 0 : CAPTION_H) - (isMap ? CREDITS_H : 0)
   const { width: shownWidth, height } = fitItem(width, ratio, room)
   return (
     <figure className="ttx-report__item">
-      <figcaption className="ttx-report__caption">
-        <Icon size={14} aria-hidden />
-        <span>{label}</span>
-      </figcaption>
+      {!printing && (
+        <figcaption className="ttx-report__caption">
+          <Icon size={14} aria-hidden />
+          <span>{label}</span>
+        </figcaption>
+      )}
       {measuring ? (
         <div style={{ height: height + (isMap ? CREDITS_H : 0) }} />
       ) : isMap ? (
