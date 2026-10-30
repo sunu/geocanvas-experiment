@@ -1,5 +1,7 @@
 # Plan 011: who is who on the canvas
 
+Status: built, in `main`; a color of one's own per person and the avatar list added in PR #100.
+
 Colors and marks that tell people apart on the board: what you have selected, what others have selected, where their
 pointers are, and where the agent has worked. Design source: the "Collaborator styles" frame of the Figma file
 (Atlantis Pod Week Hack, AHD TTX). Implemented in `apps/web/src/canvas/Peers.tsx`, `board/collaborators.ts` and the
@@ -56,7 +58,7 @@ pointers are, and where the agent has worked. Design source: the "Collaborator s
 
 ## Not done
 
-- Object name labels above selections (the Figma frame shows one; objects have no names yet).
+- Object name labels above selections (the Figma frame shows one). Objects now have names (`core.object.rename`), so this can be built.
 - Updating the Figma frame to the violet agent.
 
 ## Avatars

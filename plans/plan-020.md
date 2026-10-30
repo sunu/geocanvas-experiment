@@ -3,7 +3,7 @@
 What has happened here before: a country's disasters since 1900, and the local losses of past disasters in an area,
 from Montandon's EM-DAT and DesInventar collections. Two parts: a widget for a country, and a map layer for an area.
 
-Status: built on `feat/area-history`.
+Status: built, in `main` (PR #92).
 
 ## Spike (2026-10-30, Montandon staging)
 
