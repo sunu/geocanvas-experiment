@@ -104,7 +104,8 @@ export function CodeFootnote({ runtime, object }: { runtime: Runtime; object: Bo
                   onClick={() => pin(isOpen && focus.pinned ? undefined : r.element)}
                 >
                   <span>{r.source.layer?.title ?? object.type}</span>
-                  <span className="ttx-codenote__cell">{r.cell ? r.cell.title : 'deleted cell'}</span>
+                  {/* The cell's title, unless the layer is named as the cell (as code.add names it). */}
+                  <span className="ttx-codenote__cell">{!r.cell ? 'deleted cell' : r.cell.title !== r.source.layer?.title ? r.cell.title : ''}</span>
                   {FLAGS[r.state.state] && <span className="ttx-codenote__flag">{FLAGS[r.state.state]}</span>}
                 </button>
                 {isOpen && <Details runtime={runtime} object={object} {...r} />}

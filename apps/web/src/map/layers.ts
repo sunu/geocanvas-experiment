@@ -139,7 +139,7 @@ const DRAW_ORDER: Record<string, number> = { 'geo.tiles': 0, 'geo.raster': 1, [G
 const drawOrder = (s: LayerState) => DRAW_ORDER[s.output ?? ''] ?? 2
 
 /** The canvas accent (Tailwind cyan-500, --canvas-accent): a hovered feature of a code layer. */
-const ACCENT: [number, number, number, number] = [6, 182, 212, 200]
+const ACCENT: [number, number, number, number] = [6, 182, 212, 90]
 
 /**
  * deck.gl layers for the layers that have a result, by kind of result. Tiles, rasters and grids draw below features.

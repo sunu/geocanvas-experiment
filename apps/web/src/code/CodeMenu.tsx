@@ -58,10 +58,10 @@ export function CodeMenu({ runtime, cell, notify, onSelect }: { runtime: Runtime
               <ContextMenuCheckboxItem
                 key={o.id}
                 checked={shown.has(o.id)}
-                disabled={shown.has(o.id)}
                 onPointerEnter={() => emphasize('menu', [o.id])}
                 onFocus={() => emphasize('menu', [o.id])}
-                onSelect={() => void show({ on: o.id }, label)}
+                // Not disabled, so hovering still points it out.
+                onSelect={() => (shown.has(o.id) ? notify(`${label} already shows this output`) : void show({ on: o.id }, label))}
               >
                 {label}
               </ContextMenuCheckboxItem>
