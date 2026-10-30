@@ -13,7 +13,8 @@ export type Awareness = WebsocketProvider['awareness']
  * works (apps/worker/src/worker.ts), with no cursor or selection. A person's presence has `status`
  * while the agent in their browser works on their own key (agent/browserAgent.ts). An agent's cursor is
  * worked out in each browser from the op log instead (canvas/agentCursor.ts); presence only says what the agent
- * does now (`activity`: thinking, or a tool's title) and, for the room's agent, whom it works for (`for`).
+ * does now (`activity`: thinking, or a tool's title) and, for the room's agent, whom it works for (`for`). `hub: true`
+ * says the tab has a working JupyterHub login, so the room's agent may ask it to run code (code/relay.ts); never the login.
  */
 
 /** One person's (or the agent's) shared state, as this browser receives it. */

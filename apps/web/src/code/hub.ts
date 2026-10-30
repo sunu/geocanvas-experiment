@@ -79,12 +79,10 @@ export const hubSession = () => (state.status === 'ready' ? session : null)
 
 export const hubState = () => state
 
-export function useHub(): HubState {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => state,
-  )
+/** Called on every change of the login's state; returns the unsubscribe. */
+export function subscribeHub(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
 }
+
+export const useHub = (): HubState => useSyncExternalStore(subscribeHub, () => state)

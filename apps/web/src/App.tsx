@@ -8,6 +8,7 @@ import { roomFromHash } from './board/room'
 import { Canvas } from './canvas/Canvas'
 import { TitleBar } from './chrome/TitleBar'
 import { UserMenu } from './chrome/UserMenu'
+import { startRelay } from './code/relay'
 import { takePending, type PendingSetup } from './home/pending'
 import { recordBoard } from './home/recents'
 import { startBridge, useBridgeStatus } from './mcp/bridge'
@@ -24,6 +25,8 @@ const { board, runtime, provider, chat, uploads } = connect(room)
 setAgentChat(chat)
 // Answers only the messages this tab sends on the person's own key; idle otherwise.
 startBrowserAgent(provider.doc, provider.awareness)
+// The room's agent runs code through this tab, on this person's own JupyterHub login (plans/plan-020.md).
+startRelay(provider, chat)
 // On a local app paired with the MCP companion (apps/mcp): an external agent works on this board through this tab.
 void startBridge(
   () =>
