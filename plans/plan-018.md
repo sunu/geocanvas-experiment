@@ -4,7 +4,7 @@ A layout for phones on the same board, runtime and ops as the canvas, AI-first a
 asking the agent and reading what is there, and anyone on it can still change anything. The canvas stays as it is;
 an installable PWA comes after, as an optimization.
 
-Status: experiment, on phone-sized screens only. Steps 1 to 7 are built; step 4 was checked in Chromium with touch emulation, not yet on real phones.
+Status: experiment, in `main` (PR #87), on phone-sized screens only. Steps 1 to 7 are built; step 4 was checked in Chromium with touch emulation, not yet on real phones.
 
 ## Decisions
 

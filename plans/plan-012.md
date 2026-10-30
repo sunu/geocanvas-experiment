@@ -1,6 +1,6 @@
 # Plan 012 — Templates: a set of nodes from a few seeds
 
-Date: 2026-10-29. Status: phase 1 built (framework, sit rep, conflict explorer). Optional seeds and the New board dialog added in PR #55 (`agent-docs/tasks/board-templates.md`). Phase 2 (linking) not started.
+Date: 2026-10-29. Status: phase 1 built (framework, sit rep, conflict explorer). Optional seeds and the New board dialog added in PR #55 (`agent-docs/tasks/board-templates.md`). Phase 2 (linking) was built differently, as links and frames (plan-013): followers carry a `link` to a root instead of a `template` object.
 
 ## 1. Outcome
 

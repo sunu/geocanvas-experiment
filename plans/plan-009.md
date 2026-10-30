@@ -1,6 +1,6 @@
 # Plan 009 — Bring your own key: a browser agent beside the room agent
 
-Date: 2026-10-28. Status: implemented on `feat/byok-agent`.
+Date: 2026-10-28. Status: built, in `main` (PR #30).
 
 ## 1. Why
 

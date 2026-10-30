@@ -1,5 +1,7 @@
 # Plan 014: scenario routing on maps
 
+Status: built, in `main` (PR #58); needs refinement (PRD 4.3). Exposure and flood depth followed in plan-015 and plan-016.
+
 Routes on a map, found in the browser, that go around closed roads, so people can ask: "if this bridge is out and this
 area is flooded, how do trucks get from the port to the hospital, and how much longer does it take?" Implemented in
 `apps/web/src/routing/` (engine, worker, tool, UI), the map plugin (`packages/plugins/src/mapScenario.ts`, `blocks` on
