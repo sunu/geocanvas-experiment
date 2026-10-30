@@ -43,9 +43,13 @@ export function connector(from: Rect, to: Rect): { start: Point; end: Point; pat
  */
 export function Links({ objects, byId, selected, style }: { objects: BoardObject[]; byId: Map<string, BoardObject>; selected: Set<string>; style?: CSSProperties }) {
   const links = objects.flatMap((o) => {
-    const root = o.link && byId.get(o.link.from)
-    if (!root || contains(o, root) || contains(root, o)) return []
-    return [{ id: o.id, root, follower: o, on: selected.has(o.id) || selected.has(root.id) }]
+    // A link, or a map's layers made by code cells (plans/plan-018.md): an arrow from each cell.
+    const roots = o.link ? [o.link.from] : o.type === 'map' ? [...new Set((o.layers ?? []).flatMap((l) => l.from ?? []))] : []
+    return roots.flatMap((from) => {
+      const root = byId.get(from)
+      if (!root || contains(o, root) || contains(root, o)) return []
+      return [{ id: `${o.id}:${from}`, root, follower: o, on: selected.has(o.id) || selected.has(root.id) }]
+    })
   })
   if (!links.length) return null
   return (

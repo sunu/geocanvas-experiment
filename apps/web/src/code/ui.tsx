@@ -1,6 +1,7 @@
 import { TerminalWindowIcon } from '@phosphor-icons/react'
-import { registerObjectUI } from '../canvas/registry'
+import { registerDecoration, registerObjectUI } from '../canvas/registry'
 import { CodeObject } from './CodeObject'
+import { CodeFootnote } from './Footnote'
 
 registerObjectUI('code', {
   View: CodeObject,
@@ -16,3 +17,5 @@ registerObjectUI('code', {
     ],
   }),
 })
+
+registerDecoration(CodeFootnote)

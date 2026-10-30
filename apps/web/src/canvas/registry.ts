@@ -65,6 +65,12 @@ export function registerObjectUI<T extends BoardObject['type']>(type: T, ui: Obj
 
 export const objectUI = (type: string): ObjectUI | undefined => uis.get(type)
 
+/** UI drawn with every object, from a plugin's UI: e.g. a code cell's footnote on what shows its output (code/Footnote.tsx). */
+export type Decoration = ComponentType<{ runtime: Runtime; object: BoardObject }>
+const decorations: Decoration[] = []
+export const registerDecoration = (decoration: Decoration) => void decorations.push(decoration)
+export const objectDecorations = (): readonly Decoration[] => decorations
+
 /** Types with a tool, in the order they registered. */
 export const toolTypes = () => [...uis].filter(([, ui]) => ui.tool).map(([type, ui]) => ({ type, ...ui.tool! }))
 

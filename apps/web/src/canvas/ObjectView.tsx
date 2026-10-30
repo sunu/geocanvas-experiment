@@ -4,7 +4,7 @@ import type { BoardObject } from '../board/board'
 import type { Rect } from './camera'
 import { ObjectLabelSlot, ObjectNameContext } from './ObjectHeader'
 import { ObjectIdContext } from './loading'
-import { objectUI } from './registry'
+import { objectDecorations, objectUI } from './registry'
 
 interface Props {
   runtime: Runtime
@@ -59,6 +59,7 @@ export function ObjectView({ runtime, object: o, layer, editing, selected, arriv
           </ObjectLabelSlot.Provider>
         )
       )}
+      {known && !focused && objectDecorations().map((Decoration, i) => <Decoration key={i} runtime={runtime} object={o} />)}
       {busy !== undefined && (
         <div className="ttx-obj__busy" role="status">
           <div className="ttx-obj__busy-label">

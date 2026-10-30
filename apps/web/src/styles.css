@@ -2245,6 +2245,102 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   fill: #0e7490;
 }
 
+/* A code cell's footnote under what shows its output (code/Footnote.tsx): counter-scaled like the label, so it
+   reads the same at any zoom. */
+.ttx-codenote {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max(calc(100% * var(--ttx-zoom, 1)), 360px);
+  padding-top: 4px;
+  transform: scale(calc(1 / var(--ttx-zoom, 1)));
+  transform-origin: 0 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.ttx-codenote__item {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.ttx-codenote__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttx-codenote__flag {
+  padding: 0 4px;
+  white-space: nowrap;
+  border: 1px solid #f59e0b;
+  color: #b45309;
+}
+
+.ttx-codenote__item.is-behind .ttx-codenote__head {
+  color: #b45309;
+}
+
+.ttx-codenote__body {
+  width: 420px;
+  max-width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+}
+
+.ttx-codenote__state {
+  margin: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ttx-border);
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.ttx-codenote__code .ttx-code__source,
+.ttx-codenote__code .ttx-code__editing {
+  max-height: 220px;
+}
+
+.ttx-codenote__actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.ttx-codenote__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttx-codenote__actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ttx-layers__code {
+  vertical-align: -1px;
+}
+
 /* The run picker in a notebook's Options panel, which scrolls: the list scrolls inside a fixed height. */
 .ttx-nbopts__picker {
   display: flex;
