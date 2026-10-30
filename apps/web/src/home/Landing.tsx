@@ -35,7 +35,7 @@ function OpenBoardForm({ autoFocus }: { autoFocus?: boolean }) {
   )
 }
 
-/** Open board in the heading row, on every landing page: the same form, in a popover. */
+/** Open board in the heading row, when boards are listed: the same form, in a popover. */
 function OpenBoardButton() {
   return (
     <Popover>
@@ -45,7 +45,7 @@ function OpenBoardButton() {
           Open board
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="flex w-96 flex-col gap-2">
+      <PopoverContent align="end" className="flex w-96 max-w-[calc(100vw-2rem)] flex-col gap-2">
         <p className="text-sm font-medium">Board ID or URL</p>
         <OpenBoardForm autoFocus />
       </PopoverContent>
@@ -68,16 +68,19 @@ export function Landing({ startNew }: { startNew: boolean }) {
         <img src={logo} alt="" className="size-8" />
         <span className="font-medium">Humanitarian TTX</span>
       </header>
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-8 py-10">
-        <div className="flex items-center justify-between gap-4">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">Boards</h1>
-          <div className="flex items-center gap-2">
-            <OpenBoardButton />
-            <Button onClick={() => setCreating(true)}>
-              <PlusIcon />
-              New board
-            </Button>
-          </div>
+          {/* With no boards yet, the empty page below has both actions; here they would be there twice. */}
+          {boards.length > 0 && (
+            <div className="flex items-center gap-2">
+              <OpenBoardButton />
+              <Button onClick={() => setCreating(true)}>
+                <PlusIcon />
+                New board
+              </Button>
+            </div>
+          )}
         </div>
         {boards.length ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6">
