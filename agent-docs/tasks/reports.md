@@ -194,6 +194,8 @@ Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ but
 
 ### 5.1a Layout: the agent beside the report
 
+Report mode opens with the pages **fitted to the width** of the middle column, past 100% when there is room. A **zoom control** floats at the bottom right of the pages (zoom out, the percentage with Fit width and set steps from 50% to 200%, zoom in; 25% to 300% in all), and ⌘ or Ctrl with the wheel, or a trackpad pinch, zooms the report rather than the browser page. The zoom is this person's, and resets to Fit width each time report mode opens.
+
 Report mode is a document view, not the canvas: the dotted canvas background is off around it (the canvas carries `data-focus` with the type in focus; `styles.css`).
 
 Report mode fills the screen with three parts:

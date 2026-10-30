@@ -1,5 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { FileTextIcon } from '@phosphor-icons/react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { CheckIcon, FileTextIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { pageSize, type ReportBoardObject } from '@ttx/plugins'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
@@ -48,10 +50,20 @@ export function ReportObject({ runtime, object: r, focused, onFocus }: ObjectVie
   )
 }
 
-/** Every page, in a column that scrolls (the canvas leaves the wheel alone in focus), no wider than the area. */
+/** Zoom steps in report mode, and its limits; `fit` fills the column's width. */
+const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2]
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 3
+type Zoom = 'fit' | number
+
+/**
+ * Every page, in a column that scrolls (the canvas leaves the wheel alone in focus). It opens fitted to the column's
+ * width, as large as the page can be there; the zoom control and ⌘/Ctrl + wheel (a trackpad pinch) zoom in and out.
+ */
 function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoardObject; board: Board; runtime: ObjectViewProps['runtime']; pageWidth: number }) {
   const column = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
+  const [zoom, setZoom] = useState<Zoom>('fit')
   useLayoutEffect(() => {
     const el = column.current
     if (!el) return
@@ -60,10 +72,69 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
     setWidth(el.clientWidth)
     return () => observer.disconnect()
   }, [])
-  const scale = width ? Math.min(1, (width - 2 * SHEET_PAD) / pageWidth) : 1
+  const fit = width ? Math.max(MIN_ZOOM, (width - 2 * SHEET_PAD) / pageWidth) : 1
+  const scale = zoom === 'fit' ? fit : zoom
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
+
+  // ⌘/Ctrl + wheel and pinch zoom the report, not the browser page. Native, to prevent the browser's zoom.
+  useEffect(() => {
+    const el = column.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      setZoom(clampZoom(scaleRef.current * Math.exp(-e.deltaY / 300)))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
   return (
-    <div ref={column} className="ttx-reportmode">
-      <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} full footer={(n, count) => `Page ${n} of ${count}`} />
+    <div className="ttx-reportview">
+      <div ref={column} className="ttx-reportmode">
+        <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} full footer={(n, count) => `Page ${n} of ${count}`} />
+      </div>
+      <ZoomControl scale={scale} fitted={zoom === 'fit'} onZoom={setZoom} />
+    </div>
+  )
+}
+
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100))
+
+/** The report's zoom: out, the percentage with set steps and Fit width, in. Chrome, floating over the pages. */
+function ZoomControl({ scale, fitted, onZoom }: { scale: number; fitted: boolean; onZoom(zoom: Zoom): void }) {
+  const next = (dir: 1 | -1) => {
+    const steps = dir === 1 ? ZOOMS.filter((z) => z > scale + 0.001) : ZOOMS.filter((z) => z < scale - 0.001).reverse()
+    onZoom(clampZoom(steps[0] ?? (dir === 1 ? MAX_ZOOM : MIN_ZOOM)))
+  }
+  return (
+    <div className="ttx-ui absolute right-4 bottom-4 z-10 flex items-center gap-0.5 rounded-lg border bg-card p-1 font-sans shadow-md" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+      <Button variant="ghost" size="icon-sm" title="Zoom out" aria-label="Zoom out" disabled={scale <= MIN_ZOOM} onClick={() => next(-1)}>
+        <MinusIcon />
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-16 tabular-nums" title="Zoom" aria-label={`Zoom ${Math.round(scale * 100)}%`}>
+            {Math.round(scale * 100)}%
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="top">
+          <DropdownMenuItem onSelect={() => onZoom('fit')}>
+            Fit width
+            {fitted && <CheckIcon className="ml-auto" />}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {ZOOMS.map((z) => (
+            <DropdownMenuItem key={z} onSelect={() => onZoom(z)}>
+              {Math.round(z * 100)}%{!fitted && Math.abs(scale - z) < 0.001 && <CheckIcon className="ml-auto" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button variant="ghost" size="icon-sm" title="Zoom in" aria-label="Zoom in" disabled={scale >= MAX_ZOOM} onClick={() => next(1)}>
+        <PlusIcon />
+      </Button>
     </div>
   )
 }
