@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { defineTool, Runtime, ToolRunner, type Actor } from '@ttx/core'
+import { Chat, defineTool, Runtime, ToolRunner, type Actor } from '@ttx/core'
 import { z } from 'zod'
 import {
+  AGENT,
+  boardGet,
   capTable,
   CODE_EXECUTE_TOOL,
   followerState,
   hashSource,
   plugins,
+  runTurn,
   type CodeBoardObject,
+  type Complete,
   type ExecResult,
   type InputBoardObject,
   type MapBoardObject,
+  type Message,
 } from '../src/index'
 import { canvas } from './fakes'
 
@@ -159,4 +164,46 @@ describe('caps', () => {
     expect(truncated).toBe(true)
     expect(JSON.stringify(value).length).toBeLessThanOrEqual(64 * 1024)
   })
+})
+
+describe('the agent and code', () => {
+  it('reads the skill, sees its failing code fail, fixes it and shows the result on a map', async () => {
+    const results: Record<string, ExecResult> = { broken: failure, buffer: features(F1) }
+    const exec = defineTool({
+      id: CODE_EXECUTE_TOOL,
+      title: 'Run code',
+      description: 'Run Python code',
+      input: z.object({ source: z.string(), fresh: z.boolean().optional() }),
+      output: 'code.result',
+      cache: false,
+      run: ({ source }) => results[source]!,
+    })
+    const doc = new Y.Doc()
+    const person = new Runtime({ doc, plugins, actor: ada })
+    const map = person.dispatch('map.add', canvas, { x: 0, y: 0 }).created![0]!
+    const tools = new ToolRunner([boardGet(person), exec])
+    const runtime = new Runtime({ doc, plugins, actor: AGENT, tools })
+    const message = new Chat(doc).send({ actor: ada, text: 'put a 10 km buffer around Kathmandu on the map', selection: [map] })
+    const sent: Message[][] = []
+    const answers: Extract<Message, { role: 'assistant' }>[] = [
+      calls(['skills__read', { name: 'run-code' }]),
+      calls(['code__execute', { source: 'broken' }]),
+      calls(['code__add', { args: { title: 'Kathmandu 10 km buffer', source: 'buffer', showOn: map } }]),
+    ]
+    const complete: Complete = async (messages) => (sent.push(structuredClone(messages)), answers.shift() ?? { role: 'assistant', content: 'Done.' })
+    const reply = await runTurn(runtime, message, complete, tools)
+    // The failed test run came back to the model as a result, with the error.
+    const toolResults = sent.at(-1)!.filter((m) => m.role === 'tool').map((m) => String(m.content))
+    expect(toolResults.some((c) => c.includes('NameError'))).toBe(true)
+    expect(reply.calls.filter((c) => c.status === 'failed')).toEqual([])
+    const layer = (runtime.board.get(map) as MapBoardObject).layers![0]!
+    expect(layer).toMatchObject({ input: { fileId: F1 }, title: 'Kathmandu 10 km buffer' })
+    expect(runtime.board.get(layer.from!)).toMatchObject({ type: 'code', run: { status: 'ok' } })
+  })
+})
+
+const calls = (...list: [string, unknown][]): Extract<Message, { role: 'assistant' }> => ({
+  role: 'assistant',
+  content: null,
+  tool_calls: list.map(([name, input], i) => ({ id: `${name}-${i}`, type: 'function' as const, function: { name, arguments: JSON.stringify(input) } })),
 })

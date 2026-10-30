@@ -1,6 +1,7 @@
 /// <reference path="./markdown.d.ts" />
 import addEvent from './add-event.md'
 import mapData from './map-data.md'
+import runCode from './run-code.md'
 import satelliteImagery from './satellite-imagery.md'
 import showPlace from './show-place.md'
 
@@ -36,4 +37,4 @@ export function parseSkill(text: string): Skill {
 }
 
 /** Every skill. To add one, write its .md file here and import it above. */
-export const SKILLS: Skill[] = [addEvent, showPlace, mapData, satelliteImagery].map(parseSkill)
+export const SKILLS: Skill[] = [addEvent, showPlace, mapData, satelliteImagery, runCode].map(parseSkill)
