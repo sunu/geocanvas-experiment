@@ -15,9 +15,16 @@ export interface ReportEditingState {
   runtime: Runtime
   selected: string | null
   select(id: string | null): void
-  /** The block typed in. Typing always goes on at the end of a text, so a text over pages is typed in its last part. */
   editing: string | null
-  setEditing(id: string | null): void
+  /**
+   * Type in a block: for a text that goes on over pages, in its part that starts `at` px from its top; in a text, with
+   * the caret at character `caret` of what is typed (blank lines between paragraphs), else at the end.
+   */
+  setEditing(id: string | null, where?: { at?: number; caret?: number; draft?: string }): void
+  editingAt: number
+  caret?: number
+  /** The text as typed, when typing goes on in another part of a text over pages: the same editing session. */
+  draft?: string
   /** While a block is dragged: the index in the blocks it would be dropped before. */
   drop: number | null
   setDrop(index: number | null): void
@@ -50,8 +57,7 @@ const columnOf = (el: Element | null) => el?.closest<HTMLElement>('.ttx-reportmo
 /**
  * A block on a page in report mode: selected with a press, with its controls (drag to reorder, width, remove) while
  * hovered or selected, and the insertion line while another block is dragged over its place. A text that goes on over
- * pages is one of these on each page (`piece`); the first has the controls and is where drops go before it, the last is
- * where typing goes on.
+ * pages is one of these on each page (`piece`); the first has the controls and is where drops go before it.
  */
 export function EditableBlock({
   block: b,
@@ -73,13 +79,16 @@ export function EditableBlock({
   const typeable = b.kind === 'heading' || b.kind === 'text'
   const first = !piece || piece.from === 0
   const last = !piece || piece.to >= piece.height
+  const at = piece?.from ?? 0
   /** The block was selected already when this press began: then the click types in it. */
   const wasSelected = useRef(false)
-  const typing = ed.editing === b.id && last
+  const typing = ed.editing === b.id && ed.editingAt === at
   return (
     <div
       data-block-id={b.id}
       data-block-index={first ? index : undefined}
+      data-piece-from={piece?.from}
+      data-piece-to={piece?.to}
       className={`ttx-report__editable ${selected ? 'is-selected' : ''} ${controlsLeft ? 'controls-left' : ''} ${ed.dragging?.id === b.id ? 'is-dragging' : ''}`}
       onPointerDown={(e) => {
         e.stopPropagation() // a press on the page outside a block clears the selection (ReportMode)
@@ -89,9 +98,9 @@ export function EditableBlock({
       // Typing starts on the click, after the press: started on the press, the editor would lose its focus at once
       // to the press's own mousedown, which moves focus, and end.
       onClick={(e) => {
-        if (wasSelected.current && typeable && !typing && !(e.target as HTMLElement).closest('.ttx-report__controls')) ed.setEditing(b.id)
+        if (wasSelected.current && typeable && !typing && !(e.target as HTMLElement).closest('.ttx-report__controls')) ed.setEditing(b.id, { at, caret: caretAt(e, b) })
       }}
-      onDoubleClick={() => typeable && !typing && ed.setEditing(b.id)}
+      onDoubleClick={(e) => typeable && !typing && ed.setEditing(b.id, { at, caret: caretAt(e, b) })}
     >
       {first && ed.drop === index && <div className="ttx-report__drop" aria-hidden />}
       {last && ed.drop === count && index === count - 1 && <div className="ttx-report__drop is-after" aria-hidden />}
@@ -103,6 +112,23 @@ export function EditableBlock({
 
 /** A rich text block's paragraphs as plain text, until the editor comes (step 6). */
 export const paragraphs = (doc: RichDoc) => (doc.content ?? []).map((p) => docText({ type: 'doc', content: [p] }))
+
+/**
+ * Where in a text block's typed text a press was: the character under the pointer in its paragraph (`data-p`, the
+ * paragraph's index), counted in the text as the editor holds it, paragraphs joined by a blank line.
+ */
+function caretAt(e: React.MouseEvent, b: Block): number | undefined {
+  if (b.kind !== 'text') return undefined
+  const pos = document.caretPositionFromPoint?.(e.clientX, e.clientY)
+  const range = pos ? undefined : document.caretRangeFromPoint?.(e.clientX, e.clientY)
+  const node = pos?.offsetNode ?? range?.startContainer
+  const offset = pos?.offset ?? range?.startOffset ?? 0
+  const p = (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('p[data-p]')
+  if (!p) return undefined
+  const ps = paragraphs(b.doc)
+  const i = Number(p.dataset.p)
+  return ps.slice(0, i).reduce((n, t) => n + t.length + 2, 0) + Math.min(offset, ps[i]?.length ?? 0)
+}
 
 function BlockControls({ block: b, index }: { block: Block; index: number }) {
   const ed = useReportEditing()!
@@ -253,11 +279,11 @@ function startDrag(e: React.PointerEvent, ed: ReportEditingState, id: string, fr
  */
 function useTyping(block: Block, write: (value: string) => void, initial: () => string) {
   const ed = useReportEditing()!
-  const [value, setValue] = useState(initial)
+  const [value, setValue] = useState(() => ed.draft ?? initial())
   const begun = useRef(false)
   useEffect(() => {
-    // One undo step for the whole editing session.
-    ed.runtime.beginGesture()
+    // One undo step for the whole editing session, also when it goes on in another part of a text over pages.
+    if (ed.draft === undefined) ed.runtime.beginGesture()
     begun.current = true
   }, [ed.runtime])
   return {
@@ -316,17 +342,54 @@ function HeadingEditor({ block: b }: { block: Extract<Block, { kind: 'heading' }
   )
 }
 
+/** The parts of a text over pages on screen, by where each starts and ends in the text (px). */
+const partsOf = (id: string) =>
+  [...document.querySelectorAll<HTMLElement>(`.ttx-reportmode [data-block-id="${CSS.escape(id)}"][data-piece-from]`)].map((el) => ({
+    from: Number(el.dataset.pieceFrom),
+    to: Number(el.dataset.pieceTo),
+  }))
+
 /**
- * Typing in a text, from its end. For a text that goes on over pages, the editor takes the place of its last part
- * (`piece`): it is that part's height and scrolls inside itself, so what is typed past the page's bottom stays in sight;
- * the other pages show the text as it is typed, and it flows over the pages again when typing ends.
+ * How far down a text the caret is, in the text's own px (as pagination measures it): the caret's character found in
+ * the text as shown on another page (its paragraph, `data-p`, and the character in it, whitespace collapsed as the
+ * shown text has it), at the middle of its line. Undefined when the text is not shown elsewhere (one part only).
+ */
+function caretY(b: Block, value: string, caret: number): number | undefined {
+  const shown = document.querySelector<HTMLElement>(`.ttx-reportmode [data-block-id="${CSS.escape(b.id)}"] div.ttx-report__text`)
+  if (!shown) return undefined
+  let i = 0
+  let start = 0
+  for (const m of value.matchAll(/\n\s*\n/g)) {
+    if (caret <= m.index) break
+    i++
+    start = m.index + m[0].length
+  }
+  const offset = value.slice(start, Math.max(start, caret)).replace(/^\s+/, '').replace(/\s+/g, ' ').length
+  const box = shown.getBoundingClientRect()
+  const k = box.height / (shown.offsetHeight || 1) // the page's zoom
+  const p = shown.querySelector(`p[data-p="${i}"]`)
+  const node = p?.firstChild
+  // A paragraph not shown yet (just started, empty): the end of the text.
+  if (!node) return (box.height - 1) / k
+  const range = document.createRange()
+  range.setStart(node, Math.min(offset, node.textContent?.length ?? 0))
+  const r = range.getClientRects()[0] ?? range.getBoundingClientRect()
+  return (r.top + r.height / 2 - box.top) / k
+}
+
+/**
+ * Typing in a text. For a text that goes on over pages, the editor takes the place of the part pressed (`piece`): it is
+ * that part's height, starts scrolled to it, and scrolls inside itself, so what is typed past the page's bottom stays in
+ * sight; the other pages show the text as it is typed, and it flows over the pages again when typing ends.
  */
 function TextEditor({ block: b, piece }: { block: Extract<Block, { kind: 'text' }>; piece?: { from: number; to: number } }) {
   const ed = useReportEditing()!
-  // The caret at the end of the text, in sight: typing goes on where the text ends, on its last page.
+  // The caret where the text was pressed (or where typing reached, from another page), else at the end; a part of a
+  // text starts scrolled to that part. Only where typing starts: the part's place moves as the text grows.
   const area = useFocusSoon<HTMLTextAreaElement>((el) => {
-    el.setSelectionRange(el.value.length, el.value.length)
-    el.scrollTop = el.scrollHeight
+    if (piece) el.scrollTop = piece.from
+    const caret = ed.caret ?? el.value.length
+    el.setSelectionRange(caret, caret)
   })
   const t = useTyping(
     b,
@@ -334,6 +397,20 @@ function TextEditor({ block: b, piece }: { block: Extract<Block, { kind: 'text' 
     () => paragraphs(b.doc).join('\n\n'),
   )
   const shown = piece && piece.to - piece.from
+  // The caret follows the text over pages: once what is typed runs past this page's part (or the text, typed past the
+  // page's bottom, is cut there), typing goes on in the part that now holds the caret, in the same session.
+  const moving = useRef(false)
+  useEffect(() => {
+    const el = area.current
+    if (!el || moving.current || document.activeElement !== el) return
+    const y = caretY(b, el.value, el.selectionStart)
+    const from = piece?.from ?? 0
+    if (y === undefined || (y >= from && (!piece || y < piece.to))) return
+    const next = partsOf(b.id).find((p) => y >= p.from && y < p.to)
+    if (!next || next.from === from) return
+    moving.current = true
+    ed.setEditing(b.id, { at: next.from, caret: el.selectionStart, draft: el.value })
+  })
   // Grow with the text, so the page's layout (and its pagination) follows as people type; a part of a text keeps its height.
   useEffect(() => {
     const el = area.current
@@ -355,7 +432,7 @@ function TextEditor({ block: b, piece }: { block: Extract<Block, { kind: 'text' 
       value={t.value}
       onChange={(e) => t.onChange(e.target.value)}
       onKeyDown={(e) => e.key === 'Tab' && t.stop()}
-      onBlur={t.stop}
+      onBlur={() => moving.current || t.stop()}
     />
   )
 }

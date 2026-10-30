@@ -85,17 +85,21 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
 
   // Editing on the page (step 5b): this person's selected block, the one they type in, and where a drag would drop.
   const [selected, select] = useState<string | null>(null)
-  const [editing, setEditing] = useState<string | null>(null)
+  const [editing, setEditingState] = useState<{ id: string; at: number; caret?: number; draft?: string } | null>(null)
   const [drop, setDrop] = useState<number | null>(null)
   const [dragging, setDragging] = useState<ReportEditingState['dragging']>(null)
   // A block someone else removed is no longer selected.
   const live = selected && report.blocks.some((b) => b.id === selected) ? selected : null
+  const setEditing = (id: string | null, { at = 0, caret, draft }: { at?: number; caret?: number; draft?: string } = {}) => setEditingState(id ? { id, at, caret, draft } : null)
   const editingState: ReportEditingState = {
     report,
     runtime,
     selected: live,
     select,
-    editing,
+    editing: editing?.id ?? null,
+    editingAt: editing?.at ?? 0,
+    caret: editing?.caret,
+    draft: editing?.draft,
     setEditing,
     drop,
     setDrop,

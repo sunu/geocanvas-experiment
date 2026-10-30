@@ -239,10 +239,19 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
       )
     }
     case 'text': {
-      const ps = paragraphs(b.doc).filter((p, i, all) => p || all.length === 1)
+      // Each paragraph keeps its index (`data-p`), where a press puts the caret when typing starts.
+      const ps = paragraphs(b.doc)
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }, _, all) => p || all.length === 1)
       return (
         <div className="ttx-report__text">
-          {ps.some(Boolean) ? ps.map((p, i) => <p key={i}>{p}</p>) : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
+          {ps.some(({ p }) => p)
+            ? ps.map(({ p, i }) => (
+                <p key={i} data-p={i}>
+                  {p}
+                </p>
+              ))
+            : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
         </div>
       )
     }
