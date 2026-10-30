@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { FileTextIcon, SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
 import { docText, pageSize, type Block, type ReportBoardObject, type RichDoc } from '@ttx/plugins'
@@ -35,24 +35,35 @@ export function ReportObject({ runtime, object: r }: ObjectViewProps<ReportBoard
         // Centered in the object, whose shape need not be the page's.
         style={{ width: page.w, height: page.h, left: (r.w - page.w * scale) / 2, top: (r.h - page.h * scale) / 2, transform: `scale(${scale})` }}
       >
-        <div ref={content} className="ttx-report__content">
-          <h1 className="ttx-report__title">{titleOf(board, r)}</h1>
-          {r.blocks.length ? (
-            <div className="ttx-report__grid">
-              {r.blocks.map((b) => (
-                <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
-                  <BlockView block={b} board={board} runtime={runtime} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="ttx-report__empty">Drop objects here, or use Add to report</p>
-          )}
-        </div>
+        <ReportContent ref={content} runtime={runtime} report={r} />
         <div className="ttx-report__count">
           Page 1 of {pages} · {items} item{items === 1 ? '' : 's'}
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * A report's title and blocks, in order. The widget lays it out on its first page; the phone's Reports tab
+ * (mobile/ReportsPage.tsx) at the screen's width.
+ */
+export function ReportContent({ ref, runtime, report: r }: { ref?: Ref<HTMLDivElement>; runtime: Runtime; report: ReportBoardObject }) {
+  const board = runtime.board as Board
+  return (
+    <div ref={ref} className="ttx-report__content">
+      <h1 className="ttx-report__title">{titleOf(board, r)}</h1>
+      {r.blocks.length ? (
+        <div className="ttx-report__grid">
+          {r.blocks.map((b) => (
+            <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
+              <BlockView block={b} board={board} runtime={runtime} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="ttx-report__empty">Drop objects here, or use Add to report</p>
+      )}
     </div>
   )
 }

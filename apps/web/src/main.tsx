@@ -5,13 +5,29 @@ import './shadcn.css'
 import './styles.css'
 import { roomFromHash } from './board/room'
 import { Landing } from './home/Landing'
+import { stopInputZoom } from './iosZoom'
+import { chooseLayout } from './layout'
+import { registerServiceWorker } from './pwa/register'
+import { UpdateNotice } from './pwa/UpdateNotice'
 
 // Changing the hash (opening a board, going back to the boards) does not reload the page by itself.
 addEventListener('hashchange', () => location.reload())
 
 const root = createRoot(document.getElementById('root')!)
-const render = (node: React.ReactNode) => root.render(<StrictMode>{node}</StrictMode>)
+const render = (node: React.ReactNode) =>
+  root.render(
+    <StrictMode>
+      {node}
+      <UpdateNotice />
+    </StrictMode>,
+  )
 
-// A board (#room=<id>) loads the canvas and joins the room; without one, the landing page loads neither.
-if (roomFromHash(location.hash)) void import('./App').then(({ App }) => render(<App />))
-else render(<Landing startNew={location.hash === '#new'} />)
+registerServiceWorker()
+stopInputZoom()
+
+// A board (#room=<id>) loads the canvas, or on a phone its own layout, and joins the room; without one, the landing
+// page loads neither.
+if (roomFromHash(location.hash)) {
+  if (chooseLayout() === 'phone') void import('./mobile/MobileApp').then(({ MobileApp }) => render(<MobileApp />))
+  else void import('./App').then(({ App }) => render(<App />))
+} else render(<Landing startNew={location.hash === '#new'} />)

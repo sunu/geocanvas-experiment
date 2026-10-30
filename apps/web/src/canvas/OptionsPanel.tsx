@@ -5,7 +5,7 @@ import type { BoardObject } from '../board/board'
 import type { FocusableObjectUI } from './registry'
 
 /** Whether the draft has changes others cannot see yet. */
-const useUnshared = (draft: Draft): boolean => useSyncExternalStore(draft.subscribe, () => draft.hasUnshared())
+export const useUnshared = (draft: Draft): boolean => useSyncExternalStore(draft.subscribe, () => draft.hasUnshared())
 
 interface PanelProps {
   draft: Draft

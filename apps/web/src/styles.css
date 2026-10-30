@@ -1024,6 +1024,30 @@ body,
   color: #dc2626;
 }
 
+.ttx-chat__objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ttx-chat__objects button {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .ttx-chat__undo {
   display: inline-flex;
   align-items: center;
@@ -3220,4 +3244,10 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Above the canvas's toolbar and the phone's tabs (pwa/UpdateNotice.tsx). */
+.ttx-update {
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  white-space: nowrap;
 }
