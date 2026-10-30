@@ -48,3 +48,12 @@ export function paginate(rowHeights: number[], { contentHeight, firstPageTop, ga
   })
   return pages
 }
+
+/**
+ * An item's size in a block: its own proportions (`ratio`, height over width) at the block's width, but never taller
+ * than `room`, the height a page has for it: then smaller, still in proportion, so it fits one page.
+ */
+export function fitItem(width: number, ratio: number, room: number): { width: number; height: number } {
+  const height = Math.round(Math.min(width * ratio, room))
+  return { width: Math.round(height / ratio), height }
+}

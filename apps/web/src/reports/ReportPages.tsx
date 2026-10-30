@@ -6,7 +6,7 @@ import type { Board, BoardObject } from '../board/board'
 import { ObjectLabelSlot, ObjectNameContext } from '../canvas/ObjectHeader'
 import { objectUI } from '../canvas/registry'
 import { useMapPicture } from '../map/picture'
-import { paginate, rowsOf, type Row } from './pages'
+import { fitItem, paginate, rowsOf, type Row } from './pages'
 import { titleOf } from './reports'
 
 /** A page's margin, the space between rows, and between the two columns, in CSS px (styles.css .ttx-report__*). */
@@ -61,11 +61,12 @@ export function ReportPages({
     return () => observer.disconnect()
   })
 
-  const pages = paginate(rows.map((_, i) => heights.rows[i] ?? 0), { contentHeight: page.h - 2 * MARGIN - FOOTER, firstPageTop: heights.title, gap: ROW_GAP })
+  const contentHeight = page.h - 2 * MARGIN - FOOTER
+  const pages = paginate(rows.map((_, i) => heights.rows[i] ?? 0), { contentHeight, firstPageTop: heights.title, gap: ROW_GAP })
   const shown = which === 'first' ? pages.slice(0, 1) : pages
   const contentWidth = page.w - 2 * MARGIN
   const rowView = (row: Row, measuring = false) => (
-    <RowView key={row.join()} row={row} blocks={r.blocks} board={board} runtime={runtime} contentWidth={contentWidth} measuring={measuring} full={measuring || full} />
+    <RowView key={row.join()} row={row} blocks={r.blocks} board={board} runtime={runtime} contentWidth={contentWidth} maxHeight={contentHeight} measuring={measuring} full={measuring || full} />
   )
 
   return (
@@ -93,7 +94,7 @@ export function ReportPages({
 }
 
 /** One row of the two-column grid: a full-width block, two one-column blocks, or one in the left column. */
-function RowView({ row, blocks, board, runtime, contentWidth, measuring, full }: { row: Row; blocks: Block[]; board: Board; runtime: Runtime; contentWidth: number; measuring: boolean; full: boolean }) {
+function RowView({ row, blocks, board, runtime, contentWidth, maxHeight, measuring, full }: { row: Row; blocks: Block[]; board: Board; runtime: Runtime; contentWidth: number; maxHeight: number; measuring: boolean; full: boolean }) {
   return (
     <div className="ttx-report__row">
       {row.map((i) => {
@@ -101,7 +102,7 @@ function RowView({ row, blocks, board, runtime, contentWidth, measuring, full }:
         const width = b.span === 2 ? contentWidth : (contentWidth - COLUMN_GAP) / 2
         return (
           <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
-            <BlockView block={b} board={board} runtime={runtime} width={width} measuring={measuring} full={full} />
+            <BlockView block={b} board={board} runtime={runtime} width={width} maxHeight={maxHeight} measuring={measuring} full={full} />
           </div>
         )
       })}
@@ -117,6 +118,8 @@ interface BlockProps {
   runtime: Runtime
   /** The block's width on the page, in CSS px: a column, or the full width. */
   width: number
+  /** The most height a block may take: a page's content height. A taller item or image shrinks to it, so it fits one page. */
+  maxHeight: number
   /** Laid out only to be measured: widgets are boxes of their height, not drawn twice. */
   measuring: boolean
   /** Items in full (report mode), or as compact cards (the preview on the canvas). */
@@ -138,7 +141,7 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
         </div>
       )
     case 'image':
-      return <img className="ttx-report__image" src={uploadUrl(b.imageId)} alt="" draggable={false} />
+      return <img className="ttx-report__image" src={uploadUrl(b.imageId)} alt="" draggable={false} style={{ maxHeight: props.maxHeight }} />
     case 'divider':
       return <hr className="ttx-report__divider" />
     case 'item':
@@ -151,13 +154,13 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
  * (a sticky note, a text, an event, a country's figures, a feed…) as its own view, at its own proportions, scaled to
  * the block and read-only. A caption names it. A removed source says so.
  */
-function ItemView({ block: b, source, runtime, width, measuring, full }: BlockProps & { block: Extract<Block, { kind: 'item' }>; source: AnyObject | undefined }) {
+function ItemView({ block: b, source, runtime, width, maxHeight, measuring, full }: BlockProps & { block: Extract<Block, { kind: 'item' }>; source: AnyObject | undefined }) {
   if (b.mode === 'frozen' && b.frozen) {
     const f = b.frozen
     return (
       <div className="ttx-report__card is-frozen">
         <span className="ttx-report__tag">Frozen</span>
-        {f.imageId && <img className="ttx-report__image" src={uploadUrl(f.imageId)} alt="" draggable={false} />}
+        {f.imageId && <img className="ttx-report__image" src={uploadUrl(f.imageId)} alt="" draggable={false} style={{ maxHeight: maxHeight - FROZEN_CHROME_H }} />}
         {f.credits && <div className="ttx-report__credits">{f.credits}</div>}
         {f.text && <div className="ttx-report__card-text">{f.text}</div>}
       </div>
@@ -182,8 +185,11 @@ function ItemView({ block: b, source, runtime, width, measuring, full }: BlockPr
     )
   }
   const isMap = source.type === 'map'
-  // The widget's own proportions; a map's picture leaves out its header.
-  const height = Math.round((width * (isMap ? source.h - MAP_HEADER_PX : source.h)) / source.w)
+  // The widget's own proportions (a map's picture leaves out its header), to the block's width; but never taller than
+  // a page has room for, under the caption (and a map's credits): then smaller, centered in the block, still in proportion.
+  const ratio = (isMap ? source.h - MAP_HEADER_PX : source.h) / source.w
+  const room = maxHeight - CAPTION_H - (isMap ? CREDITS_H : 0)
+  const { width: shownWidth, height } = fitItem(width, ratio, room)
   return (
     <figure className="ttx-report__item">
       <figcaption className="ttx-report__caption">
@@ -193,9 +199,9 @@ function ItemView({ block: b, source, runtime, width, measuring, full }: BlockPr
       {measuring ? (
         <div style={{ height: height + (isMap ? CREDITS_H : 0) }} />
       ) : isMap ? (
-        <MapPicture runtime={runtime} map={source as MapBoardObject} height={height} />
+        <MapPicture runtime={runtime} map={source as MapBoardObject} width={shownWidth} height={height} />
       ) : (
-        <EmbeddedView runtime={runtime} source={source} width={width} height={height} />
+        <EmbeddedView runtime={runtime} source={source} width={shownWidth} height={height} />
       )}
     </figure>
   )
@@ -203,13 +209,17 @@ function ItemView({ block: b, source, runtime, width, measuring, full }: BlockPr
 
 /** One line under a map picture for its credits, in CSS px (styles.css .ttx-report__credits). */
 const CREDITS_H = 16
+/** An item's caption above it, with its gap, at most, in CSS px (styles.css .ttx-report__caption). */
+const CAPTION_H = 24
+/** A frozen card's padding, tag and credits around its picture, in CSS px. */
+const FROZEN_CHROME_H = 64
 
 /** A map in a report: a picture of it as this person sees it, and its credits, which a picture does not carry. */
-function MapPicture({ runtime, map, height }: { runtime: Runtime; map: MapBoardObject; height: number }) {
+function MapPicture({ runtime, map, width, height }: { runtime: Runtime; map: MapBoardObject; width: number; height: number }) {
   const { url, credits } = useMapPicture(runtime, map)
   return (
     <>
-      {url ? <img className="ttx-report__map" src={url} alt="" draggable={false} style={{ height }} /> : <div className="ttx-report__map is-loading" style={{ height }} />}
+      {url ? <img className="ttx-report__map" src={url} alt="" draggable={false} style={{ width, height }} /> : <div className="ttx-report__map is-loading" style={{ width, height }} />}
       <div className="ttx-report__credits is-line">{credits}</div>
     </>
   )

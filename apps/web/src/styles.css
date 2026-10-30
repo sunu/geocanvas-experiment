@@ -3058,6 +3058,8 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
 .ttx-report__image {
   display: block;
   max-width: 100%;
+  margin-inline: auto;
+  object-fit: contain;
 }
 
 .ttx-report__divider {
@@ -3237,7 +3239,8 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
 
 .ttx-report__map {
   display: block;
-  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
   object-fit: cover;
   background: var(--ttx-bg);
 }
@@ -3256,6 +3259,8 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
 .ttx-report__embed {
   position: relative;
   overflow: hidden;
+  /* Smaller than the block when a page cannot hold its full height: centered. */
+  margin-inline: auto;
 }
 
 .ttx-report__embedded {

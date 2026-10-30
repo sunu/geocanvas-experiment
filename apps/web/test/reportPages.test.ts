@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { paginate, rowsOf } from '../src/reports/pages'
+import { fitItem, paginate, rowsOf } from '../src/reports/pages'
 
 const spans = (...s: (1 | 2)[]) => s.map((span) => ({ span }))
 
@@ -30,5 +30,16 @@ describe('report pages', () => {
 
   it('keep a first row taller than what is left below the title on page 1', () => {
     expect(paginate([95], space)).toEqual([[0]])
+  })
+})
+
+describe('report items', () => {
+  it('take the block width at their own proportions', () => {
+    expect(fitItem(600, 0.5, 900)).toEqual({ width: 600, height: 300 })
+  })
+
+  it('shrink, still in proportion, when a page cannot hold their height', () => {
+    // A tall map: 600 wide would be 1200 high; the page has 800.
+    expect(fitItem(600, 2, 800)).toEqual({ width: 400, height: 800 })
   })
 })
