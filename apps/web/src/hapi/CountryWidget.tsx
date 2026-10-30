@@ -1,29 +1,31 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Icon } from '@phosphor-icons/react'
-import type { ConflictBoardObject, CountryBoardObject, PresenceBoardObject } from '@ttx/plugins'
+import type { ConflictBoardObject, CountryBoardObject, HistoryBoardObject, PresenceBoardObject } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import type { ObjectViewProps } from '../canvas/registry'
 import { loadCountries, type Country, type Source } from './api'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import { useReportLoading } from '../canvas/loading'
 
-/** The board objects that show one country's HAPI data. */
-type CountryWidgetObject = CountryBoardObject | PresenceBoardObject | ConflictBoardObject
+/** The board objects that show one country's data: HDX HAPI's, and its disaster history. */
+type CountryWidgetObject = CountryBoardObject | PresenceBoardObject | ConflictBoardObject | HistoryBoardObject
 
 interface CountryWidgetProps extends ObjectViewProps<CountryWidgetObject> {
   title: string
   Icon: Icon
   /** Put the country's name in the header, for widgets that do not show it in their body. */
   nameInHeader?: boolean
+  /** The op that picks the country: country.setCountry for the HDX HAPI widgets. */
+  setCountryOp?: string
   /** The widget's body, once a country is picked. */
   children(iso3: string): ReactNode
 }
 
 /**
- * The frame of a widget on one country's HDX HAPI data. Double-click to pick the country (editing); picking ends
+ * The frame of a widget on one country's data (HDX HAPI's, or its disaster history). Double-click to pick the country (editing); picking ends
  * editing. The board stores only the ISO3 code, so everyone sees the same country and each browser reads the data.
  */
-export function CountryWidget({ runtime, object: o, editing, onDone, title, Icon, nameInHeader, children }: CountryWidgetProps) {
+export function CountryWidget({ runtime, object: o, editing, onDone, title, Icon, nameInHeader, setCountryOp = 'country.setCountry', children }: CountryWidgetProps) {
   const bodyRef = useRef<HTMLDivElement>(null)
 
   // While editing, the wheel scrolls the country list, not the canvas camera. The canvas listens natively,
@@ -38,7 +40,7 @@ export function CountryWidget({ runtime, object: o, editing, onDone, title, Icon
 
   const pick = (country: string) => {
     runtime.beginGesture()
-    runtime.dispatch('country.setCountry', { kind: 'objects', ids: [o.id] }, { country })
+    runtime.dispatch(setCountryOp, { kind: 'objects', ids: [o.id] }, { country })
     onDone()
   }
 

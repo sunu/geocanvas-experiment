@@ -76,7 +76,15 @@ export const DATA_LAYERS = {
     tool: 'data.healthFacilities',
     input: {},
   },
-} as const satisfies Record<string, { label: string; title: string; tool: string; input: Record<string, unknown> }>
+  desinventar: {
+    label: 'Past disasters (DesInventar), zoomed in',
+    title: 'Past disasters (DesInventar)',
+    tool: 'history.desinventar',
+    input: {},
+    // Each record's hazard as a category: floods, landslides, fires… in their own colors.
+    style: { byProperty: 'hazard' },
+  },
+} as const satisfies Record<string, { label: string; title: string; tool: string; input: Record<string, unknown>; style?: LayerStyle }>
 
 export type DataLayerKey = keyof typeof DATA_LAYERS
 
