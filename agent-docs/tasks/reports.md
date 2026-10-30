@@ -116,7 +116,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 
 ### 3.3 Live and frozen items
 
-> **Under discussion:** `plans/plan-015.md` proposes replacing live and frozen with **synced** and **detached**: a detached item would keep a copy of its object (its fields) rather than a picture, so it shows in full like a synced one, can be made for every type with no browser step, and can be lightly edited in the report. Not decided; what follows is today's behavior.
+> **Under discussion:** `plans/plan-019.md` proposes replacing live and frozen with **synced** and **detached**: a detached item would keep a copy of its object (its fields) rather than a picture, so it shows in full like a synced one, can be made for every type with no browser step, and can be lightly edited in the report. Not decided; what follows is today's behavior.
 
 - **Live:** the item shows its source object as the object is now, through a report renderer for its type.
 - **Frozen:** the item keeps what its source showed when it was frozen, and never changes.
@@ -333,7 +333,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
    - **5a** (built): report mode opens from ⤢, a double-click or the Object panel's Open; it is live (`FocusableObjectUI.live`: no draft, Share or exit dialog) and keeps the agent chat on the left (`keepChat`); every page scrolls in the middle, on real pages; the Options panel has the name, the page, and the items (Live or Frozen, Go to source, Remove).
    - **5b:** editing on the page: drag to reorder, the column toggle, the insert menu, × and Delete, headings and plain text.
 6. **Rich text:** the editor (Tiptap, needs approval), `report.setText`.
-7. **Live and frozen** (under discussion: `plans/plan-015.md` would replace this step with synced and detached items):
+7. **Live and frozen** (under discussion: `plans/plan-019.md` would replace this step with synced and detached items):
    - report renderers and `freeze` for each type
    - the high-resolution map PNG export
    - keeping report pictures out of the Uploads gallery (a new upload kind, or a flag)
@@ -368,7 +368,7 @@ Made (2026-10-29, from the product owner):
 19. **Report tools go in a bottom report toolbar** that replaces the canvas toolbar in report mode; controls on a block sit on the block (§5.1b, 5b). 2026-10-30.
 20. **Undo in report mode is this person's latest change on the board,** wherever it was made (§5.1). 2026-10-30.
 
-Under discussion: **synced and detached items** (`plans/plan-015.md`), a proposal for colleagues' feedback, with its own questions (what "detached" means, pinning external data, deleting a source, edits, the words).
+Under discussion: **synced and detached items** (`plans/plan-019.md`), a proposal for colleagues' feedback, with its own questions (what "detached" means, pinning external data, deleting a source, edits, the words).
 
 Open:
 1. **The PDF approach:** decided by the spike (§7.4).

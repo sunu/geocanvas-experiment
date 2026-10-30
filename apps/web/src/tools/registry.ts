@@ -5,6 +5,7 @@ import { eventsGet, eventsSearch, forecastTool, geocodeTools, gfs, OpenCageGeoco
 import { healthFacilitiesTool, LayercakeHealth } from '../data/health'
 import { populationTool, SourceCoopPopulation } from '../data/population'
 import { eventFootprintTool } from '../events/footprint'
+import { ExposureWorker, exposureTool } from '../exposure/exposure'
 import { monty } from '../events/monty'
 import { choroplethTool } from '../hapi/choropleth'
 import { boundariesTool } from '../map/adminAreas'
@@ -16,6 +17,8 @@ import { ToolRunner } from '@ttx/core'
 
 /** Reads GeoJSON, GeoParquet and shapefiles from URLs and uploads, in one worker. */
 const urlFeatures = new UrlFeatures()
+/** OpenStreetMap POIs from Layercake, in one worker, so its footer (~5 MB) is read once per page. */
+const layercake = new LayercakeHealth()
 
 /** Every tool the app has, and the one runner for them, so all maps on the board share one cache. */
 export const tools = new ToolRunner([
@@ -23,7 +26,7 @@ export const tools = new ToolRunner([
   populationTool(new SourceCoopPopulation()),
   adminBoundariesTool(new WorldBankBoundaries()),
   overtureTool(new OvertureParquet()),
-  healthFacilitiesTool(new LayercakeHealth()),
+  healthFacilitiesTool(layercake),
   urlFeaturesTool(urlFeatures),
   uploadFeaturesTool(urlFeatures),
   urlRasterTool(),
@@ -40,4 +43,5 @@ export const tools = new ToolRunner([
   openeoCollections(),
   openeoCoverage(),
   routeTool(routing),
+  exposureTool(new ExposureWorker(), layercake),
 ])

@@ -1,82 +1,126 @@
-# Plan 015 — Proposal: synced and detached report items
+# Plan 015: flood exposure of buildings in Scenario mode
 
-Date: 2026-10-30. Status: **proposed, for feedback.** Not decided, not scheduled, nothing built. Today's behavior (live and frozen items, `agent-docs/tasks/reports.md` §3.3) is unchanged until this is agreed.
+How many buildings are in a flood area, and how a what-if changes that: "if the river covers this area, how many
+houses are in the water, and are there schools or health facilities among them?" This is exposure (what is in the
+water), not damage or risk: no depth, no vulnerability. It runs fully in the browser, like routing (plan-014), and
+joins a map's Scenario mode as plan-014 planned: a new optional field of `scenario`, a recipe each browser computes.
 
-## 1. Why
+Status: built on `feat/flood-exposure` (on `scenario-planning`, now in main); the spike's measurements are below, and what changed while building is under Decisions made while building.
 
-A report item is **live** or **frozen** today. A frozen item keeps only a text, a picture upload or some data (`Frozen` in `packages/plugins/src/reports.ts`). Three problems follow:
-- **A frozen item shows as a small text card, not as the thing itself.** A sticky note is no longer a sticky note, and a map would be a bare picture.
-- **Most widgets cannot be frozen at all.** A map, an event or a country widget would need the browser to make its picture, so report mode disables the switch for them.
-- **"Frozen" reads as a lock,** not as a relationship to the board.
+## What it works on
 
-## 2. The proposal
+- **Flood areas are the scenario's affected areas.** The polygons of the layers marked `blocks` (an event footprint, an
+  uploaded GeoJSON file, a notebook result) and the Polygon closures that are on. One set of areas drives both
+  analyses: switching a what-if off changes the routes and the exposure together. Points and lines do not count.
+- **Buildings from Overture**, read with `readOverture` (`data/overtureRead.ts`, shared with buildings and routing),
+  only the columns `bbox`, `subtype` and `class`, never `geometry`. A building is exposed when the center of its bbox
+  is inside a flood polygon.
+- **Kinds of buildings from OpenStreetMap, not Overture.** Overture's `subtype` is empty for almost every building
+  outside cities (below), so it cannot say how many schools or clinics are in the water. Health facilities already
+  come from Layercake's `pois` (`data/health.ts`); schools are in the same file. Count those POIs inside the flood
+  areas, and give Overture's subtype only as "of which tagged residential, …" when it is there.
 
-Two ways for an item to relate to the object on the board it came from:
-- **Synced.** The item is linked to its object on the board, the original. It always shows that object as it is now. People can see the link, and change the object on the board, not in the report.
-- **Detached.** The item started as an object on the board but no longer follows it. It is the report's own copy, editable to a small extent in the report. People can see where it came from.
+## Spike: reading the light columns (Overture 2026-10-21.0)
 
-**Either way, the item is visible in full:** a detached sticky note is still a sticky note in its color, and a detached map still shows its picture. A report always reads complete, on screen and in print.
+Measured in headless Chrome on the dev server, with a throwaway module imported in the page (not committed): flood polygons from
+Montandon, the Overture files and footers they touch, the row groups whose `bbox` statistics meet the polygon (not
+only its bbox), then the light columns of those row groups, 4 at a time, counting buildings in the polygons.
 
-### 2.1 A detached item keeps a copy of its object, not a picture
+| Flood polygon | Bbox (deg²) | Row groups: bbox / polygon | Rows read | Light / geometry / all columns | Read | Buildings: bbox / polygon |
+| --- | --- | --- | --- | --- | --- | --- |
+| CEMS EMSR857 aoi12, Mozambique | 0.004 | 2 / 2 | 43k | 0.6 / 2.7 / 4.6 MB | 9.2 s (cold) | 10,376 / 7,633 |
+| CEMS EMSR927 aoi05, Nepal | 0.012 | 2 / 2 | 72k | 0.9 / 4.2 / 7.3 MB | 3.4 s | 26,274 / 9,271 |
+| GDACS 1104124 (MultiPolygon), Nepal | 3.6 | 95 / 10 | 379k | 4.8 / 22 / 39 MB | 11.8 s | 216,658 / 20,920 |
+| CEMS EMSR838 aoi08, Pakistan | 0.48 | 34 / 17 | 680k | 7.5 / 45 / 71 MB | 7.5–12.3 s | 489,650 / 259,736 |
+| GFD 4439, Mozambique | 54 | 826 / 826 | 17.3M | 237 / 1,223 / 1,982 MB | not read | |
+| GDACS 1104136-2, Pakistan | 38 | 1,294 / 836 | 32.4M | 363 / 2,072 / 3,330 MB | not read | |
 
-- **The copy:** `{ type, fields, view?, at }`, the object's own fields at the moment it was detached. These are recipes and references (a map's layers, an event's id, a sticky note's text and color), with `w` and `h` for its proportions, but without `id`, `x`, `y`, `z` or `link`. A map's copy also keeps the view of the person who detached it.
-- **The same renderers:** the report draws a detached item from its copy, exactly as it draws a synced one from the board. It looks as the object did.
-- **No browser step:** detaching is a plain op. It copies the fields and, for a map, the runner's saved view (`Views`). The agent can detach anything, maps included.
-- **Detached from the board, not frozen in time:** a detached event card still fetches its event's details from Montandon, and a detached country widget fetches today's figures. Pinning external data "as of" a date would be a separate option. It matters most for a shared report link or a PDF (§4).
+Footers: 0.7–3.2 MB (1–5 files) for the first four; 7 MB (6 files, 18 s) and 9.5 MB (15 files, 41 s) for the
+country-scale two, before any row is read.
 
-### 2.2 What people see
+What it shows:
 
-- **In report mode, each item's caption row has a status chip:**
-  - **Synced:** a link icon. Tooltip: "Shows *name* on the board as it is now. Edit it on the board."
-  - **Detached:** a broken-link icon. Tooltip: "A copy of *name*, made *date*. It no longer follows the board."
-- **On the canvas,** the preview stays compact, with no chips.
-- **The Options panel's item row:**
-  - **Synced / Detached:** a select, for every type.
-  - **Go to source,** while the source exists.
-  - **Remove.**
-  - **A detached item's row also has:**
-    - its **Caption**, its own title in the report
-    - for a sticky note or a text, its **Text**
-    - **Sync again:** back to the board, which drops the copy and its edits, after a confirmation
-    - **Replace with the board's version:** detach again from the source as it is now, also after a confirmation
+- **The light columns are 10–13% of the bytes** (geometry alone is about 60%). Exposure needs no shapes.
+- **Testing row groups against the polygon, not its bbox, matters**: 95 to 10 row groups for Nepal's GDACS area, 34
+  to 17 for Pakistan's CEMS area. And within them, counting in the polygon instead of its bbox: 216,658 to 20,920.
+- **Counting is cheap**: 80 ms for 680k rows (point in polygon, no index). The time is round trips: each range request
+  to Overture's S3 (us-west-2) took 0.4–0.6 s from here, and hyparquet makes 3 per row group for these columns.
+  17 requests in flight instead of 4 gave 7.5 s instead of 8.8 s, so concurrency is not the lever; fewer, larger
+  requests might be (one range per row group spanning the three columns, if the columns between them are small).
+- **Country-scale polygons are out of reach**: GFD and the larger GDACS areas are country envelopes (19 to 56
+  vertices over 38–54 deg²), 17–32 million buildings and 240–360 MB of light columns. They need a cap with a clear
+  message, not a longer wait.
+- **Overture's `subtype` is nearly empty there**: 98–100% of exposed buildings have none (Pakistan: 46 of 259,736
+  have one). Hence the OpenStreetMap POIs above.
+- **Montandon's flood polygons are coarse.** CEMS items are titled "… flash flood hazard area" with 8–139 vertices,
+  simplified areas rather than mapped water; GDACS gives regions; GFD gives country envelopes. Counts over them are
+  "buildings in the hazard area", and the UI must say so. Drawn and uploaded areas can be as precise as people make
+  them.
 
-  Editing on the page itself would come with the report's page tools (step 5b).
-- **Deleting a synced item's source:** the item says "The source object was removed", with Remove. A detached item keeps showing its copy.
+## Design
 
-### 2.3 First edits on a detached item
+- **Board:** `scenario.exposure?: { buildings: true }`, written by an op (`map.setExposure`), so the agent can switch it
+  on and undo covers it. A recipe only: no counts on the board.
+- **Tool:** a browser tool `exposure.buildings` (output kind `exposure.counts`), input the flood polygons (as
+  `routing.route` takes closures), run in a worker (`exposure/exposure.worker.ts`) on `readOverture`. The tool runner
+  caches results by input, so a what-if switched off and on again costs nothing. Row groups are chosen by testing
+  their `bbox` statistics against the polygons (a new helper beside `rowGroupsInBbox` in `data/wkb.ts`, tested in
+  Node).
+- **Caps, checked before reading rows:** at most 8 files and 64 row groups (about 30 MB of light columns, roughly
+  30 s here); beyond that the panel says the area is too large to count in the browser and suggests a smaller area.
+  Also a cap on files, since footers alone took 41 s for 15 files.
+- **Baseline:** like routes, exposure is also counted for the areas from data alone, without the what-ifs, so the
+  panel shows what the what-ifs add.
+- **Panel:** an "Exposure" section in the Scenario tab: buildings in flood areas, health facilities and schools among
+  them (from OpenStreetMap), what the what-ifs add, and the caveats (exposure, not damage; the hazard area's source;
+  Overture's coverage). Loading while the first read runs; errors as the routes show them.
+- **Map:** exposed health facilities and schools as points; buildings as a count, not drawn (hundreds of thousands).
+  A line in the map's legend (`routing/RouteLegend.tsx`), so snapshots carry the figure into a situation report.
+- **Agent:** `summarize` says exposure is on; browser and MCP agents can run `exposure.buildings`; the room's agent
+  cannot see results, as with routes.
 
-Small at first: the **text** of a detached sticky note or text, and the **caption** of any detached item. Widget-specific edits (a map's view or layers, an event's choice, a country) would come later.
+## Decisions made while building
 
-## 3. What would change
+- **Country outlines are left out, by name.** A Montandon event footprint is not only flood areas: Nepal's flood
+  (gdacs-event-1104124-1) has 14 polygons, among them EM-DAT's hazard and event areas and IFRC's event area, each the
+  whole of Nepal (80–88° E). One of them made the count refuse (9 files). A single area larger than 4 deg² (about
+  200 × 200 km; `MAX_AREA_DEG2` in `exposure/areas.ts`) is left out, and the panel names it; GDACS's 3.6 deg² area and
+  the CEMS areas still count. Routing still treats those outlines as closures (it closes every road in Nepal): a
+  question for plan-014.
+- **Two columns, not three**: `bbox` and `subtype`. `class` was only for kinds of buildings, which come from
+  OpenStreetMap; one request fewer per row group.
+- **Facilities from the health facilities' Layercake worker** (`LayercakeHealth.facilities`, pick `facilities`):
+  health first, then `amenity` school, kindergarten, college or university. One worker, so the 5 MB footer is read
+  once per page. If they cannot be read (more than 12 row groups), the building count stands and the panel says why.
+- **The flood polygons are indexed** in a 64 × 64 grid over their bounds (`Flood`): an uploaded flood extent can have
+  thousands of polygons.
+- **A footprint comes into a scenario by source** (after PR #67 split footprints into a layer per source's area):
+  only the hazard areas up to 4 deg² are ticked as affected areas (`affectedByDefault`). For Nepal that is GDACS's
+  region and the 10 CEMS areas; EM-DAT's hazard area (all of Nepal), the IFRC and EM-DAT event areas and the points
+  come unticked. So routes no longer find every road in Nepal closed, and the count is 77,003 buildings, 51 health
+  facilities and 147 schools, with nothing left out.
+- **Facilities are drawn on live maps only**, as rose (health) and teal (education) dots; the legend line is on
+  snapshots too.
 
-**Stored names stay** (AGENTS.md: never rename stored fields or values):
-- `mode` keeps its stored values: `'live'` means **Synced** and `'frozen'` means **Detached**. Only the UI, the op descriptions and `summarize` use the new words.
-- New optional fields on an item block:
-  - `copy`: the detached copy
-  - `caption`: a detached item's own title; a synced item's caption is always its source's name
-- The existing optional `frozen` field stays readable. A block with `frozen` and no `copy` still shows its saved text or picture.
+Measured end to end (headless Chrome, dev server): the Nepal footprint plus a 0.07° × 0.06° what-if at Bharatpur,
+30 s for the first count: 119,605 buildings, 137 health facilities and 229 schools, of which the what-if adds 42,602
+buildings. Switching the what-if off gave 77,003 (the baseline) at once, from the tool cache.
 
-**Plugin** (`packages/plugins/src/reports.ts`):
-- **`report.setItemMode`** (op id unchanged; title "Sync or detach report item"):
-  - `frozen` (Detached) makes the copy, checked against the type's schema (`registry.objectSchema`). It fails only when the source is gone and there is no copy.
-  - `live` (Synced) relinks and drops the copy and caption.
-  - The `frozen` argument stays accepted, but is ignored.
-- **New `report.editItem`** (an agent tool too): `blockId`, `caption?`, `text?`. Only for a detached item, and `text` only for a sticky note or a text. It is a gesture op, like `text.setText`.
-- **`summarize`:** "synced", or "detached (a copy of a *type*, made *date*)".
-- **`freezeText`** and its type list go: every type can be detached.
+## Steps (done)
 
-**Web** (`apps/web/src/reports/`):
-- **`ItemView`** draws `board.get(sourceId)` when synced, or an object made from `copy` when detached (with `id` set to the block's id, so it never collides with a board object).
-- **`useMapPicture`** (`map/picture.ts`) takes an optional view, for a detached map's saved view.
-- **The chips and the Options panel rows** described in §2.2.
+1. Pure code, tested in Node: point in polygon over the polygons (with holes), row groups meeting polygons, counting
+   rows, and the POI counts.
+2. The worker, the tool and its caps; reuse `readOverture`. Try one range per row group for the three columns.
+3. `scenario.exposure`, `map.setExposure`, tests beside `mapScenario.test.ts`.
+4. The panel section, the POI points, the legend line; check in headless Chrome with the polygons above.
+5. AGENTS.md.
 
-**Steps:** this would replace step 7 of `agent-docs/tasks/reports.md` ("live and frozen, map pictures") with its own PR, before the report's page tools (step 5b).
+## Later
 
-## 4. Questions for reviewers
 
-1. **What does "detached" mean?** Is a copy of the object (its fields, drawn as the object) the right meaning, rather than a picture of it?
-2. **External data.** Should a detached item also pin its external data "as of" a date: the event's details, the country's figures, ReliefWeb's updates? Always, as an option, or only for a shared link or a PDF?
-3. **Deleting a source.** What should happen when a synced item's source is deleted from the board: show "removed" (as proposed), detach it automatically, or ask first when deleting an object that is in a report?
-4. **Edits.** Which edits should a detached item allow, first and later?
-5. **Words.** Do "Synced" and "Detached" work for the people who will use reports? Other candidates: "Linked / Copy", "Live / Snapshot".
-6. **The board side.** Should an object on the board show that it is in a report (for example a small badge, "In 1 report")?
+- **People exposed**: sum WorldPop (already a COG layer, `data.population`) in the polygons, reading pixels rather
+  than drawing them.
+- **Depth and return periods**: counts by depth class from flood hazard maps would turn exposure into a first step
+  of risk. Candidates (JRC global river flood hazard maps, WRI Aqueduct) are not checked yet for COG and CORS.
+- **By district**: counts by COD-AB area need the boundary polygons in the tool, which are vector tiles today.
+- **Larger areas**: a precomputed building count grid would make country-scale areas possible; not looked for yet.

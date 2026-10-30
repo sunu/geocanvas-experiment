@@ -19,7 +19,7 @@ import {
   type UrlFormat,
 } from './mapLayers.js'
 import { mapAnnotation, SHAPE_COLORS, SHAPE_POINTS, SHAPES, type MapAnnotation, type MapShape, type ShapeColor } from './mapAnnotations.js'
-import { closureGeometry, mapScenario, MAX_ROUTE_KM, nextRouteColor, ROUTE_PROFILES, type ClosureGeometry, type MapScenario } from './mapScenario.js'
+import { closureGeometry, mapScenario, MAX_ROUTE_KM, nextRouteColor, RETURN_PERIODS, ROUTE_PROFILES, type ClosureGeometry, type MapScenario } from './mapScenario.js'
 import { areaOfView, MAP_HEADER_PX, viewOfArea } from './mapView.js'
 import { checkArea, FORECAST_VARIABLES, forecastLayer, gfs, HORIZONS, latestRun, type ForecastVariable, type Horizon } from './weather.js'
 
@@ -183,6 +183,8 @@ export const mapPlugin = definePlugin({
           shapes.length && `shapes: ${shapes.join(', ')}`,
           routes.length && `routes: ${routes.join(', ')}`,
           closures.length && `road closures: ${closures.join(', ')}`,
+          scenario.exposure?.buildings &&
+            `exposure: buildings in flood areas counted${scenario.exposure.returnPeriod ? `, with the depth and damage of a ${scenario.exposure.returnPeriod}-year river flood` : ''}`,
         ]
           .filter(Boolean)
           .join('; ')
@@ -555,6 +557,26 @@ export const mapPlugin = definePlugin({
         const map = mapOf(ctx)
         const scenario = map.scenario ?? NO_SCENARIO
         return { id: map.id, scenario: { ...scenario, closures: changeItem(scenario.closures, closureId, 'closure', () => undefined) } }
+      },
+      apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
+    }),
+    defineOp({
+      id: 'map.setExposure',
+      title: 'Count exposed buildings',
+      description:
+        "Count the buildings in a map scenario's flood areas, for everyone, or stop counting them: the polygons of its road closures that are on and of its layers that block roads. Each browser counts Overture's buildings and OpenStreetMap's health facilities and schools in them, and the count with the closures (what-ifs) is compared with the count without them. Areas up to about half a square degree; a country-wide area is too large.",
+      target: oneMap,
+      args: z.object({
+        buildings: z.boolean().describe('Count buildings in the flood areas'),
+        returnPeriod: z
+          .union(RETURN_PERIODS.map((r) => z.literal(r)))
+          .optional()
+          .describe('Also estimate flood depth and damage, for a river flood of this return period (years), from the GloFAS hazard maps'),
+      }),
+      prepare(ctx, { buildings, returnPeriod }) {
+        const map = mapOf(ctx)
+        const { exposure: _, ...scenario } = map.scenario ?? NO_SCENARIO
+        return { id: map.id, scenario: buildings ? { ...scenario, exposure: { buildings, ...(returnPeriod && { returnPeriod }) } } : scenario }
       },
       apply: (tx, { id, scenario }) => setScenario(tx, id, scenario),
     }),

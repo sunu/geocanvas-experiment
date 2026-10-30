@@ -58,6 +58,68 @@ body,
 .ttx-obj {
   position: absolute;
   box-sizing: border-box;
+  /* Fades in what an agent added when its cursor gets there (canvas/agentCursor.ts). */
+  transition: opacity 200ms ease-out;
+}
+
+.ttx-obj.is-arriving {
+  opacity: 0;
+  transition: none;
+}
+
+/* An agent working on it, or on its data (canvas/agentCursor.ts): a placeholder card in the agent's violet over it, a
+ * dashed edge and a light sweeping across, with what the agent does at the bottom left. The name above it stays. Edge
+ * and label keep their size on screen at any zoom. */
+.ttx-obj__busy {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: calc(1.5px / var(--ttx-zoom, 1)) dashed var(--agent);
+  background:
+    linear-gradient(110deg, transparent 40%, color-mix(in srgb, var(--agent) 18%, transparent) 50%, transparent 60%) 100% 0 / 300% 100% no-repeat,
+    color-mix(in srgb, color-mix(in srgb, var(--agent) 8%, var(--background)) 94%, transparent);
+  pointer-events: none;
+  animation: ttx-busy-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes ttx-busy-sweep {
+  to {
+    background-position: 0% 0, 0 0;
+  }
+}
+
+/* Where the agent's first add will land, while it thinks (canvas/agentCursor.ts): a busy card on its own, in screen
+ * space, placed by its style. */
+.ttx-agent-placeholder {
+  inset: auto;
+  /* Under the agent's cursor, which comes after it: a busy card's z-index lifts it over a widget's content only. */
+  z-index: auto;
+}
+
+.ttx-obj__busy-label {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 14px 18px;
+  color: var(--agent);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: scale(calc(1 / var(--ttx-zoom, 1)));
+  transform-origin: 0 100%;
+}
+
+.ttx-obj__busy-ring {
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in srgb, var(--agent) 30%, transparent);
+  border-top-color: var(--agent);
+  border-radius: 50%;
+  animation: ttx-spin 0.8s linear infinite;
 }
 
 /*
@@ -404,6 +466,53 @@ body,
   font-size: 12px;
   line-height: 16px;
   white-space: nowrap;
+}
+
+/* What the agent does now, beside its name: an op, a search, or thinking. */
+.ttx-cursor__doing {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* An agent's cursor is moved every frame (canvas/agentCursor.ts), so it needs no smoothing of its own. */
+.ttx-cursor--agent {
+  transition: none;
+}
+
+/* The agent's cursor floats over the page (it drifts, canvas/agentCursor.ts): lifted, so its shadow falls further. */
+.ttx-cursor--agent svg {
+  filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.22));
+}
+
+/* An agent working off-screen: a marker on the canvas edge, pointing at it. */
+.ttx-agent-edge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--agent-foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ttx-obj {
+    transition: none;
+  }
+
+  .ttx-obj__busy,
+  .ttx-obj__busy-ring {
+    animation: none;
+  }
 }
 
 /* The color swatches of the palette's color field (canvas/coreUI.tsx). */
@@ -913,6 +1022,30 @@ body,
 
 .ttx-chat__calls li.is-failed {
   color: #dc2626;
+}
+
+.ttx-chat__objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ttx-chat__objects button {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .ttx-chat__undo {
@@ -2412,6 +2545,28 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 3.5px var(--ttx-ink);
 }
 
+/* Ends a polygon being drawn (map/draw.ts): a touch screen has no Enter, and no double-click it sends reliably. */
+.ttx-map__done {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ttx-ink);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ttx-map__done[hidden] {
+  display: none;
+}
+
 .ttx-map__toolhint {
   max-width: 200px;
   padding: 2px 4px;
@@ -2581,6 +2736,17 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   flex: none;
   width: 10px;
   height: 10px;
+}
+
+/* The exposure line: the flood areas' blue, not a route's color. */
+.ttx-routelegend__flood {
+  border: 1px solid #2563eb;
+  background: rgb(37 99 235 / 0.25);
+}
+
+/* The flood depth line: the deepest of the depth colors (exposure/useExposure.ts DEPTH_COLORS). */
+.ttx-routelegend__depth {
+  background: #08519c;
 }
 
 .ttx-routelegend__title {
@@ -3013,6 +3179,13 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   line-height: 1.2;
 }
 
+/* A report in one flow (ReportPages.tsx ReportContent): the phone's Reports tab, which makes it one column (mobile.css). */
+.ttx-report__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+}
+
 /* One row of the two-column grid (reports/pages.ts); rows are 16px apart, as ReportPages' ROW_GAP. */
 .ttx-report__row {
   display: grid;
@@ -3271,4 +3444,10 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   transform-origin: 0 0;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* Above the canvas's toolbar and the phone's tabs (pwa/UpdateNotice.tsx). */
+.ttx-update {
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  white-space: nowrap;
 }

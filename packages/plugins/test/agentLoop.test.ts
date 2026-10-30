@@ -13,12 +13,15 @@ import {
   MAX_STEPS,
   plugins,
   runTurn,
+  SEARCH_RESULTS,
+  THINKING,
   TURNS_PER_HOUR,
   type Complete,
+  type FunctionTool,
   type Geocoder,
   type Message,
 } from '../src/index'
-import { freeSpot } from '../src/agent/call'
+import { firstAddSpot, freeSpot } from '../src/agent/call'
 import type { MontyClient } from '../src/monty/client'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
@@ -132,6 +135,22 @@ describe('runTurn', () => {
       ['event.add', 'applied'],
     ])
     expect(reply.undo!.created).toHaveLength(1)
+  })
+
+  it('says what it does next: thinking before each model call, the title before each tool call', async () => {
+    const { doc, chat } = board()
+    const monty = { findEvents: async () => [] } as unknown as MontyClient
+    const message = chat.send({ actor: ada, text: 'add a sticky about floods', selection: [] })
+    const model = scripted(
+      tools(call('events__search', { text: 'flood' })),
+      tools(call('sticky__add', { args: { text: 'Floods' } }), call('sticky__add', { args: { text: 'More' } })),
+      { role: 'assistant', content: 'Added it.' },
+    )
+    const runtime = new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } })
+    const activity: string[] = []
+    await runTurn(runtime, message, model.complete, new ToolRunner([boardGet(runtime), eventsSearch(monty)]), [], (title) => activity.push(title))
+    const sticky = runtime.registry.op('sticky.add')!.title
+    expect(activity).toEqual([THINKING, 'Search events', THINKING, sticky, sticky, THINKING])
   })
 
   it("finds a place, adds a map, and shows the place in the asker's view only", async () => {
@@ -297,6 +316,16 @@ describe('placing what an agent adds', () => {
     expect(overlaps(doc)).toEqual([])
   })
 
+  it("predicts where a turn's first add lands, as browsers show its placeholder", async () => {
+    const { doc, chat, person: ada_ } = board()
+    const center = { x: 300, y: 50 }
+    const size = ada_.registry.objectType('sticky')!.defaultSize
+    const predicted = firstAddSpot(ada_.board.list(), center, size)
+    const message = chat.send({ actor: ada, text: 'add a note', selection: [], center })
+    await turn(agent(doc), message, scripted(tools(call('sticky__add', { args: { text: 'Note' } }))).complete)
+    expect(person(doc).board.list().find((o) => o.type === 'sticky')).toMatchObject(predicted)
+  })
+
   it('goes below everything when no near row is free', () => {
     const wall = { x: -5000, y: -5000, w: 20000, h: 10000 }
     expect(freeSpot({ x: 0, y: 0, w: 200, h: 200 }, [wall])).toEqual({ x: 0, y: 5000 + GAP })
@@ -341,6 +370,15 @@ describe('Agent', () => {
     expect(replies(chat).map((r) => r.replyTo)).toEqual([first.id, second.id])
     expect(most).toBe(1)
     expect(busy).toEqual([true, false])
+  })
+
+  it('says for whom it works, and stops saying anything when it is done', async () => {
+    const { doc, chat } = board()
+    const activity: unknown[] = []
+    new Agent({ doc, complete: async () => ({ role: 'assistant', content: 'ok' }), onActivity: (a) => activity.push(a) })
+    chat.send({ actor: ada, text: 'one', selection: [] })
+    for (let i = 0; i < 10; i++) await settle()
+    expect(activity).toEqual([{ for: 'ada', title: THINKING }, null])
   })
 
   it('shows the earlier turns, so "the duplicate" can name an object that is not selected', async () => {
@@ -502,5 +540,70 @@ describe('undoing an agent turn', () => {
     person.dispatch('core.object.move', { kind: 'objects', ids: [added] }, { dx: 5 })
     expect((await person.invoke('agent.undoTurn', canvas, { replyId: old.id })).status).toBe('applied')
     expect(person.board.get(a)!.x).toBe(0)
+  })
+})
+
+describe('skills and deferred tools', () => {
+  const names = (t: FunctionTool[]) => t.map((x) => x.function.name)
+  /** A model that gives these answers in turn, and records the tools and system prompt of each call. */
+  function recording(...answers: Extract<Message, { role: 'assistant' }>[]) {
+    const sent: string[][] = []
+    const results: string[] = []
+    let system = ''
+    const complete: Complete = async (messages, tools) => {
+      system = messages[0]!.content as string
+      const last = messages.at(-1)!
+      if (last.role === 'tool') results.push(last.content)
+      sent.push(names(tools))
+      return answers.shift() ?? { role: 'assistant', content: 'Done.' }
+    }
+    return { complete, sent, results, system: () => system }
+  }
+  const geocoder: Geocoder = { forward: async () => [], reverse: async () => undefined }
+
+  it('sends the core tools first, and lists only the skills whose tools the agent has', async () => {
+    const { doc, chat } = board()
+    const m = recording()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'hi', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.sent[0]).toEqual(expect.arrayContaining(['tools__search', 'skills__read', 'box__add', 'map__add', 'core__object__delete', 'board__get']))
+    expect(m.sent[0]).not.toContain('map__showArea')
+    expect(m.sent[0]).not.toContain('data__geocode')
+    // Geocoding is there, Montandon search is not.
+    expect(m.system()).toContain('- show-place:')
+    expect(m.system()).not.toContain('add-event')
+  })
+
+  it("gives a skill's steps and loads its tools for the next call", async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('skills__read', { name: 'show-place' })))
+    const runtime = new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } })
+    const activity: string[] = []
+    const message = chat.send({ actor: ada, text: 'show Beira', selection: [] })
+    const reply = await runTurn(runtime, message, m.complete, new ToolRunner([boardGet(runtime), ...geocodeTools(geocoder)]), [], (title) => activity.push(title))
+    expect(activity).toEqual([THINKING, 'Read the show-place skill', THINKING])
+    expect(m.results[0]).toContain('data__geocode first')
+    expect(m.sent[1]).toEqual(expect.arrayContaining(['data__geocode', 'map__showArea']))
+    expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the show-place skill', status: 'applied' }])
+  })
+
+  it('loads the tools a search finds', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('tools__search', { query: 'road closure' })))
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'close the bridge', selection: [] }), m.complete)
+    const found = (JSON.parse(m.results[0]!) as { loaded: { name: string }[] }).loaded.map((t) => t.name)
+    expect(found[0]).toBe('map__addClosure')
+    expect(found.length).toBeLessThanOrEqual(SEARCH_RESULTS)
+    expect(m.sent[1]).toEqual(expect.arrayContaining(found))
+    expect(m.sent[0]).not.toContain('map__addClosure')
+  })
+
+  it('runs a tool that is not loaded when the model names it', async () => {
+    const { doc, person, chat } = board()
+    const map = person.dispatch('map.add', canvas, { x: 0, y: 400 }).created![0]!
+    const m = recording(tools(call('map__setBasemap', { ids: [map], args: { basemap: 'dark' } })))
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'make it dark', selection: [map] }), m.complete)
+    expect(m.sent[0]).not.toContain('map__setBasemap')
+    expect(reply.calls[0]).toMatchObject({ tool: 'map.setBasemap', status: 'applied' })
+    expect(person.board.get(map)).toMatchObject({ basemap: 'dark' })
   })
 })

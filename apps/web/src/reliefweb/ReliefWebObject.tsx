@@ -5,6 +5,7 @@ import type { ObjectViewProps } from '../canvas/registry'
 import { disasterPage, loadUpdates, type ReliefWebUpdate } from './feed'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import { RELIEFWEB_FACE } from '../canvas/widgetFaces'
+import { useReportLoading } from '../canvas/loading'
 
 /**
  * The latest ReliefWeb updates for a disaster (by its GLIDE numbers): situation reports, maps, appeals.
@@ -44,6 +45,7 @@ export function ReliefWebObject({ object: o, editing }: ObjectViewProps<ReliefWe
   }, [editing])
 
   const shown = state?.key === key ? state : undefined
+  useReportLoading(o.glides.length > 0 && shown?.updates === undefined && shown?.error === undefined)
   return (
     <div className="ttx-relief">
       {/* A press anywhere but on a button or link selects and drags the feed, like any object. */}

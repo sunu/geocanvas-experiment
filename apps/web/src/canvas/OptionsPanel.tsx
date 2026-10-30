@@ -4,9 +4,9 @@ import type { Draft, Runtime } from '@ttx/core'
 import type { BoardObject } from '../board/board'
 import type { FocusableObjectUI } from './registry'
 
-/** Whether the draft has changes others cannot see yet; never, with no draft. */
+/** Whether the draft has changes others cannot see yet; never, with no draft (a live type). */
 const noSubscribe = () => () => {}
-const useUnshared = (draft: Draft | undefined): boolean => useSyncExternalStore(draft?.subscribe ?? noSubscribe, () => !!draft?.hasUnshared())
+export const useUnshared = (draft: Draft | undefined): boolean => useSyncExternalStore(draft?.subscribe ?? noSubscribe, () => !!draft?.hasUnshared())
 
 interface PanelProps {
   /** What the Options change: the draft's runtime, or the board's for a live type. */

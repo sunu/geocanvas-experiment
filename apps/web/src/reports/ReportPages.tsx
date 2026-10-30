@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
 import { docText, MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject, type RichDoc } from '@ttx/plugins'
@@ -90,6 +90,30 @@ export function ReportPages({
         </div>
       ))}
     </>
+  )
+}
+
+/**
+ * A report's title and blocks in one flow, at whatever width it is given, with items as compact cards: the phone's
+ * Reports tab (mobile/ReportsPage.tsx) reads reports this way, in one column (mobile.css).
+ */
+export function ReportContent({ ref, runtime, report: r }: { ref?: Ref<HTMLDivElement>; runtime: Runtime; report: ReportBoardObject }) {
+  const board = runtime.board as Board
+  return (
+    <div ref={ref} className="ttx-report__content">
+      <h1 className="ttx-report__title">{titleOf(board, r)}</h1>
+      {r.blocks.length ? (
+        <div className="ttx-report__grid">
+          {r.blocks.map((b) => (
+            <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
+              <BlockView block={b} board={board} runtime={runtime} width={0} maxHeight={Infinity} measuring={false} full={false} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="ttx-report__empty">Drop objects here, or use Add to report</p>
+      )}
+    </div>
   )
 }
 

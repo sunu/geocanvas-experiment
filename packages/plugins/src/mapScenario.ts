@@ -55,7 +55,24 @@ export const scenarioClosure = z.object({
 })
 export type ScenarioClosure = z.infer<typeof scenarioClosure>
 
-export const mapScenario = z.object({ routes: z.array(scenarioRoute), closures: z.array(scenarioClosure) })
+/** The return periods (years) of the GloFAS river flood hazard maps, which give flood depth (plans/plan-016.md). */
+export const RETURN_PERIODS = [10, 20, 50, 75, 100, 200, 500] as const
+export type ReturnPeriod = (typeof RETURN_PERIODS)[number]
+
+/**
+ * Which exposure counts the scenario shows: `buildings`, the buildings in its flood areas (the polygons of the closures
+ * that are on and of the layers that block roads), with the health facilities and schools among them; with
+ * `returnPeriod`, also the depth of a flood of that return period at each, from the GloFAS maps, and the damage it
+ * would do. Each browser counts them (apps/web/src/exposure/, apps/web/src/inundation/); the board stores only what
+ * to count. Optional: scenarios made before it have none.
+ */
+export const scenarioExposure = z.object({
+  buildings: z.boolean(),
+  returnPeriod: z.union(RETURN_PERIODS.map((r) => z.literal(r))).optional(),
+})
+export type ScenarioExposure = z.infer<typeof scenarioExposure>
+
+export const mapScenario = z.object({ routes: z.array(scenarioRoute), closures: z.array(scenarioClosure), exposure: scenarioExposure.optional() })
 export type MapScenario = z.infer<typeof mapScenario>
 
 /** The first color no route uses yet, or the least used one. */

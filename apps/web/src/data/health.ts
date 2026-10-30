@@ -3,7 +3,8 @@ import { defineTool } from '@ttx/core'
 import { areaSchema } from './area'
 import type { Bbox } from '@ttx/plugins'
 import { LAYERCAKE_ATTRIBUTION, MAX_ROW_GROUPS } from './layercake'
-import type { LayercakeRequest, LayercakeResponse } from './layercake.worker'
+import type { FacilityFeature } from './layercake'
+import type { LayercakeRequest, LayercakeResponse, PoiPick } from './layercake.worker'
 
 /** Health facilities in an area, as points. */
 export interface HealthSource {
@@ -11,8 +12,9 @@ export interface HealthSource {
 }
 
 /**
- * Health facilities read in the browser from Layercake's GeoParquet. The reader (hyparquet) runs in a
- * worker started on the first query, so it adds nothing to the main bundle and the footer is read once per page.
+ * Health facilities, and for exposure counts also places of education, read in the browser from Layercake's
+ * GeoParquet. The reader (hyparquet) runs in a worker started on the first query, so it adds nothing to the main
+ * bundle and the footer is read once per page: share one instance.
  */
 export class LayercakeHealth implements HealthSource {
   private worker?: Worker
@@ -28,24 +30,33 @@ export class LayercakeHealth implements HealthSource {
     return w
   }
 
-  async query(area: Bbox, opts: { signal?: AbortSignal } = {}) {
-    opts.signal?.throwIfAborted()
+  query(area: Bbox, opts: { signal?: AbortSignal } = {}) {
+    return this.ask(area, 'health', opts.signal)
+  }
+
+  /** Health facilities and places of education (schools, colleges), for exposure counts. */
+  facilities(area: Bbox, opts: { signal?: AbortSignal } = {}) {
+    return this.ask(area, 'facilities', opts.signal) as Promise<GeoJSON.FeatureCollection<GeoJSON.Point, FacilityFeature['properties']>>
+  }
+
+  private async ask(area: Bbox, pick: PoiPick, signal?: AbortSignal) {
+    signal?.throwIfAborted()
     const worker = (this.worker ??= this.start())
     const id = this.nextId++
     const post = (msg: LayercakeRequest) => worker.postMessage(msg)
     // An abort stops the worker's downloads for this query.
     const onAbort = () => post({ kind: 'abort', id })
-    opts.signal?.addEventListener('abort', onAbort, { once: true })
+    signal?.addEventListener('abort', onAbort, { once: true })
     try {
       const res = await new Promise<LayercakeResponse>((resolve) => {
         this.pending.set(id, resolve)
-        post({ kind: 'query', id, bbox: area })
+        post({ kind: 'query', id, bbox: area, pick })
       })
-      opts.signal?.throwIfAborted()
+      signal?.throwIfAborted()
       if (!res.ok) throw new Error(res.error)
       return res.value
     } finally {
-      opts.signal?.removeEventListener('abort', onAbort)
+      signal?.removeEventListener('abort', onAbort)
     }
   }
 }

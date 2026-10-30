@@ -10,9 +10,9 @@ import { useSnapshot, type SnapshotRequest } from './snapshots'
 /** Where a map with no view yet looks: the whole world. */
 export const WORLD = { center: [20, 10] as [number, number], zoom: 1, bearing: 0 }
 
-/** What a map's data says about itself: the layers' attributions and captions, and the routes' (Overture roads). */
-export function creditsOf(states: LayerState[], routes: RouteState[]): string {
-  const results = [...states.map((st) => st.value), ...routes.map((r) => r.result)]
+/** What a map's data says about itself: the layers' attributions and captions, the routes' (Overture roads), and the flood exposure's. */
+export function creditsOf(states: LayerState[], scenario: { routes: RouteState[]; exposure?: { result?: unknown } }): string {
+  const results = [...states.map((st) => st.value), ...scenario.routes.map((r) => r.result), scenario.exposure?.result]
   return [...new Set(results.flatMap((v) => [attributionOf(v), captionOf(v)]).filter((a) => !!a))].join(' · ')
 }
 
@@ -52,7 +52,7 @@ export function useMapPicture(runtime: Runtime, o: MapBoardObject): { url?: stri
   const subscribe = useCallback((listener: () => void) => views.subscribe(listener), [views])
   const view = useSyncExternalStore(subscribe, () => views.get(runtime.actor.id, o.id) ?? views.latest(o.id)?.view) ?? WORLD
   const url = useSnapshot(pictureRequest(o, view, layers, shapes, scenario))
-  return { url, credits: [BASEMAP_CREDITS[o.basemap], creditsOf(states, scenario.routes)].filter(Boolean).join(' · ') }
+  return { url, credits: [BASEMAP_CREDITS[o.basemap], creditsOf(states, scenario)].filter(Boolean).join(' · ') }
 }
 
 const NO_LAYERS: MapLayer[] = []

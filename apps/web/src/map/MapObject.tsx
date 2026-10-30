@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl, type MapMouseEvent } from 'maplibre-gl'
+import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import type { ObjectViewProps } from '../canvas/registry'
+import { useReportLoading } from '../canvas/loading'
 import { stableJson, Views, type Runtime, type SavedView } from '@ttx/core'
 import { MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
@@ -104,10 +105,11 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   runtimeRef.current = runtime
   const layers = o.layers ?? NO_LAYERS
   const states = useLayerStates(layers)
+  useReportLoading(states.some((st) => st.loading))
   const scenario = useScenario(o, layers, states)
   // Routes are found on Overture's roads, whose license asks for attribution like a layer's. A forecast's caption (model,
   // run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
-  const credits = creditsOf(states, scenario.routes)
+  const credits = creditsOf(states, scenario)
   /** In focus: Map mode (data, notes, drawings) or Scenario mode (routes, closures); the Options panel's tabs pick it. */
   const mode = useMapMode(o.id)
   /** The latest states, for map events. */
@@ -224,11 +226,15 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   useEffect(() => {
     const map = mapRef.current
     if (!map || !writing) return
-    const onDown = (e: MapMouseEvent) => {
+    const onDown = (e: MapMouseEvent | MapTouchEvent) => {
       if (!(e.originalEvent.target as Element).closest('.ttx-mapsticky')) setWriting(undefined)
     }
     map.on('mousedown', onDown)
-    return () => void map.off('mousedown', onDown)
+    map.on('touchstart', onDown)
+    return () => {
+      map.off('mousedown', onDown)
+      map.off('touchstart', onDown)
+    }
   }, [writing])
 
   // Placing a sticky: the next click on the map, not on a note, adds one there, for everyone, and opens it to write.
@@ -272,23 +278,22 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     const save = () => {
       clearTimeout(timer)
       if (!pending) return
-      shownAt = pending.at
-      views.set(me, o.id, pending)
+      // A move that ends where the view already is (a resize, entering focus) is not a pan: saving it would only change
+      // `at`, which in focus marks the draft as changed with nothing to share.
+      if (!sameView(pending, views.get(me, o.id))) {
+        shownAt = pending.at
+        views.set(me, o.id, pending)
+      }
       pending = undefined
     }
     // Show this doc's view first. After leaving focus with Discard, the map still shows the draft's view, and the
     // resize that ends focus would otherwise save it to the board as a pan.
     const saved = views.get(me, o.id)
-    if (saved) {
-      const c = map.getCenter()
-      if (Math.abs(c.lng - saved.center[0]) > 1e-7 || Math.abs(c.lat - saved.center[1]) > 1e-7 || Math.abs(map.getZoom() - saved.zoom) > 1e-7)
-        map.jumpTo({ center: saved.center, zoom: saved.zoom, bearing: saved.bearing })
-    }
+    if (saved && !sameView(shown(map), saved)) map.jumpTo({ center: saved.center, zoom: saved.zoom, bearing: saved.bearing })
     const onMoveStart = () => clearTimeout(timer)
     const onMoveEnd = () => {
       if (moving) return void (moving = false)
-      const c = map.getCenter()
-      pending = { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), at: Date.now() }
+      pending = { ...shown(map), at: Date.now() }
       timer = setTimeout(save, SAVE_AFTER_MS)
     }
     map.on('movestart', onMoveStart)
@@ -372,7 +377,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
         )}
         {/* Notes and shapes are added in focus only; a double-click on the canvas lets the map pan, nothing more. */}
         {focused && mode === 'map' && <DrawingBox tool={tool} color={shapeColor} onTool={setTool} onColor={setShapeColor} />}
-        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} active={!!focused && mode === 'scenario'} />
+        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} exposure={scenario.exposure} active={!!focused && mode === 'scenario'} />
         {!live && snapshot && (
           <>
             <img className="ttx-map__snapshot" src={snapshot} alt="" draggable={false} />
@@ -396,6 +401,18 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       </div>
     </div>
   )
+}
+
+/** What `map` shows now, as a view. */
+function shown(map: MapLibreMap): Omit<SavedView, 'at'> {
+  const c = map.getCenter()
+  return { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing() }
+}
+
+/** The same place, zoom and bearing, to within rounding. */
+function sameView(a: Omit<SavedView, 'at'>, b: Omit<SavedView, 'at'> | undefined): boolean {
+  const near = (x: number, y: number) => Math.abs(x - y) <= 1e-7
+  return !!b && near(a.center[0], b.center[0]) && near(a.center[1], b.center[1]) && near(a.zoom, b.zoom) && near(a.bearing, b.bearing)
 }
 
 /**

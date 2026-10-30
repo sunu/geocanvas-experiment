@@ -9,6 +9,9 @@ import { ObjectHeader } from '../canvas/ObjectHeader'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { ReportPages } from './ReportPages'
+
+/** The phone's Reports tab reads a report as one flow (mobile/ReportsPage.tsx). */
+export { ReportContent } from './ReportPages'
 import { titleOf } from './reports'
 
 /** Space around and between the sheets in report mode, in px. */

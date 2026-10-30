@@ -27,6 +27,7 @@ export class Agent {
   private accepts: (message: UserMessage) => boolean
   private turnsPerHour: number | undefined
   private onBusy: (busy: boolean) => void
+  private onActivity: (activity: { for: string; title: string } | null) => void
   private keepAlive: (work: Promise<void>) => void
   private busy = false
   private turns: number[] = []
@@ -43,6 +44,8 @@ export class Agent {
     turnsPerHour?: number
     /** Called when a turn starts (true) and when the queue is empty (false). */
     onBusy?: (busy: boolean) => void
+    /** Called with what the agent does next (runTurn's onActivity) and the asker's person id, and with null when the queue is empty. */
+    onActivity?: (activity: { for: string; title: string } | null) => void
     /** Given the promise of the running turns, so the room stays in memory until they end. */
     keepAlive?: (work: Promise<void>) => void
   }) {
@@ -50,6 +53,7 @@ export class Agent {
     this.accepts = opts.accepts ?? forRoom
     this.turnsPerHour = opts.turnsPerHour
     this.onBusy = opts.onBusy ?? (() => {})
+    this.onActivity = opts.onActivity ?? (() => {})
     this.keepAlive = opts.keepAlive ?? (() => {})
     this.runtime = new Runtime({ doc: opts.doc, plugins, actor: AGENT })
     this.tools = new ToolRunner([boardGet(this.runtime), ...(opts.tools ?? [])])
@@ -85,10 +89,12 @@ export class Agent {
         this.turns.push(now)
         const entries = this.chat.list()
         const history = entries.slice(0, entries.findIndex((e) => e.id === message.id))
-        this.chat.reply(await runTurn(this.runtime, message, this.complete, this.tools, history))
+        const onActivity = (title: string) => this.onActivity({ for: message.actor.id, title })
+        this.chat.reply(await runTurn(this.runtime, message, this.complete, this.tools, history, onActivity))
       }
     } finally {
       this.busy = false
+      this.onActivity(null)
       this.onBusy(false)
     }
   }

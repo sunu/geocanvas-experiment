@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CircleNotchIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
-import { ROUTE_COLORS, ROUTE_PROFILES, type MapBoardObject, type MapLayer, type RouteProfile, type ScenarioClosure } from '@ttx/plugins'
+import { footprintParts, ROUTE_COLORS, ROUTE_PROFILES, type MapBoardObject, type MapLayer, type RouteProfile, type ScenarioClosure } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -9,8 +9,12 @@ import { cn } from '@/lib/utils'
 import type { Board } from '../board/board'
 import { useLayerStates, type LayerState } from '../map/layers'
 import { useBoardEvents } from '../map/MapOptions'
+import { monty } from '../events/monty'
+import { affectedByDefault } from '../exposure/areas'
+import { ExposureSection } from '../exposure/ExposureSection'
 import { importAffectedAreas } from './importArea'
-import { detour, formatDuration, formatKm, signedKm, useClosures, useRoutes, type RouteState } from './useRoutes'
+import { useScenario } from './ScenarioOnMap'
+import { detour, formatDuration, formatKm, signedKm, type RouteState } from './useRoutes'
 
 const PROFILE_LABEL: Record<RouteProfile, string> = { car: 'Car', truck: 'Truck' }
 const NO_LAYERS: MapLayer[] = []
@@ -24,14 +28,14 @@ function op(runtime: Runtime, mapId: string, id: string, args: Record<string, un
 /**
  * A map's Options in Scenario mode: its routes with their times and what the closures add, and what closes roads,
  * from data (layers that block roads: imported files, event footprints, notebook results) and from what-ifs (closures
- * drawn with the scenario toolbar). Each can be switched off and on to compare. In focus all of it is on the draft.
+ * drawn with the scenario toolbar), and the buildings in those areas (exposure). Each can be switched off and on to
+ * compare. In focus all of it is on the draft.
  */
 export function ScenarioPanel({ runtime, object: o }: { runtime: Runtime; object: MapBoardObject }) {
   const layers = o.layers ?? NO_LAYERS
   // The map runs the same tools; the tool runner shares the runs and caches the results.
   const states = useLayerStates(layers)
-  const { all, closures } = useClosures(o.scenario, layers, states)
-  const routes = useRoutes(o.scenario?.routes ?? [], all)
+  const { routes, closures, exposure } = useScenario(o, layers, states)
   const mapOp = (id: string, args: Record<string, unknown>) => op(runtime, o.id, id, args)
 
   return (
@@ -68,6 +72,11 @@ export function ScenarioPanel({ runtime, object: o }: { runtime: Runtime; object
           ))}
         </div>
       </section>
+      <ExposureSection
+        exposure={exposure}
+        returnPeriod={o.scenario?.exposure?.returnPeriod}
+        onSet={(buildings, returnPeriod) => mapOp('map.setExposure', { buildings, ...(returnPeriod && { returnPeriod }) })}
+      />
     </div>
   )
 }
@@ -154,12 +163,26 @@ function FromData({
     )
   }
 
-  /** An event's footprint as a layer that blocks roads. */
+  /**
+   * An event's footprint as a layer per source's area, as the map menu adds it (footprintParts), in one step. The hazard
+   * areas are affected areas at once (they block roads and are counted); the areas that only locate the event, the
+   * points and anything country-wide are added unticked (affectedByDefault). Without a footprint, one layer, which
+   * says why in the list.
+   */
+  const [adding, setAdding] = useState<string>()
   const addFootprint = (eventId: string, title: string) => {
-    const before = new Set(layers.map((l) => l.id))
-    op(runtime, mapId, 'map.addEventLayer', { eventId, title })
-    const added = (runtime.board.get(mapId) as MapBoardObject | undefined)?.layers?.find((l) => !before.has(l.id))
-    if (added) runtime.dispatch('map.setLayerBlocks', { kind: 'objects', ids: [mapId] }, { layerId: added.id, blocks: true })
+    setAdding(eventId)
+    monty.getFootprint(eventId).then(
+      (fc) => {
+        const before = new Set(layers.map((l) => l.id))
+        op(runtime, mapId, 'map.addEventLayers', { eventId, parts: footprintParts(fc, title) })
+        const affected = new Set(fc.features.filter(affectedByDefault).map((f) => f.properties.id))
+        for (const l of (runtime.board.get(mapId) as MapBoardObject | undefined)?.layers ?? []) {
+          if (!before.has(l.id) && affected.has(String(l.input.itemId))) runtime.dispatch('map.setLayerBlocks', { kind: 'objects', ids: [mapId] }, { layerId: l.id, blocks: true })
+        }
+      },
+      () => op(runtime, mapId, 'map.addEventLayer', { eventId, title }),
+    ).finally(() => setAdding(undefined))
   }
 
   return (
@@ -201,8 +224,9 @@ function FromData({
           <p className="mt-3 mb-1 text-xs/4 text-muted-foreground">Footprints of the events on this board</p>
           <div className="flex flex-col gap-1">
             {events.map((e) => (
-              <Button key={e.id} variant="ghost" size="sm" className="justify-start truncate" title={e.id} onClick={() => addFootprint(e.id, e.name)}>
+              <Button key={e.id} variant="ghost" size="sm" className="justify-start truncate" title={e.id} disabled={!!adding} onClick={() => addFootprint(e.id, e.name)}>
                 {e.name}
+                {adding === e.id && <CircleNotchIcon className="size-3 animate-spin" aria-label="Reading the footprint" />}
               </Button>
             ))}
           </div>
