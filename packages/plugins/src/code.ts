@@ -33,6 +33,25 @@ import { newLayerId, type MapLayer } from './mapLayers.js'
 /** The browser tool that runs code (apps/web/src/code/execute.ts). Environments without a hub login lack it. */
 export const CODE_EXECUTE_TOOL = 'code.execute'
 
+/**
+ * code.execute as the model sees it, without its `run`: the browser's tool (apps/web/src/code/execute.ts) runs it
+ * on the person's hub, and the room's agent gets a tool that asks the asker's tab to run it (agent/relay.ts).
+ */
+export const codeExecuteSpec = {
+  id: CODE_EXECUTE_TOOL,
+  title: 'Run Python code',
+  description:
+    "Run Python code on the person's JupyterHub and get its output (features, a table, an image, text, a number) or its error, without changing the board. " +
+    'Use it to test code before code.add or code.run. The last expression is the output, or call ttx.show(value).',
+  input: z.object({
+    source: z.string().max(20_000),
+    /** Run again even if the same code ran a moment ago (a person's Run). */
+    fresh: z.boolean().optional(),
+  }),
+  output: 'code.result',
+  cache: false,
+} as const
+
 export type CodeBoardObject = AnyObject & { type: 'code'; title: string; language: 'python'; source: string; output?: CodeOutput; run?: CodeRun }
 
 const oneCell = { kind: 'objects', types: ['code'], min: 1, max: 1 } as const

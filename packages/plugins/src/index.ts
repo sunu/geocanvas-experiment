@@ -1,6 +1,6 @@
 export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
-export { CODE_EXECUTE_TOOL, codePlugin, followersOf, type CodeBoardObject } from './code.js'
+export { CODE_EXECUTE_TOOL, codeExecuteSpec, codePlugin, followersOf, type CodeBoardObject } from './code.js'
 export {
   ACCEPTS,
   accepts,

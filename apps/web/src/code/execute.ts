@@ -1,10 +1,9 @@
-import { z } from 'zod'
 import { defineTool } from '@ttx/core'
 import {
   bboxOfGeoJson,
   capTable,
   capText,
-  CODE_EXECUTE_TOOL,
+  codeExecuteSpec,
   OUTPUT_KINDS,
   RUN_TIMEOUT_MS,
   summarizeOutput,
@@ -66,18 +65,7 @@ async function toOutput(raw: { kind: string; value: unknown }): Promise<ExecOutp
 }
 
 export const codeExecuteTool = defineTool({
-  id: CODE_EXECUTE_TOOL,
-  title: 'Run Python code',
-  description:
-    "Run Python code on the person's JupyterHub and get its output (features, a table, an image, text, a number) or its error, without changing the board. " +
-    'Use it to test code before code.add or code.run. The last expression is the output, or call ttx.show(value).',
-  input: z.object({
-    source: z.string().max(20_000),
-    /** Run again even if the same code ran a moment ago (a person's Run). */
-    fresh: z.boolean().optional(),
-  }),
-  output: 'code.result',
-  cache: false,
+  ...codeExecuteSpec,
   async run({ source, fresh }): Promise<ExecResult> {
     const session = hubSession()
     if (!session) throw new Error(hubState().error ?? 'Running code needs a JupyterHub login in this browser: connect one in the user menu.')
