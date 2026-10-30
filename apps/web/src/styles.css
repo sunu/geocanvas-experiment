@@ -2269,15 +2269,11 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   color: var(--muted-foreground);
 }
 
-.ttx-codenote__item {
-  width: fit-content;
-  max-width: 100%;
-}
-
 .ttx-codenote__head {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  width: fit-content;
   padding: 0;
   border: 0;
   background: none;
@@ -2293,8 +2289,52 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   color: #b45309;
 }
 
-.ttx-codenote__item.is-behind .ttx-codenote__head {
+.ttx-codenote__head.is-behind {
   color: #b45309;
+}
+
+.ttx-codenote__head:hover,
+.ttx-codenote__row:hover {
+  color: var(--ttx-ink);
+}
+
+/* The elements of one object, one row each: hover points them out, click opens their details. */
+.ttx-codenote__rows {
+  width: 420px;
+  max-width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+}
+
+.ttx-codenote__rows .ttx-codenote__body {
+  width: auto;
+  margin: 0;
+  border-width: 1px 0;
+}
+
+.ttx-codenote__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  background: none;
+  color: var(--ttx-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ttx-codenote__row.is-hovered,
+.ttx-codenote__row.is-open {
+  background: color-mix(in srgb, var(--canvas-accent) 10%, transparent);
+}
+
+.ttx-codenote__cell {
+  flex: 1;
+  color: var(--ttx-muted);
 }
 
 .ttx-codenote__body {
