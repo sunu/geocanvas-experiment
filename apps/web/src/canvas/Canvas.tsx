@@ -700,7 +700,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       ref={rootRef}
       onContextMenuCapture={onContextMenuCapture}
       className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''} ${focus?.keepChat ? 'keeps-chat' : ''}`}
-      // The type in focus, for its own look of the whole view (styles.css: report mode has no dotted canvas).
+      // The type in focus, for its own look of the whole view (canvas/focus.css: report mode has no dotted canvas).
       data-focus={focused?.type}
       style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius } as CSSProperties}
       onPointerDown={onPointerDown}

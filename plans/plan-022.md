@@ -107,7 +107,7 @@ already does the same, by importing `reports/reports`. It is shown when the sele
   - `apps/web/src/canvas/{ObjectView,Links,ObjectMenu}.tsx`
   - `apps/web/src/map/{layers.ts,MapObject.tsx}`
   - `packages/plugins/src/{code.ts,codeOutput.ts}`
-  - `apps/web/src/styles.css`
+  - `apps/web/src/code/code.css`, `canvas/canvas.css` (the CSS was split by feature after this plan)
   - AGENTS.md (code cells section)
 - Reuse:
   - `followerState`, `ACCEPTS`, `followersOf`, `planShow`/`applyLinks` (code.ts)

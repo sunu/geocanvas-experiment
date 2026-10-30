@@ -1,0 +1,5 @@
+/* Above the canvas's toolbar and the phone's tabs (pwa/UpdateNotice.tsx). */
+.ttx-update {
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  white-space: nowrap;
+}

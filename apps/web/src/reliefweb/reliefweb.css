@@ -1,0 +1,84 @@
+/* --- ReliefWeb updates (a feed made from an event) ----------------------- */
+
+.ttx-relief {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--ttx-panel);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
+  font-size: 12px;
+}
+
+.ttx-relief__list {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 10px;
+}
+
+.ttx-relief__note {
+  padding: 12px 2px;
+  color: var(--ttx-muted);
+}
+
+.ttx-relief__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-relief__item:last-child {
+  border-bottom: 0;
+}
+
+.ttx-relief__name {
+  color: var(--ttx-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ttx-relief__name:hover {
+  color: var(--ttx-accent);
+  text-decoration: underline;
+}
+
+.ttx-relief__meta {
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-relief__summary {
+  color: var(--ttx-ink);
+  opacity: 0.85;
+}
+
+.ttx-relief__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  align-self: flex-start;
+  color: var(--ttx-accent);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.ttx-relief__file:hover {
+  text-decoration: underline;
+}
+
+.ttx-relief__hint {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  pointer-events: none;
+  white-space: nowrap;
+}

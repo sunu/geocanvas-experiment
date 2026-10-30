@@ -1,0 +1,508 @@
+/* --- Report (reports/ReportObject.tsx) ------------------------------------------------------------------------------
+ * The report's first page, laid out at the paper's size in CSS px and scaled to the object by a transform, so the
+ * preview is the page report mode shows. A canvas object: square corners, a border, no shadow.
+ */
+
+.ttx-report {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
+  background: var(--ttx-bg);
+}
+
+/* On the canvas: sheet 1, centered in the object. */
+.ttx-report__preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A page at its scale: the sheet takes the scaled size, the page inside it is laid out at its real size. */
+.ttx-report__sheet {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+}
+
+/* Out of sight: what pagination measures (ReportPages). No height, so it adds nothing to scroll. */
+.ttx-report__measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Report mode: every page in a column that scrolls. */
+.ttx-report.is-mode {
+  outline: none;
+  background: var(--ttx-panel);
+}
+
+/* Report mode's view: the scrolling pages, with the zoom control floating over them. */
+.ttx-reportview {
+  position: absolute;
+  inset: 0;
+}
+
+.ttx-reportmode {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  /* Not align-items: center, which cuts off the left of a page zoomed wider than the view; auto margins below. */
+  align-items: flex-start;
+  gap: 32px;
+  padding: 32px;
+  overflow: auto;
+  background: var(--ttx-panel);
+}
+
+/* Pages on white: a border around each, square and flat (a page, not a card: no shadow). */
+.ttx-reportmode > .ttx-report__sheet {
+  margin-inline: auto;
+  box-sizing: content-box;
+  border: 1px solid var(--ttx-border);
+}
+
+.ttx-report__page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  overflow: hidden;
+  background: #fff;
+  color: var(--ttx-ink);
+  font-family: var(--ttx-font);
+}
+
+.ttx-report__content {
+  box-sizing: border-box;
+  padding: 56px;
+}
+
+.ttx-report__title {
+  /* Padding, not margin: pagination measures it (offsetHeight leaves margins out). */
+  margin: 0;
+  padding-bottom: 24px;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* A report in one flow (ReportPages.tsx ReportContent): the phone's Reports tab, which makes it one column (mobile.css). */
+.ttx-report__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+}
+
+/* One row of the two-column grid (reports/pages.ts); rows are 16px apart, as ReportPages' ROW_GAP. */
+.ttx-report__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 24px;
+}
+
+.ttx-report__row + .ttx-report__row {
+  margin-top: 16px;
+}
+
+.ttx-report__block {
+  min-width: 0;
+}
+
+.ttx-report__heading {
+  margin: 8px 0 0;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.ttx-report__heading--1 {
+  font-size: 24px;
+}
+
+.ttx-report__heading--2 {
+  font-size: 19px;
+}
+
+.ttx-report__heading--3 {
+  font-size: 16px;
+}
+
+.ttx-report__text {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ttx-report__text p {
+  margin: 0 0 8px;
+}
+
+.ttx-report__image {
+  display: block;
+  max-width: 100%;
+  margin-inline: auto;
+  object-fit: contain;
+}
+
+.ttx-report__divider {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--ttx-border);
+}
+
+/* A page break, in report mode only: where the page ends. */
+.ttx-report__break {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ttx-report__break::before,
+.ttx-report__break::after {
+  flex: 1;
+  border-top: 1px dashed var(--ttx-border);
+  content: '';
+}
+
+/* Part of a text that goes on over pages (ReportPages.tsx RowView): this page's lines of it. */
+.ttx-report__piece {
+  overflow: hidden;
+}
+
+.ttx-report__card {
+  position: relative;
+  padding: 12px 14px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-bg);
+  font-size: 14px;
+}
+
+.ttx-report__card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.ttx-report__card-text {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.ttx-report__card.is-gone {
+  color: var(--ttx-muted);
+  font-style: italic;
+}
+
+.ttx-report__tag {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ttx-report__credits {
+  margin-top: 4px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-report__empty {
+  margin: 80px 0 0;
+  color: var(--ttx-muted);
+  font-size: 18px;
+  text-align: center;
+}
+
+.ttx-report__count {
+  position: absolute;
+  right: 56px;
+  bottom: 28px;
+  color: var(--ttx-muted);
+  font-size: 13px;
+}
+
+/*
+ * Objects dragged over a report (ObjectView `dropping`; the canvas raises their layer above everything): faded and a
+ * little smaller, so the report shows through as the place they go. Only a look while dragging; their stored layer
+ * and size do not change. No pointer events, so the report under them is what the pointer finds.
+ */
+.ttx-obj.is-dropping {
+  opacity: 0.6;
+  transform: scale(0.8);
+  transform-origin: center;
+  pointer-events: none;
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
+}
+
+/* The report under objects being dragged (Canvas.tsx DropZone): where a drop adds them. Screen space, like selections. */
+.ttx-dropzone {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed var(--canvas-accent);
+  background: color-mix(in srgb, var(--canvas-accent) 10%, transparent);
+}
+
+.ttx-dropzone__label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--canvas-accent);
+  /* Dark on cyan: white on cyan-500 is too faint for small text. */
+  color: var(--ttx-ink);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A report's Options panel (reports/ReportOptions.tsx). */
+.ttx-reportopts__name {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.ttx-reportopts__page {
+  display: flex;
+  gap: 8px;
+}
+
+.ttx-reportopts__page select {
+  flex: 1;
+}
+
+.ttx-reportopts__items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ttx-reportopts__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ttx-reportopts__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttx-reportopts__item button {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ttx-muted);
+  cursor: pointer;
+}
+
+.ttx-reportopts__item button:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+/* A block's name: goes to it on the page. */
+.ttx-reportopts__item button.ttx-reportopts__label {
+  display: block;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+/* An item in full (reports/ReportPages.tsx ItemView): a caption, then the widget as it is. */
+.ttx-report__item {
+  margin: 0;
+}
+
+.ttx-report__caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--ttx-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ttx-report__map {
+  display: block;
+  max-width: 100%;
+  margin-inline: auto;
+  object-fit: cover;
+  background: var(--ttx-bg);
+}
+
+/* One line, as ReportPages' CREDITS_H counts it. */
+.ttx-report__credits.is-line {
+  height: 16px;
+  margin-top: 0;
+  overflow: hidden;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A widget's own view at its board size, scaled to the block. Read-only in a report. */
+.ttx-report__embed {
+  position: relative;
+  overflow: hidden;
+  /* Smaller than the block when a page cannot hold its full height: centered. */
+  margin-inline: auto;
+}
+
+.ttx-report__embedded {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  transform-origin: 0 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Editing in report mode (reports/editing.tsx): a block's selection, its controls, typing, and where a drag drops. */
+.ttx-report__editable {
+  position: relative;
+  outline: 1px solid transparent;
+  outline-offset: 4px;
+}
+
+.ttx-report__editable:hover {
+  outline-color: color-mix(in srgb, var(--canvas-accent) 40%, transparent);
+}
+
+.ttx-report__editable.is-selected {
+  outline: 1.5px solid var(--canvas-accent);
+}
+
+/* Beside the block, in the page's right margin (56px, room in either column), so they never cover its content. */
+.ttx-report__controls {
+  position: absolute;
+  top: -2px;
+  left: calc(100% + 8px);
+  z-index: 2;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+}
+
+.ttx-report__editable.controls-left > .ttx-report__controls {
+  right: calc(100% + 8px);
+  left: auto;
+}
+
+.ttx-report__editable:hover > .ttx-report__controls,
+.ttx-report__editable.is-selected > .ttx-report__controls {
+  display: flex;
+}
+
+.ttx-report__controls button {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ttx-muted);
+  cursor: pointer;
+}
+
+.ttx-report__controls button:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+.ttx-report__controls .is-handle {
+  cursor: grab;
+}
+
+/* The page's margin is out of sight (zoomed wider than the column): inside the block, at the top, where it is in
+   sight (its left is set in editing.tsx), over its content. */
+.ttx-report__editable > .ttx-report__controls.is-inside {
+  top: 4px;
+  right: auto;
+}
+
+/* While a block is dragged: it stays faded in its place, and the pointer holds it everywhere. */
+.ttx-report__editable.is-dragging {
+  opacity: 0.4;
+}
+
+.ttx-reportmode.is-dragging,
+.ttx-reportmode.is-dragging * {
+  cursor: grabbing !important;
+}
+
+/* The insertion line while a block is dragged: before this block, or after the last one. */
+.ttx-report__drop {
+  position: absolute;
+  top: -10px;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--canvas-accent);
+  pointer-events: none;
+}
+
+.ttx-report__drop.is-after {
+  top: auto;
+  bottom: -10px;
+}
+
+/* Typing in place: the same type as the block, no box of its own. */
+.ttx-report__editor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+}
+
+.ttx-report__placeholder {
+  color: var(--ttx-muted);
+  font-weight: 400;
+}
