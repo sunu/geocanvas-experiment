@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowsInLineHorizontalIcon, ArrowsOutLineHorizontalIcon, DotsSixVerticalIcon, XIcon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
 import { docText, textDoc, type Block, type ReportBoardObject } from '@ttx/plugins'
@@ -38,19 +38,26 @@ const columnOf = (el: Element | null) => el?.closest<HTMLElement>('.ttx-reportmo
  * A block on a page in report mode: selected with a press, with its controls (drag to reorder, width, remove) while
  * hovered or selected, and the insertion line while another block is dragged over its place.
  */
-export function EditableBlock({ block: b, index, count, children }: { block: Block; index: number; count: number; children: ReactNode }) {
+export function EditableBlock({ block: b, index, count, controlsLeft, children }: { block: Block; index: number; count: number; controlsLeft: boolean; children: ReactNode }) {
   const ed = useReportEditing()!
   const selected = ed.selected === b.id
   const typeable = b.kind === 'heading' || b.kind === 'text'
+  /** The block was selected already when this press began: then the click types in it. */
+  const wasSelected = useRef(false)
   return (
     <div
       data-block-id={b.id}
       data-block-index={index}
-      className={`ttx-report__editable ${selected ? 'is-selected' : ''}`}
+      className={`ttx-report__editable ${selected ? 'is-selected' : ''} ${controlsLeft ? 'controls-left' : ''}`}
       onPointerDown={(e) => {
         e.stopPropagation() // a press on the page outside a block clears the selection (ReportMode)
-        if (selected && typeable && ed.editing !== b.id && !(e.target as HTMLElement).closest('.ttx-report__controls')) ed.setEditing(b.id)
-        else if (!selected) ed.select(b.id)
+        wasSelected.current = selected
+        if (!selected) ed.select(b.id)
+      }}
+      // Typing starts on the click, after the press: started on the press, the editor would lose its focus at once
+      // to the press's own mousedown, which moves focus, and end.
+      onClick={(e) => {
+        if (wasSelected.current && typeable && ed.editing !== b.id && !(e.target as HTMLElement).closest('.ttx-report__controls')) ed.setEditing(b.id)
       }}
       onDoubleClick={() => typeable && ed.setEditing(b.id)}
     >
@@ -177,7 +184,29 @@ function useTyping(block: Block, write: (value: string) => void, initial: () => 
   }
 }
 
+/**
+ * Focus an editor as it appears, and again on the next frame if something took the focus meanwhile: when a toolbar
+ * menu adds the block, the menu still holds the focus as the editor mounts, and would keep it. Not later only, which
+ * would lose what is typed in that frame.
+ */
+function useFocusSoon<E extends HTMLInputElement | HTMLTextAreaElement>() {
+  const ref = useRef<E>(null)
+  useLayoutEffect(() => {
+    const take = () => {
+      const el = ref.current
+      if (!el || document.activeElement === el) return
+      el.focus()
+      el.select()
+    }
+    take()
+    const frame = requestAnimationFrame(take)
+    return () => cancelAnimationFrame(frame)
+  }, [])
+  return ref
+}
+
 function HeadingEditor({ block: b }: { block: Extract<Block, { kind: 'heading' }> }) {
+  const field = useFocusSoon<HTMLInputElement>()
   const t = useTyping(
     b,
     (text) => t.ed.runtime.dispatch('report.setText', { kind: 'objects', ids: [t.ed.report.id] }, { blockId: b.id, text }),
@@ -185,13 +214,12 @@ function HeadingEditor({ block: b }: { block: Extract<Block, { kind: 'heading' }
   )
   return (
     <input
+      ref={field}
       className={`ttx-report__heading ttx-report__heading--${b.level} ttx-report__editor`}
       aria-label="Heading"
       placeholder="Heading"
       maxLength={200}
-      autoFocus
       value={t.value}
-      onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => t.onChange(e.target.value)}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Tab') && t.stop()}
       onBlur={t.stop}
@@ -200,7 +228,7 @@ function HeadingEditor({ block: b }: { block: Extract<Block, { kind: 'heading' }
 }
 
 function TextEditor({ block: b }: { block: Extract<Block, { kind: 'text' }> }) {
-  const area = useRef<HTMLTextAreaElement>(null)
+  const area = useFocusSoon<HTMLTextAreaElement>()
   const t = useTyping(
     b,
     (text) => t.ed.runtime.dispatch('report.setText', { kind: 'objects', ids: [t.ed.report.id] }, { blockId: b.id, doc: textDoc(text) }),
@@ -219,7 +247,6 @@ function TextEditor({ block: b }: { block: Extract<Block, { kind: 'text' }> }) {
       className="ttx-report__text ttx-report__editor"
       aria-label="Text"
       placeholder="Type text. A blank line starts a new paragraph."
-      autoFocus
       value={t.value}
       onChange={(e) => t.onChange(e.target.value)}
       onKeyDown={(e) => e.key === 'Tab' && t.stop()}

@@ -3467,17 +3467,24 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   outline: 1.5px solid var(--canvas-accent);
 }
 
+/* Beside the block, in the page's right margin (56px, room in either column), so they never cover its content. */
 .ttx-report__controls {
   position: absolute;
-  top: -14px;
-  right: -6px;
+  top: -2px;
+  left: calc(100% + 8px);
   z-index: 2;
   display: none;
+  flex-direction: column;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--ttx-border);
   border-radius: 6px;
   background: var(--ttx-panel);
+}
+
+.ttx-report__editable.controls-left > .ttx-report__controls {
+  right: calc(100% + 8px);
+  left: auto;
 }
 
 .ttx-report__editable:hover > .ttx-report__controls,

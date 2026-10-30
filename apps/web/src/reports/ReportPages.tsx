@@ -8,7 +8,7 @@ import { ObjectLabelSlot, ObjectNameContext } from '../canvas/ObjectHeader'
 import { objectUI } from '../canvas/registry'
 import { useMapPicture } from '../map/picture'
 import { fitItem, paginate, rowsOf, type Row } from './pages'
-import { titleOf } from './reports'
+import { labelOf, titleOf } from './reports'
 
 /** A page's margin, the space between rows, and between the two columns, in CSS px (styles.css .ttx-report__*). */
 const MARGIN = 56
@@ -124,14 +124,15 @@ function RowView({ row, blocks, board, runtime, contentWidth, maxHeight, measuri
   const editable = !!useReportEditing() && !measuring
   return (
     <div className="ttx-report__row">
-      {row.map((i) => {
+      {row.map((i, n) => {
         const b = blocks[i]!
         const width = b.span === 2 ? contentWidth : (contentWidth - COLUMN_GAP) / 2
         const view = <BlockView block={b} board={board} runtime={runtime} width={width} maxHeight={maxHeight} measuring={measuring} full={full} />
         return (
           <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
             {editable ? (
-              <EditableBlock block={b} index={i} count={blocks.length}>
+              // A one-column block on the left keeps its controls in the page's left margin; others in the right one.
+              <EditableBlock block={b} index={i} count={blocks.length} controlsLeft={b.span === 1 && n === 0}>
                 {view}
               </EditableBlock>
             ) : (
@@ -210,7 +211,7 @@ function ItemView({ block: b, source, runtime, width, maxHeight, measuring, full
   const o = source as AnyObject & { text?: string; title?: string; value?: { name?: string } }
   if (source.type === 'frame') return <h2 className="ttx-report__heading ttx-report__heading--1">{o.name || o.title || 'Frame'}</h2>
   const Icon = objectUI(source.type)?.tool?.Icon ?? SquaresFourIcon
-  const label = o.name || (runtime.registry.objectType(source.type)?.title ?? source.type)
+  const label = labelOf(source, runtime.registry)
   // On the canvas, or for a type this app cannot draw (a newer one): a compact card, its name and its text if any.
   if (!full || !objectUI(source.type)?.View) {
     const text = source.type === 'input' ? `Area of interest: ${o.value?.name ?? 'not set'}` : o.text

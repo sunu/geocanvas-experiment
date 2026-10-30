@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { CheckIcon, ImageIcon, MinusIcon, SquaresFourIcon, StackPlusIcon, TextHIcon, TextTIcon } from '@phosphor-icons/react'
-import { Uploads, uploadUrl, type Runtime } from '@ttx/core'
+import { Uploads, uploadUrl, type Registry, type Runtime } from '@ttx/core'
 import type { ReportBoardObject } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -13,7 +13,7 @@ import { BTN, Face, PANEL } from '../canvas/Toolbar'
 import { objectUI } from '../canvas/registry'
 import { refusal, typesOf, uploadFile } from '../uploads/upload'
 import { runReportOp, useReportEditing } from './editing'
-import { holds } from './reports'
+import { holds, labelOf } from './reports'
 
 /**
  * Report mode's toolbar (agent-docs/tasks/reports.md §5.1b), at the bottom center in the canvas toolbar's place and look:
@@ -61,7 +61,8 @@ export function ReportToolbar() {
             <Face Icon={TextHIcon} text="Heading" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start">
+        {/* Focus stays where an item sent it (the new heading's editor), not back on this button. */}
+        <DropdownMenuContent side="top" align="start" onCloseAutoFocus={(e) => e.preventDefault()}>
           {([1, 2, 3] as const).map((level) => (
             <DropdownMenuItem key={level} onSelect={() => add({ kind: 'heading', text: '', level }, true)}>
               Heading {level}
@@ -79,6 +80,7 @@ export function ReportToolbar() {
       <AddFromBoard
         report={r}
         board={board}
+        registry={runtime.registry}
         onPick={(id) => {
           const index = at()
           runtime.beginGesture()
@@ -121,7 +123,7 @@ function ImageMenu({ runtime, onUpload, onPick }: { runtime: Runtime; onUpload()
           <Face Icon={ImageIcon} text="Image" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="max-h-80 w-64 overflow-y-auto">
+      <DropdownMenuContent side="top" align="start" className="max-h-80 w-64 overflow-y-auto" onCloseAutoFocus={(e) => e.preventDefault()}>
         <DropdownMenuItem onSelect={onUpload}>Upload an image…</DropdownMenuItem>
         {media.length > 0 && (
           <>
@@ -141,13 +143,13 @@ function ImageMenu({ runtime, onUpload, onPick }: { runtime: Runtime; onUpload()
 }
 
 /** Add from board: the board's objects (not reports) by name, searchable, checked when already in this report. */
-function AddFromBoard({ report, board, onPick }: { report: ReportBoardObject; board: Board; onPick(id: string): void }) {
+function AddFromBoard({ report, board, registry, onPick }: { report: ReportBoardObject; board: Board; registry: Registry; onPick(id: string): void }) {
   const objects = useObjects(board)
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const choices = objects
     .filter((o) => o.type !== 'report')
-    .map((o) => ({ o, label: o.name || ((o as { title?: string }).title ?? o.type) }))
+    .map((o) => ({ o, label: labelOf(o, registry, { withText: true }) }))
     .filter(({ label, o }) => !q.trim() || `${label} ${o.type}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => a.label.localeCompare(b.label))
   return (

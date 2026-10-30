@@ -97,6 +97,8 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = stateRef.current
+      // An open menu, popover or dialog (the toolbar's) closes on Esc itself, and keeps the selection.
+      if (document.querySelector('[role="menu"], [data-radix-popper-content-wrapper], [role="dialog"]')) return
       const typing = !!(e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')
       if (e.key === 'Escape' && (st.editing || st.selected)) {
         e.preventDefault()
