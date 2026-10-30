@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Runtime } from '@ttx/core'
 import type { BoardObject } from '../board/board'
 import type { Rect } from './camera'
+import { useEmphasized } from './emphasis'
 import { ObjectLabelSlot, ObjectNameContext } from './ObjectHeader'
 import { ObjectIdContext } from './loading'
 import { objectDecorations, objectUI } from './registry'
@@ -29,6 +30,7 @@ interface Props {
 /** One object on the canvas, in world coordinates. `layer` is its place in the stacking order. Its type's UI fills it. */
 export function ObjectView({ runtime, object: o, layer, editing, selected, arriving, busy, onDone, focused, onFocus, dropping }: Props) {
   const [label, setLabel] = useState<HTMLElement | null>(null)
+  const emphasized = useEmphasized(o.id)
   // A board can hold objects of a type this build does not know, made by a newer version (e.g. a tab
   // opened before a deploy).
   const known = !!runtime.registry.objectType(o.type)
@@ -41,7 +43,7 @@ export function ObjectView({ runtime, object: o, layer, editing, selected, arriv
   return (
     <div
       data-id={o.id}
-      className={`ttx-obj ttx-obj--${o.type} ${editing ? 'is-editing' : ''} ${selected ? 'is-selected' : ''} ${focused ? 'is-focused' : ''} ${arriving ? 'is-arriving' : ''} ${dropping ? 'is-dropping' : ''}`}
+      className={`ttx-obj ttx-obj--${o.type} ${editing ? 'is-editing' : ''} ${selected ? 'is-selected' : ''} ${focused ? 'is-focused' : ''} ${arriving ? 'is-arriving' : ''} ${dropping ? 'is-dropping' : ''} ${emphasized ? 'is-emphasized' : ''}`}
       style={{ left: r.x, top: r.y, width: r.w, height: r.h, zIndex: layer, ...ui?.frameStyle?.(o) }}
     >
       {/* The name above the object, outside its box; its views fill it through ObjectHeader. */}

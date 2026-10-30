@@ -153,6 +153,12 @@ body,
   display: none;
 }
 
+/* Pointed out for a moment (canvas/emphasis.ts): a footnote row or a menu item is about it. Not the selection. */
+.ttx-obj.is-emphasized {
+  outline: 2px solid color-mix(in srgb, var(--canvas-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
 .ttx-obj.is-selected .ttx-obj__label {
   color: var(--canvas-accent);
 }

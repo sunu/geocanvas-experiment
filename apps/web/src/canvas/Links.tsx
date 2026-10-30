@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { BoardObject } from '../board/board'
 import { contains, type Rect } from './camera'
+import { useEmphasizedIds } from './emphasis'
 
 type Point = { x: number; y: number }
 
@@ -42,13 +43,15 @@ export function connector(from: Rect, to: Rect): { start: Point; end: Point; pat
  * at its own container. In the world, above frames and under every other object (`zIndex`, set by the canvas).
  */
 export function Links({ objects, byId, selected, style }: { objects: BoardObject[]; byId: Map<string, BoardObject>; selected: Set<string>; style?: CSSProperties }) {
+  // A link between two objects pointed out (canvas/emphasis.ts) is highlighted as the selection's are.
+  const emphasized = useEmphasizedIds()
   const links = objects.flatMap((o) => {
     // A link, or a map's layers made by code cells (plans/plan-018.md): an arrow from each cell.
     const roots = o.link ? [o.link.from] : o.type === 'map' ? [...new Set((o.layers ?? []).flatMap((l) => l.from ?? []))] : []
     return roots.flatMap((from) => {
       const root = byId.get(from)
       if (!root || contains(o, root) || contains(root, o)) return []
-      return [{ id: `${o.id}:${from}`, root, follower: o, on: selected.has(o.id) || selected.has(root.id) }]
+      return [{ id: `${o.id}:${from}`, root, follower: o, on: selected.has(o.id) || selected.has(root.id) || (emphasized.has(o.id) && emphasized.has(root.id)) }]
     })
   })
   if (!links.length) return null
