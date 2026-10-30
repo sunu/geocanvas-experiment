@@ -188,6 +188,7 @@ export class Runtime {
     return this.registry.ops().filter((op) => {
       if (op.hidden || op.target.kind !== target.kind) return false
       if (op.applyView && !this.view) return false
+      if (op.tools?.some((id) => !this.tools?.tool(id))) return false
       if (matchTarget(op.target, target, this.board)) return false
       try {
         return op.when ? op.when(this.context(target, this.actor)) : true

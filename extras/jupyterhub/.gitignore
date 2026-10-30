@@ -1,0 +1,4 @@
+# The local hub's state.
+jupyterhub.sqlite
+jupyterhub_cookie_secret
+jupyterhub-proxy.pid

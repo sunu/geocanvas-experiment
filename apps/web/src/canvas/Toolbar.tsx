@@ -15,6 +15,7 @@ import {
   NoteIcon,
   SquareIcon,
   SquaresFourIcon,
+  TerminalWindowIcon,
   TextTIcon,
   UploadSimpleIcon,
   WarningIcon,
@@ -67,6 +68,7 @@ const EVENT_CONTEXT: Item[] = [
 const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },
   { label: 'Add Jupyter notebook', text: 'Notebook', Icon: CodeIcon, tool: 'notebook', key: 'N' },
+  { label: 'Add Python code, run on your JupyterHub', text: 'Code', Icon: TerminalWindowIcon, tool: 'code', key: 'C' },
   { label: 'Add report', text: 'Report', Icon: FileTextIcon, tool: 'report', key: 'P' },
 ]
 /** What you draw on the board yourself. */

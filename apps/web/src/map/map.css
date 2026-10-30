@@ -666,3 +666,8 @@
   margin: 4px 0 0;
   color: #dc2626;
 }
+
+/* A layer made by a code cell, in the layer list (code/). */
+.ttx-layers__code {
+  vertical-align: -1px;
+}

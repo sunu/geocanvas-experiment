@@ -39,6 +39,8 @@ export const mapLayer = z.object({
   style: layerStyle.optional(),
   /** Its features close the roads they cover, for the map's routes (mapRoutes.ts): e.g. a flood extent. */
   blocks: z.boolean().optional(),
+  /** The code cell that made this layer (code.ts): a run of the cell gives the layer its new features. */
+  from: z.string().optional(),
 })
 export type MapLayer = z.infer<typeof mapLayer>
 

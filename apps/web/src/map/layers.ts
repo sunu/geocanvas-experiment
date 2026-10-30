@@ -23,6 +23,8 @@ export interface LayerState {
   error?: string
   filter?: LayerFilter
   style?: LayerStyle
+  /** The code cell that made the layer (plan-021): its features can be hovered and clicked (code/focus.ts). */
+  from?: string
 }
 
 /** The bbox [west, south, east, north] of a feature collection's coordinates, or undefined when it has none. */
@@ -64,6 +66,7 @@ function layerState(l: MapLayer, r: { value?: unknown; error?: string } | undefi
     ...(r?.error !== undefined && { error: r.error }),
     ...(l.filter && { filter: l.filter }),
     ...(l.style && { style: l.style }),
+    ...(l.from && { from: l.from }),
   }
 }
 
@@ -135,8 +138,15 @@ const isArea = (f: GeoJSON.Feature) => f.geometry?.type === 'Polygon' || f.geome
 const DRAW_ORDER: Record<string, number> = { 'geo.tiles': 0, 'geo.raster': 1, [GRID_OUTPUT]: 1 }
 const drawOrder = (s: LayerState) => DRAW_ORDER[s.output ?? ''] ?? 2
 
-/** deck.gl layers for the layers that have a result, by kind of result. Tiles, rasters and grids draw below features. */
-export function deckLayers(states: LayerState[]): Layer[] {
+/** The canvas accent (Tailwind cyan-500, --canvas-accent): a hovered feature of a code layer. */
+const ACCENT: [number, number, number, number] = [6, 182, 212, 90]
+
+/**
+ * deck.gl layers for the layers that have a result, by kind of result. Tiles, rasters and grids draw below features.
+ * Layers made by code can be picked (hovered and clicked). With `highlight` (a layer id, plan-022), that layer is drawn
+ * stronger and the other feature layers fainter.
+ */
+export function deckLayers(states: LayerState[], { highlight }: { highlight?: string } = {}): Layer[] {
   // A stable sort: within a kind, the list's order.
   return [...states].sort((a, b) => drawOrder(a) - drawOrder(b)).flatMap((s): Layer[] => {
     if (s.value === undefined) return []
@@ -148,14 +158,20 @@ export function deckLayers(states: LayerState[]): Layer[] {
     if (s.output === 'geo.features') {
       const all = s.value as GeoJSON.FeatureCollection
       const { colorOf } = featurePaint(all, s.style)
+      const strong = highlight === s.id
       // Areas colored by a property are a choropleth, so they are filled more than a plain outline's light fill.
-      const areaAlpha = s.style?.byProperty ? 170 : 30
+      const areaAlpha = s.style?.byProperty ? 170 : strong ? 80 : 30
       // Points: solid dots. Polygons (countries, buildings): a light fill and an outline, so the basemap stays readable.
       return [
         new GeoJsonLayer({
           id: `layer-${s.id}`,
           data: filterFeatures(all, s.filter),
-          opacity,
+          opacity: highlight && !strong ? opacity * 0.35 : opacity,
+          pickable: !!s.from,
+          autoHighlight: !!s.from,
+          highlightColor: ACCENT,
+          ...(strong && { lineWidthMinPixels: 3 }),
+          updateTriggers: { getFillColor: [strong] },
           pointType: 'circle',
           // Sized in meters, kept between 2.5 and 6 px: thousands of points (health facilities in a
           // country) stay apart when zoomed out, and a single pin stays visible.
