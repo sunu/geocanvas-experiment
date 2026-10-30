@@ -1,5 +1,31 @@
 export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
+export { CODE_EXECUTE_TOOL, codePlugin, followersOf, type CodeBoardObject } from './code.js'
+export {
+  ACCEPTS,
+  accepts,
+  bboxOfGeoJson,
+  capTable,
+  capText,
+  errorText,
+  followerState,
+  hashSource,
+  KIND_NAMES,
+  MAX_INLINE_BYTES,
+  OUTPUT_KINDS,
+  RUN_TIMEOUT_MS,
+  stripAnsi,
+  summarize as summarizeOutput,
+  tableValue,
+  type CodeError,
+  type CodeOutput,
+  type CodeRun,
+  type ExecOutput,
+  type ExecResult,
+  type FollowerState,
+  type OutputKind,
+  type TableValue,
+} from './codeOutput.js'
 export { boardGet, bboxOfGeometries, eventsGet, eventsSearch, type EventFacts } from './agentTools.js'
 export { conflict, defineTemplate, MY_VIEW, sitrep, TEMPLATE_OP_PREFIX, templatesPlugin, type ContentNode, type Facts, type RootNode, type SeedKind, type TemplateDef, type TemplateNode } from './templates/index.js'
 export { eventsPlugin, eventLayer, EVENT_FOOTPRINT_TOOL, footprintParts, isWholeFootprint, type EventBoardObject, type FootprintPart } from './events.js'
