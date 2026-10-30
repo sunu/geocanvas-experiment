@@ -1,0 +1,524 @@
+/* --- Canvas ------------------------------------------------------------- */
+
+.ttx-canvas {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background-color: var(--ttx-bg);
+  /* --ttx-dots (0 to 1) is the dots' opacity and --ttx-dot-r their radius in px, both from the zoom (Canvas.tsx). */
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--ttx-grid) calc(var(--ttx-dots, 1) * 100%), transparent) calc(var(--ttx-dot-r, 1) * 1px),
+    transparent calc(var(--ttx-dot-r, 1) * 1px)
+  );
+  touch-action: none;
+  user-select: none;
+  cursor: default;
+}
+
+.ttx-canvas.is-drawing {
+  cursor: crosshair;
+}
+
+.ttx-canvas.is-panning,
+.ttx-canvas.is-panning * {
+  cursor: grab !important;
+}
+
+.ttx-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  transform-origin: 0 0;
+}
+
+.ttx-obj {
+  position: absolute;
+  box-sizing: border-box;
+  /* Fades in what an agent added when its cursor gets there (canvas/agentCursor.ts). */
+  transition: opacity 200ms ease-out;
+}
+
+.ttx-obj.is-arriving {
+  opacity: 0;
+  transition: none;
+}
+
+/* An agent working on it, or on its data (canvas/agentCursor.ts): a placeholder card in the agent's violet over it, a
+ * dashed edge and a light sweeping across, with what the agent does at the bottom left. The name above it stays. Edge
+ * and label keep their size on screen at any zoom. */
+.ttx-obj__busy {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: calc(1.5px / var(--ttx-zoom, 1)) dashed var(--agent);
+  background:
+    linear-gradient(110deg, transparent 40%, color-mix(in srgb, var(--agent) 18%, transparent) 50%, transparent 60%) 100% 0 / 300% 100% no-repeat,
+    color-mix(in srgb, color-mix(in srgb, var(--agent) 8%, var(--background)) 94%, transparent);
+  pointer-events: none;
+  animation: ttx-busy-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes ttx-busy-sweep {
+  to {
+    background-position: 0% 0, 0 0;
+  }
+}
+
+/* Where the agent's first add will land, while it thinks (canvas/agentCursor.ts): a busy card on its own, in screen
+ * space, placed by its style. */
+.ttx-agent-placeholder {
+  inset: auto;
+  /* Under the agent's cursor, which comes after it: a busy card's z-index lifts it over a widget's content only. */
+  z-index: auto;
+}
+
+.ttx-obj__busy-label {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 14px 18px;
+  color: var(--agent);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: scale(calc(1 / var(--ttx-zoom, 1)));
+  transform-origin: 0 100%;
+}
+
+.ttx-obj__busy-ring {
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in srgb, var(--agent) 30%, transparent);
+  border-top-color: var(--agent);
+  border-radius: 50%;
+  animation: ttx-spin 0.8s linear infinite;
+}
+
+/*
+ * The name row above a widget, as Figma labels a frame (canvas/ObjectHeader.tsx): its icon and name, which is where it
+ * is grabbed and identified, and its actions, shown on hover or selection. It lives inside the world, so it is scaled
+ * back by the zoom to keep its size on screen, and widened by it to keep the object's width.
+ */
+.ttx-obj__label {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: calc(100% * var(--ttx-zoom, 1));
+  height: 24px;
+  padding-bottom: 4px;
+  transform: scale(calc(1 / var(--ttx-zoom, 1)));
+  transform-origin: 0 100%;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Boxes, texts and sticky notes have no name: no row, so no hit area above them. */
+.ttx-obj__label:empty {
+  display: none;
+}
+
+.ttx-obj.is-selected .ttx-obj__label {
+  color: var(--canvas-accent);
+}
+
+.ttx-obj__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ttx-obj__name > input {
+  box-sizing: border-box;
+  min-width: 4ch;
+  /* Its width follows the name (canvas/ObjectHeader.tsx). */
+  height: 22px;
+  padding: 0 6px;
+  border: 2px solid var(--canvas-accent);
+  border-radius: 4px;
+  outline: 0;
+  background: #fff;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.ttx-obj__name > input::selection {
+  background: var(--canvas-accent);
+  color: #fff;
+}
+
+.ttx-obj__name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ttx-obj__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+
+.ttx-obj:hover .ttx-obj__actions,
+.ttx-obj.is-selected .ttx-obj__actions,
+.ttx-obj.is-editing .ttx-obj__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ttx-obj__actions button,
+.ttx-obj__actions a {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ttx-obj__actions button:hover:not(:disabled),
+.ttx-obj__actions a:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+/* In focus mode the object fills the screen: its row goes inside, at the top, as a bar. */
+.ttx-obj.is-focused {
+  padding-top: 32px;
+}
+
+.ttx-obj.is-focused .ttx-obj__label {
+  top: 0;
+  bottom: auto;
+  z-index: 1;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  transform: none;
+  border-bottom: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+}
+
+.ttx-obj.is-focused .ttx-obj__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Fill and border color come from the object's color (canvas/style.ts). */
+.ttx-box {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 2px solid;
+  border-radius: 0;
+}
+
+/* The stroke of a line or an arrow, corner to corner of its box (canvas/coreUI.tsx). */
+.ttx-box-stroke {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Fill color comes from the note's color; its text is always dark (objects/sticky.tsx). */
+.ttx-sticky {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Flat, like everything on the canvas: its color is its edge. */
+  font-family: var(--ttx-font);
+  font-weight: 300;
+  line-height: 1.3;
+}
+
+.ttx-sticky__text {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  font: inherit;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ttx-sticky__text--edit {
+  display: block;
+  margin: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  user-select: text;
+}
+
+/* An object type this build does not know (made by a newer version of the app). */
+.ttx-unknown {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  border: 1px dashed var(--ttx-border);
+  border-radius: 0;
+  color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+/* Font size and color come from the object. The plain div sets the height; the editor sits over it. */
+.ttx-text-wrap {
+  position: relative;
+  font-family: var(--ttx-font);
+  line-height: 1.4;
+}
+
+.ttx-text {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 4px;
+  font: inherit;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ttx-text--edit {
+  position: absolute;
+  inset: 0;
+  display: block;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  user-select: text;
+}
+
+.ttx-draft {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--canvas-accent);
+}
+
+/*
+ * Selection chrome: screen space, one layer above the whole world. Safari can paint a transformed
+ * layer (the world) above siblings with a higher z-index, so the chrome gets its own composited
+ * layer (translateZ) and an explicit order above the world.
+ */
+.ttx-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform: translateZ(0);
+  pointer-events: none;
+}
+
+.ttx-selection,
+.ttx-marquee {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.ttx-selection {
+  border: 1.5px solid var(--canvas-accent);
+}
+
+.ttx-marquee {
+  border: 1px solid var(--canvas-accent);
+  background: color-mix(in srgb, var(--canvas-accent) 8%, transparent);
+}
+
+.ttx-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--canvas-accent);
+  border-radius: 2px;
+  background: #fff;
+  pointer-events: auto;
+}
+
+.ttx-handle--nw,
+.ttx-handle--se {
+  cursor: nwse-resize;
+}
+
+.ttx-handle--ne,
+.ttx-handle--sw {
+  cursor: nesw-resize;
+}
+
+/* Other people and the agent: selections, cursors and name tags in their color (canvas/Peers.tsx, board/collaborators.ts). */
+/* Links from a root to what follows it (canvas/Links.tsx): arrows in the world, attached to the objects' sides. */
+.ttx-links {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ttx-links > path {
+  fill: none;
+  stroke: var(--ttx-muted);
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.ttx-links > path.is-on {
+  stroke: var(--canvas-accent); /* the selection outline's color */
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.ttx-links .ttx-links__head path {
+  fill: var(--ttx-muted);
+  stroke: none;
+}
+
+.ttx-links .ttx-links__head.is-on path {
+  fill: var(--canvas-accent);
+}
+
+.ttx-peer-selection {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid;
+}
+
+/* The agent's marks are dashed, so they do not depend on color alone. */
+.ttx-peer-selection.is-agent {
+  border-style: dashed;
+}
+
+.ttx-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: transform 100ms linear;
+}
+
+/* The pointer's tip is the cursor's point: the shape sits 1.25px inside its box (stroke and padding). */
+.ttx-cursor svg {
+  display: block;
+  margin: -1.25px 0 0 -1.25px;
+  filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.1)) drop-shadow(0 10px 15px rgb(0 0 0 / 0.1));
+}
+
+.ttx-cursor__name {
+  position: absolute;
+  left: 14px;
+  top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* What the agent does now, beside its name: an op, a search, or thinking. */
+.ttx-cursor__doing {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* An agent's cursor is moved every frame (canvas/agentCursor.ts), so it needs no smoothing of its own. */
+.ttx-cursor--agent {
+  transition: none;
+}
+
+/* The agent's cursor floats over the page (it drifts, canvas/agentCursor.ts): lifted, so its shadow falls further. */
+.ttx-cursor--agent svg {
+  filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.22));
+}
+
+/* An agent working off-screen: a marker on the canvas edge, pointing at it. */
+.ttx-agent-edge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--agent-foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ttx-obj {
+    transition: none;
+  }
+
+  .ttx-obj__busy,
+  .ttx-obj__busy-ring {
+    animation: none;
+  }
+}
+
+/* The color swatches of the palette's color field (canvas/coreUI.tsx). */
+
+.ttx-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.ttx-swatch.is-on {
+  box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 4px var(--ttx-accent);
+}
+
+.ttx-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--ttx-ink);
+  color: var(--ttx-panel);
+  font-size: 13px;
+  z-index: 1000004;
+}

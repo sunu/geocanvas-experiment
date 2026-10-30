@@ -10,7 +10,7 @@ import { useMapPicture } from '../map/picture'
 import { fitItem, paginate, rowsOf, type Piece, type Row, type RowSize } from './pages'
 import { labelOf, titleOf } from './reports'
 
-/** A page's margin, the space between rows, and between the two columns, in CSS px (styles.css .ttx-report__*). */
+/** A page's margin, the space between rows, and between the two columns, in CSS px (reports/reports.css .ttx-report__*). */
 const MARGIN = 56
 const ROW_GAP = 16
 const COLUMN_GAP = 24
@@ -325,9 +325,9 @@ function ItemView({ block: b, source, runtime, width, maxHeight, measuring, full
   )
 }
 
-/** One line under a map picture for its credits, in CSS px (styles.css .ttx-report__credits). */
+/** One line under a map picture for its credits, in CSS px (reports/reports.css .ttx-report__credits). */
 const CREDITS_H = 16
-/** An item's caption above it, with its gap, at most, in CSS px (styles.css .ttx-report__caption). */
+/** An item's caption above it, with its gap, at most, in CSS px (reports/reports.css .ttx-report__caption). */
 const CAPTION_H = 24
 /** A frozen card's padding, tag and credits around its picture, in CSS px. */
 const FROZEN_CHROME_H = 64

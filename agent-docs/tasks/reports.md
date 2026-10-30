@@ -199,7 +199,7 @@ Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ but
 ### 5.1a Layout: full screen, with the agent as an overlay
 
 Report mode is a view of its own, not the canvas (`FocusableObjectUI.fullScreen`, `keepChat` and `live`; round 2 of 5a, 2026-10-30):
-- **The document is the main page.** It fills the screen to its edges, beside the Options panel, on white, with no dotted canvas (the canvas carries `data-focus` with the type in focus; `styles.css`). Each page has a 1 px border, square and flat.
+- **The document is the main page.** It fills the screen to its edges, beside the Options panel, on white, with no dotted canvas (the canvas carries `data-focus` with the type in focus; `canvas/focus.css`). Each page has a 1 px border, square and flat.
 - **The Options panel** is on the right (§5.2). Its header shows the report's title, as the Object panel does (`panel(object, board)`); the badge says Report.
 - **The agent chat is an overlay** at the top left, over the page. It takes no room from the layout, is capped in height, and collapses to uncover the page. People ask the agent to act on the report ("add the map", "write a summary of the key figures"), and its edits appear on the pages as it makes them.
 - **Zoom:** report mode opens with the pages **fitted to the width** of the screen left of the Options panel, past 100% when there is room. A **zoom control** floats at the bottom left (zoom out, the percentage with Fit width and set steps from 50% to 200%, zoom in; 25% to 300% in all), and ⌘ or Ctrl with the wheel, or a trackpad pinch, zooms the report rather than the browser page. The zoom is this person's, and resets to Fit width each time report mode opens.

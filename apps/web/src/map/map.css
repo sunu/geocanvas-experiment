@@ -1,0 +1,668 @@
+/* --- Map ---------------------------------------------------------------- */
+
+.ttx-map {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--ttx-panel);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
+  font-size: 12px;
+}
+
+.ttx-map__body {
+  position: relative;
+  flex: 1;
+}
+
+.ttx-map__gl {
+  position: absolute;
+  inset: 0;
+  /*
+   * Keep MapLibre's z-indexes inside the map. deck.gl's canvas sits in MapLibre's top-left control
+   * container (z-index 2), which would otherwise paint data layers over the hint and the layer list.
+   */
+  isolation: isolate;
+}
+
+/* Bottom left: the layer list is top left, MapLibre's attribution bottom right. */
+.ttx-map__hint {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* --- Map: place search and data layers ---------------------------------- */
+
+.ttx-place {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.ttx-place__icon {
+  position: absolute;
+  left: 6px;
+  color: var(--ttx-muted);
+  pointer-events: none;
+}
+
+.ttx-place input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 6px 2px 22px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  font: inherit;
+  user-select: text;
+}
+
+.ttx-place__results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 2;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+.ttx-place__note {
+  padding: 4px 6px;
+  color: var(--ttx-muted);
+}
+
+.ttx-place__result {
+  display: flex;
+  align-items: center;
+}
+
+.ttx-place__result button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ttx-place__result button:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
+.ttx-place__name {
+  flex: 1;
+  min-width: 0;
+}
+
+.ttx-place__type {
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+/* Top left: the bottom corners hold MapLibre's attribution, which must stay readable. */
+.ttx-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ttx-layers__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.ttx-layers__item:hover {
+  background: rgb(0 0 0 / 0.04);
+}
+
+.ttx-options__empty {
+  margin: 0;
+  color: var(--ttx-muted);
+}
+
+.ttx-layers__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ttx-layers__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttx-layers__note {
+  font-size: 11px;
+  color: var(--ttx-muted);
+}
+
+.ttx-layers__item.is-error .ttx-layers__note {
+  color: #dc2626;
+}
+
+.ttx-layers button {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ttx-muted);
+  cursor: pointer;
+}
+
+.ttx-layers button:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+/* Annotation tools, top right while a map is edited. Above the deck.gl canvas. */
+.ttx-map__tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 2px 6px rgb(0 0 0 / 0.12);
+}
+
+.ttx-map__tools button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ttx-ink);
+  cursor: pointer;
+}
+
+.ttx-map__tools button:hover {
+  background: var(--ttx-bg);
+}
+
+.ttx-map__tools button.is-on {
+  background: var(--ttx-accent);
+  color: #fff;
+}
+
+/* The drawing box's rows: tools, then the color of the next shape (map/DrawingBox.tsx). */
+.ttx-map__toolrow {
+  display: flex;
+  gap: 2px;
+}
+
+.ttx-map__toolrow + .ttx-map__toolrow {
+  padding-top: 2px;
+  border-top: 1px solid var(--ttx-border);
+}
+
+.ttx-map__tools button.ttx-map__swatch {
+  width: 22px;
+  height: 22px;
+}
+
+.ttx-map__swatch i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+.ttx-map__swatch.is-current i {
+  box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 3.5px var(--ttx-ink);
+}
+
+/* Ends a polygon being drawn (map/draw.ts): a touch screen has no Enter, and no double-click it sends reliably. */
+.ttx-map__done {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ttx-ink);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ttx-map__done[hidden] {
+  display: none;
+}
+
+.ttx-map__toolhint {
+  max-width: 200px;
+  padding: 2px 4px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+/*
+ * A sticky note pinned to a place on a map (MapStickies.tsx): a MapLibre marker whose bottom left corner is on the
+ * place, where the note's tail points. The same size at any zoom. z-index 3: above deck.gl's canvas (2).
+ */
+.ttx-mapsticky {
+  z-index: 3;
+  padding: 0 0 10px 0;
+}
+
+.ttx-mapsticky.is-editable {
+  cursor: grab;
+}
+
+.ttx-mapsticky__note {
+  position: relative;
+  width: 140px;
+  max-height: 120px;
+  margin-left: -1px;
+  border-radius: 2px 2px 2px 0;
+  /* The canvas's yellow sticky. */
+  background: color-mix(in srgb, #fef9c3 60%, #eab308);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.25), 0 4px 10px rgb(0 0 0 / 0.2);
+  color: #18181b;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+/* The tail, from the note's bottom left corner down to the place. */
+.ttx-mapsticky__note::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 100%;
+  border-left: 10px solid color-mix(in srgb, #fef9c3 60%, #eab308);
+  border-bottom: 10px solid transparent;
+}
+
+.ttx-mapsticky__text {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  padding: 6px 8px;
+  overflow: hidden;
+  font: inherit;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ttx-mapsticky__text--edit {
+  height: 80px;
+  margin: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: auto;
+  background: transparent;
+  cursor: text;
+}
+
+.ttx-mapsticky__empty {
+  opacity: 0.5;
+}
+
+.ttx-mapsticky__remove {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #18181b;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ttx-mapsticky.is-editable:hover .ttx-mapsticky__remove {
+  display: grid;
+}
+
+/* The value under the pointer on a choropleth, while a map is edited. Above the deck.gl canvas. */
+.ttx-map__hover {
+  position: absolute;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.75);
+  color: #fff;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* A choropleth's classes in the map's layer list. */
+.ttx-layers__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 2px;
+}
+
+.ttx-layers__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ttx-layers__legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+/* A new map asks where to look (opens focus, with the map's Location tools). */
+.ttx-map__place {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ttx-accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* A map's Location tools in its Options panel (map/LocationPicker.tsx). */
+.ttx-location {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ttx-location form {
+  display: flex;
+  gap: 4px;
+}
+
+.ttx-location input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+}
+
+.ttx-location input[aria-invalid='true'] {
+  border-color: #dc2626;
+}
+
+.ttx-location button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttx-location button:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.04);
+}
+
+.ttx-location button:disabled {
+  color: var(--ttx-muted);
+  cursor: default;
+}
+
+.ttx-location button.is-active {
+  border-color: var(--ttx-accent);
+  color: var(--ttx-accent);
+}
+
+.ttx-layers__legend i.is-point {
+  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+}
+
+.ttx-layers__legend i.is-line {
+  height: 2px;
+  border-radius: 1px;
+  box-shadow: none;
+}
+
+/* A raster's color ramp and its range. */
+.ttx-layers__ramp {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ttx-muted);
+}
+
+.ttx-layers__ramp i {
+  display: block;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.ttx-layers__ramp > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.ttx-location select {
+  font: inherit;
+}
+
+.ttx-location__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* A layer's attributes, filter and style (map/LayerList.tsx). */
+.ttx-layers__item button.is-active {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-accent);
+}
+
+.ttx-layers__details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 6px 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.03);
+  font-size: 12px;
+}
+
+.ttx-layers__details label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ttx-layers__details select,
+.ttx-layers__details input {
+  min-width: 0;
+  font: inherit;
+}
+
+.ttx-layers__swatches {
+  display: flex;
+  gap: 4px;
+}
+
+.ttx-layers .ttx-layers__swatches button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+.ttx-layers .ttx-layers__swatches button.is-active {
+  box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 4px var(--ttx-ink);
+}
+
+.ttx-layers__filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.ttx-layers__filter input {
+  flex: 1;
+  width: 60px;
+}
+
+.ttx-layers .ttx-layers__filter button {
+  padding: 2px 8px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+}
+
+.ttx-layers .ttx-layers__filter button:disabled {
+  color: var(--ttx-muted);
+}
+
+.ttx-layers__attrs {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ttx-layers__attrs th {
+  color: var(--ttx-muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+.ttx-layers__attrs th:nth-child(2) {
+  width: 52px;
+}
+
+.ttx-layers__attrs td {
+  overflow: hidden;
+  padding: 2px 4px 2px 0;
+  border-top: 1px solid var(--ttx-border);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A map that is not live shows a picture of its view (map/snapshots.ts), with the credits its control would show. */
+.ttx-map__snapshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+/* Collapsed to an ⓘ like MapLibre's compact attribution; the credits show on hover or focus. */
+.ttx-map__credits {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  max-width: calc(100% - 8px);
+  min-height: 20px;
+  box-sizing: border-box;
+  padding: 0 20px 0 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.8);
+  color: #333;
+  font-size: 10px;
+  pointer-events: auto;
+}
+
+.ttx-map__credits::after {
+  content: 'i';
+  position: absolute;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #333;
+  color: #fff;
+  font: italic bold 9px/12px Georgia, serif;
+  text-align: center;
+}
+
+.ttx-map__credits span {
+  display: none;
+  overflow: hidden;
+  padding: 0 4px 0 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttx-map__credits:hover span,
+.ttx-map__credits:focus span {
+  display: block;
+}
+
+/* A note's or shape's color in the map's list of drawings (map/MapOptions.tsx). */
+.ttx-drawings__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+/* A failed action in a map's Options panel (the weather forecast). */
+.ttx-options__error {
+  margin: 4px 0 0;
+  color: #dc2626;
+}

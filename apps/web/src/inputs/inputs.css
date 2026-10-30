@@ -1,0 +1,4 @@
+.ttx-input__error {
+  margin-top: 6px;
+  color: var(--destructive);
+}

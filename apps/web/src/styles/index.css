@@ -1,0 +1,30 @@
+/*
+ * The app's own styles, outside Tailwind (shadcn.css loads Tailwind and the shadcn tokens first). Each feature keeps its
+ * styles beside its code; this file is the one place that loads them, in this order. Order matters where two rules of
+ * the same specificity meet: later files win. Rules are plain CSS, unlayered, so they win over Tailwind's layers.
+ *
+ * - tokens.css: every color, shadow, radius and layer (z-index) as a custom property. Rules use tokens, not values,
+ *   so dark mode (PRD step 11) changes tokens.css only.
+ * - Feature files: one per folder, classes prefixed with the feature (`.ttx-map__…`, `.ttx-report__…`).
+ */
+@import './tokens.css';
+@import './base.css';
+@import '../canvas/canvas.css';
+@import '../events/events.css';
+@import '../palette/palette.css';
+@import '../agent/chat.css';
+@import '../canvas/focus.css';
+@import '../openeo/openeo.css';
+@import '../notebooks/notebooks.css';
+@import '../uploads/uploads.css';
+@import '../pdfs/pdfs.css';
+@import '../images/images.css';
+@import '../reliefweb/reliefweb.css';
+@import '../hapi/hapi.css';
+@import '../inputs/inputs.css';
+@import '../history/history.css';
+/* After the Options panel's rules (canvas/focus.css): a map's location tools and layer list sit inside it. */
+@import '../map/map.css';
+@import '../routing/routing.css';
+@import '../reports/reports.css';
+@import '../pwa/pwa.css';

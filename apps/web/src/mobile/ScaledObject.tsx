@@ -4,7 +4,7 @@ import type { BoardObject } from '../board/board'
 import { ObjectView } from '../canvas/ObjectView'
 import { objectUI } from '../canvas/registry'
 
-/** The widget's name row above it, as on the canvas (styles.css, .ttx-obj__label). */
+/** The widget's name row above it, as on the canvas (canvas/canvas.css, .ttx-obj__label). */
 export const LABEL_H = 24
 
 interface Props {

@@ -170,7 +170,7 @@ function BlockControls({ block: b, index }: { block: Block; index: number }) {
   )
 }
 
-/** The controls' width and their gap from the block, in px (styles.css .ttx-report__controls). */
+/** The controls' width and their gap from the block, in px (reports/reports.css .ttx-report__controls). */
 const CONTROLS_W = 24
 const CONTROLS_GAP = 8
 
