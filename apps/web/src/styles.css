@@ -1289,6 +1289,23 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   display: none;
 }
 
+/* Report mode is a document view, not the canvas: full screen, white, no dots. */
+.ttx-canvas[data-focus='report'] {
+  background-color: var(--ttx-panel);
+  background-image: none;
+}
+
+/*
+ * A type that keeps the chat in focus (a report: canvas/registry.ts keepChat): the agent chat stays open as an overlay
+ * at the top left, over the page, so people can ask the agent to work on it; it takes no room from the layout, and
+ * collapses to uncover the page. The title bar above it is hidden, so it moves up to the top.
+ */
+body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
+  display: flex;
+  top: 8px;
+  max-height: min(70%, calc(100% - 16px));
+}
+
 .ttx-focusbtn {
   display: inline-flex;
   padding: 3px;
@@ -3078,6 +3095,65 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   background: var(--ttx-bg);
 }
 
+/* On the canvas: sheet 1, centered in the object. */
+.ttx-report__preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A page at its scale: the sheet takes the scaled size, the page inside it is laid out at its real size. */
+.ttx-report__sheet {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+}
+
+/* Out of sight: what pagination measures (ReportPages). No height, so it adds nothing to scroll. */
+.ttx-report__measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Report mode: every page in a column that scrolls. */
+.ttx-report.is-mode {
+  outline: none;
+  background: var(--ttx-panel);
+}
+
+/* Report mode's view: the scrolling pages, with the zoom control floating over them. */
+.ttx-reportview {
+  position: absolute;
+  inset: 0;
+}
+
+.ttx-reportmode {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  /* Not align-items: center, which cuts off the left of a page zoomed wider than the view; auto margins below. */
+  align-items: flex-start;
+  gap: 32px;
+  padding: 32px;
+  overflow: auto;
+  background: var(--ttx-panel);
+}
+
+/* Pages on white: a border around each, square and flat (a page, not a card: no shadow). */
+.ttx-reportmode > .ttx-report__sheet {
+  margin-inline: auto;
+  box-sizing: content-box;
+  border: 1px solid var(--ttx-border);
+}
+
 .ttx-report__page {
   position: absolute;
   top: 0;
@@ -3095,16 +3171,30 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
 }
 
 .ttx-report__title {
-  margin: 0 0 24px;
+  /* Padding, not margin: pagination measures it (offsetHeight leaves margins out). */
+  margin: 0;
+  padding-bottom: 24px;
   font-size: 32px;
   font-weight: 600;
   line-height: 1.2;
 }
 
+/* A report in one flow (ReportPages.tsx ReportContent): the phone's Reports tab, which makes it one column (mobile.css). */
 .ttx-report__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px 24px;
+}
+
+/* One row of the two-column grid (reports/pages.ts); rows are 16px apart, as ReportPages' ROW_GAP. */
+.ttx-report__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 24px;
+}
+
+.ttx-report__row + .ttx-report__row {
+  margin-top: 16px;
 }
 
 .ttx-report__block {
@@ -3141,6 +3231,8 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
 .ttx-report__image {
   display: block;
   max-width: 100%;
+  margin-inline: auto;
+  object-fit: contain;
 }
 
 .ttx-report__divider {
@@ -3244,6 +3336,114 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A report's Options panel (reports/ReportOptions.tsx). */
+.ttx-reportopts__name {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.ttx-reportopts__page {
+  display: flex;
+  gap: 8px;
+}
+
+.ttx-reportopts__page select {
+  flex: 1;
+}
+
+.ttx-reportopts__items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ttx-reportopts__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ttx-reportopts__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttx-reportopts__item button {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ttx-muted);
+  cursor: pointer;
+}
+
+.ttx-reportopts__item button:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+/* An item in full (reports/ReportPages.tsx ItemView): a caption, then the widget as it is. */
+.ttx-report__item {
+  margin: 0;
+}
+
+.ttx-report__caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--ttx-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ttx-report__map {
+  display: block;
+  max-width: 100%;
+  margin-inline: auto;
+  object-fit: cover;
+  background: var(--ttx-bg);
+}
+
+/* One line, as ReportPages' CREDITS_H counts it. */
+.ttx-report__credits.is-line {
+  height: 16px;
+  margin-top: 0;
+  overflow: hidden;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A widget's own view at its board size, scaled to the block. Read-only in a report. */
+.ttx-report__embed {
+  position: relative;
+  overflow: hidden;
+  /* Smaller than the block when a page cannot hold its full height: centered. */
+  margin-inline: auto;
+}
+
+.ttx-report__embedded {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  transform-origin: 0 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* Above the canvas's toolbar and the phone's tabs (pwa/UpdateNotice.tsx). */
