@@ -3283,6 +3283,29 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   border-top: 1px solid var(--ttx-border);
 }
 
+/* A page break, in report mode only: where the page ends. */
+.ttx-report__break {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ttx-report__break::before,
+.ttx-report__break::after {
+  flex: 1;
+  border-top: 1px dashed var(--ttx-border);
+  content: '';
+}
+
+/* Part of a text that goes on over pages (ReportPages.tsx RowView): this page's lines of it. */
+.ttx-report__piece {
+  overflow: hidden;
+}
+
 .ttx-report__card {
   position: relative;
   padding: 12px 14px;
@@ -3551,6 +3574,23 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
 
 .ttx-report__controls .is-handle {
   cursor: grab;
+}
+
+/* The page's margin is out of sight (zoomed wider than the column): inside the block, at the top, where it is in
+   sight (its left is set in editing.tsx), over its content. */
+.ttx-report__editable > .ttx-report__controls.is-inside {
+  top: 4px;
+  right: auto;
+}
+
+/* While a block is dragged: it stays faded in its place, and the pointer holds it everywhere. */
+.ttx-report__editable.is-dragging {
+  opacity: 0.4;
+}
+
+.ttx-reportmode.is-dragging,
+.ttx-reportmode.is-dragging * {
+  cursor: grabbing !important;
 }
 
 /* The insertion line while a block is dragged: before this block, or after the last one. */
