@@ -2061,6 +2061,190 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   text-align: center;
 }
 
+/* --- Code cell (plans/plan-018.md) ---------------------------------------- */
+
+.ttx-code {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--ttx-panel);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
+  font-size: 12px;
+}
+
+.ttx-code__source,
+.ttx-code__editing {
+  flex: 0 1 auto;
+  max-height: 55%;
+  min-height: 48px;
+  margin: 0;
+  overflow: auto;
+  border-bottom: 1px solid var(--ttx-border);
+  background: #fafafa;
+}
+
+.ttx-code__source {
+  padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, monospace;
+  white-space: pre;
+}
+
+.ttx-code__editing .cm-editor {
+  height: 100%;
+  font-size: 12px;
+}
+
+.ttx-code__editing .cm-editor.cm-focused {
+  outline: none;
+}
+
+.ttx-code__placeholder {
+  color: var(--ttx-muted);
+  font-family: inherit;
+}
+
+.ttx-code__status {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+  color: var(--ttx-muted);
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-code__hint {
+  text-align: right;
+}
+
+.ttx-code__run {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ttx-code__run:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ttx-code__problem,
+.ttx-code__error {
+  padding: 6px 10px;
+  border-bottom: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.ttx-code__error-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ttx-code__error-head button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ttx-code__error-head button + button {
+  flex: none;
+  text-decoration: underline;
+}
+
+.ttx-code__error pre {
+  max-height: 140px;
+  margin: 6px 0 0;
+  overflow: auto;
+  font: 11px/1.4 ui-monospace, monospace;
+  white-space: pre-wrap;
+}
+
+.ttx-code__output {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+}
+
+.ttx-code__text {
+  margin: 0;
+  padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, monospace;
+  white-space: pre-wrap;
+}
+
+.ttx-code__number {
+  margin: auto;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.ttx-code__image {
+  width: 100%;
+  object-fit: contain;
+}
+
+.ttx-code__table {
+  flex: 1;
+  overflow: auto;
+}
+
+.ttx-code__table table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.ttx-code__table th,
+.ttx-code__table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--ttx-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ttx-code__table th {
+  position: sticky;
+  top: 0;
+  background: var(--ttx-panel);
+}
+
+.ttx-code__geo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  color: var(--ttx-muted);
+}
+
+.ttx-code__geo svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.ttx-code__geo path {
+  fill: rgb(14 116 144 / 0.15);
+  stroke: #0e7490;
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.ttx-code__geo circle {
+  fill: #0e7490;
+}
+
 /* The run picker in a notebook's Options panel, which scrolls: the list scrolls inside a fixed height. */
 .ttx-nbopts__picker {
   display: flex;
