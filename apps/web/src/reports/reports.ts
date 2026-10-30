@@ -1,4 +1,4 @@
-import type { Board, InvocationRecord, Runtime } from '@ttx/core'
+import type { AnyObject, Board, InvocationRecord, Registry, Runtime } from '@ttx/core'
 import { reportTitle, type ReportBoardObject } from '@ttx/plugins'
 
 /** A report of the board, as pickers list it. */
@@ -11,6 +11,17 @@ export interface ReportChoice {
 
 /** The title a report shows: its name, the live title of the frame it was made from, or "Untitled report". */
 export const titleOf = (board: Board, report: ReportBoardObject) => reportTitle(report, report.titleFrom ? board.get(report.titleFrom) : undefined)
+
+/**
+ * How an object is named: its name, its title, an area's place, else its type. In lists (`withText`), where objects
+ * must be told apart, the start of a sticky note's or text's text comes before its type; not on a report's page,
+ * which shows that text already.
+ */
+export function labelOf(o: AnyObject, registry: Registry, { withText = false }: { withText?: boolean } = {}): string {
+  const f = o as AnyObject & { title?: string; text?: string; value?: { name?: string } }
+  const text = withText ? f.text?.replace(/\s+/g, ' ').trim() : undefined
+  return o.name || f.title || (text && (text.length > 48 ? `${text.slice(0, 47)}…` : text)) || f.value?.name || (registry.objectType(o.type)?.title ?? o.type)
+}
 
 /** True when the report shows the object: as an item, or as the frame it was made from (its title). */
 export const holds = (report: ReportBoardObject, id: string) => report.titleFrom === id || report.blocks.some((b) => b.kind === 'item' && b.sourceId === id)

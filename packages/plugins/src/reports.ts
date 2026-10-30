@@ -239,13 +239,15 @@ export const reportsPlugin = definePlugin({
       target: { kind: 'objects', min: 1 },
       args: z.object({
         reportId: z.string().min(1).optional().meta({ widget: 'report' }).describe('The report to add them to. Leave it out for a new report'),
+        // Report mode's toolbar adds after the selected block; forms do not ask (`advanced`).
+        index: z.number().int().optional().meta({ advanced: true }).describe('Where in the report. Default: at the end'),
       }),
       // With one report on the board, that one; otherwise a new report unless someone picks one.
       defaults: (ctx) => {
         const reports = ctx.board.list().filter((o) => o.type === 'report')
         return reports.length === 1 ? { reportId: reports[0]!.id } : {}
       },
-      prepare(ctx, { reportId }) {
+      prepare(ctx, { reportId, index }) {
         const report = reportId ? reportOf(ctx, reportId) : undefined
         const blocks = report?.blocks ?? []
         const already = new Set(blocks.flatMap((b) => (b.kind === 'item' ? [b.sourceId] : [])))
@@ -267,7 +269,7 @@ export const reportsPlugin = definePlugin({
                 y: Math.round(Math.min(...selected.map((o) => o.y))),
                 ...ctx.registry.objectType('report')!.defaultSize,
               },
-          blocks: [...blocks, ...added],
+          blocks: insertAt(blocks, added, index),
           ...(whole && { titleFrom: first!.id }),
           count: added.length,
           name: report ? report.name || 'the report' : 'a new report',

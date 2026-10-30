@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: steps 2 to 5a built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: steps 2 to 5 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -205,6 +205,8 @@ Report mode is a view of its own, not the canvas (`FocusableObjectUI.fullScreen`
 
 ### 5.1b Tools in report mode (5b)
 
+Built in step 5b (`reports/ReportToolbar.tsx`, `reports/editing.tsx`): the toolbar and the controls below; a press selects a block (outlined in the canvas accent), a press on a selected heading or text, or a double-click, types in it (`report.setText`, one undo step per editing session; the editor keeps its own text while typing), Esc ends typing, then clears the selection, and only then leaves report mode (caught before the canvas's Esc); Delete or Backspace removes the selected block. Reordering drags a block's handle across pages, with an insertion line (`dropIndex` and `moveIndex` in `reports/pages.ts`), Esc cancels, and the column scrolls near its edges. Image uploads go through `uploadFile` (media only) or pick from the board's uploads. Empty headings and texts show a muted placeholder in report mode only. Every action starts its own gesture: one undo step each. A block's controls sit beside it in the page's margin, never over its content: the left margin for a one-column block on the left, the right margin for the others. Lists that must tell objects apart (From board, the Options panel's items) name a sticky note or text by the start of its text (`labelOf` with `withText`); captions and cards on the page use its name or type, since the page shows the text already. A toolbar menu leaves the focus with what it added (a new heading's editor), and Esc while a menu is open closes the menu only.
+
 Decided 2026-10-30: the tools for adding to a report are a **report toolbar at the bottom center**, in the canvas toolbar's style and place, replacing it in report mode (the canvas toolbar is hidden in focus already).
 - **Its tools:** Heading (levels 1 to 3 in its menu), Text, Image (upload a file, or pick from the board's uploads), Divider, and **Add from board** (a picker of the board's objects by type and name, which adds them as items, as Add to report does).
 - **Where a new block goes:** after the selected block, or at the end of the report when nothing is selected (`report.addBlock` with `index`).
@@ -331,7 +333,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
 4. **Drag onto a report** (built): the drop zone, the confirmation, objects back in place, one undo step.
 5. **Report mode,** in two PRs:
    - **5a** (built): report mode opens from ⤢, a double-click or the Object panel's Open; it is live (`FocusableObjectUI.live`: no draft, Share or exit dialog) and keeps the agent chat on the left (`keepChat`); every page scrolls in the middle, on real pages; the Options panel has the name, the page, and the items (Live or Frozen, Go to source, Remove).
-   - **5b:** editing on the page: drag to reorder, the column toggle, the insert menu, × and Delete, headings and plain text.
+   - **5b** (built): editing on the page: the report toolbar (Heading, Text, Image, Divider, From board), block controls (drag to reorder, width, ×), Delete and Esc, typing headings and plain text.
 6. **Rich text:** the editor (Tiptap, needs approval), `report.setText`.
 7. **Live and frozen** (under discussion: `plans/plan-019.md` would replace this step with synced and detached items):
    - report renderers and `freeze` for each type

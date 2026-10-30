@@ -126,6 +126,18 @@ describe('reports', () => {
     expect(defaults()).toEqual({})
   })
 
+  it('add at a place in the report when asked, which forms do not ask for', async () => {
+    const rt = setup()
+    const r = add(rt, 'report', { x: 5000 })
+    await rt.invoke('report.addBlock', one(r), { block: { kind: 'heading', text: 'A' } })
+    await rt.invoke('report.addBlock', one(r), { block: { kind: 'heading', text: 'B' } })
+    const note = add(rt, 'sticky')
+    await rt.invoke('report.addItems', one(note), { reportId: r, index: 1 })
+    expect(report(rt, r).blocks.map((b) => (b.kind === 'item' ? 'item' : b.kind === 'heading' ? b.text : b.kind))).toEqual(['A', 'item', 'B'])
+    const args = (exportTools(rt.availableOps(one(note))).find((t) => t.name === 'report__addItems')!.input_schema as any).properties.args.properties
+    expect(args.index).toMatchObject({ advanced: true })
+  })
+
   it('never put a report in a report', async () => {
     const rt = setup()
     const r = add(rt, 'report')

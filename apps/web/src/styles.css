@@ -3493,3 +3493,99 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   bottom: calc(88px + env(safe-area-inset-bottom));
   white-space: nowrap;
 }
+
+/* Editing in report mode (reports/editing.tsx): a block's selection, its controls, typing, and where a drag drops. */
+.ttx-report__editable {
+  position: relative;
+  outline: 1px solid transparent;
+  outline-offset: 4px;
+}
+
+.ttx-report__editable:hover {
+  outline-color: color-mix(in srgb, var(--canvas-accent) 40%, transparent);
+}
+
+.ttx-report__editable.is-selected {
+  outline: 1.5px solid var(--canvas-accent);
+}
+
+/* Beside the block, in the page's right margin (56px, room in either column), so they never cover its content. */
+.ttx-report__controls {
+  position: absolute;
+  top: -2px;
+  left: calc(100% + 8px);
+  z-index: 2;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+}
+
+.ttx-report__editable.controls-left > .ttx-report__controls {
+  right: calc(100% + 8px);
+  left: auto;
+}
+
+.ttx-report__editable:hover > .ttx-report__controls,
+.ttx-report__editable.is-selected > .ttx-report__controls {
+  display: flex;
+}
+
+.ttx-report__controls button {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ttx-muted);
+  cursor: pointer;
+}
+
+.ttx-report__controls button:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-ink);
+}
+
+.ttx-report__controls .is-handle {
+  cursor: grab;
+}
+
+/* The insertion line while a block is dragged: before this block, or after the last one. */
+.ttx-report__drop {
+  position: absolute;
+  top: -10px;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--canvas-accent);
+  pointer-events: none;
+}
+
+.ttx-report__drop.is-after {
+  top: auto;
+  bottom: -10px;
+}
+
+/* Typing in place: the same type as the block, no box of its own. */
+.ttx-report__editor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+}
+
+.ttx-report__placeholder {
+  color: var(--ttx-muted);
+  font-weight: 400;
+}
