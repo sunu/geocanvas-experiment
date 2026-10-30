@@ -210,8 +210,8 @@ Built in step 5b (`reports/ReportToolbar.tsx`, `reports/editing.tsx`): the toolb
 
 Added after testing 5b (branch `feat/report-pages`):
 - **Page break** in the toolbar, after Divider: a `pageBreak` block, shown in report mode as a dashed line labelled "Page break" (nothing on the canvas preview or in print), selected, dragged and removed like any block; it has no width toggle.
-- **Typing in a text that goes on over pages:** each page's part of it is a block on that page, selected together; the first has the controls and is where a drop before it goes. Pressing a part types there: the editor is that part's height, starts scrolled to it, and scrolls inside itself, so what is typed past the page's bottom stays in sight; the other pages follow as it is typed, and the text flows over the pages again when typing ends.
-- **The caret goes where the text was pressed** (else at the end of a new text), and a heading's text is selected to type over. Before, opening a text selected all of it, so the first key replaced the whole text.
+- **Typing goes on at the end of a text,** wherever it was pressed: the caret is at its end, in sight. Before, opening a text selected all of it, so the first key replaced the whole text. A heading's text is selected to type over.
+- **Typing in a text that goes on over pages:** each page's part of it is a block on that page, selected together; the first has the controls and is where a drop before it goes. Pressing any part types in the last one: the editor is that part's height, at the text's end, and scrolls inside itself, so what is typed past the page's bottom stays in sight; the other pages follow as it is typed, and the text flows over the pages again when typing ends.
 - **Dragging shows what moves:** the block's icon and name follow the pointer, the block stays faded in its place, and the pointer is a closed hand until the drop.
 - **Controls stay in sight when zoomed:** when the page's margin is out of sight (zoomed wider than the column, or under the Options panel), a block's controls go inside it, at the top, at the edge of what is in sight.
 
@@ -226,7 +226,7 @@ Decided 2026-10-30: the tools for adding to a report are a **report toolbar at t
 
 - The report's **name** (`core.object.rename`).
 - **Paper** (A4 or Letter) and **orientation** (portrait or landscape).
-- **Items:** every block, in report order, by icon and name (`blockLabel` and `blockIcon` in `reports/reports.ts`, which the dragged block uses too): a heading's or a text's words, an image's file name, Divider, Page break, an item's object. Each has **Remove**; an item also has a **Live / Frozen** switch and **Go to source** (leaves focus and selects the object).
+- **Items:** every block, in report order, by icon and name (`blockLabel` and `blockIcon` in `reports/reports.ts`, which the dragged block uses too): a heading's or a text's words, an image's file name, Divider, Page break, an item's object. Its name goes to the block on the page (scrolled into view and selected; `showBlock` in `reports/editing.tsx`). Each has **Remove**; an item also has a **Live / Frozen** switch and **Go to source** (leaves focus and selects the object).
 - **Export PDF** (§7).
 - **Share link** (§8).
 

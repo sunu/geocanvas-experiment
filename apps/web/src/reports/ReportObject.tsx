@@ -10,7 +10,7 @@ import { ObjectHeader } from '../canvas/ObjectHeader'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { ReportPages } from './ReportPages'
-import { ReportEditing, runReportOp, useReportEditing, type ReportEditingState } from './editing'
+import { ReportEditing, runReportOp, SHOW_BLOCK, useReportEditing, type ReportEditingState } from './editing'
 import { ReportToolbar } from './ReportToolbar'
 
 /** The phone's Reports tab reads a report as one flow (mobile/ReportsPage.tsx). */
@@ -85,20 +85,17 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
 
   // Editing on the page (step 5b): this person's selected block, the one they type in, and where a drag would drop.
   const [selected, select] = useState<string | null>(null)
-  const [editing, setEditingState] = useState<{ id: string; at: number; caret?: number } | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
   const [drop, setDrop] = useState<number | null>(null)
   const [dragging, setDragging] = useState<ReportEditingState['dragging']>(null)
   // A block someone else removed is no longer selected.
   const live = selected && report.blocks.some((b) => b.id === selected) ? selected : null
-  const setEditing = (id: string | null, { at = 0, caret }: { at?: number; caret?: number } = {}) => setEditingState(id ? { id, at, caret } : null)
   const editingState: ReportEditingState = {
     report,
     runtime,
     selected: live,
     select,
-    editing: editing?.id ?? null,
-    editingAt: editing?.at ?? 0,
-    caret: editing?.caret,
+    editing,
     setEditing,
     drop,
     setDrop,
@@ -128,6 +125,20 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  // The Options panel's list goes to a block: select it and bring it into view (its first page, for a text over pages).
+  useEffect(() => {
+    const el = column.current
+    if (!el) return
+    const onShow = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail
+      setEditing(null)
+      select(id)
+      el.querySelector(`[data-block-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+    }
+    el.addEventListener(SHOW_BLOCK, onShow)
+    return () => el.removeEventListener(SHOW_BLOCK, onShow)
   }, [])
 
   // ⌘/Ctrl + wheel and pinch zoom the report, not the browser page. Native, to prevent the browser's zoom.

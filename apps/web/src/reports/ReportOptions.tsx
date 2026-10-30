@@ -3,6 +3,7 @@ import { ORIENTATIONS, PAPERS, type Orientation, type Paper, type ReportBoardObj
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import type { ObjectViewProps } from '../canvas/registry'
+import { showBlock } from './editing'
 import { blockIcon, blockLabel, titleOf, useUploadName } from './reports'
 
 const PAPER_LABEL: Record<Paper, string> = { a4: 'A4', letter: 'US Letter' }
@@ -70,9 +71,9 @@ export function ReportOptions({ runtime, object: r, onGoTo }: ObjectViewProps<Re
               return (
                 <li key={b.id} className="ttx-reportopts__item">
                   <Icon size={14} aria-hidden />
-                  <span className="ttx-reportopts__label" title={label}>
+                  <button type="button" className="ttx-reportopts__label" title={`Go to ${label} in the report`} onClick={() => showBlock(b.id)}>
                     {label}
-                  </span>
+                  </button>
                   {b.kind === 'item' && (
                     <select
                       aria-label={`${label}: live or frozen`}

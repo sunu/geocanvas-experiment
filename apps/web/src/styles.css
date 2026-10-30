@@ -3460,6 +3460,14 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   color: var(--ttx-ink);
 }
 
+/* A block's name: goes to it on the page. */
+.ttx-reportopts__item button.ttx-reportopts__label {
+  display: block;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
 /* An item in full (reports/ReportPages.tsx ItemView): a caption, then the widget as it is. */
 .ttx-report__item {
   margin: 0;

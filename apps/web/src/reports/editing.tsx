@@ -15,14 +15,9 @@ export interface ReportEditingState {
   runtime: Runtime
   selected: string | null
   select(id: string | null): void
+  /** The block typed in. Typing always goes on at the end of a text, so a text over pages is typed in its last part. */
   editing: string | null
-  /**
-   * Type in a block: for a text that goes on over pages, in its part that starts `at` px from its top; in a text, with
-   * the caret at character `caret` of what is typed (blank lines between paragraphs), else at the end.
-   */
-  setEditing(id: string | null, where?: { at?: number; caret?: number }): void
-  editingAt: number
-  caret?: number
+  setEditing(id: string | null): void
   /** While a block is dragged: the index in the blocks it would be dropped before. */
   drop: number | null
   setDrop(index: number | null): void
@@ -40,13 +35,23 @@ export function runReportOp(runtime: Runtime, reportId: string, opId: string, ar
   return runtime.dispatch(opId, { kind: 'objects', ids: [reportId] }, args)
 }
 
+/**
+ * Go to a block in report mode: scrolled into view and selected. For the Options panel's list, which is outside report
+ * mode's editing state: report mode listens for this on its column.
+ */
+export function showBlock(id: string) {
+  document.querySelector('.ttx-reportmode')?.dispatchEvent(new CustomEvent<string>(SHOW_BLOCK, { detail: id }))
+}
+export const SHOW_BLOCK = 'ttx-report-show-block'
+
 /** The scrolling column that holds report mode's pages: where blocks are found and the view scrolls while dragging. */
 const columnOf = (el: Element | null) => el?.closest<HTMLElement>('.ttx-reportmode') ?? null
 
 /**
  * A block on a page in report mode: selected with a press, with its controls (drag to reorder, width, remove) while
  * hovered or selected, and the insertion line while another block is dragged over its place. A text that goes on over
- * pages is one of these on each page (`piece`); the first has the controls and is where drops go before it.
+ * pages is one of these on each page (`piece`); the first has the controls and is where drops go before it, the last is
+ * where typing goes on.
  */
 export function EditableBlock({
   block: b,
@@ -68,10 +73,9 @@ export function EditableBlock({
   const typeable = b.kind === 'heading' || b.kind === 'text'
   const first = !piece || piece.from === 0
   const last = !piece || piece.to >= piece.height
-  const at = piece?.from ?? 0
   /** The block was selected already when this press began: then the click types in it. */
   const wasSelected = useRef(false)
-  const typing = ed.editing === b.id && ed.editingAt === at
+  const typing = ed.editing === b.id && last
   return (
     <div
       data-block-id={b.id}
@@ -85,9 +89,9 @@ export function EditableBlock({
       // Typing starts on the click, after the press: started on the press, the editor would lose its focus at once
       // to the press's own mousedown, which moves focus, and end.
       onClick={(e) => {
-        if (wasSelected.current && typeable && !typing && !(e.target as HTMLElement).closest('.ttx-report__controls')) ed.setEditing(b.id, { at, caret: caretAt(e, b) })
+        if (wasSelected.current && typeable && !typing && !(e.target as HTMLElement).closest('.ttx-report__controls')) ed.setEditing(b.id)
       }}
-      onDoubleClick={(e) => typeable && !typing && ed.setEditing(b.id, { at, caret: caretAt(e, b) })}
+      onDoubleClick={() => typeable && !typing && ed.setEditing(b.id)}
     >
       {first && ed.drop === index && <div className="ttx-report__drop" aria-hidden />}
       {last && ed.drop === count && index === count - 1 && <div className="ttx-report__drop is-after" aria-hidden />}
@@ -99,23 +103,6 @@ export function EditableBlock({
 
 /** A rich text block's paragraphs as plain text, until the editor comes (step 6). */
 export const paragraphs = (doc: RichDoc) => (doc.content ?? []).map((p) => docText({ type: 'doc', content: [p] }))
-
-/**
- * Where in a text block's typed text a press was: the character under the pointer in its paragraph (`data-p`, the
- * paragraph's index), counted in the text as the editor holds it, paragraphs joined by a blank line.
- */
-function caretAt(e: React.MouseEvent, b: Block): number | undefined {
-  if (b.kind !== 'text') return undefined
-  const pos = document.caretPositionFromPoint?.(e.clientX, e.clientY)
-  const range = pos ? undefined : document.caretRangeFromPoint?.(e.clientX, e.clientY)
-  const node = pos?.offsetNode ?? range?.startContainer
-  const offset = pos?.offset ?? range?.startOffset ?? 0
-  const p = (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('p[data-p]')
-  if (!p) return undefined
-  const ps = paragraphs(b.doc)
-  const i = Number(p.dataset.p)
-  return ps.slice(0, i).reduce((n, t) => n + t.length + 2, 0) + Math.min(offset, ps[i]?.length ?? 0)
-}
 
 function BlockControls({ block: b, index }: { block: Block; index: number }) {
   const ed = useReportEditing()!
@@ -330,18 +317,16 @@ function HeadingEditor({ block: b }: { block: Extract<Block, { kind: 'heading' }
 }
 
 /**
- * Typing in a text. For a text that goes on over pages, the editor takes the place of the part pressed (`piece`): it is
- * that part's height, starts scrolled to it, and scrolls inside itself, so what is typed past the page's bottom stays in
- * sight; the other pages show the text as it is typed, and it flows over the pages again when typing ends.
+ * Typing in a text, from its end. For a text that goes on over pages, the editor takes the place of its last part
+ * (`piece`): it is that part's height and scrolls inside itself, so what is typed past the page's bottom stays in sight;
+ * the other pages show the text as it is typed, and it flows over the pages again when typing ends.
  */
 function TextEditor({ block: b, piece }: { block: Extract<Block, { kind: 'text' }>; piece?: { from: number; to: number } }) {
   const ed = useReportEditing()!
-  // The caret where the text was pressed, else at the end; a part of a text starts scrolled to that part. Only where
-  // typing starts: the part's place moves as the text grows.
+  // The caret at the end of the text, in sight: typing goes on where the text ends, on its last page.
   const area = useFocusSoon<HTMLTextAreaElement>((el) => {
-    if (piece) el.scrollTop = piece.from
-    const caret = ed.caret ?? el.value.length
-    el.setSelectionRange(caret, caret)
+    el.setSelectionRange(el.value.length, el.value.length)
+    el.scrollTop = el.scrollHeight
   })
   const t = useTyping(
     b,
