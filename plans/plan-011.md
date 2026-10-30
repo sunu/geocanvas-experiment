@@ -10,15 +10,32 @@ pointers are, and where the agent has worked. Design source: the "Collaborator s
 | Role | Color | Outline | Marks |
 | --- | --- | --- | --- |
 | You | `--canvas-accent`, cyan-500 | solid 1.5 px | corner handles (only yours); marquee and draw draft in the same color |
-| Another person | one of six, `board/collaborators.ts` | solid 1.5 px | cursor arrow and name tag; no handles |
+| Another person | one of about 60 in tiers (Figma's seven first); unique on the board, `board/collaborators.ts` | solid 1.5 px | cursor arrow and name tag; no handles |
 | The agent | `--agent`, violet-500 | dashed 1.5 px | sparkle in its tag, in the chat and on its avatar |
 
 - **Yours is cyan for everyone.** Each person sees their own selection in cyan, so the color that means "mine" is the
   same on every screen. Cyan is never assigned to anyone else.
-- **People keep one color.** It is picked once per browser from the six (orange, pink, yellow, blue, emerald, red),
-  stored with the person (`board/person.ts`) and sent in presence as a hex, so every browser draws them the same.
-  A stored color from outside the palette is replaced on load. Six is the Figma file's count; with more people than
-  colors, two share one, and the name tag tells them apart.
+- **Everyone on the board has a color of their own.** Colors come in tiers, used in this order: (1) Figma's seven
+  multiplayer colors, each as the nearest shadcn (Tailwind) color; (2) 15 more shadcn colors spanning the rainbow,
+  from a farthest-first search over every shade (300 to 700) of every hue; (3) the next 17 of that search; (4)
+  generated soft and deep hues for the boards that need more. About 65 people fit before a color repeats; after
+  that the name tags tell them apart. Browns and olives are out.
+- **Figma's colors.** Figma's editor defines seven multiplayer colors, read from the `ui_color_multiplayer_*` tokens of
+  its loaded app bundle on 2026-10-30: `#18a0fb`, `#1bc47d`, `#907cff`, `#ef5533`, `#ee46d3`, `#00b5ce`, `#ffc700`.
+  Matched by distance in OKLab to blue-400, emerald-500, indigo-400, orange-600, fuchsia-500, teal-500 and amber-300
+  (`FIGMA_COLORS`). Figma's `#00b5ce` is a cyan, which is yours, so it is mapped to teal-500, the nearest shadcn
+  color that is not cyan. Its own sky blue (`#18a0fb`, nearest sky-500) went to blue-400 for the same reason. The
+  tokens are the palette's source; how Figma picks one for a person (a hash, or the order they join) is not in them,
+  and with seven colors Figma must repeat them on a busy file, which this app does not.
+- **How a color is assigned** (`claimColor`, `board/collaborators.ts`): a person keeps the color they had when no one
+  else has it (a new person's comes from their id). Otherwise they take the free color that looks least like any in
+  use, measured as distance in OKLab (the farthest from its nearest), not simply the next in a list, so the second
+  person is not given a neighbour of the first. When two people join at the same moment and clash, the one with the
+  higher client id moves, so exactly one does. Colors are freed when people leave. Tabs of one person share a color.
+  The guess is that Figma and Miro assign per session, since a person's color there changes, but their documentation
+  does not say. Presence carries the hex, so every browser draws a person the same way.
+- **Label text** on a color is black or white, whichever has the higher contrast (WCAG), at least 4.5:1 on every
+  color (`onColor`).
 - **The agent is violet, and violet is not a person's color.** The Figma file gave violet to a person and black to the
   agent; violet moved to the agent so that "violet means the agent" holds everywhere. The agent has no selection of
   its own, so its work is marked by the objects it added or changed in the last 5 s (`board/agentActivity.ts`, from
@@ -40,5 +57,8 @@ pointers are, and where the agent has worked. Design source: the "Collaborator s
 ## Not done
 
 - Object name labels above selections (the Figma frame shows one; objects have no names yet).
-- Collaborator avatars (no list of people on the board exists yet).
 - Updating the Figma frame to the violet agent.
+
+## Avatars
+
+The others on the board show as a stack of avatars in the user menu (`chrome/PresenceAvatars.tsx`): a person's initial on their color, the agent as a violet square with a sparkle, hover for the name, four shown and the rest counted. Your own avatar stays neutral, as in the Figma file.
