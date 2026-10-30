@@ -25,6 +25,7 @@ export class Agent {
   /** board.get and the tools given. One runner per room, so its cache serves every turn. */
   private tools: ToolRunner
   private accepts: (message: UserMessage) => boolean
+  private toolsFor: (message: UserMessage) => ToolDef[]
   private turnsPerHour: number | undefined
   private onBusy: (busy: boolean) => void
   private onActivity: (activity: { for: string; title: string } | null) => void
@@ -38,6 +39,11 @@ export class Agent {
     complete: Complete | undefined
     /** Read-only tools beside board.get: geocoding and Montandon search, when their keys are set. */
     tools?: ToolDef[]
+    /**
+     * Tools for one message's turn beside the others: the room's agent gets the asker's tab's tools this way
+     * (agent/relay.ts), only while that tab can run them.
+     */
+    toolsFor?: (message: UserMessage) => ToolDef[]
     /** The messages this agent answers. Default: the room's (forRoom). */
     accepts?: (message: UserMessage) => boolean
     /** At most this many turns an hour; no limit when undefined (a person's own key). */
@@ -51,6 +57,7 @@ export class Agent {
   }) {
     this.complete = opts.complete
     this.accepts = opts.accepts ?? forRoom
+    this.toolsFor = opts.toolsFor ?? (() => [])
     this.turnsPerHour = opts.turnsPerHour
     this.onBusy = opts.onBusy ?? (() => {})
     this.onActivity = opts.onActivity ?? (() => {})
@@ -90,7 +97,16 @@ export class Agent {
         const entries = this.chat.list()
         const history = entries.slice(0, entries.findIndex((e) => e.id === message.id))
         const onActivity = (title: string) => this.onActivity({ for: message.actor.id, title })
-        this.chat.reply(await runTurn(this.runtime, message, this.complete, this.tools, history, onActivity))
+        // The turn's own tools, for its tool calls and for ops' prepare (OpContext.tools). Turns run one at a time.
+        const extra = this.toolsFor(message)
+        const tools = extra.length ? new ToolRunner([...this.tools.list(), ...extra]) : this.tools
+        this.runtime.tools = tools
+        try {
+          this.chat.reply(await runTurn(this.runtime, message, this.complete, tools, history, onActivity))
+        } finally {
+          this.runtime.tools = this.tools
+          if (tools !== this.tools) tools.dispose()
+        }
       }
     } finally {
       this.busy = false

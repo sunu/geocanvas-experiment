@@ -1,3 +1,4 @@
+import { codeExecuteTool } from '../code/execute'
 import { adminBoundariesTool, WorldBankBoundaries } from '../data/boundaries'
 import { OvertureParquet, overtureTool } from '../data/buildings'
 import { uploadFeaturesTool, UrlFeatures, urlFeaturesTool, urlRasterTool, urlTilesTool } from '../data/fromUrl'
@@ -46,4 +47,5 @@ export const tools = new ToolRunner([
   openeoCoverage(),
   routeTool(routing),
   exposureTool(new ExposureWorker(), layercake),
+  codeExecuteTool,
 ])

@@ -40,9 +40,12 @@ Rules:
 - Only some tools are loaded. To do something none of them does, read the skill for it, or call tools__search with a few words for what you need: it loads the tools it finds.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
-/** Every op an agent may call (not hidden, and not a view op: the agent has no camera), and the read-only tools. */
+/**
+ * Every op an agent may call (not hidden, not a view op: the agent has no camera, and not one whose tools it lacks),
+ * and the read-only tools.
+ */
 export function agentTools(runtime: Runtime, tools: ToolRunner): FunctionTool[] {
-  const ops = runtime.registry.ops().filter((op) => !op.hidden && !op.applyView)
+  const ops = runtime.registry.ops().filter((op) => !op.hidden && !op.applyView && (op.tools ?? []).every((id) => tools.tool(id)))
   const defs: ToolDefinition[] = [...exportTools(ops), ...exportToolDefs(tools.list())]
   const names = new Set<string>()
   for (const d of defs) {

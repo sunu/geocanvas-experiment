@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { Views, type OpContext } from '@ttx/core'
 import type { EventFacts } from '../agentTools.js'
+import type { CodeOutput } from '../codeOutput.js'
 import type { PlaceFeatures } from '../geocode.js'
 import type { Bbox } from '../mapLayers.js'
 import { areaOfView, MAP_HEADER_PX, type Area } from '../mapView.js'
@@ -24,6 +25,8 @@ export interface Facts {
   country?: string
   glides?: string[]
   area?: Area
+  /** A code cell's last good output (code.ts): what the code.* link recipes show. */
+  code?: CodeOutput
 }
 
 export interface Resolved {
