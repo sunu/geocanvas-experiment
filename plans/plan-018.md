@@ -1,200 +1,103 @@
-# Plan 018: code cells on JupyterHub
+# Plan 018: the board on a phone
 
+A layout for phones on the same board, runtime and ops as the canvas, AI-first and fully editable: a phone is for
+asking the agent and reading what is there, and anyone on it can still change anything. The canvas stays as it is;
+an installable PWA comes after, as an optimization.
 
-## Context
+Status: experiment, on phone-sized screens only. Steps 1 to 7 are built; step 4 was checked in Chromium with touch emulation, not yet on real phones.
 
-The board can show data only through ops and tools that we wrote (layers, footprints, openEO). Some requests have no op, for example "put a 10 km buffer around Kathmandu on a map" or "find Sentinel-2 scenes over this area with a STAC query". We want the agent, and people, to write a short Python snippet for such a request. The snippet runs on a JupyterHub, the result goes on the canvas, and the code that made the result stays visible, editable and re-runnable.
+## Decisions
 
-Decisions from the user:
-- The agent can run code without approval. Guards: a time limit, output size caps, runs per hour per room, and the hub's own resource limits.
-- **Each person runs code as themselves**, on their own hub login. The hub token stays in that person's browser, as "My key" does (plan-009). Execution therefore happens in a browser, as in MyST/thebe: kernel REST and WebSocket go from the tab to the person's single-user server.
-- In-place editing uses CodeMirror 6, a new dependency (approved). It loads lazily.
+- **A second layout, not a responsive canvas.** The canvas is made for a mouse and a keyboard (drag to select, ⌘K,
+  right-click menus, a 360 px chat panel over the canvas). A phone gets `mobile/MobileApp.tsx`, loaded instead of
+  `App.tsx` by `main.tsx` when the screen is at most 640 px wide (`layout.ts`); `?layout=phone|desktop` overrides
+  it in this browser, and `?layout=auto` goes back to the screen size. Both layouts join the room through
+  `board/session.ts`. The phone's chunk is 18 kB and it does not load the canvas's code (`App`, 120 kB).
+- **Every widget type shows with no phone code of its own.** A card is the type's own `View`, drawn as on the
+  canvas at its own size and scaled to the screen's width (`ScaledObject.tsx`: a `.ttx-world` of one object with
+  `--ttx-zoom`, so the name row is counter-scaled as on the canvas). A type whose height follows its content (a text)
+  is shown at its content's height when that is taller than the stored one: only whoever changes a text fits it, so
+  a stored height can be short, and a card would cut the rest off. Cards only show: nothing in them takes a tap,
+  and a tap opens the widget full screen; a long press chooses the card without opening it. The canvas's own hints
+  ("Double-click to pan and zoom", the focus button) are hidden; a new map still says "Choose a location". A per-type compact view, which reports also need
+  (`agent-docs/tasks/reports.md` step 7), can replace the scaled card type by type later.
+- **The board as the canvas lays it out, read-only** (`mobile/BoardCanvas.tsx`): the Board tab switches between
+  List and Canvas (kept per browser), for boards whose layout says something. One finger pans, two zoom
+  (`mobile/gestures.ts`, the canvas's camera helpers); a tap on a widget opens it full screen as in the list, and a tap
+  on a frame fits the view to it. Nothing there moves, resizes or adds: editing stays in the list, the full screen
+  and the palette. The camera is the view's own; maps show snapshots; links are drawn as on the canvas. Boxes are
+  shown here, unlike in the list, since they are part of the layout.
+- **The board as a list** (`mobile/order.ts`): reading order (top to bottom, then left to right), a frame as a
+  section of what it holds directly (`framedBy`, as reports add a frame) with its frames nested inside it. Boxes
+  (shapes, lines, arrows) are left out: they arrange the canvas and say nothing on a phone.
+- **Full screen is focus mode, as on the canvas.** A type with a focus mode opens in it (`ObjectSheet.tsx`): laid out
+  at the screen's size with `focused` and `editing`, its Options below it, on a `Draft` made when it opens and closed
+  when it closes, as `enterFocus` does. Share sends the draft (after the type's `beforeShare`); leaving with
+  unshared changes, by Back, Ask or the browser's back, asks Share, Discard or Keep editing (`ExitDialog`). Any other
+  type is edited live, as on the canvas, drawn at its own size scaled to the screen's width, so a text measures its
+  height at its own width when it is edited here (laid out at the screen's width, it would save a wrong height).
+- **Drawing on a map works with a finger**: pointer events in `map/draw.ts`, a Done button for polygons, and
+  double-tap on a map's note, from developmentseed/humanitarian-ttx#83, which this branch builds on. On a phone the
+  tools are 36 px, for a finger.
+- **The browser's back closes the full screen** (a swipe on iOS, the back button on Android): opening one pushes a
+  history entry with only a state (`mobile/history.ts`; the hash stays, since changing it reloads the board), and
+  `popstate` leaves it as Back does. Keep editing puts the entry back.
+- **The keyboard:** Chrome on Android resizes the page for it (`interactive-widget=resizes-content`); Safari on iOS
+  does not, so the layout follows `visualViewport` (`mobile/viewport.ts`) and the prompt box stays above it, except
+  while the page is zoomed in: a zoomed visual viewport is small too, and a layout fitted to it zoomed with it, so
+  pinching back out could not show the whole screen. Safari also zooms into a field whose text is under 16px when
+  it is focused, and most of the app's are 12 to 14px: on iOS only, the viewport gets `maximum-scale=1`
+  (`src/iosZoom.ts`, from `main.tsx`, so the landing page has it too), which stops that zoom but not pinch zoom; on
+  Android it would stop pinch zoom as well.
+- **The selection is the chosen card.** Opening a card selects it in presence, so others see it outlined on the
+  canvas, the agent acts on it, and the Ask page shows it with a button to clear it.
+- **Adds go next to the chosen card** (`mobile/placement.ts`). The phone sets `runtime.view`: `center()` is the
+  chosen card's right edge (the agent's `freeSpot` then puts its adds on the card's row, past it), or below the
+  board with no card; `zoomTo` scrolls the list, `focus` opens the full screen. Adds from the palette go through
+  the same `firstAddSpot` as the agent's, since a person on a phone does not see where they land. A new object
+  opens at once, for editing if its type has `editOnCreate`.
+- **Editing is the palette.** The + button and the full screen's ⋯ open the command palette on the selection: every
+  op, form and template, with no phone code per op. Undo and redo are in the top bar.
+- **Ask is the default tab.** The canvas's chat, split into `useChatThread`, `ChatEntries`, `ChatComposer` and
+  `sendMessage` (`agent/ChatPanel.tsx`), so both layouts use the same thread, entries and prompt box. On a phone,
+  each reply also lists what it added and changed (from its `undo` record), to open them, since no canvas shows
+  them. Starter prompts fill the box; nothing is sent until Send. "My key" with no key falls back to the room's
+  agent.
+- **Maps:** only the map open full screen is live; the list's maps are snapshots (`publishViewport` with no objects,
+  the open map as `focused`), and the card of the open map draws nothing while it is open, so the map is not live
+  twice. A map no longer saves a move that ends where its view already is (a resize, entering focus): it only
+  changed the view's `at`, which made a draft look changed, on the canvas too.
+- **Reports tab:** the board's reports one at a time, their title and blocks reflowed at the screen's width (the
+  widget's `ReportContent`, in one column), not the page scaled down, which would be unreadable. A report is edited
+  from its widget until report mode exists.
+- **PWA** (`src/pwa/`): a manifest and icons (made from `assets/logo.svg`); our own service worker (`sw.js`, no
+  dependency), which the build writes to `/sw.js` with its version and the files to cache at install
+  (`precache.ts`: the page, the entry and both layouts with what they load at once, about 3.8 MB before
+  compression). Pages come from the network, or from the cache when offline or after 4 s; `/assets/*` from the cache
+  (their names carry hashes); everything else (the board's socket, `/monty`, `/uploads`, map tiles) is not touched.
+  Registered in production builds only. A new version waits until the person reloads from the app's notice
+  (`UpdateNotice.tsx`), so a tab never runs two builds' code against the board. Offline, a board's layout loads and
+  says it is offline; its content needs the network (offline boards, with y-indexeddb, are a separate decision).
 
-The result is board state, not execution state. **Any person can see outputs, and read and edit code. Only a person with a hub login can run code.**
+## Steps
 
-## Core idea: one `code` object, typed output, followers
+1. Shell, list and full screen: built.
+2. Ask page and the reply's objects: built.
+3. Placement next to the chosen card, palette edits: built.
+4. Phones: touch pans in a focused map, the keyboard (visualViewport), checked in Chromium with touch emulation.
+   Still to check on real phones: iOS Safari's keyboard, WebGL contexts, memory with the Overture and exposure
+   workers.
+5. Gestures: a long press chooses a card; the browser's back closes the full screen: built.
+6. PWA: built.
+7. Reports tab, to read: built. Report mode (editing) comes with the reports work.
 
-```
-  code cell (root)                      followers (optional projections)
-  ┌────────────────────────┐   link     ┌──────────────┐
-  │ title, source (python) │──────────▶ │ map layer     │ geo.features
-  │ output: kind + ref     │──────────▶ │ input (AOI)   │ geo.features → area
-  │ run: ok | error, log   │──────────▶ │ image         │ image.png
-  └────────────────────────┘──────────▶ │ text / sticky │ text, number
-```
+Not in this plan: updates sent to people as they happen ("2 new ReliefWeb reports"). They are to come from the room
+deterministically, not from the agent, and get their own plan.
 
-- The **cell always shows its own output**. Every kind (text, number, table, JSON, image, geometry preview) therefore has a home, and followers are optional. This is how the workflow is generalized beyond maps.
-- **Output kinds** reuse the tool output vocabulary: `geo.features`, `geo.raster` (a COG URL), `image.png`, `table`, `text`, `json`.
-- **Followers declare the kind they accept.** A follower renders only when the cell's output kind matches its kind.
+## Known limits
 
-## Data model (`packages/plugins/src/code.ts`, new `code` plugin)
-
-`code` object type (layer `top`, default size about 420×300):
-- `title: string`, `language: 'python'`, `source: string`
-- `output?`: `{ kind, uploadId?, value?, summary, at, by, sourceHash }`. This is the **last good output**. A failed run does not change it.
-  - `geo.features` and `image.png` go to R2 through the existing `POST /uploads` and are stored by `uploadId`. GeoJSON and PNG are already in `UPLOAD_TYPES`, so the gallery, `GET /uploads/<id>` and `data.uploadFeatures` work unchanged.
-  - `text`, `number`, `json` and `table` (columns + rows) are stored inline in `value`, with a 64 KB cap. A larger output is truncated and flagged.
-  - `summary` is a short text for `summarize` and for the agent: the feature count and bbox, the columns and row count, or the first 200 characters.
-- `run?`: `{ status: 'ok' | 'error', at, by, ms, sourceHash, stdout? (capped 8 KB), error?: { ename, evalue, traceback } }`. This is the **latest attempt**.
-- Optional `stale` is not stored. The UI derives it (see "When the code changes").
-
-Map layers get one new optional field in `mapLayer` (`mapLayers.ts`): `from?: string`, the id of the code cell that made the layer. A map can hold many code layers and still keep its own object `link` (from an event, through a template), so map provenance is per layer. Example: `{ id, tool: 'data.uploadFeatures', input: { fileId }, title, from: cellId }`.
-
-Other followers (`image`, `text`, `sticky`, `input`) use the existing object `link` (plan-013). This requires these changes:
-- Add `'code'` to `ROOT_TYPES` (`links/roots.ts`), and a `factsOf` branch: `{ name: title, area: bbox of a geo output, code: output }`.
-- Add new recipes in `links/recipes.ts`: `codeArea` (input), `codeImage` (image `imageId`), `codeText` (text and sticky). A recipe writes `link.args.renderedAt = output.at`.
-- **A code recipe returns no change when the kind does not match.** It does not blank the follower. This is different from event recipes. The follower keeps the last good result, and the UI marks it stale (see below).
-
-## Ops (all in the `code` plugin, so palette, agent and MCP list them)
-
-| op | what it does |
-|---|---|
-| `code.add` `{ title, source, showOn?: objectId }` | Adds a cell. With `source`, it runs the code first (async `prepare`). With `showOn`, it also adds the follower: a layer on a map, a link on another object. |
-| `code.setSource` `{ source }` | `gesture: true`, as sticky typing is. It does not run the code. |
-| `code.run` | Async `prepare` executes the code through the tool `code.execute`. `apply` writes `run`. If the run is ok, it also writes `output`, updates the layers whose `from` is the cell (`fileId`) and runs `applyLinks`. Everything is in one transaction, so one ⌘Z takes back the run and its effects on the followers. |
-| `code.show` `{ on: objectId }` | Adds a follower for an existing cell. It fails if the kinds do not match ("map needs geo.features; the cell returns a table"). |
-
-Error policy, which depends on the actor:
-- **Agent actor:** an execution error, a timeout or a kind mismatch with `showOn` **throws in `prepare`**. Nothing is written. The agent gets the error and the last 30 traceback lines (at most 2 KB) through `OpCall.error`, then fixes the code and calls again. It has 12 model calls per turn.
-- **User actor:** the error is recorded on the cell (`run.status = 'error'`). Followers do not change.
-
-## Execution: browser-side Jupyter client (`apps/web/src/code/`)
-
-- `hub.ts`: the person's hub URL and token in localStorage, as `agent/keys.ts` stores them, and never sent to the Worker, the doc, chat or presence. Phase 1: the person pastes a token from the hub's `/hub/token` page. Phase 2: JupyterHub OAuth (register TTX as a hub OAuth client and use PKCE). The client starts the server if it is not running (`POST /hub/api/users/{name}/server`, then poll progress), and shows the status in the user menu ("JupyterHub: connected as …").
-- `kernel.ts`: our own minimal client for the Jupyter messaging protocol, about 200 lines. **No `@jupyterlab/services`**, which is large. It does these steps:
-  1. Start one kernel per person per board (`POST /api/kernels`).
-  2. Open the WebSocket at `/api/kernels/<id>/channels`.
-  3. Send `execute_request` and collect `stream`, `display_data`, `execute_result` and `error` until `execute_reply` and status `idle`.
-  4. On timeout (60 s), `POST …/interrupt`.
-- **Preamble** (`ttx.py`, sent once per kernel):
-  - `ttx.show(obj, kind=None)` sends `display_data` with MIME `application/vnd.ttx.output+json`.
-  - It converts shapely geometries, GeoDataFrames and GeoJSON dicts to `geo.features` (reprojected to EPSG:4326), DataFrames to `table`, matplotlib figures to `image.png`, and str and numbers to `text` and `number`.
-  - Without `ttx.show`, the cell's last expression is the output.
-  - Each run executes in a **fresh namespace** (`ttx._run(src)`). The kernel stays warm, so imports are fast, but a re-run does not depend on other cells. This keeps the code reproducible.
-- `execute.ts`: the browser tool `code.execute` (`defineTool`, `cache: false`, output `code.result`). It returns `{ ok, output?, error?, stdout, ms }` and does not write the board. Before it returns, it uploads geo and PNG outputs. The op's `prepare` calls it through `ctx.tools`. A small in-tab memo by `sourceHash` (5 min) lets the agent run a scratch test and then call `code.add` without a second execution.
-- Guards: at most 60 s per run, 50 MB per upload (`MAX_UPLOAD_BYTES`), and 64 KB per inline value. The hub's server limits (CPU, memory, idle culling) do the rest. Document the hub config: `c.Spawner.args` CORS `allow_origin` for the board origin, and hub `tornado_settings` headers.
-- **The hub must allow CORS from the board's origin.** This is the same constraint as for URL layers.
-
-## Who can run code: the agent paths
-
-- **Browser agent ("My key") and MCP:** they run their tools in the tab, so `code.execute` and the ops work natively when the tab has a hub login.
-- **Room agent (Durable Object):** it has no hub token. Add a **tab relay**: the DO sends the tool call to the asker's socket in a custom y-websocket message type, the tab runs it in its `ToolRunner` (only for tools that are marked `relay: true`), and the tab sends the answer back. The timeout is the run limit + 10 s.
-  - The DO offers `code__execute` and the `code.*` ops only when the asker's presence says `hub: true`.
-  - With no tab or a closed tab, the tool fails: "Run this from a tab signed in to JupyterHub."
-  - The relay is generic. Later it can also give the room agent `routing.route` and `exposure.buildings`, which it cannot see today.
-- **Skill** `packages/plugins/src/skills/run-code.md` (requires `code__execute`). It says:
-  - Use an op first if one exists. Use code only for what ops cannot do.
-  - Describe the `ttx.show` API and the output kinds.
-  - Buffer in metres, not degrees: `gdf.to_crs(gdf.estimate_utm_crs()).buffer(10_000).to_crs(4326)`.
-  - For STAC, use `pystac-client` and return a GeoDataFrame of item footprints or a table.
-  - Test with `code__execute`, then call `code.add` with `showOn`.
-  - Keep code short and self-contained, with no hidden state.
-
-Example (Kathmandu): the agent calls `data__geocode` and gets the point. It writes the snippet and tests it with `code__execute`, which returns `geo.features` with 1 polygon. Then it calls `code.add { title: 'Kathmandu 10 km buffer', source, showOn: <map> }`. The cell appears beside the map, the map gets the layer with `from = cell`, and the link arrow is drawn.
-
-## UI
-
-**Code cell widget** (`apps/web/src/code/CodeObject.tsx`, registered with `registerObjectUI`, tool key `C`):
-- Header: title, language chip, a Run button (disabled with a tooltip "Sign in to JupyterHub to run" when there is no login), and a status (ran 2 min ago by Agent, 1.2 s).
-- Body: the code (read-only highlighted on the canvas; CodeMirror when edited or in focus) above the output, which is rendered by kind: a table grid, text, an image, a geometry preview (a small static SVG of the features with the feature count and bbox), or collapsed JSON.
-- Error state: a red strip with `ename: evalue`, an expandable traceback, stdout, and **"Ask agent to fix"**, which posts to the chat with the cell selected ("Fix the error in this code").
-- Running state: a local busy overlay (`useReportLoading`), and presence `activity: 'Running <title>'` so that others see who runs it.
-- In focus (F): a large editor, the full output and the run history. The run history is not a new field; it comes from the op log.
-
-**Provenance footnote on followers** (`apps/web/src/code/Provenance.tsx`):
-- Objects with a `link` to a code cell show a footnote under their frame: "‹/› Generated by code · Kathmandu 10 km buffer · 2 min ago". Click to expand it:
-  - The snippet, read-only with highlighting.
-  - **Edit**, which opens CodeMirror in place. It edits the **cell's** `source` through `code.setSource`, so it is the same text as in the cell.
-  - **Run**, then **Go to cell** and **Unlink** (`link.remove`).
-- Map layers: in the layer list, a layer with `from` gets the same "‹/›" badge and expander, and the map's credits get "Generated by code".
-- Reports later: frozen items keep the source as a caption.
-
-**Link arrows** already draw root to follower (`canvas/Links.tsx`). Extend them to code roots, and draw a dotted arrow from a cell to each map that has a layer with `from`.
-
-## When the code changes: errors and kind changes
-
-The UI derives `stale` for each follower. It compares what the follower shows (the layer's `fileId`, or `link.args.renderedAt`) with `cell.output`:
-
-| situation | cell | follower | footnote says / offers |
-|---|---|---|---|
-| Run ok, same kind | new output | updated in the same transaction | — |
-| Run failed | shows error, keeps last good output | unchanged | "Latest run failed. Showing the result from 10:42." · Go to cell · Ask agent to fix |
-| Run ok, **kind changed** (now a table, not geometry) | shows the table | **unchanged, marked stale** (layer greyed in the list) | "The code now returns a table, not features. Showing the earlier result." · Undo edit (⌘Z) · Unlink · Remove layer |
-| Source edited, not run | "edited, not run" chip | unchanged | "Code changed since this was made." · Run |
-| Cell deleted | — | keeps its data | Footnote reads "Generated by code (deleted)". The layer keeps `fileId`, and the upload stays in R2. |
-
-The run is never refused for a kind change: the person may want the new kind. The follower is never silently blanked either. The agent's `code.run` and `code.add` get the mismatch in `OpCall.summary`, so they can tell the asker.
-
-## Phases
-
-1. **Run code by hand.** Hub login (pasted token), kernel client, preamble, the `code` plugin (type and ops without followers), the cell widget with CodeMirror (lazy), and outputs of every kind. Tests: the preamble's MIME-to-kind conversion and the ops' error policy, in Node.
-2. **Followers.** Layer `from`, the code recipes, the `code.show` op, the provenance footnote with edit in place, stale states and link arrows.
-3. **Agent.** The skill and `code__execute` for BYOK and MCP, then the room-agent tab relay.
-4. **Later, not planned now:** hub OAuth; cell `inputs` from board objects (for example the map's area as `aoi`); long jobs over 60 s (queued and done by a hub-side service, as openEO does); export a cell as `.ipynb` or a Notebook Factory template.
-
-Step 0 of implementation: copy this plan into `plans/plan-018.md` and add a line about it to `AGENTS.md`.
-
-## Critical files
-
-- New: `packages/plugins/src/code.ts` (plugin, type, ops), `packages/plugins/src/codeOutput.ts` (kinds, caps, `summary`), `packages/plugins/src/skills/run-code.md`, `apps/web/src/code/{hub,kernel,execute,ttx.py,CodeObject,Provenance,ui}.tsx|ts`.
-- Changed:
-  - `packages/plugins/src/mapLayers.ts` (`from?`)
-  - `packages/plugins/src/links/{roots,recipes}.ts`
-  - `packages/plugins/src/index.ts` and `plugins.ts` (list the plugin)
-  - `apps/web/src/plugins.ts`
-  - `apps/web/src/tools/registry.ts` (`code.execute`)
-  - `apps/web/src/map/` layer list (badge, stale)
-  - `apps/web/src/canvas/Links.tsx`
-  - `apps/web/src/board/presence.ts` (`hub`)
-  - `apps/worker/src/worker.ts` (relay, phase 3)
-  - `skills/index.ts`
-- Reuse: `POST /uploads` and `data.uploadFeatures` (`apps/web/src/data/fromUrl.ts`), `planLinks` and `applyLinks` (`links/propagate.ts`), the async `prepare` pattern (`event.setEvent`, `map.addForecast`), the key storage of `agent/keys.ts`, `useReportLoading` (`canvas/loading.ts`), and the agent `callOp` placement (`agent/call.ts`).
-
-## Verification
-
-- `npm test`:
-  - Kernel client against a fake WebSocket server that replays recorded Jupyter messages (ok, error, stream, display_data, timeout).
-  - Output conversion and caps.
-  - `code.run` writes `output` and updates the `from` layers and linked followers in one transaction, and one undo reverts all of them.
-  - An agent actor's failing run throws and writes nothing. A user actor's failing run records the error.
-  - A kind mismatch leaves followers unchanged.
-  - The stale derivation table.
-- `npm run typecheck`, `npm run build`.
-- Manual: a local JupyterHub run with `uvx` (the user's setup: DummyAuthenticator, SimpleLocalProcessSpawner, `geopandas`, `pystac-client`, CORS for `localhost:5173`). Document the config in `plans/plan-018.md`.
-  1. Paste a token and run a cell by hand.
-  2. Ask the BYOK agent "put a 10 km buffer around Kathmandu on a map", and check the layer, the footnote and the arrow.
-  3. Edit the buffer to 20 km in the footnote and run. The map updates.
-  4. Change the code to return a DataFrame. The cell shows the table, and the map is marked stale.
-  5. Break the code. The cell shows the error, and "Ask agent to fix" repairs it.
-  6. A second browser with no hub login sees everything, and Run is disabled.
-  7. Phase 3: the same flow through the room agent with the asker's tab open, then with it closed (clear error).
-
-## Status (2026-10-30)
-
-Built and tested against a local JupyterHub 5 (uvx, DummyAuthenticator, SimpleLocalProcessSpawner) in Chrome:
-
-- Phase 1: the hub login, the kernel client, the preamble, the `code` plugin and the cell widget, with every output kind.
-- Phase 2: map layers with `from`, the `code.<type>` link recipes, `code.show`, the footnote with edit in place, the stale states, the arrows.
-- Phase 3, part: the `run-code` skill and `code.execute` for the browser agent and MCP. `OpDef.tools` keeps the code ops away from agents that cannot run code.
-
-Not built yet: the room agent's tab relay (phase 3), and phase 4.
-
-Changes from the plan:
-
-- A cell on the canvas shows its code as plain text. CodeMirror (with highlighting) loads only to edit.
-- The person's presence does not say "Running <title>" yet: a run shows as busy only in the runner's tab.
-
-## Hub setup
-
-A local hub for tests: `extras/jupyterhub/` (configuration and how to start it).
-
-The hub must allow CORS from the board's origin:
-
-```python
-c.JupyterHub.tornado_settings = {'headers': {'Access-Control-Allow-Origin': 'https://<board origin>', 'Access-Control-Allow-Headers': 'Authorization, Content-Type'}}
-c.Spawner.args = ['--ServerApp.allow_origin=https://<board origin>']
-```
-
-The kernel's WebSocket carries the token in its URL, since a browser cannot set headers on a WebSocket. JupyterHub 5+ takes it only with `Sec-Fetch-Mode: websocket`, and browsers send that header only to secure hosts. A plain-HTTP hub (local tests) needs `c.Spawner.environment = {'JUPYTERHUB_ALLOW_TOKEN_IN_URL': '1'}`, or the socket is refused with 403. An HTTPS hub should not need it; this is not tested yet.
-
-The single-user image needs `geopandas`, `shapely`, `pandas` and `pystac-client` for the skill's examples, and `matplotlib` for images.
+- The full screen has no undo of its own: the top bar's undo is under it. Undo on a draft, as ⌘Z in focus on the
+  canvas, is not built.
+- Opening another object full screen while one is open (from the agent's `focus`) drops the first one's draft.
+- The agent's turns are shared by the room (20 per hour): an AI-first phone layout spends them faster.
+- No access control, as everywhere: anyone with the link edits.

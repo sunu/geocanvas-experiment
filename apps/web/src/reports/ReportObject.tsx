@@ -1,114 +1,143 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { FileTextIcon, SquaresFourIcon } from '@phosphor-icons/react'
-import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
-import { docText, pageSize, type Block, type ReportBoardObject, type RichDoc } from '@ttx/plugins'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { CheckIcon, FileTextIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { pageSize, type ReportBoardObject } from '@ttx/plugins'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import { ObjectHeader } from '../canvas/ObjectHeader'
-import { objectUI, type ObjectViewProps } from '../canvas/registry'
+import { FocusButton } from '../canvas/OptionsPanel'
+import type { ObjectViewProps } from '../canvas/registry'
+import { ReportPages } from './ReportPages'
+
+/** The phone's Reports tab reads a report as one flow (mobile/ReportsPage.tsx). */
+export { ReportContent } from './ReportPages'
 import { titleOf } from './reports'
 
+/** Space around and between the sheets in report mode, in px. */
+const SHEET_PAD = 32
+
 /**
- * A report on the canvas (agent-docs/tasks/reports.md §4): its first page, laid out at the paper's real size and
- * scaled down to the object, so the preview is the page report mode will show. Items show as cards until each
- * widget type gets its own report view (step 7). Report mode itself comes in step 5.
+ * A report (agent-docs/tasks/reports.md §4, §5). On the canvas: its first page, scaled down to the object, with items as
+ * compact cards. In report mode (focus): every page, in a column that scrolls, as large as fits up to 100%, with items
+ * in full (a map's picture, a widget's own view). Both use the pages as they print (ReportPages).
  */
-export function ReportObject({ runtime, object: r }: ObjectViewProps<ReportBoardObject>) {
+export function ReportObject({ runtime, object: r, focused, onFocus }: ObjectViewProps<ReportBoardObject>) {
   const board = runtime.board as Board
   // Re-render when any source changes, so its card follows it.
   useObjects(board)
   const page = pageSize(r.paper, r.orientation)
-  const scale = Math.min(r.w / page.w, r.h / page.h)
-  const content = useRef<HTMLDivElement>(null)
-  const [pages, setPages] = useState(1)
-  useLayoutEffect(() => {
-    // An estimate until report mode paginates between blocks: the laid-out content's height in pages.
-    if (content.current) setPages(Math.max(1, Math.ceil(content.current.scrollHeight / page.h)))
-  })
   const items = r.blocks.filter((b) => b.kind === 'item').length
 
   return (
-    <div className="ttx-report">
-      <ObjectHeader icon={<FileTextIcon size={14} aria-hidden />} title={titleOf(board, r)} />
-      <div
-        className="ttx-report__page"
-        // Centered in the object, whose shape need not be the page's.
-        style={{ width: page.w, height: page.h, left: (r.w - page.w * scale) / 2, top: (r.h - page.h * scale) / 2, transform: `scale(${scale})` }}
-      >
-        <div ref={content} className="ttx-report__content">
-          <h1 className="ttx-report__title">{titleOf(board, r)}</h1>
-          {r.blocks.length ? (
-            <div className="ttx-report__grid">
-              {r.blocks.map((b) => (
-                <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
-                  <BlockView block={b} board={board} runtime={runtime} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="ttx-report__empty">Drop objects here, or use Add to report</p>
-          )}
+    <div className={`ttx-report ${focused ? 'is-mode' : ''}`}>
+      <ObjectHeader icon={<FileTextIcon size={14} aria-hidden />} title={titleOf(board, r)}>
+        {!focused && onFocus && <FocusButton onFocus={onFocus} />}
+      </ObjectHeader>
+      {focused ? (
+        <ReportMode report={r} board={board} runtime={runtime} pageWidth={page.w} />
+      ) : (
+        <div className="ttx-report__preview" onDoubleClick={onFocus}>
+          <ReportPages
+            report={r}
+            board={board}
+            runtime={runtime}
+            which="first"
+            scale={Math.min(r.w / page.w, r.h / page.h)}
+            full={false}
+            footer={(_, count) => `Page 1 of ${count} · ${items} item${items === 1 ? '' : 's'}`}
+          />
         </div>
-        <div className="ttx-report__count">
-          Page 1 of {pages} · {items} item{items === 1 ? '' : 's'}
-        </div>
-      </div>
+      )}
     </div>
   )
 }
 
-/** Paragraphs of a rich text block as plain text, until the editor comes (step 6). */
-const paragraphs = (doc: RichDoc) => (doc.content ?? []).map((p) => docText({ type: 'doc', content: [p] }))
+/** Zoom steps in report mode, and its limits; `fit` fills the column's width. */
+const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2]
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 3
+type Zoom = 'fit' | number
 
-function BlockView({ block: b, board, runtime }: { block: Block; board: Board; runtime: Runtime }) {
-  switch (b.kind) {
-    case 'heading': {
-      const H = (`h${b.level + 1}` as 'h2' | 'h3' | 'h4')
-      return <H className={`ttx-report__heading ttx-report__heading--${b.level}`}>{b.text}</H>
+/**
+ * Every page, in a column that scrolls (the canvas leaves the wheel alone in focus). It opens fitted to the column's
+ * width, as large as the page can be there; the zoom control and ⌘/Ctrl + wheel (a trackpad pinch) zoom in and out.
+ */
+function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoardObject; board: Board; runtime: ObjectViewProps['runtime']; pageWidth: number }) {
+  const column = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  const [zoom, setZoom] = useState<Zoom>('fit')
+  useLayoutEffect(() => {
+    const el = column.current
+    if (!el) return
+    const observer = new ResizeObserver(() => setWidth(el.clientWidth))
+    observer.observe(el)
+    setWidth(el.clientWidth)
+    return () => observer.disconnect()
+  }, [])
+  const fit = width ? Math.max(MIN_ZOOM, (width - 2 * SHEET_PAD) / pageWidth) : 1
+  const scale = zoom === 'fit' ? fit : zoom
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
+
+  // ⌘/Ctrl + wheel and pinch zoom the report, not the browser page. Native, to prevent the browser's zoom.
+  useEffect(() => {
+    const el = column.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      setZoom(clampZoom(scaleRef.current * Math.exp(-e.deltaY / 300)))
     }
-    case 'text':
-      return (
-        <div className="ttx-report__text">
-          {paragraphs(b.doc).map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-        </div>
-      )
-    case 'image':
-      return <img className="ttx-report__image" src={uploadUrl(b.imageId)} alt="" draggable={false} />
-    case 'divider':
-      return <hr className="ttx-report__divider" />
-    case 'item':
-      return <ItemView block={b} source={board.get(b.sourceId)} runtime={runtime} />
-  }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
+  return (
+    <div className="ttx-reportview">
+      <div ref={column} className="ttx-reportmode">
+        <ReportPages report={report} board={board} runtime={runtime} which="all" scale={scale} full footer={(n, count) => `Page ${n} of ${count}`} />
+      </div>
+      <ZoomControl scale={scale} fitted={zoom === 'fit'} onZoom={setZoom} />
+    </div>
+  )
 }
 
-/** An item: its frozen copy, or its source as a card (a frame shows as a heading), or a note that the source is gone. */
-function ItemView({ block: b, source, runtime }: { block: Extract<Block, { kind: 'item' }>; source: AnyObject | undefined; runtime: Runtime }) {
-  if (b.mode === 'frozen' && b.frozen) {
-    const f = b.frozen
-    return (
-      <div className="ttx-report__card is-frozen">
-        <span className="ttx-report__tag">Frozen</span>
-        {f.imageId && <img className="ttx-report__image" src={uploadUrl(f.imageId)} alt="" draggable={false} />}
-        {f.credits && <div className="ttx-report__credits">{f.credits}</div>}
-        {f.text && <div className="ttx-report__card-text">{f.text}</div>}
-      </div>
-    )
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100))
+
+/** The report's zoom: out, the percentage with set steps and Fit width, in. Chrome, floating over the pages. */
+function ZoomControl({ scale, fitted, onZoom }: { scale: number; fitted: boolean; onZoom(zoom: Zoom): void }) {
+  const next = (dir: 1 | -1) => {
+    const steps = dir === 1 ? ZOOMS.filter((z) => z > scale + 0.001) : ZOOMS.filter((z) => z < scale - 0.001).reverse()
+    onZoom(clampZoom(steps[0] ?? (dir === 1 ? MAX_ZOOM : MIN_ZOOM)))
   }
-  if (!source) return <div className="ttx-report__card is-gone">The source object was removed.</div>
-  const o = source as AnyObject & { text?: string; title?: string; value?: { name?: string } }
-  if (source.type === 'frame') return <h2 className="ttx-report__heading ttx-report__heading--1">{o.name || o.title || 'Frame'}</h2>
-  const Icon = objectUI(source.type)?.tool?.Icon ?? SquaresFourIcon
-  const typeTitle = runtime.registry.objectType(source.type)?.title ?? source.type
-  const text = source.type === 'text' || source.type === 'sticky' ? o.text : source.type === 'input' ? `Area of interest: ${o.value?.name ?? 'not set'}` : undefined
   return (
-    <div className="ttx-report__card">
-      <div className="ttx-report__card-head">
-        <Icon size={16} aria-hidden />
-        <span>{o.name || typeTitle}</span>
-      </div>
-      {text && <div className="ttx-report__card-text">{text}</div>}
+    <div className="ttx-ui absolute bottom-4 left-4 z-10 flex items-center gap-0.5 rounded-lg border bg-card p-1 font-sans shadow-md" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+      <Button variant="ghost" size="icon-sm" title="Zoom out" aria-label="Zoom out" disabled={scale <= MIN_ZOOM} onClick={() => next(-1)}>
+        <MinusIcon />
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-16 tabular-nums" title="Zoom" aria-label={`Zoom ${Math.round(scale * 100)}%`}>
+            {Math.round(scale * 100)}%
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="top">
+          <DropdownMenuItem onSelect={() => onZoom('fit')}>
+            Fit width
+            {fitted && <CheckIcon className="ml-auto" />}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {ZOOMS.map((z) => (
+            <DropdownMenuItem key={z} onSelect={() => onZoom(z)}>
+              {Math.round(z * 100)}%{!fitted && Math.abs(scale - z) < 0.001 && <CheckIcon className="ml-auto" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button variant="ghost" size="icon-sm" title="Zoom in" aria-label="Zoom in" disabled={scale >= MAX_ZOOM} onClick={() => next(1)}>
+        <PlusIcon />
+      </Button>
     </div>
   )
 }

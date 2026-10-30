@@ -1,4 +1,4 @@
-# The preamble each kernel runs once (plans/plan-018.md, apps/web/src/code/kernel.ts). It defines _ttx_run, which
+# The preamble each kernel runs once (plans/plan-020.md, apps/web/src/code/kernel.ts). It defines _ttx_run, which
 # runs a cell's code in a fresh namespace, and `ttx.show`, which gives the output in one MIME type the board reads.
 # The board's kinds: geo.features, image.png, table, text, number, json (packages/plugins/src/codeOutput.ts).
 

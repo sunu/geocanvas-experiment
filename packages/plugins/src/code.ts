@@ -23,7 +23,7 @@ import { UPLOAD_FEATURES_TOOL } from './map.js'
 import { newLayerId, type MapLayer } from './mapLayers.js'
 
 /**
- * Code cells (plans/plan-018.md): a short Python snippet, run on the person's own JupyterHub by their browser
+ * Code cells (plans/plan-020.md): a short Python snippet, run on the person's own JupyterHub by their browser
  * (apps/web/src/code/), and its output. No React and no Jupyter here. The cell always shows its own output;
  * other objects can show it too: a map as a layer (the layer's `from` is the cell), an input, an image, a text
  * or a sticky note through a link (links/recipes.ts). Each follower takes some kinds of output (ACCEPTS); a run

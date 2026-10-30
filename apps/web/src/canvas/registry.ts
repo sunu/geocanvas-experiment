@@ -1,7 +1,7 @@
 import type { ComponentType, CSSProperties } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
-import type { BoardObject } from '../board/board'
+import type { Board, BoardObject } from '../board/board'
 
 export interface ObjectViewProps<O extends BoardObject = BoardObject> {
   runtime: Runtime
@@ -13,6 +13,8 @@ export interface ObjectViewProps<O extends BoardObject = BoardObject> {
   focused: boolean
   /** Open it in focus mode: for a focus button in its header. Only for focusable types, and not while focused. */
   onFocus?(): void
+  /** In focus, for its Options: leave focus and show another object on the canvas (e.g. a report item's source). */
+  onGoTo?(id: string): void
 }
 
 /** The parts of the object panel that depend on the type. Its type's name is the badge, and its history gives Updated and Prompt. */
@@ -40,19 +42,28 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
   /** Removed when editing ends with nothing in it. */
   isEmpty?(object: O): boolean
   /** What the object panel (canvas/ObjectPanel.tsx) says about one of them when it is the only selection. A type without it has no panel. */
-  panel?(object: O): PanelInfo
+  panel?(object: O, board: Board): PanelInfo
 }
 
 /**
  * A type with in-focus mode (agent-docs/tasks/in-focus-widgets.md): its view fills the screen, with
- * its Options panel beside it. Both get this person's draft of the board as `runtime`, so changes made
- * there reach others only when shared.
+ * its Options panel beside it. By default both get this person's draft of the board as `runtime`, so
+ * changes made there reach others only when shared.
  */
 export interface FocusableObjectUI<O extends BoardObject = BoardObject> extends ObjectUI<O> {
-  /** Contextual tools, beside the object in focus. Every change is an op on `runtime` (the draft). */
+  /** Contextual tools, beside the object in focus. Every change is an op on `runtime` (the draft, or the board when `live`). */
   Options: ComponentType<ObjectViewProps<O>>
   /** Ops to run on the draft just before it is shared, e.g. a map shares its view. */
   beforeShare?(runtime: Runtime, object: O): void
+  /**
+   * Focus edits the board itself, with no private draft, Share or exit dialog: others and the agent see changes as
+   * they happen. For a report, which the agent edits too, and which a draft's Share could overwrite.
+   */
+  live?: true
+  /** The agent chat stays open in focus, as an overlay at the top left, so people can ask it to work on the object. */
+  keepChat?: true
+  /** Focus fills the whole screen, to its edges, beside the Options panel: a view of its own (a report's document). */
+  fullScreen?: true
 }
 
 export const isFocusable = (ui: ObjectUI | undefined): ui is FocusableObjectUI => !!ui && 'Options' in ui
@@ -70,6 +81,9 @@ export type Decoration = ComponentType<{ runtime: Runtime; object: BoardObject }
 const decorations: Decoration[] = []
 export const registerDecoration = (decoration: Decoration) => void decorations.push(decoration)
 export const objectDecorations = (): readonly Decoration[] => decorations
+
+/** What to call an object where its view is not there to show it: its name, else its type's. */
+export const objectName = (runtime: Runtime, o: { name?: string; type: string }) => o.name || runtime.registry.objectType(o.type)?.title || o.type
 
 /** Types with a tool, in the order they registered. */
 export const toolTypes = () => [...uis].filter(([, ui]) => ui.tool).map(([type, ui]) => ({ type, ...ui.tool! }))

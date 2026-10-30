@@ -46,7 +46,7 @@ export function Links({ objects, byId, selected, style }: { objects: BoardObject
   // A link between two objects pointed out (canvas/emphasis.ts) is highlighted as the selection's are.
   const emphasized = useEmphasizedIds()
   const links = objects.flatMap((o) => {
-    // A link, or a map's layers made by code cells (plans/plan-018.md): an arrow from each cell.
+    // A link, or a map's layers made by code cells (plans/plan-020.md): an arrow from each cell.
     const roots = o.link ? [o.link.from] : o.type === 'map' ? [...new Set((o.layers ?? []).flatMap((l) => l.from ?? []))] : []
     return roots.flatMap((from) => {
       const root = byId.get(from)

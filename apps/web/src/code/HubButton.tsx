@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { connectHub, disconnectHub, useHub } from './hub'
 
 /**
- * This person's JupyterHub login, in the user menu (plans/plan-018.md). Code cells run on it, as this person. The
+ * This person's JupyterHub login, in the user menu (plans/plan-020.md). Code cells run on it, as this person. The
  * token comes from the hub's Token page and stays in this browser.
  */
 export function HubButton() {

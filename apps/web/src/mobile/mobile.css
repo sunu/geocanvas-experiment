@@ -1,0 +1,221 @@
+/*
+ * The phone's layout (MobileApp.tsx). Its chrome uses the shadcn components and Tailwind; this file lays out the
+ * screen, and the list's cards, which draw canvas objects (square, flat) at a scale.
+ */
+
+.ttx-m {
+  position: fixed;
+  /* The part of the screen the keyboard leaves (viewport.ts); the whole screen without one. */
+  top: var(--ttx-vv-top, 0);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  height: var(--ttx-vv-height, 100dvh);
+  background: var(--ttx-bg);
+  color: var(--foreground);
+}
+
+.ttx-m__bar {
+  flex-shrink: 0;
+  height: calc(52px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+}
+
+.ttx-m__main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.ttx-m__tabs {
+  flex-shrink: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Board: the list of widgets. */
+
+.ttx-m-list {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 60px 16px 96px;
+  box-sizing: border-box;
+}
+
+.ttx-m-section {
+  margin: 20px 0 8px calc(var(--depth, 0) * 8px);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ttx-m-section button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.ttx-m-card {
+  position: relative;
+  display: block;
+  margin-bottom: 20px;
+  overflow: hidden;
+  outline: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Cards only show: a tap anywhere opens the widget, so nothing in it takes the press. */
+.ttx-m-card .ttx-world,
+.ttx-m-card .ttx-world * {
+  pointer-events: none !important;
+}
+
+/* The canvas's own affordances: on a phone the whole card is the button. */
+.ttx-m-card .ttx-map__hint,
+.ttx-m-card .ttx-focusbtn {
+  display: none;
+}
+
+.ttx-m-card.is-selected .ttx-obj {
+  outline: 2px solid var(--canvas-accent);
+}
+
+.ttx-m-card:focus-visible .ttx-obj {
+  outline: 2px solid var(--ring);
+}
+
+.ttx-m-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  z-index: 10;
+}
+
+/* List or Canvas, over the top of the Board tab (MobileApp.tsx). */
+.ttx-m-switch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  z-index: 10;
+  transform: translateX(-50%);
+}
+
+/* Board as the canvas lays it out (BoardCanvas.tsx): it takes every touch, and nothing in it does. */
+.ttx-m-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--ttx-bg);
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.ttx-m-canvas .ttx-world,
+.ttx-m-canvas .ttx-world * {
+  pointer-events: none !important;
+}
+
+.ttx-m-canvas .ttx-map__hint,
+.ttx-m-canvas .ttx-focusbtn {
+  display: none;
+}
+
+.ttx-m-canvas__fit {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+}
+
+/* A map's drawing and scenario tools, big enough for a finger. */
+.ttx-m-sheet .ttx-map__tools button {
+  width: 36px;
+  height: 36px;
+}
+
+/* One widget full screen. */
+
+.ttx-m-sheet {
+  position: fixed;
+  /* The part of the screen the keyboard leaves (viewport.ts); the whole screen without one. */
+  top: var(--ttx-vv-top, 0);
+  left: 0;
+  right: 0;
+  z-index: 1000003;
+  display: flex;
+  flex-direction: column;
+  height: var(--ttx-vv-height, 100dvh);
+  background: var(--ttx-bg);
+}
+
+.ttx-m-sheet__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.ttx-m-sheet__scroll {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.ttx-m-sheet__options {
+  max-height: 55%;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Ask: the thread fills the screen, the prompt stays at the bottom. */
+
+.ttx-m-ask {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ttx-m-ask__list.ttx-chat__list {
+  flex: 1;
+  max-height: none;
+}
+
+.ttx-m-ask__compose {
+  padding-bottom: 8px;
+}
+
+/* Reports: one report at the screen's width, in one column. */
+
+.ttx-m-reports {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ttx-m-report {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: #fff;
+  color: #0a0a0a;
+}
+
+.ttx-m-report .ttx-report__content {
+  padding: 20px 16px 32px;
+}
+
+.ttx-m-report .ttx-report__title {
+  font-size: 24px;
+}
+
+.ttx-m-report .ttx-report__grid {
+  grid-template-columns: 1fr;
+}

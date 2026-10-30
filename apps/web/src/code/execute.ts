@@ -18,7 +18,7 @@ import { uploadFile } from '../uploads/upload'
 import { hubSession, hubState } from './hub'
 
 /**
- * The browser tool that runs a code cell (plans/plan-018.md) on this person's JupyterHub, for the `code` ops'
+ * The browser tool that runs a code cell (plans/plan-020.md) on this person's JupyterHub, for the `code` ops'
  * prepare. It writes nothing on the board: features and pictures are uploaded to the room (so every browser can
  * read them by id), and the rest comes back inline, cut to fit. The code's own errors are a result, not a failure.
  */

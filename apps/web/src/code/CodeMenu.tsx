@@ -4,12 +4,13 @@ import type { Runtime } from '@ttx/core'
 import { accepts, followersOf, KIND_NAMES, NEW_FOLLOWER, type CodeBoardObject } from '@ttx/plugins'
 import { ContextMenuCheckboxItem, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger } from '@/components/ui/context-menu'
 import { clearEmphasis, emphasize } from '../canvas/emphasis'
+import { objectName } from '../canvas/registry'
 import { useRunCell } from './cell'
 
 const NEW_LABEL: Record<string, string> = { map: 'New map', image: 'New image', sticky: 'New sticky note' }
 
 /**
- * A code cell's entries in the right-click menu (canvas/ObjectMenu.tsx, plan-019): Run, and "Show output on" with
+ * A code cell's entries in the right-click menu (canvas/ObjectMenu.tsx, plan-021): Run, and "Show output on" with
  * the board's objects that can show the output and a new one. Hovering an object's entry points it out on the
  * canvas, since several maps may share a name.
  */
@@ -22,7 +23,7 @@ export function CodeMenu({ runtime, cell, notify, onSelect }: { runtime: Runtime
   // Names as people see them; repeated ones numbered, in board order ("Map", "Map 2").
   const seen = new Map<string, number>()
   const named = candidates.map((o) => {
-    const base = o.name || runtime.registry.objectType(o.type)?.title || o.type
+    const base = objectName(runtime, o)
     const n = (seen.get(base) ?? 0) + 1
     seen.set(base, n)
     return { o, label: n > 1 ? `${base} ${n}` : base }

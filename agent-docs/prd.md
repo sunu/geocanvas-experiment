@@ -98,6 +98,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Room agent in the Durable Object | Built | OpenRouter tool loop, 12 model calls per turn, 20 turns per room per hour. Undo per turn. |
 | Bring your own key in the browser | Built | Key stays in localStorage and goes only to the provider. |
+| Phone layout: Ask, the board as a list, widgets full screen, reports; installable (PWA) | Experiment (plan-018) | Same ops, widgets and focus drafts as the canvas. Not yet checked on real phones. |
 | External agents through the MCP companion | Built | Local only. Tools are the tab's ops and read-only tools. |
 | Add, remove and edit every widget | Ongoing rule | Holds as long as every change is an op. Check it for each new widget. |
 | Summarize the board into a report | Next (with reports) | `summarizeBoard` exists for prompts. Step 10 of `agent-docs/tasks/reports.md`. |
@@ -109,7 +110,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Start a board from an event | Built | New board → Situation report with the event (`agent-docs/tasks/board-templates.md`). Picking an event on an event card also adds its ReliefWeb feed. Related events in its geography are not built. |
 | Templates that prepopulate widgets (SitRep first) | Built (plan-012, plan-013) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives an empty root and blank widgets. Its objects follow the seed's root (the event card, an area input) and sit in a frame: change the root and they update. Historical hazard explorer next. |
-| Create and export reports | Next (steps 2 to 4 of 10 built) | A report is a widget on the canvas and a mode (focus): a document editor with two columns, A4 or Letter, rich text, items added from the board, live or frozen. PDF export and a report URL. Modeled on OCHA humanitarian snapshots. Spec and steps: `agent-docs/tasks/reports.md`. |
+| Create and export reports | Next (steps 2 to 5a of 10 built) | A report is a widget on the canvas and a mode (focus): a document editor with two columns, A4 or Letter, rich text, items added from the board, live or frozen. PDF export and a report URL. Modeled on OCHA humanitarian snapshots. Spec and steps: `agent-docs/tasks/reports.md`. |
 
 ### 4.7 Non-functional requirements
 
@@ -146,7 +147,7 @@ One PR per step.
 - **Uploads on R2:** bucket names, file size and count limits, cleanup for deleted branch previews.
 - **Live-map cap:** how many live maps at once.
 - **Legend visibility:** focus only, always, toggle, or by zoom.
-- **Reports:** decided: both a widget and a mode, with live or frozen items. Still open: the PDF approach (a spike decides), rich text storage, the report URL's expiry and permissions, and the others in `agent-docs/tasks/reports.md` §10.
+- **Reports:** decided: both a widget and a mode, with live or frozen items. Still open: the PDF approach (a spike decides), rich text storage, the report URL's expiry and permissions, and the others in `agent-docs/tasks/reports.md` §10. Under discussion: `plans/plan-019.md` proposes synced and detached items in place of live and frozen.
 - **Templates:** which templates follow the situation report and conflict explorer, and when templates become data that facilitators can edit (plan-012).
 - **Collaboration scope:** comments, mentions and an avatar list are not in `features.md`. In or out?
 - **Design-spec proposals:** frame context, version history and the docked accordion options panel are design proposals, not code. Ticket them before building. Frames and links between widgets are built for templates (plan-013); links that people draw by hand are not.
@@ -158,5 +159,5 @@ One PR per step.
 - `agent-docs/architect.md`: focus widgets extend the current widget; data in DuckDB-wasm; uploads on Cloudflare.
 - `agent-docs/tasks/in-focus-widgets.md`: focus mode design, widget fields and ops, steps 1–16, decisions.
 - `agent-docs/tasks/reports.md`: reports: the widget, report mode, live and frozen items, PDF export options, the report URL, steps 1–10.
-- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames, `plan-014.md` scenario routing.
+- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames, `plan-019.md` synced and detached report items (proposal), `plan-014.md` scenario routing.
 - Figma "Atlantis Pod Week Hack - AHD TTX": source of truth for chrome; wireframes for every feature.

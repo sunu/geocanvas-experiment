@@ -1,6 +1,6 @@
 # Local JupyterHub for code cells
 
-Code cells (`plans/plan-018.md`) run Python on your own JupyterHub. This folder has a configuration for a local
+Code cells (`plans/plan-020.md`) run Python on your own JupyterHub. This folder has a configuration for a local
 hub, for tests on your machine only. Do not use it on a server: any user name signs in with one shared password,
 and all servers run as you.
 
@@ -50,4 +50,4 @@ cannot answer per origin, and with a token in a header this is safe. A browser s
 
 A real hub needs the same CORS settings, with the deployed board's origin in `BOARD_ORIGINS` and as the hub's
 `Access-Control-Allow-Origin` (not `*`). On an HTTPS hub, do not set
-`JUPYTERHUB_ALLOW_TOKEN_IN_URL`. See "Hub setup" in `plans/plan-018.md`.
+`JUPYTERHUB_ALLOW_TOKEN_IN_URL`. See "Hub setup" in `plans/plan-020.md`.
