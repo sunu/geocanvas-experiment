@@ -28,7 +28,7 @@ import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Hint } from '@/components/Hint'
 import { toolTypes } from './registry'
-import { CONFLICT_FACE, COUNTRY_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
+import { CONFLICT_FACE, COUNTRY_FACE, IFRCGO_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
 
 /** 'select', or the object type to draw. */
 export type Tool = string
@@ -52,7 +52,7 @@ interface Item {
   key?: string
 }
 
-/** The toolbar's groups, in order, between separators. The country widgets and the ReliefWeb feed are named and drawn as on the canvas (widgetFaces.ts).*/
+/** The toolbar's groups, in order, between separators. The country widgets, the ReliefWeb feed and the IFRC GO card are named and drawn as on the canvas (widgetFaces.ts).*/
 const SELECT: Item[] = [
   { label: 'Select', Icon: CursorIcon, tool: 'select', key: 'V' },
   { label: 'Move', Icon: HandIcon, tool: 'hand', key: 'H' },
@@ -63,6 +63,7 @@ const EVENT_CONTEXT: Item[] = [
   { ...PRESENCE_FACE, tool: 'presence' },
   { ...CONFLICT_FACE, tool: 'conflict' },
   { ...RELIEFWEB_FACE, tool: 'reliefweb' },
+  { ...IFRCGO_FACE, tool: 'ifrcgo' },
 ]
 const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },

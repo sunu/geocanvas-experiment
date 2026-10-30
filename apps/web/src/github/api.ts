@@ -1,4 +1,6 @@
 import type { GithubRef } from '@ttx/plugins'
+import { perPage } from '../cards/perPage'
+import { cutAtWord } from '../cards/text'
 
 /**
  * A public GitHub issue or pull request, read straight from api.github.com, which sends CORS headers: no Worker
@@ -75,10 +77,7 @@ export function bodySummary(markdown: string | null | undefined): string | undef
     .replace(/[*_`>]+/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-  if (!text) return undefined
-  if (text.length <= SUMMARY_CHARS) return text
-  const cut = text.slice(0, SUMMARY_CHARS)
-  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), SUMMARY_CHARS / 2))}…`
+  return text ? cutAtWord(text, SUMMARY_CHARS) : undefined
 }
 
 interface Person {
@@ -192,17 +191,5 @@ async function read(ref: GithubRef): Promise<GithubItem> {
   return item
 }
 
-const cache = new Map<string, Promise<GithubItem>>()
-
 /** The item, once per page; `refresh` asks GitHub again. A failure is not kept. */
-export function loadGithub(ref: GithubRef, { refresh = false } = {}): Promise<GithubItem> {
-  const key = `${ref.owner}/${ref.repo}/${ref.kind}/${ref.number}`.toLowerCase()
-  if (refresh) cache.delete(key)
-  let p = cache.get(key)
-  if (!p) {
-    p = read(ref)
-    cache.set(key, p)
-    p.catch(() => cache.get(key) === p && cache.delete(key))
-  }
-  return p
-}
+export const loadGithub = perPage(read, (ref: GithubRef) => `${ref.owner}/${ref.repo}/${ref.kind}/${ref.number}`)

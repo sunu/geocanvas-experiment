@@ -2282,9 +2282,9 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   white-space: nowrap;
 }
 
-/* --- GitHub issue or pull request ----------------------------------------- */
+/* --- Cards made from a pasted link: GitHub, IFRC GO ------------------------ */
 
-.ttx-github {
+.ttx-card {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -2296,7 +2296,7 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   font-size: 12px;
 }
 
-.ttx-github__body {
+.ttx-card__body {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -2306,40 +2306,40 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   overflow: hidden;
 }
 
-.ttx-github__note {
+.ttx-card__note {
   color: var(--ttx-muted);
 }
 
-.ttx-github__form {
+.ttx-card__form {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.ttx-github__form input {
+.ttx-card__form input {
   padding: 6px 8px;
   border: 1px solid var(--ttx-border);
   border-radius: 4px;
   font: inherit;
 }
 
-.ttx-github__error {
+.ttx-card__error {
   color: #cf222e;
 }
 
-.ttx-github__title {
+.ttx-card__title {
   color: var(--ttx-ink);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
 }
 
-.ttx-github__title:hover {
+.ttx-card__title:hover {
   color: var(--ttx-accent);
   text-decoration: underline;
 }
 
-.ttx-github__meta {
+.ttx-card__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2397,7 +2397,7 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   height: 8px;
 }
 
-.ttx-github__summary {
+.ttx-card__summary {
   color: var(--ttx-ink);
   opacity: 0.85;
 }
@@ -2444,6 +2444,74 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
 }
 
 .ttx-github__linkedtitle em {
+  color: var(--ttx-muted);
+  font-style: normal;
+}
+
+/* IFRC GO emergency card: severity, key figures, appeals, field reports. */
+.ttx-ifrc__severity {
+  padding: 1px 6px;
+  background: #6e7781;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ttx-ifrc__severity.is-0 {
+  background: #9a6700;
+}
+
+.ttx-ifrc__severity.is-1 {
+  background: #bc4c00;
+}
+
+.ttx-ifrc__severity.is-2 {
+  background: #cf222e;
+}
+
+.ttx-ifrc__figures {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.ttx-ifrc__figures dt {
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-ifrc__figures dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ttx-ifrc__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ttx-border);
+}
+
+.ttx-ifrc__appeal {
+  display: flex;
+  flex-direction: column;
+}
+
+.ttx-ifrc__section a {
+  color: var(--ttx-ink);
+  text-decoration: none;
+}
+
+.ttx-ifrc__section a:hover {
+  color: var(--ttx-accent);
+  text-decoration: underline;
+}
+
+.ttx-ifrc__section a em {
   color: var(--ttx-muted);
   font-style: normal;
 }

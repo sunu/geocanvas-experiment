@@ -40,7 +40,8 @@ const FORMATS = new Set([
 const SUMMARY_CHARS = 220
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
-const decode = (s: string) =>
+/** Text with its HTML entities decoded (&amp;, &#8217;, …). */
+export const decode = (s: string) =>
   s.replace(/&(#x[\da-f]+|#\d+|\w+);/gi, (m, e: string) =>
     e[0] === '#' ? String.fromCodePoint(e[1]?.toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : (ENTITIES[e.toLowerCase()] ?? m),
   )
