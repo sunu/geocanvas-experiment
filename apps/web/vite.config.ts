@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import { DEFAULT_PORT, TOKEN_FILE } from '../mcp/src/pairing.ts'
+import { mdText } from '../../packages/plugins/mdText.ts'
 
 /**
  * In dev, hands the app's own pages the MCP companion's saved pairing token (apps/mcp/src/pairing.ts), so a tab pairs
@@ -30,7 +31,7 @@ const mcpPairing: Plugin = {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), mcpPairing],
+  plugins: [react(), tailwindcss(), mcpPairing, mdText],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     port: 5173,

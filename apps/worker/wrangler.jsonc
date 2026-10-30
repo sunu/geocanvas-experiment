@@ -3,6 +3,8 @@
   "name": "humanitarian-ttx",
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-20",
+  // The agent's skills are Markdown files, imported as text (packages/plugins/src/skills/).
+  "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   // The built web app. API paths and /connect/* run the Worker; other requests are served from these assets.
   "assets": {
     "directory": "../web/dist",
