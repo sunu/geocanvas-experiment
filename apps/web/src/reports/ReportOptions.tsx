@@ -3,7 +3,7 @@ import { ORIENTATIONS, PAPERS, type Block, type Orientation, type Paper, type Re
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import { objectUI, type ObjectViewProps } from '../canvas/registry'
-import { titleOf } from './reports'
+import { labelOf, titleOf } from './reports'
 
 const PAPER_LABEL: Record<Paper, string> = { a4: 'A4', letter: 'US Letter' }
 const ORIENTATION_LABEL: Record<Orientation, string> = { portrait: 'Portrait', landscape: 'Landscape' }
@@ -65,7 +65,7 @@ export function ReportOptions({ runtime, object: r, onGoTo }: ObjectViewProps<Re
             {items.map((b) => {
               const source = board.get(b.sourceId)
               const Icon = (source && objectUI(source.type)?.tool?.Icon) || SquaresFourIcon
-              const label = source ? source.name || ((source as { title?: string }).title ?? runtime.registry.objectType(source.type)?.title ?? source.type) : 'Removed object'
+              const label = source ? labelOf(source, runtime.registry, { withText: true }) : 'Removed object'
               const freezable = !!source && FREEZABLE.has(source.type)
               return (
                 <li key={b.id} className="ttx-reportopts__item">
