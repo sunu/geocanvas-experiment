@@ -2504,6 +2504,28 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   box-shadow: 0 0 0 2px var(--ttx-panel), 0 0 0 3.5px var(--ttx-ink);
 }
 
+/* Ends a polygon being drawn (map/draw.ts): a touch screen has no Enter, and no double-click it sends reliably. */
+.ttx-map__done {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ttx-ink);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ttx-map__done[hidden] {
+  display: none;
+}
+
 .ttx-map__toolhint {
   max-width: 200px;
   padding: 2px 4px;

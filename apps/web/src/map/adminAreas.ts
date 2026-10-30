@@ -152,8 +152,11 @@ export function syncAdminLayers(map: MapLibreMap, states: LayerState[]) {
   }
 }
 
-/** The fill layers of the choropleths among these data layers, to read a value under the pointer. */
-export const fillLayerIds = (map: MapLibreMap) => (map.getStyle().layers ?? []).filter((l) => l.id.startsWith('admin-') && l.type === 'fill').map((l) => l.id)
+/**
+ * The fill layers of the choropleths among these data layers, to read a value under the pointer. None before the style
+ * has loaded: the tap that opens a map on a phone sends it a mousemove at once.
+ */
+export const fillLayerIds = (map: MapLibreMap) => (map.getStyle()?.layers ?? []).filter((l) => l.id.startsWith('admin-') && l.type === 'fill').map((l) => l.id)
 
 /** The data layer a MapLibre layer id belongs to. */
 export const dataLayerOf = (layerId: string) => layerId.replace(/^admin-/, '').replace(/-(fill|line)$/, '')
