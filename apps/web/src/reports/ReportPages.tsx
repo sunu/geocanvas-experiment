@@ -2,13 +2,14 @@ import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'rea
 import { EditableBlock, useReportEditing } from './editing'
 import { SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
-import { docText, MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject, type RichDoc } from '@ttx/plugins'
+import { docText, MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { ObjectLabelSlot, ObjectNameContext } from '../canvas/ObjectHeader'
 import { objectUI } from '../canvas/registry'
 import { useMapPicture } from '../map/picture'
 import { fitItem, paginate, rowsOf, type Row } from './pages'
 import { labelOf, titleOf } from './reports'
+import { RichText } from './RichText'
 
 /** A page's margin, the space between rows, and between the two columns, in CSS px (styles.css .ttx-report__*). */
 const MARGIN = 56
@@ -145,9 +146,6 @@ function RowView({ row, blocks, board, runtime, contentWidth, maxHeight, measuri
   )
 }
 
-/** Paragraphs of a rich text block as plain text, until the editor comes (step 6). */
-const paragraphs = (doc: RichDoc) => (doc.content ?? []).map((p) => docText({ type: 'doc', content: [p] }))
-
 interface BlockProps {
   board: Board
   runtime: Runtime
@@ -174,10 +172,9 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
       )
     }
     case 'text': {
-      const ps = paragraphs(b.doc).filter((p, i, all) => p || all.length === 1)
       return (
         <div className="ttx-report__text">
-          {ps.some(Boolean) ? ps.map((p, i) => <p key={i}>{p}</p>) : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
+          {docText(b.doc) ? <RichText doc={b.doc} /> : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
         </div>
       )
     }

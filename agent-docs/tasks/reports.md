@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: steps 2 to 5 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: steps 2 to 6 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder; the rich text editor, with pasted markdown formatted); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -42,7 +42,7 @@ Rules every feature follows (PRD §2): writes are ops, so the agent and the MCP 
 - **Toolbar** (`canvas/Toolbar.tsx`):
   - The groups are fixed arrays. `MAP_AND_REPORT` exists, but today holds only Map and Notebook.
   - The keys A, R, T, S, E, M, N, I, L, O, V and H are taken.
-- **Text** on the canvas is a plain string, typed in a `<textarea>` and written whole by `text.setText`. No rich text library is installed.
+- **Text** on the canvas is a plain string, typed in a `<textarea>` and written whole by `text.setText`. Reports have a rich text editor (§5.3); the canvas's text does not.
 - **Map pictures** (`map/snapshots.ts`):
   - One hidden MapLibre map with its deck.gl overlay (`preserveDrawingBuffer`) draws a PNG of a map view.
   - It is reachable only through `useSnapshot`, and its pixel ratio is fixed when it is made (at most 2).
@@ -236,6 +236,8 @@ Removing happens **only in report mode**, where people see the whole report and 
 - `text` blocks are edited with a ProseMirror-based editor (Tiptap). It is a new dependency, approved in its step (§9).
 - What it offers: paragraphs, headings, bold, italic, links, lists, and quotes.
 - **Storage:** the editor's JSON, stored in the block and written whole by `report.setText`, a gesture op like `text.setText`. Typing is one undo step per editing gesture. Two people typing in one block at the same moment can lose keystrokes, as with text on the canvas today.
+- **Built (step 6):** `apps/web/src/reports/RichTextEditor.tsx` (Tiptap with StarterKit and `@tiptap/markdown`, loaded on first edit) and `RichText.tsx`, which draws the stored JSON without Tiptap, so the canvas and report mode's pages never load the editor. The node and mark types are listed in `richTextExtensions.ts`: paragraph, headings 1 to 3, bold, italic, strike, link, bullet and ordered lists, quote, code and code block, rule, line break. Links go only to http, https and mailto, checked when drawn, since the JSON comes from people and agents. Not built: a formatting toolbar (shortcuts such as ⌘B and typing `## ` work).
+- **Pasting markdown** (`markdownPaste.ts`): a paste of plain text that looks like markdown becomes formatted text, as the editor's own nodes (never HTML, so pasted HTML shows as text). It formats only when the clipboard has no rich text, or comes from a code editor (VS Code), and when the text has markdown marks: a heading, list, quote or fence on one of several lines, or bold or a web link anywhere; a single line like "# of households" stays text. A paste with a **table or an image** is left as plain text, since the editor has no node for them and the parser would drop them. Headings deeper than level 3 become level 3. ⌘/Ctrl+Shift+V pastes the text as it is.
 - **Later:** character-level co-editing with y-prosemirror on a `Y.XmlFragment`, if people need it (§10).
 
 ### 5.4 Adding from another widget's focus
@@ -334,7 +336,7 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
 5. **Report mode,** in two PRs:
    - **5a** (built): report mode opens from ⤢, a double-click or the Object panel's Open; it is live (`FocusableObjectUI.live`: no draft, Share or exit dialog) and keeps the agent chat on the left (`keepChat`); every page scrolls in the middle, on real pages; the Options panel has the name, the page, and the items (Live or Frozen, Go to source, Remove).
    - **5b** (built): editing on the page: the report toolbar (Heading, Text, Image, Divider, From board), block controls (drag to reorder, width, ×), Delete and Esc, typing headings and plain text.
-6. **Rich text:** the editor (Tiptap, needs approval), `report.setText`.
+6. **Rich text** (built, with markdown paste: #98): the editor (Tiptap, approved), `report.setText`. The editor is its own lazy chunk (`RichTextEditor`, 465 kB, 147 kB gzipped), loaded when a text block is first edited; the board's main bundle has none of it.
 7. **Live and frozen** (under discussion: `plans/plan-019.md` would replace this step with synced and detached items):
    - report renderers and `freeze` for each type
    - the high-resolution map PNG export

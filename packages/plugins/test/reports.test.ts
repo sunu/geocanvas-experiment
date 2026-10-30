@@ -145,6 +145,17 @@ describe('reports', () => {
     expect((await rt.invoke('report.addItems', { kind: 'objects', ids: [r, other] }, { reportId: r })).status).toBe('failed')
   })
 
+  it('reads marked text as one line, and blocks apart', () => {
+    const doc = {
+      type: 'doc' as const,
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'un' }, { type: 'text', text: 'believ', marks: [{ type: 'bold' }] }, { type: 'text', text: 'able, ' }, { type: 'text', text: 'see' }] },
+        { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'a' }] }] }, { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'b' }] }] }] },
+      ],
+    }
+    expect(docText(doc)).toBe('unbelievable, see a b')
+  })
+
   it('add, move, widen and remove blocks, each one undo step', async () => {
     const rt = setup()
     const r = add(rt, 'report')

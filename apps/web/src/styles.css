@@ -3243,21 +3243,25 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
   min-width: 0;
 }
 
-.ttx-report__heading {
+.ttx-report__heading,
+.ttx-report__editor :is(h1, h2, h3) {
   margin: 8px 0 0;
   font-weight: 600;
   line-height: 1.25;
 }
 
-.ttx-report__heading--1 {
+.ttx-report__heading--1,
+.ttx-report__editor h1 {
   font-size: 24px;
 }
 
-.ttx-report__heading--2 {
+.ttx-report__heading--2,
+.ttx-report__editor h2 {
   font-size: 19px;
 }
 
-.ttx-report__heading--3 {
+.ttx-report__heading--3,
+.ttx-report__editor h3 {
   font-size: 16px;
 }
 
@@ -3268,6 +3272,48 @@ body:has(.ttx-canvas.is-focus.keeps-chat) .ttx-chatpanel {
 
 .ttx-report__text p {
   margin: 0 0 8px;
+}
+
+/* What the rich text editor offers (reports/RichText.tsx draws the same elements from the stored JSON). */
+.ttx-report__text ul,
+.ttx-report__text ol {
+  margin: 0 0 8px;
+  padding-left: 22px;
+}
+
+.ttx-report__text li > p {
+  margin: 0;
+}
+
+.ttx-report__text blockquote {
+  margin: 0 0 8px;
+  padding-left: 12px;
+  border-left: 3px solid var(--ttx-border);
+  color: var(--ttx-muted);
+}
+
+.ttx-report__text code {
+  padding: 0 3px;
+  background: var(--ttx-border);
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+.ttx-report__text pre {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: var(--ttx-border);
+  overflow-x: auto;
+}
+
+.ttx-report__text pre code {
+  padding: 0;
+  background: none;
+}
+
+.ttx-report__text a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 .ttx-report__image {

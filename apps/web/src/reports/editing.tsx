@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, lazy, Suspense, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowsInLineHorizontalIcon, ArrowsOutLineHorizontalIcon, DotsSixVerticalIcon, XIcon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
-import { docText, textDoc, type Block, type ReportBoardObject } from '@ttx/plugins'
+import type { Block, ReportBoardObject, RichDoc } from '@ttx/plugins'
 import { dropIndex, moveIndex } from './pages'
+import { RichText } from './RichText'
 
 /**
  * Editing a report in report mode (agent-docs/tasks/reports.md §5.1b, step 5b): which block this person has selected
@@ -163,7 +164,7 @@ function startDrag(e: React.PointerEvent, ed: ReportEditingState, id: string, fr
  * (report.setText, a gesture op: one undo step per editing session). Others' changes to the same block meanwhile wait
  * until this person stops editing.
  */
-function useTyping(block: Block, write: (value: string) => void, initial: () => string) {
+function useTyping<T>(block: Block, write: (value: T) => void, initial: () => T) {
   const ed = useReportEditing()!
   const [value, setValue] = useState(initial)
   const begun = useRef(false)
@@ -174,7 +175,7 @@ function useTyping(block: Block, write: (value: string) => void, initial: () => 
   }, [ed.runtime])
   return {
     value,
-    onChange: (v: string) => {
+    onChange: (v: T) => {
       setValue(v)
       if (begun.current) write(v)
     },
@@ -227,30 +228,18 @@ function HeadingEditor({ block: b }: { block: Extract<Block, { kind: 'heading' }
   )
 }
 
+// The editor is most of Tiptap, so it loads when the first text block is edited; the block shows as it is meanwhile.
+const RichTextEditor = lazy(() => import('./RichTextEditor'))
+
 function TextEditor({ block: b }: { block: Extract<Block, { kind: 'text' }> }) {
-  const area = useFocusSoon<HTMLTextAreaElement>()
-  const t = useTyping(
+  const t = useTyping<RichDoc>(
     b,
-    (text) => t.ed.runtime.dispatch('report.setText', { kind: 'objects', ids: [t.ed.report.id] }, { blockId: b.id, doc: textDoc(text) }),
-    () => (b.doc.content ?? []).map((p) => docText({ type: 'doc', content: [p] })).join('\n\n'),
+    (doc) => t.ed.runtime.dispatch('report.setText', { kind: 'objects', ids: [t.ed.report.id] }, { blockId: b.id, doc }),
+    () => b.doc,
   )
-  // Grow with the text, so the page's layout (and its pagination) follows as people type.
-  useEffect(() => {
-    const el = area.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [t.value])
   return (
-    <textarea
-      ref={area}
-      className="ttx-report__text ttx-report__editor"
-      aria-label="Text"
-      placeholder="Type text. A blank line starts a new paragraph."
-      value={t.value}
-      onChange={(e) => t.onChange(e.target.value)}
-      onKeyDown={(e) => e.key === 'Tab' && t.stop()}
-      onBlur={t.stop}
-    />
+    <Suspense fallback={<div className="ttx-report__text"><RichText doc={b.doc} /></div>}>
+      <RichTextEditor doc={b.doc} onChange={t.onChange} onBlur={t.stop} />
+    </Suspense>
   )
 }
