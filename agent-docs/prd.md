@@ -68,6 +68,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | **Chart** | Planned (step 14) | Yes | Types: bar, stacked bar, donut, line, stat, ranked list. Source, encoding, filters, markers, provenance. Observable Plot is approved. |
 | **Input** (date or location) | Stretch (step 16) | — | Feeds a map's location or a chart's data fetch. |
 | ReliefWeb feed | Built | No | Added beside an event with GLIDE numbers. |
+| GitHub issue or pull request | Built | No | A pasted link to a public item: state, labels, checks, and the pull requests that mention an issue. Private repositories and review state are not built (plan-019). |
 | Country context, Who's where, Conflict (HDX HAPI) | Built | No | Province and district tables are not built. |
 | Image, PDF | Built | PDF yes | From drops and the uploads gallery. |
 | Box, text, sticky note | Built | No |  |

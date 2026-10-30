@@ -2282,6 +2282,172 @@ body:has(.ttx-canvas.is-focus) .ttx-shell {
   white-space: nowrap;
 }
 
+/* --- GitHub issue or pull request ----------------------------------------- */
+
+.ttx-github {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--ttx-panel);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
+  font-size: 12px;
+}
+
+.ttx-github__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.ttx-github__note {
+  color: var(--ttx-muted);
+}
+
+.ttx-github__form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ttx-github__form input {
+  padding: 6px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.ttx-github__error {
+  color: #cf222e;
+}
+
+.ttx-github__title {
+  color: var(--ttx-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ttx-github__title:hover {
+  color: var(--ttx-accent);
+  text-decoration: underline;
+}
+
+.ttx-github__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-github__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The state is always written out; its color only adds to it. */
+.ttx-github__state {
+  padding: 1px 6px;
+  border-radius: 0;
+  background: #6e7781;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ttx-github__state.is-open {
+  background: #1a7f37;
+}
+
+.ttx-github__state.is-merged {
+  background: #8250df;
+}
+
+.ttx-github__state.is-closed {
+  background: #cf222e;
+}
+
+.ttx-github__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ttx-github__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--ttx-border);
+  font-size: 11px;
+}
+
+.ttx-github__label i {
+  width: 8px;
+  height: 8px;
+}
+
+.ttx-github__summary {
+  color: var(--ttx-ink);
+  opacity: 0.85;
+}
+
+.ttx-github__pull {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-github__checks {
+  font-weight: 600;
+}
+
+.ttx-github__checks.is-passing {
+  color: #1a7f37;
+}
+
+.ttx-github__checks.is-failing {
+  color: #cf222e;
+}
+
+.ttx-github__linked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ttx-border);
+}
+
+.ttx-github__linked a {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--ttx-ink);
+  text-decoration: none;
+}
+
+.ttx-github__linked a:hover .ttx-github__linkedtitle {
+  color: var(--ttx-accent);
+  text-decoration: underline;
+}
+
+.ttx-github__linkedtitle em {
+  color: var(--ttx-muted);
+  font-style: normal;
+}
+
 /* Country context (HDX HAPI): a card of figures, each part with its source. */
 .ttx-country {
   display: flex;
