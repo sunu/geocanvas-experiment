@@ -7,6 +7,7 @@ import { routingLayers, type RouteState } from '../routing/useRoutes'
 import { syncAdminLayers } from './adminAreas'
 import { basemapStyle } from './basemaps'
 import { deckLayers, loadLayerStates, shapeLayer } from './layers'
+import { exposureLayers, floodedLayers, type ExposureState } from '../exposure/useExposure'
 
 /**
  * Pictures of the maps that are not live (budget.ts), all drawn by one hidden map: one MapLibre map and its deck.gl
@@ -27,6 +28,8 @@ export interface SnapshotRequest {
   /** The scenario's routes as found so far, and its closures (routing/). The ends' markers are DOM, and not drawn. */
   routes: RouteState[]
   closures: ScenarioClosure[]
+  /** A flood exposure map's counts (exposure/): the flooded buildings and the facilities are drawn as on the live map. */
+  exposure?: ExposureState
   /** Pixels per CSS px: more than the screen's for print (reports/print.ts), the same area, sharper. */
   pixelRatio?: number
 }
@@ -43,9 +46,19 @@ const TIMEOUT_MS = 8000
 
 const snapshots = new Map<string, Promise<string>>()
 
+/**
+ * A request's cache key. An exposure count can carry 200,000 flooded buildings: it is keyed by what it found (counts
+ * and the flood), which changes whenever those points do.
+ */
+function keyOf(req: SnapshotRequest): string {
+  const r = req.exposure?.result
+  const exposure = r && [r.buildings, r.facilities.length, r.inundation?.returnPeriod, r.inundation?.flooded]
+  return stableJson({ ...req, exposure, view: { ...req.view, center: req.view.center.map((c) => Math.round(c * 1e5) / 1e5) } })
+}
+
 /** The snapshot of a map as `req` shows it, from the cache or drawn next. */
 function snapshot(req: SnapshotRequest): Promise<string> {
-  const key = stableJson({ ...req, view: { ...req.view, center: req.view.center.map((c) => Math.round(c * 1e5) / 1e5) } })
+  const key = keyOf(req)
   let p = snapshots.get(key)
   if (p) {
     // Most recently used last.
@@ -118,7 +131,9 @@ async function draw(req: SnapshotRequest): Promise<string> {
   }
   map.jumpTo(req.view)
   const states = await loadLayerStates(req.layers)
-  overlay.setProps({ layers: [...deckLayers(states), shapeLayer(req.shapes), ...routingLayers(req.routes, req.closures)] })
+  overlay.setProps({
+    layers: [...deckLayers(states), shapeLayer(req.shapes), ...floodedLayers(req.exposure), ...routingLayers(req.routes, req.closures), ...exposureLayers(req.exposure)],
+  })
   syncAdminLayers(map, states)
   const deadline = performance.now() + TIMEOUT_MS
   await Promise.race([once(map, 'idle'), sleep(TIMEOUT_MS)])
@@ -144,7 +159,7 @@ async function capture(container: HTMLElement): Promise<string> {
 
 /** The snapshot of a map, once drawn; undefined until then and while `req` is undefined (the map is live). */
 export function useSnapshot(req: SnapshotRequest | undefined): string | undefined {
-  const key = req && stableJson(req)
+  const key = req && keyOf(req)
   const [shown, setShown] = useState<{ key: string; url: string }>()
   useEffect(() => {
     if (!req || !key) return

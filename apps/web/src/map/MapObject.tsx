@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import type { PickingInfo } from '@deck.gl/core'
+import type { Layer, PickingInfo } from '@deck.gl/core'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
@@ -187,7 +187,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     }
     const overlay = new MapboxOverlay({
       interleaved: false,
-      layers: [...deckLayers(statesRef.current, { highlight: highlightRef.current }), shapeLayer(shapesRef.current), ...scenarioRef.current],
+      layers: [...deckLayers(statesRef.current, { highlight: highlightRef.current }), shapeLayer(shapesRef.current), ...ownCopies(scenarioRef.current)],
       onHover: (info) => {
         if (!pickingRef.current) return
         const element = codeElement(info)
@@ -368,7 +368,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Only when a layer or its result changed: new deck.gl layers make deck.gl redraw all their data, and the canvas
   // re-renders the map on every camera move.
   useEffect(() => {
-    overlayRef.current?.setProps({ layers: [...deckLayers(states, { highlight }), shapeLayer(shapes), ...scenario.deck] })
+    overlayRef.current?.setProps({ layers: [...deckLayers(states, { highlight }), shapeLayer(shapes), ...ownCopies(scenario.deck)] })
     highlightRef.current = highlight
     statesRef.current = states
     shapesRef.current = shapes
@@ -437,6 +437,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     </div>
   )
 }
+
+/**
+ * Copies of the scenario's deck.gl layers for one overlay. A layer belongs to the deck that first draws it: the map is
+ * rebuilt when it becomes live or not (leaving focus), and handing the old overlay's layers to the new one failed
+ * deck.gl's assertion, so routes, closures and exposure vanished from the map. A copy keeps the same id and props
+ * (data included), so deck.gl carries its state over and does not process the data again.
+ */
+const ownCopies = (layers: Layer[]) => layers.map((l) => l.clone({}))
 
 /** What `map` shows now, as a view. */
 function shown(map: MapLibreMap): Omit<SavedView, 'at'> {
