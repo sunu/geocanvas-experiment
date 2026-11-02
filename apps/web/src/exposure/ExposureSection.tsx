@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { FacilityCategory } from '../data/layercake'
 import { DAMAGE_BANDS, DEPTH_CLASSES } from '../inundation/damage'
 import type { Inundation } from '../inundation/estimate'
-import { signedCount } from '../routing/RouteLegend'
+import { signedCount } from '../routing/AnalysisSummary'
 import { MAX_AREA_DEG2 } from './areas'
 import type { Exposure } from './exposure'
 import { addedByWhatIfs, DEPTH_COLORS, FACILITY_COLORS, facilitiesBy, type ExposureState } from './useExposure'
@@ -26,10 +26,13 @@ const metres = (d: number) => `${d < 10 ? d.toFixed(1) : Math.round(d)} m`
  * damage it would do (plans/plan-016.md). Estimates, and the panel says so.
  */
 export function ExposureSection({
+  fixed,
   exposure: s,
   returnPeriod,
   onSet,
 }: {
+  /** On a flood exposure map: always counting, so no button to start or stop. */
+  fixed?: boolean
   exposure: ExposureState | undefined
   returnPeriod: ReturnPeriod | undefined
   onSet(on: boolean, returnPeriod?: ReturnPeriod): void
@@ -48,9 +51,11 @@ export function ExposureSection({
         <div className="flex flex-col gap-2 rounded-md border p-2">
           <div className="flex items-center gap-2">
             <span className="flex-1 text-sm font-medium">Buildings in flood areas</span>
-            <Button variant="ghost" size="icon-xs" className="text-muted-foreground" title="Stop counting" aria-label="Stop counting buildings" onClick={() => onSet(false)}>
-              <XIcon />
-            </Button>
+            {!fixed && (
+              <Button variant="ghost" size="icon-xs" className="text-muted-foreground" title="Stop counting" aria-label="Stop counting buildings" onClick={() => onSet(false)}>
+                <XIcon />
+              </Button>
+            )}
           </div>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Flood depth

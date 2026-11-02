@@ -35,8 +35,10 @@ export function useExposure(
   closures: ScenarioClosure[],
   fromLayers: GeoJSON.Feature[],
   waiting: boolean,
+  /** A flood exposure map counts always; another map when its exposure is switched on (from before exposure maps). */
+  exposureMap = false,
 ): ExposureState | undefined {
-  const on = !!scenario?.exposure?.buildings
+  const on = exposureMap || !!scenario?.exposure?.buildings
   const { areas, dataAreas, leftOut } = useMemo(() => {
     const data = areasToCount(fromLayers.map((f) => ({ geometry: f.geometry, label: String(f.properties?.title ?? 'An affected area') })))
     const whatIfs = areasToCount(closures.flatMap((c) => (c.off ? [] : [{ geometry: c.geometry as GeoJSON.Geometry, label: c.note || 'A closed area' }])))

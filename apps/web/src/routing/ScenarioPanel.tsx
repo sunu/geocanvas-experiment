@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CircleNotchIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
-import { footprintParts, ROUTE_COLORS, ROUTE_PROFILES, type MapBoardObject, type MapLayer, type RouteProfile, type ScenarioClosure } from '@ttx/plugins'
+import { analysisOf, footprintParts, ROUTE_COLORS, ROUTE_PROFILES, type MapBoardObject, type MapLayer, type RouteProfile, type ScenarioClosure } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -37,29 +37,41 @@ export function ScenarioPanel({ runtime, object: o }: { runtime: Runtime; object
   const states = useLayerStates(layers)
   const { routes, closures, exposure } = useScenario(o, layers, states)
   const mapOp = (id: string, args: Record<string, unknown>) => op(runtime, o.id, id, args)
+  const analysis = analysisOf(o)
 
   return (
     <div className="ttx-ui">
-      <p className="mt-3 text-xs/4 text-muted-foreground">Routes go around the affected areas that are on. Try what-ifs here: others see them once you share.</p>
-      <section className="ttx-options__section">
-        <h3>Routes</h3>
-        {!routes.length && <p className="text-xs/4 text-muted-foreground">Use the route tool on the map: a click where a route starts, one where it ends.</p>}
-        <div className="flex flex-col gap-2">
-          {routes.map((s) => (
-            <RouteCard
-              key={s.route.id}
-              state={s}
-              onTitle={(title) => mapOp('map.setRoute', { routeId: s.route.id, title })}
-              onProfile={(profile) => mapOp('map.setRoute', { routeId: s.route.id, profile })}
-              onRemove={() => mapOp('map.removeRoute', { routeId: s.route.id })}
-            />
-          ))}
-        </div>
-      </section>
+      <p className="mt-3 text-xs/4 text-muted-foreground">
+        {analysis === 'routes' ? 'Routes go around the affected areas that are on, and the closures.' : 'Counts the buildings in the affected areas that are on, and in the closed areas.'} Try
+        what-ifs here: others see them once you share.
+      </p>
+      {analysis === 'routes' && (
+        <>
+          <section className="ttx-options__section">
+            <h3>Routes</h3>
+            {!routes.length && <p className="text-xs/4 text-muted-foreground">Use the route tool on the map: a click where a route starts, one where it ends.</p>}
+            <div className="flex flex-col gap-2">
+              {routes.map((s) => (
+                <RouteCard
+                  key={s.route.id}
+                  state={s}
+                  onTitle={(title) => mapOp('map.setRoute', { routeId: s.route.id, title })}
+                  onProfile={(profile) => mapOp('map.setRoute', { routeId: s.route.id, profile })}
+                  onRemove={() => mapOp('map.removeRoute', { routeId: s.route.id })}
+                />
+              ))}
+            </div>
+          </section>
+        </>
+      )}
       <FromData runtime={runtime} mapId={o.id} layers={layers} states={states} onBlocks={(layerId, blocks) => mapOp('map.setLayerBlocks', { layerId, blocks })} />
       <section className="ttx-options__section">
         <h3>What-ifs</h3>
-        {!closures.length && <p className="text-xs/4 text-muted-foreground">Close a road or an area with the tools on the map.</p>}
+        {!closures.length && (
+          <p className="text-xs/4 text-muted-foreground">
+            {analysis === 'routes' ? 'Close a road or an area with the tools on the map.' : 'Close an area with the tool on the map: a what-if flood area.'}
+          </p>
+        )}
         <div className="flex flex-col">
           {closures.map((c) => (
             <ClosureRow
@@ -72,11 +84,14 @@ export function ScenarioPanel({ runtime, object: o }: { runtime: Runtime; object
           ))}
         </div>
       </section>
-      <ExposureSection
-        exposure={exposure}
-        returnPeriod={o.scenario?.exposure?.returnPeriod}
-        onSet={(buildings, returnPeriod) => mapOp('map.setExposure', { buildings, ...(returnPeriod && { returnPeriod }) })}
-      />
+      {analysis === 'exposure' && (
+        <ExposureSection
+          fixed={o.analysis === 'exposure'}
+          exposure={exposure}
+          returnPeriod={o.scenario?.exposure?.returnPeriod}
+          onSet={(buildings, returnPeriod) => mapOp('map.setExposure', { buildings, ...(returnPeriod && { returnPeriod }) })}
+        />
+      )}
     </div>
   )
 }

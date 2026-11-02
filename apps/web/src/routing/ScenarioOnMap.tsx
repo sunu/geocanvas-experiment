@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl'
 import type { Runtime } from '@ttx/core'
-import type { MapBoardObject, MapLayer } from '@ttx/plugins'
+import { analysisOf, type MapAnalysis, type MapBoardObject, type MapLayer } from '@ttx/plugins'
 import { exposureLayers, floodedLayers, useExposure, type ExposureState } from '../exposure/useExposure'
 import { drawShape } from '../map/draw'
 import type { LayerState } from '../map/layers'
@@ -9,9 +9,12 @@ import { isGeoJsonFile } from '../uploads/upload'
 import { importAffectedAreas } from './importArea'
 import { routing } from './routing'
 import { EndMarker, RouteMarkers } from './RouteMarkers'
-import { RouteLegend } from './RouteLegend'
+import { AnalysisSummary } from './AnalysisSummary'
 import { ScenarioToolbar, type ScenarioTool } from './ScenarioToolbar'
 import { routingLayers, useClosures, useRoutes, type RouteState } from './useRoutes'
+
+/** A flood exposure map needs no routes or closed roads: only areas that flood, drawn or imported. */
+const EXPOSURE_TOOLS: ScenarioTool[] = ['closeArea']
 
 /** The red of closures (useRoutes.ts), for the area being drawn. */
 const CLOSURE_RED = '#dc2626'
@@ -31,7 +34,7 @@ export function useScenario(o: MapBoardObject, layers: MapLayer[], states: Layer
   const { all, fromLayers, closures } = useClosures(o.scenario, layers, states)
   const routes = useRoutes(o.scenario?.routes ?? [], all)
   const blocking = new Set(layers.flatMap((l) => (l.blocks ? [l.id] : [])))
-  const exposure = useExposure(o.scenario, closures, fromLayers, states.some((s) => blocking.has(s.id) && s.loading))
+  const exposure = useExposure(o.scenario, closures, fromLayers, states.some((s) => blocking.has(s.id) && s.loading), analysisOf(o) === 'exposure')
   const deck = useMemo(() => [...floodedLayers(exposure), ...routingLayers(routes, closures), ...exposureLayers(exposure)], [routes, closures, exposure])
   return { routes, closures, exposure, deck }
 }
@@ -48,6 +51,7 @@ export function ScenarioOnMap({
   mapId,
   routes,
   exposure,
+  analysis,
   active,
 }: {
   runtime: Runtime
@@ -56,6 +60,8 @@ export function ScenarioOnMap({
   mapId: string
   routes: RouteState[]
   exposure: ExposureState | undefined
+  /** What the map is for: its summary at the top left, and the tools it needs. */
+  analysis: MapAnalysis | undefined
   /** Scenario mode: the toolbar and its tools. */
   active: boolean
 }) {
@@ -187,8 +193,8 @@ export function ScenarioOnMap({
       {dropping && <div className="ttx-map__dropnote">Drop a GeoJSON file of affected areas: its features close the roads they cover</div>}
       {map && <RouteMarkers runtime={runtime} map={map} mapId={mapId} routes={routes.map((s) => s.route)} editable={active} />}
       {map && routeStart && <EndMarker map={map} lngLat={routeStart} label="A" color="#71717a" draggable={false} />}
-      <RouteLegend routes={routes} exposure={exposure} />
-      {active && <ScenarioToolbar tool={tool} onTool={setTool} onImport={importFile} status={routeStart && tool === 'route' ? { text: 'Now click where the route ends · Esc cancels' } : status} />}
+      {analysis && <AnalysisSummary analysis={analysis} routes={routes} exposure={exposure} />}
+      {active && <ScenarioToolbar tools={analysis === 'exposure' ? EXPOSURE_TOOLS : undefined} tool={tool} onTool={setTool} onImport={importFile} status={routeStart && tool === 'route' ? { text: 'Now click where the route ends · Esc cancels' } : status} />}
     </>
   )
 }
