@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { EditorContent, Extension, getSchema, useEditor, type JSONContent } from '@tiptap/react'
+import { EditorContent, Extension, getSchema, useEditor, type Editor, type JSONContent } from '@tiptap/react'
 import { Plugin } from '@tiptap/pm/state'
 import { docText, textDoc, type RichDoc } from '@ttx/plugins'
 import { clampHeadings, shouldFormatPaste } from './markdownPaste'
@@ -45,25 +45,69 @@ function editable(doc: RichDoc): RichDoc {
 }
 
 /**
+ * Where the caret is, for a text that goes on over pages (editing.tsx): `y`, the middle of its line, in the text's own
+ * px from its top, as pagination measures it (the editor draws the same elements as RichText.tsx, in the same type);
+ * and `pos`, its place in the document.
+ */
+export interface Caret {
+  y: number
+  pos: number
+}
+
+function caretOf(editor: Editor): Caret {
+  const el = editor.view.dom as HTMLElement
+  const box = el.getBoundingClientRect()
+  const k = box.height / (el.offsetHeight || 1) // the page's zoom
+  const pos = editor.state.selection.head
+  const c = editor.view.coordsAtPos(pos)
+  return { y: ((c.top + c.bottom) / 2 - box.top) / k, pos }
+}
+
+/**
  * The rich text editor of a report's text block (Tiptap). It keeps its own content while editing and reports each
  * change as the editor's JSON; the report is written by the caller. Loaded on its own (`React.lazy`), since it is most
- * of the weight and only report mode needs it.
+ * of the weight and only report mode needs it. The caret starts at `start`: the position given, else under the point
+ * where the text was pressed, else at the end.
  */
-export default function RichTextEditor({ doc, onChange, onBlur }: { doc: RichDoc; onChange: (doc: RichDoc) => void; onBlur: () => void }) {
+export default function RichTextEditor({
+  doc,
+  start,
+  onChange,
+  onCaret,
+  onBlur,
+}: {
+  doc: RichDoc
+  start?: { pos?: number; point?: { x: number; y: number } }
+  onChange: (doc: RichDoc) => void
+  onCaret?: (caret: Caret) => void
+  onBlur: () => void
+}) {
   const content = useMemo(() => editable(doc), []) // eslint-disable-line react-hooks/exhaustive-deps -- the editor owns the content from here on
   const editor = useEditor({
     extensions,
     content: content as JSONContent,
-    autofocus: 'end',
     editorProps: { attributes: { class: 'ttx-report__text ttx-report__editor', 'aria-label': 'Text' } },
-    onUpdate: ({ editor }) => onChange(editor.getJSON() as RichDoc),
+    onUpdate: ({ editor }) => {
+      onChange(editor.getJSON() as RichDoc)
+      onCaret?.(caretOf(editor))
+    },
+    onSelectionUpdate: ({ editor }) => onCaret?.(caretOf(editor)),
     onBlur,
   })
-  // Focus is taken as the editor mounts (autofocus); again on the next frame if something took it meanwhile (see useFocusSoon).
+  // Focus is taken as the editor mounts, and again on the next frame if something took it meanwhile (see useFocusSoon):
+  // the caret where the text was pressed, as the editor draws the text where its picture was.
   useEffect(() => {
     if (!editor) return
-    const frame = requestAnimationFrame(() => !editor.isDestroyed && !editor.isFocused && editor.commands.focus('end'))
+    const place = () => {
+      if (editor.isDestroyed || editor.isFocused) return
+      const pressed = start?.point && editor.view.posAtCoords({ left: start.point.x, top: start.point.y })?.pos
+      editor.commands.focus(start?.pos ?? pressed ?? 'end')
+    }
+    place()
+    const frame = requestAnimationFrame(place)
     return () => cancelAnimationFrame(frame)
+    // Once, as typing starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
   return <EditorContent editor={editor} />
 }

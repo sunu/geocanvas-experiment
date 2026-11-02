@@ -1,6 +1,6 @@
 /*
  * shadcn/ui tokens, from the Figma file (Atlantis Pod Week Hack, AHD TTX): neutral palette, --radius 10px so
- * md = 8, lg = 10, xl = 14. Tailwind's preflight is left out on purpose: styles.css is plain CSS that
+ * md = 8, lg = 10, xl = 14. Tailwind's preflight is left out on purpose: the app's own CSS (styles/index.css) is plain CSS that
  * predates it, and a reset would change every canvas object. Only the theme and utilities are loaded.
  */
 @layer theme, base, components, utilities;

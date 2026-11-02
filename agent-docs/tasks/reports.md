@@ -1,6 +1,6 @@
 # Task: reports
 
-Date: 2026-10-29. Status: steps 2 to 6 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder; the rich text editor, with pasted markdown formatted); step 1 (PDF spike) waits on approvals. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
+Date: 2026-10-29. Status: steps 2 to 6 built (the headless `reports` plugin; the widget on the canvas, tool P, Add to report from the menus; dropping objects on a report; report mode, live, with the chat, on real pages; editing on the page: the report toolbar, block controls, typing headings and text, drag to reorder; text that goes on over pages, page breaks, every block in the Options panel's list; the rich text editor, with pasted markdown formatted), and step 8's first part: print and save as PDF through the browser's print dialog (§7.5). The rest of step 1 (PDF spike: options 2–4) waits on approvals and a cost decision. Scope from `agent-docs/features.md` ("Ability for agent to sum up the current board and provide the report") and PRD 4.6, where reports are next. Modeled on OCHA humanitarian snapshots.
 
 ## 1. Requirements
 
@@ -98,6 +98,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
 | `text` | Rich text (§5.3). |
 | `image` | An upload id. |
 | `divider` | Nothing. |
+| `pageBreak` | Nothing. What follows starts a new page. |
 | `item` | `{ sourceId, mode: 'live' \| 'frozen', frozen?: FrozenItem }`: an object on the board. |
 
 - **One write path:** `blocks` is written only by the report ops (§6), and replaced whole, as a map's `layers` are. Two people changing one report at the same moment can lose one change. Most report editing happens in focus, where edits are private until Share, which narrows this.
@@ -112,7 +113,7 @@ A **block** is `{ id, kind, span: 1 | 2, … }`:
   - Letter is 816 × 1056 px.
   - Landscape swaps the two sides.
   - Margins are fixed.
-- **Page breaks** (built in step 5a, `apps/web/src/reports/pages.ts` and `ReportPages.tsx`). The flow becomes rows: a full-width block is a row by itself, two one-column blocks in a row share it, and a one-column block before a full-width one sits alone in the left column. Every block is laid out once out of sight at the page's column widths to measure its row, and measured again when a row changes size (an image loads). Rows go on pages in order, page 1 under the report's title; a row that does not fit what is left starts the next page. An item or image never grows taller than a page's content area: one taller at the block's width shrinks, keeping its proportions, centered in its block (`fitItem` in `pages.ts`), so it always fits one page. Only a row of text taller than a page still gets a page of its own and is clipped; splitting text between pages comes later. Each page shows its number at the bottom.
+- **Page breaks** (built in step 5a, `apps/web/src/reports/pages.ts` and `ReportPages.tsx`). The flow becomes rows: a full-width block is a row by itself, two one-column blocks in a row share it, and a one-column block before a full-width one sits alone in the left column. Every block is laid out once out of sight at the page's column widths to measure its row, and measured again when a row changes size (an image loads). Rows go on pages in order, page 1 under the report's title; a row that does not fit what is left starts the next page. An item or image never grows taller than a page's content area: one taller at the block's width shrinks, keeping its proportions, centered in its block (`fitItem` in `pages.ts`), so it always fits one page. A **text alone in its row** (full width, or one column with nothing beside it) **goes on over pages**: measuring also gives where it may be cut, between its lines (each paragraph's top and line height), and a text that does not fit fills what is left of the page up to the last line that fits, then goes on at the top of the next page (`paginate` gives each page the **pieces** of rows it shows, px `from` to `to`). Each page shows the whole text shifted up and clipped to its lines, so no line is cut. A text beside another block in a row of two is not cut: taller than a page, it gets a page of its own and is clipped. After a **page break** block (`pageBreak`), the next row starts a new page; the break stays at the end of its page, and a break at the end of a report adds no page. Each page shows its number at the bottom.
 
 ### 3.3 Live and frozen items
 
@@ -186,7 +187,7 @@ Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ but
   - Each block has a drag handle. Dragging shows where it will go, in either column.
   - A toggle on each block switches it between one column and the full width.
   - An insert menu, between blocks and at the end, adds a heading, text, an image (upload, or from the board's uploads) or a divider.
-- **Every page, scrolling.** A report can run over several pages. Report mode shows them all, stacked top to bottom with a gap between, in a column that scrolls, as the PDF widget's focus view does. A new page starts when the content reaches the page's height; a block does not split between pages unless it is text (§3.2).
+- **Every page, scrolling.** A report can run over several pages. Report mode shows them all, stacked top to bottom with a gap between, in a column that scrolls, as the PDF widget's focus view does. A new page starts when the content reaches the page's height; a block does not split between pages unless it is a text alone in its row (§3.2), and a page break starts a new page.
 - **Edits are live, with no private draft** (decided 2026-10-29). Unlike other focus modes, report mode writes straight to the shared report, as typing in a text on the canvas does:
   - others and the agent see changes as they happen
   - undo is per gesture
@@ -198,14 +199,22 @@ Step 5 is two PRs: **5a** (built) is report mode itself: opening it (the ⤢ but
 ### 5.1a Layout: full screen, with the agent as an overlay
 
 Report mode is a view of its own, not the canvas (`FocusableObjectUI.fullScreen`, `keepChat` and `live`; round 2 of 5a, 2026-10-30):
-- **The document is the main page.** It fills the screen to its edges, beside the Options panel, on white, with no dotted canvas (the canvas carries `data-focus` with the type in focus; `styles.css`). Each page has a 1 px border, square and flat.
+- **The document is the main page.** It fills the screen to its edges, beside the Options panel, on white, with no dotted canvas (the canvas carries `data-focus` with the type in focus; `canvas/focus.css`). Each page has a 1 px border, square and flat.
 - **The Options panel** is on the right (§5.2). Its header shows the report's title, as the Object panel does (`panel(object, board)`); the badge says Report.
 - **The agent chat is an overlay** at the top left, over the page. It takes no room from the layout, is capped in height, and collapses to uncover the page. People ask the agent to act on the report ("add the map", "write a summary of the key figures"), and its edits appear on the pages as it makes them.
 - **Zoom:** report mode opens with the pages **fitted to the width** of the screen left of the Options panel, past 100% when there is room. A **zoom control** floats at the bottom left (zoom out, the percentage with Fit width and set steps from 50% to 200%, zoom in; 25% to 300% in all), and ⌘ or Ctrl with the wheel, or a trackpad pinch, zooms the report rather than the browser page. The zoom is this person's, and resets to Fit width each time report mode opens.
 
 ### 5.1b Tools in report mode (5b)
 
-Built in step 5b (`reports/ReportToolbar.tsx`, `reports/editing.tsx`): the toolbar and the controls below; a press selects a block (outlined in the canvas accent), a press on a selected heading or text, or a double-click, types in it (`report.setText`, one undo step per editing session; the editor keeps its own text while typing), Esc ends typing, then clears the selection, and only then leaves report mode (caught before the canvas's Esc); Delete or Backspace removes the selected block. Reordering drags a block's handle across pages, with an insertion line (`dropIndex` and `moveIndex` in `reports/pages.ts`), Esc cancels, and the column scrolls near its edges. Image uploads go through `uploadFile` (media only) or pick from the board's uploads. Empty headings and texts show a muted placeholder in report mode only. Every action starts its own gesture: one undo step each. A block's controls sit beside it in the page's margin, never over its content: the left margin for a one-column block on the left, the right margin for the others. Lists that must tell objects apart (From board, the Options panel's items) name a sticky note or text by the start of its text (`labelOf` with `withText`); captions and cards on the page use its name or type, since the page shows the text already. A toolbar menu leaves the focus with what it added (a new heading's editor), and Esc while a menu is open closes the menu only.
+Built in step 5b (`reports/ReportToolbar.tsx`, `reports/editing.tsx`): the toolbar and the controls below; a press selects a block (outlined in the canvas accent), a press on a selected heading or text, or a double-click, types in it (`report.setText`, one undo step per editing session; the editor keeps its own text while typing), Esc ends typing, then clears the selection, and only then leaves report mode (caught before the canvas's Esc); Delete or Backspace removes the selected block. Reordering drags a block's handle across pages, with an insertion line (`dropIndex` and `moveIndex` in `reports/pages.ts`), Esc cancels, and the column scrolls near its edges. Image uploads go through `uploadFile` (media only) or pick from the board's uploads. Empty headings and texts show a muted placeholder in report mode only. Every action starts its own gesture: one undo step each. A block's controls sit beside it in the page's margin, never over its content: the left margin for a one-column block on the left, the right margin for the others. Lists that must tell objects apart (From board, the Options panel's list) name a sticky note or text by the start of its text (`labelOf` with `withText`); captions and cards on the page use its name or type, since the page shows the text already. A toolbar menu leaves the focus with what it added (a new heading's editor), and Esc while a menu is open closes the menu only.
+
+Added after testing 5b (branch `feat/report-pages`):
+- **Page break** in the toolbar, after Divider: a `pageBreak` block, shown in report mode as a dashed line labelled "Page break" (nothing on the canvas preview or in print), selected, dragged and removed like any block; it has no width toggle.
+- **The caret goes where the text was pressed** (at the end of a new text), and a heading's text is selected to type over. Before, opening a text selected all of it, so the first key replaced the whole text.
+- **Typing in a text that goes on over pages:** each page's part of it is a block on that page, selected together; the first has the controls and is where a drop before it goes. Pressing a part types there: the editor is that part's height and scrolls inside itself; the other pages follow as it is typed.
+- **The caret follows the text over pages:** once what is typed runs past the part's page (or a text typed past its page's bottom is cut there), the editor moves to the part that now holds the caret, with the caret and the text as typed, in the same editing session (one undo step). Where the caret is comes from the rich text editor itself (ProseMirror's `coordsAtPos`, `caretOf` in `reports/RichTextEditor.tsx`), since it draws the same elements as the pages in the same type; a press puts the caret under the pointer (`posAtCoords`). Page cuts are measured between the lines of every paragraph, heading and code block, also in lists and quotes.
+- **Dragging shows what moves:** the block's icon and name follow the pointer, the block stays faded in its place, and the pointer is a closed hand until the drop.
+- **Controls stay in sight when zoomed:** when the page's margin is out of sight (zoomed wider than the column, or under the Options panel), a block's controls go inside it, at the top, at the edge of what is in sight.
 
 Decided 2026-10-30: the tools for adding to a report are a **report toolbar at the bottom center**, in the canvas toolbar's style and place, replacing it in report mode (the canvas toolbar is hidden in focus already).
 - **Its tools:** Heading (levels 1 to 3 in its menu), Text, Image (upload a file, or pick from the board's uploads), Divider, and **Add from board** (a picker of the board's objects by type and name, which adds them as items, as Add to report does).
@@ -218,15 +227,15 @@ Decided 2026-10-30: the tools for adding to a report are a **report toolbar at t
 
 - The report's **name** (`core.object.rename`).
 - **Paper** (A4 or Letter) and **orientation** (portrait or landscape).
-- **Items:** each item block, with its source's title, a **Live / Frozen** switch, **Go to source** (leaves focus and selects the object), and **Remove**.
-- **Export PDF** (§7).
+- **Items:** every block, in report order, by icon and name (`blockLabel` and `blockIcon` in `reports/reports.ts`, which the dragged block uses too): a heading's or a text's words, an image's file name, Divider, Page break, an item's object. Its name goes to the block on the page (scrolled into view and selected; `showBlock` in `reports/editing.tsx`). Each has **Remove**; an item also has a **Live / Frozen** switch and **Go to source** (leaves focus and selects the object).
+- **Export,** at the foot of the panel, always in sight below the items: Print or save as PDF (§7.5), also ⌘P in report mode.
 - **Share link** (§8).
 
 ### 5.2a Removing from a report
 
 Removing happens **only in report mode**, where people see the whole report and what they take out of it. The canvas's menus (§4) only add.
 - **Each block** (an item, a heading, text, an image, a divider) has a **Remove** action: an × on the block's toolbar while it is hovered or selected, and the Delete key on a selected block.
-- **The Options panel's item list** has Remove on each item too (§5.2).
+- **The Options panel's list** has Remove on each block too (§5.2).
 - **Removing an item never touches its object** on the board: the object stays, and so do the other reports it is in.
 - A frame's heading item is one block like any other: removing it leaves the frame's objects in the report.
 - Each removal is one undo step (`report.removeBlock`). The agent removes blocks with the same op, for example "take the conflict map out of the report".
@@ -236,7 +245,7 @@ Removing happens **only in report mode**, where people see the whole report and 
 - `text` blocks are edited with a ProseMirror-based editor (Tiptap). It is a new dependency, approved in its step (§9).
 - What it offers: paragraphs, headings, bold, italic, links, lists, and quotes.
 - **Storage:** the editor's JSON, stored in the block and written whole by `report.setText`, a gesture op like `text.setText`. Typing is one undo step per editing gesture. Two people typing in one block at the same moment can lose keystrokes, as with text on the canvas today.
-- **Built (step 6):** `apps/web/src/reports/RichTextEditor.tsx` (Tiptap with StarterKit and `@tiptap/markdown`, loaded on first edit) and `RichText.tsx`, which draws the stored JSON without Tiptap, so the canvas and report mode's pages never load the editor. The node and mark types are listed in `richTextExtensions.ts`: paragraph, headings 1 to 3, bold, italic, strike, link, bullet and ordered lists, quote, code and code block, rule, line break. Links go only to http, https and mailto, checked when drawn, since the JSON comes from people and agents. Not built: a formatting toolbar (shortcuts such as ⌘B and typing `## ` work).
+- **Built (step 6):** `apps/web/src/reports/RichTextEditor.tsx` (Tiptap with StarterKit and `@tiptap/markdown`, its own chunk, loaded when report mode opens so a new text takes typing at once) and `RichText.tsx`, which draws the stored JSON without Tiptap, so the canvas and report mode's pages never load the editor. The node and mark types are listed in `richTextExtensions.ts`: paragraph, headings 1 to 3, bold, italic, strike, link, bullet and ordered lists, quote, code and code block, rule, line break. Links go only to http, https and mailto, checked when drawn, since the JSON comes from people and agents. Not built: a formatting toolbar (shortcuts such as ⌘B and typing `## ` work).
 - **Pasting markdown** (`markdownPaste.ts`): a paste of plain text that looks like markdown becomes formatted text, as the editor's own nodes (never HTML, so pasted HTML shows as text). It formats only when the clipboard has no rich text, or comes from a code editor (VS Code), and when the text has markdown marks: a heading, list, quote or fence on one of several lines, or bold or a web link anywhere; a single line like "# of households" stays text. A paste with a **table or an image** is left as plain text, since the editor has no node for them and the parser would drop them. Headings deeper than level 3 become level 3. ⌘/Ctrl+Shift+V pastes the text as it is.
 - **Later:** character-level co-editing with y-prosemirror on a `Y.XmlFragment`, if people need it (§10).
 
@@ -254,7 +263,7 @@ All with zod schemas, so they are in ⌘K, are agent tools, and are in the MCP m
 | `report.add` | canvas | the type's fields, as every `<type>.add` |
 | `report.setPage` | one report | `paper`, `orientation` |
 | `report.addItems` | the selection | `reportId`, optional: without it, a new report is made to the right of the objects. Its defaults choose the board's report when there is exactly one. Items go at the end, live; freeze them afterwards with `report.setItemMode`. A frame adds the objects in it; into an empty report, it also titles the report (§4). Objects already in the report, and reports, are skipped. Maps and frames take the full width, other items one column. |
-| `report.addBlock` | one report | `block` (a heading with its level, text as plain `text` or a rich `doc`, an image, or a divider), `index`. Headings and dividers take the full width. |
+| `report.addBlock` | one report | `block` (a heading with its level, text as plain `text` or a rich `doc`, an image, a divider, or a page break), `index`. Headings, dividers and page breaks take the full width. |
 | `report.removeBlock` | one report | `blockId` |
 | `report.moveBlock` | one report | `blockId`, `index` |
 | `report.setSpan` | one report | `blockId`, `span` |
@@ -309,7 +318,33 @@ Export must be reliable: what prints is what the report shows.
 
 ### 7.4 The spike (step 1)
 
+Partly answered by building option 1 (§7.5): our own pagination (`reports/pages.ts`) puts every block on real pages, so page breaks did not need Paged.js, and Chrome's print gives the report as on screen. Still to compare: option 2 (a download with no dialog, which needs the Workers paid plan) and Safari's print.
+
 Make one test report: a map, an image, rich text, two columns with one full-width block, two pages, and a landscape version. Export it with options 1, 2, 3 and 4 (react-pdf). Compare the results against §7.1, record them here with the PDFs, and decide.
+
+### 7.5 Print and save as PDF (built, option 1)
+
+Built on `feat/report-print` (`reports/ReportPrint.tsx`, `reports/print.ts`, print rules in `reports/reports.css`):
+- **Where:** **Print or save as PDF** at the foot of the Options panel, or ⌘P in report mode, which no longer prints the app's screen. People pick "Save as PDF" in the dialog for a file.
+- **The print view:** every page at scale 1, portaled into the body, out of sight on screen and the only thing shown in print. It is read-only: report mode's editing context is cut off, since context passes through the portal, so no controls, placeholders or page break labels print.
+  - **Paper:** `@page` takes the report's paper at its physical size (210 × 297 mm, 8.5 × 11 in, turned for landscape) with no margin. The pages carry their own margins, and the browser's header and footer go.
+  - **Sheets:** each sheet is that size too, so A4's 1122.5 px does not push an empty page after every sheet.
+  - **Colors:** they print as on screen (`print-color-adjust: exact`).
+- **Maps are drawn again for print.** The same area as the report shows, at about 300 dpi of their printed width (`printRatio`), within 4096 px a side and at least 2×. The snapshot renderer takes a `pixelRatio` per request (MapLibre's `setPixelRatio` and deck.gl's `useDevicePixels`); screen pictures are unchanged.
+- **Waiting:** the print dialog opens once every map picture is drawn, every image has loaded, and no item's source is loading (`isLoading`), twice in a row. A status says what it waits for, with Cancel.
+  - After 60 s it prints what there is and says how many maps were not ready.
+  - A board map of 600 px wide printed full width took under a second once its tiles were cached.
+- **Notebooks print their summary card** (title, template, files): the notebook page they embed does not print.
+- **No widget captions or frame headings in print** (decided 2026-10-30): the icon and name above each item, and the heading a frame's item shows, name things on the board, which a reader of the page does not need. They stay in report mode. Without them a printed report can take less room, so it can have fewer pages than report mode shows. People add their own headings where a section needs one.
+- **Checked** with Chromium's PDF output (the dialog's engine), for A4 portrait, A4 landscape and Letter:
+  - as many pages as report mode, each at the paper's size, no empty page
+  - real text, page numbers
+  - the map at more than 3× its CSS width
+  - nothing from editing printed
+- **Not done:**
+  - a download with no dialog (option 2)
+  - a check in Safari and Firefox
+  - maps whose tiles never load print as blank areas after the 60 s limit
 
 ## 8. The report URL
 
@@ -335,13 +370,13 @@ Make one test report: a map, an image, rich text, two columns with one full-widt
 4. **Drag onto a report** (built): the drop zone, the confirmation, objects back in place, one undo step.
 5. **Report mode,** in two PRs:
    - **5a** (built): report mode opens from ⤢, a double-click or the Object panel's Open; it is live (`FocusableObjectUI.live`: no draft, Share or exit dialog) and keeps the agent chat on the left (`keepChat`); every page scrolls in the middle, on real pages; the Options panel has the name, the page, and the items (Live or Frozen, Go to source, Remove).
-   - **5b** (built): editing on the page: the report toolbar (Heading, Text, Image, Divider, From board), block controls (drag to reorder, width, ×), Delete and Esc, typing headings and plain text.
-6. **Rich text** (built, with markdown paste: #98): the editor (Tiptap, approved), `report.setText`. The editor is its own lazy chunk (`RichTextEditor`, 465 kB, 147 kB gzipped), loaded when a text block is first edited; the board's main bundle has none of it.
+   - **5b** (built): editing on the page: the report toolbar (Heading, Text, Image, Divider, From board), block controls (drag to reorder, width, ×), Delete and Esc, typing headings and plain text. Then text that goes on over pages, page breaks, the dragged block following the pointer, every block in the Options panel's list, and controls in sight when zoomed.
+6. **Rich text** (built, with markdown paste: #98): the editor (Tiptap, approved), `report.setText`. The editor is its own lazy chunk (`RichTextEditor`, 465 kB, 147 kB gzipped), loaded when report mode opens (`preloadEditor`); the board's main bundle has none of it.
 7. **Live and frozen** (under discussion: `plans/plan-019.md` would replace this step with synced and detached items):
    - report renderers and `freeze` for each type
    - the high-resolution map PNG export
    - keeping report pictures out of the Uploads gallery (a new upload kind, or a flag)
-8. **PDF export,** as the spike decided.
+8. **PDF export:** print and save as PDF built (§7.5); a download with no dialog (option 2) waits on the spike and a cost decision.
 9. **The report URL:** publish, frozen and live, unpublish.
 10. **The agent drafts a report:** from the board (`summarizeBoard`) with the report ops. This is PRD 4.5, "Summarize the board into a report".
 
@@ -371,6 +406,7 @@ Made (2026-10-29, from the product owner):
 18. **Report mode is full screen,** on white with a border on each page, and **the chat is an overlay** at the top left that takes no room (5a, round 2). 2026-10-30.
 19. **Report tools go in a bottom report toolbar** that replaces the canvas toolbar in report mode; controls on a block sit on the block (§5.1b, 5b). 2026-10-30.
 20. **Undo in report mode is this person's latest change on the board,** wherever it was made (§5.1). 2026-10-30.
+21. **Long text goes on over pages,** cut between lines; **people move blocks to the next page with a Page break block,** and a dragged block shows beside the pointer (§3.2, §5.1b). 2026-10-30.
 
 Under discussion: **synced and detached items** (`plans/plan-019.md`), a proposal for colleagues' feedback, with its own questions (what "detached" means, pinning external data, deleting a source, edits, the words).
 

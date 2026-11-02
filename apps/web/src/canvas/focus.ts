@@ -7,7 +7,7 @@ import { MAX_ZOOM, MIN_ZOOM, type Camera, type Rect } from './camera'
  * instead of being a scaled-up small box.
  */
 
-/** Width of the Options panel (px), on the right; must match .ttx-options in styles.css. */
+/** Width of the Options panel (px), on the right; must match .ttx-options in canvas/focus.css. */
 export const PANEL_W = 320
 /** Margin around the focused object and the panel (px). */
 const GAP = 16

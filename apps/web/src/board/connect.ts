@@ -4,7 +4,8 @@ import { WebsocketProvider } from 'y-websocket'
 import { Chat, Runtime, Uploads } from '@ttx/core'
 import { plugins } from '../plugins'
 import type { Board, BoardObject } from './board'
-import { personActor } from './person'
+import { claimColor } from './collaborators'
+import { personActor, savePerson } from './person'
 import { tools } from '../tools/registry'
 
 /** Join a room: the Worker routes /connect/<room> to that room's Durable Object. */
@@ -14,6 +15,8 @@ export function connect(room: string) {
   const provider = new WebsocketProvider(url, room, doc)
   const runtime = new Runtime({ doc, plugins, actor: personActor(), tools })
   provider.awareness.setLocalStateField('user', runtime.actor)
+  // Everyone on the board has a color of their own (collaborators.ts).
+  claimColor(runtime.actor, provider.awareness, () => savePerson(runtime.actor))
   // Merged gesture entries wait for the gesture to end; write them before the tab goes.
   addEventListener('pagehide', () => runtime.flush())
   return { board: runtime.board as Board, runtime, provider, chat: new Chat(doc), uploads: new Uploads(doc) }

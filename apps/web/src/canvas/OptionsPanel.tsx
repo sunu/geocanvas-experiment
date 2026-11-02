@@ -51,6 +51,11 @@ export function OptionsPanel({ runtime, draft, object, ui, title, onShare, onExi
       <div className="ttx-options__body">
         <ui.Options runtime={runtime} object={object} editing onDone={() => {}} focused onGoTo={onGoTo} />
       </div>
+      {ui.OptionsFooter && (
+        <footer className="ttx-options__footer">
+          <ui.OptionsFooter runtime={runtime} object={object} editing onDone={() => {}} focused onGoTo={onGoTo} />
+        </footer>
+      )}
     </aside>
   )
 }

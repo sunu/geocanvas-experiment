@@ -53,6 +53,8 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
 export interface FocusableObjectUI<O extends BoardObject = BoardObject> extends ObjectUI<O> {
   /** Contextual tools, beside the object in focus. Every change is an op on `runtime` (the draft, or the board when `live`). */
   Options: ComponentType<ObjectViewProps<O>>
+  /** Actions at the foot of the Options panel, below its scrolling body: always in sight (a report's Export). */
+  OptionsFooter?: ComponentType<ObjectViewProps<O>>
   /** Ops to run on the draft just before it is shared, e.g. a map shares its view. */
   beforeShare?(runtime: Runtime, object: O): void
   /**
@@ -75,6 +77,12 @@ export function registerObjectUI<T extends BoardObject['type']>(type: T, ui: Obj
 }
 
 export const objectUI = (type: string): ObjectUI | undefined => uis.get(type)
+
+/** UI drawn with every object, from a plugin's UI: e.g. a code cell's footnote on what shows its output (code/Footnote.tsx). */
+export type Decoration = ComponentType<{ runtime: Runtime; object: BoardObject }>
+const decorations: Decoration[] = []
+export const registerDecoration = (decoration: Decoration) => void decorations.push(decoration)
+export const objectDecorations = (): readonly Decoration[] => decorations
 
 /** What to call an object where its view is not there to show it: its name, else its type's. */
 export const objectName = (runtime: Runtime, o: { name?: string; type: string }) => o.name || runtime.registry.objectType(o.type)?.title || o.type

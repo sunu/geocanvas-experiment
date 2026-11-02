@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { CheckIcon, ImageIcon, MinusIcon, SquaresFourIcon, StackPlusIcon, TextHIcon, TextTIcon } from '@phosphor-icons/react'
+import { CheckIcon, FileDashedIcon, ImageIcon, MinusIcon, SquaresFourIcon, StackPlusIcon, TextHIcon, TextTIcon } from '@phosphor-icons/react'
 import { Uploads, uploadUrl, type Registry, type Runtime } from '@ttx/core'
 import type { ReportBoardObject } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import { holds, labelOf } from './reports'
 
 /**
  * Report mode's toolbar (agent-docs/tasks/reports.md §5.1b), at the bottom center in the canvas toolbar's place and look:
- * add a heading, text, an image or a divider, or objects from the board. What it adds goes after the selected block, or
+ * add a heading, text, an image, a divider or a page break, or objects from the board. What it adds goes after the selected block, or
  * at the end, and becomes the selected block; a new heading or text opens for typing.
  */
 export function ReportToolbar() {
@@ -76,6 +76,9 @@ export function ReportToolbar() {
       <ImageMenu runtime={runtime} onUpload={() => file.current?.click()} onPick={(imageId) => add({ kind: 'image', imageId })} />
       <Button variant="ghost" size="sm" className={BTN} title="Add a divider" aria-label="Add a divider" onClick={() => add({ kind: 'divider' })}>
         <Face Icon={MinusIcon} text="Divider" />
+      </Button>
+      <Button variant="ghost" size="sm" className={BTN} title="Add a page break: what follows starts a new page" aria-label="Add a page break" onClick={() => add({ kind: 'pageBreak' })}>
+        <Face Icon={FileDashedIcon} text="Page break" />
       </Button>
       <AddFromBoard
         report={r}

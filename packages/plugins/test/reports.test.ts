@@ -179,6 +179,13 @@ describe('reports', () => {
     expect((await rt.invoke('report.removeBlock', one(r), { blockId: 'nope' })).status).toBe('failed')
   })
 
+  it('adds a page break, full width', async () => {
+    const rt = setup()
+    const r = add(rt, 'report')
+    await rt.invoke('report.addBlock', one(r), { block: { kind: 'pageBreak' } })
+    expect(report(rt, r).blocks[0]).toMatchObject({ kind: 'pageBreak', span: 2 })
+  })
+
   it('edit the text of headings and text blocks only', () => {
     const rt = setup()
     const r = add(rt, 'report', { blocks: [{ id: 'h', kind: 'heading', text: 'A', level: 1, span: 2 }, { id: 't', kind: 'text', doc: textDoc('a'), span: 1 }, { id: 'd', kind: 'divider', span: 2 }] })

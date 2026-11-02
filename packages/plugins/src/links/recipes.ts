@@ -1,4 +1,5 @@
 import type { AnyObject } from '@ttx/core'
+import type { CodeOutput, OutputKind } from '../codeOutput.js'
 import { choroplethLayer } from '../hapi.js'
 import type { MapBoardObject } from '../map.js'
 import { eventLayer, type MapLayer } from '../mapLayers.js'
@@ -45,6 +46,19 @@ const mapRecipe = (id: string, layer: (f: Facts) => MapLayer | undefined): Recip
   render: (facts, node) => ({ set: { layers: withLayer(node, id, layer(facts)) }, ...(facts.area && { view: facts.area }) }),
 })
 
+/** The recipe `code.<type>`: what a node of `type` shows of a cell's output of `kinds`. */
+function codeRecipe(type: string, kinds: OutputKind | OutputKind[], fields: (output: CodeOutput, facts: Facts) => Record<string, unknown> | undefined): Recipe {
+  return {
+    id: `code.${type}`,
+    types: [type],
+    render: (facts, node) => {
+      const set = facts.code && [kinds].flat().includes(facts.code.kind) ? fields(facts.code, facts) : undefined
+      if (!set) return { set: {} }
+      return { set: { ...set, link: { ...node.link!, args: { ...node.link!.args, renderedAt: facts.code!.at } } } }
+    },
+  }
+}
+
 const list: Recipe[] = [
   {
     id: 'country',
@@ -61,6 +75,12 @@ const list: Recipe[] = [
   },
   mapRecipe('eventFootprint', (f) => (f.eventId ? eventLayer(f.eventId, f.name) : undefined)),
   mapRecipe('conflictChoropleth', (f) => (f.country ? choroplethLayer(f.country, 'conflictEvents', 1) : undefined)),
+  // A code cell's output (code.ts). Unlike the others, a recipe here leaves its node as it is when the output is
+  // of another kind: the node keeps the last result it could show, and the UI says it is behind (followerState).
+  codeRecipe('input', 'geo.features', (o, f) => (f.area ? { value: { ...f.area, ...(f.name && { name: f.name }) } } : undefined)),
+  codeRecipe('image', 'image.png', (o, f) => ({ imageId: o.uploadId, ...(f.name && { name: f.name }) })),
+  codeRecipe('text', ['text', 'number'], (o) => ({ text: String(o.value ?? '') })),
+  codeRecipe('sticky', ['text', 'number'], (o) => ({ text: String(o.value ?? '') })),
   {
     id: 'frameTitle',
     types: ['frame'],

@@ -1,6 +1,6 @@
 # Plan 013 — Links and frames: templates that follow their seeds
 
-Date: 2026-10-29. Status: implemented on `feat/frames-and-links`. Follows plan-012 (templates, phase 1).
+Date: 2026-10-29. Status: built, in `main` (PR #62). Links are made by templates only; links people draw by hand are not built. Follows plan-012 (templates, phase 1).
 
 ## 1. Outcome
 

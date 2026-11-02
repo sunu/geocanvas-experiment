@@ -1,0 +1,221 @@
+/* --- Agent chat (right; outside the canvas, so clicks never reach it) ---- */
+
+/* The Uploads panel (uploads/UploadsPanel.tsx) takes the top-right corner, in the place of the user menu. */
+.ttx-chat {
+  position: fixed;
+  right: 8px;
+  top: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100% - 16px));
+  border-radius: 10px;
+  background: var(--ttx-panel);
+  box-shadow: 0 0 0 1px var(--ttx-border), 0 4px 16px rgb(0 0 0 / 0.08);
+  font-size: 13px;
+  z-index: 1000003;
+}
+
+.ttx-chat__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 10px 14px;
+  border-bottom: 1px solid var(--ttx-border);
+  font-weight: 600;
+}
+
+.ttx-chat__close {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  cursor: pointer;
+}
+
+.ttx-chat__close:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+
+.ttx-chat__list {
+  flex: 1;
+  min-height: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.ttx-chat__empty,
+.ttx-chat__thinking {
+  margin: 0;
+  color: var(--ttx-muted);
+}
+
+.ttx-chat__entry {
+  margin-bottom: 14px;
+}
+
+.ttx-chat__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.ttx-chat__entry--agent .ttx-chat__who {
+  color: var(--agent);
+}
+
+.ttx-chat__chip {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.06);
+  color: var(--ttx-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.ttx-chat__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.ttx-chat__calls {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+.ttx-chat__calls li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ttx-chat__calls li.is-failed {
+  color: #dc2626;
+}
+
+.ttx-chat__objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ttx-chat__objects button {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ttx-chat__undo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ttx-chat__undo:hover {
+  background: rgb(0 0 0 / 0.04);
+}
+
+.ttx-chat__undone {
+  margin-top: 6px;
+  color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+.ttx-chat__undo-error {
+  margin-top: 4px;
+  color: #dc2626;
+  font-size: 12px;
+}
+
+/* The mode switch takes the free space; the buttons after it sit next to it. */
+.ttx-chat__keys {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-chat__keys label {
+  display: grid;
+  gap: 2px;
+  color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+.ttx-chat__keys input,
+.ttx-chat__keys select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.ttx-chat__keys p {
+  margin: 0;
+  color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+.ttx-chat__keys-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ttx-chat__keys-actions button {
+  padding: 4px 10px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ttx-chat__keys-actions button[type='submit'] {
+  border-color: var(--ttx-accent);
+  background: var(--ttx-accent);
+  color: #fff;
+}
+
+.ttx-chat__keys-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { EditableBlock, useReportEditing } from './editing'
 import { SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
@@ -7,11 +7,18 @@ import type { Board, BoardObject } from '../board/board'
 import { ObjectLabelSlot, ObjectNameContext } from '../canvas/ObjectHeader'
 import { objectUI } from '../canvas/registry'
 import { useMapPicture } from '../map/picture'
-import { fitItem, paginate, rowsOf, type Row } from './pages'
+import { fitItem, paginate, rowsOf, type Piece, type Row, type RowSize } from './pages'
+import { printRatio } from './print'
 import { labelOf, titleOf } from './reports'
 import { RichText } from './RichText'
 
-/** A page's margin, the space between rows, and between the two columns, in CSS px (styles.css .ttx-report__*). */
+/**
+ * True inside the print view (ReportPrint.tsx): maps are drawn at print resolution, and a notebook shows its summary
+ * card, since the page it embeds does not print.
+ */
+export const Printing = createContext(false)
+
+/** A page's margin, the space between rows, and between the two columns, in CSS px (reports/reports.css .ttx-report__*). */
 const MARGIN = 56
 const ROW_GAP = 16
 const COLUMN_GAP = 24
@@ -44,18 +51,21 @@ export function ReportPages({
   footer(page: number, count: number): ReactNode
 }) {
   const page = pageSize(r.paper, r.orientation)
-  const rows = rowsOf(r.blocks)
+  // In print, a frame's heading is left out with the widgets' captions: the page reads as a document, not the board.
+  const printing = useContext(Printing)
+  const blocks = printing ? r.blocks.filter((b) => !(b.kind === 'item' && board.get(b.sourceId)?.type === 'frame')) : r.blocks
+  const rows = rowsOf(blocks)
   const title = titleOf(board, r)
   const measure = useRef<HTMLDivElement>(null)
-  const [heights, setHeights] = useState<{ title: number; rows: number[] }>({ title: 0, rows: [] })
+  const [sizes, setSizes] = useState<{ title: number; rows: RowSize[] }>({ title: 0, rows: [] })
 
   useLayoutEffect(() => {
     const el = measure.current
     if (!el) return
     const read = () => {
-      const [t, ...rs] = [...el.children].map((c) => (c as HTMLElement).offsetHeight)
-      const next = { title: t ?? 0, rows: rs }
-      setHeights((h) => (h.title === next.title && h.rows.length === next.rows.length && h.rows.every((v, i) => v === next.rows[i]) ? h : next))
+      const [t, ...rs] = [...el.children] as HTMLElement[]
+      const next = { title: t?.offsetHeight ?? 0, rows: rs.map((row, i) => sizeOf(row, (rows[i] ?? []).map((b) => blocks[b]!))) }
+      setSizes((s) => (JSON.stringify(s) === JSON.stringify(next) ? s : next))
     }
     read()
     const observer = new ResizeObserver(read)
@@ -64,12 +74,37 @@ export function ReportPages({
   })
 
   const contentHeight = page.h - 2 * MARGIN - FOOTER
-  const pages = paginate(rows.map((_, i) => heights.rows[i] ?? 0), { contentHeight, firstPageTop: heights.title, gap: ROW_GAP })
+  const pages = paginate(
+    rows.map((_, i) => sizes.rows[i] ?? { height: 0 }),
+    { contentHeight, firstPageTop: sizes.title, gap: ROW_GAP },
+  )
   const shown = which === 'first' ? pages.slice(0, 1) : pages
   const contentWidth = page.w - 2 * MARGIN
-  const rowView = (row: Row, measuring = false) => (
-    <RowView key={row.join()} row={row} blocks={r.blocks} board={board} runtime={runtime} contentWidth={contentWidth} maxHeight={contentHeight} measuring={measuring} full={measuring || full} />
-  )
+  // Each part of a row by its place among the row's parts: a part keeps its key (and an editor in it stays) when the
+  // line its page ends at moves as the text grows.
+  const part = new Map<Piece, number>()
+  const parts = new Map<number, number>()
+  for (const p of pages.flat()) {
+    part.set(p, parts.get(p.row) ?? 0)
+    parts.set(p.row, (parts.get(p.row) ?? 0) + 1)
+  }
+  const rowView = (row: Row, piece?: Piece) => {
+    const height = piece ? (sizes.rows[piece.row]?.height ?? 0) : 0
+    return (
+      <RowView
+        key={piece ? `${row.join()}:${part.get(piece)}` : row.join()}
+        row={row}
+        piece={piece && { from: piece.from, to: piece.to, height }}
+        blocks={blocks}
+        board={board}
+        runtime={runtime}
+        contentWidth={contentWidth}
+        maxHeight={contentHeight}
+        measuring={!piece}
+        full={!piece || full}
+      />
+    )
+  }
 
   return (
     <>
@@ -77,15 +112,15 @@ export function ReportPages({
           report mode's even where the canvas shows compact cards. Widgets are boxes of their height here, not drawn. */}
       <div ref={measure} className="ttx-report__measure" style={{ width: page.w - 2 * MARGIN }} aria-hidden>
         <h1 className="ttx-report__title">{title}</h1>
-        {rows.map((row) => rowView(row, true))}
+        {rows.map((row) => rowView(row))}
       </div>
-      {shown.map((rowIndexes, n) => (
+      {shown.map((pieces, n) => (
         <div key={n} className="ttx-report__sheet" style={{ width: page.w * scale, height: page.h * scale }}>
           <div className="ttx-report__page" style={{ width: page.w, height: page.h, transform: `scale(${scale})` }}>
             <div className="ttx-report__content">
               {n === 0 && <h1 className="ttx-report__title">{title}</h1>}
-              {n === 0 && !r.blocks.length && <p className="ttx-report__empty">Drop objects here, or use Add to report</p>}
-              {rowIndexes.map((i) => rowView(rows[i]!))}
+              {n === 0 && !blocks.length && <p className="ttx-report__empty">Drop objects here, or use Add to report</p>}
+              {pieces.map((piece) => rowView(rows[piece.row]!, piece))}
             </div>
             <div className="ttx-report__count">{footer(n + 1, pages.length)}</div>
           </div>
@@ -93,6 +128,29 @@ export function ReportPages({
       ))}
     </>
   )
+}
+
+/**
+ * A measured row's size: its height, where a text alone in its row may be cut between pages (between its lines, from
+ * the top and line height of each paragraph, heading and code block, also in lists and quotes), and whether it is a
+ * page break.
+ */
+function sizeOf(row: HTMLElement, blocks: Block[]): RowSize {
+  const height = row.offsetHeight
+  const [b] = blocks
+  if (blocks.length !== 1 || !b) return { height }
+  if (b.kind === 'pageBreak') return { height, breaks: true }
+  if (b.kind !== 'text') return { height }
+  const top = row.getBoundingClientRect().top
+  const cuts: number[] = []
+  for (const p of row.querySelectorAll<HTMLElement>('.ttx-report__text :is(p, h2, h3, h4, pre)')) {
+    const at = p.getBoundingClientRect().top - top
+    const line = parseFloat(getComputedStyle(p).lineHeight)
+    if (at > 0) cuts.push(Math.round(at))
+    if (!(line > 0)) continue
+    for (let k = 1; k < Math.round(p.offsetHeight / line); k++) cuts.push(Math.round(at + k * line))
+  }
+  return { height, cuts }
 }
 
 /**
@@ -120,20 +178,49 @@ export function ReportContent({ ref, runtime, report: r }: { ref?: Ref<HTMLDivEl
 }
 
 /** One row of the two-column grid: a full-width block, two one-column blocks, or one in the left column. */
-function RowView({ row, blocks, board, runtime, contentWidth, maxHeight, measuring, full }: { row: Row; blocks: Block[]; board: Board; runtime: Runtime; contentWidth: number; maxHeight: number; measuring: boolean; full: boolean }) {
+function RowView({
+  row,
+  piece,
+  blocks,
+  board,
+  runtime,
+  contentWidth,
+  maxHeight,
+  measuring,
+  full,
+}: {
+  row: Row
+  /** What of the row this page shows, when a text goes on over pages: px `from` to `to` of its `height`. */
+  piece?: { from: number; to: number; height: number }
+  blocks: Block[]
+  board: Board
+  runtime: Runtime
+  contentWidth: number
+  maxHeight: number
+  measuring: boolean
+  full: boolean
+}) {
   // In report mode (only there), each block on the page can be selected, moved, widened, removed and typed in.
   const editable = !!useReportEditing() && !measuring
+  const cut = !!piece && (piece.from > 0 || piece.to < piece.height)
   return (
     <div className="ttx-report__row">
       {row.map((i, n) => {
         const b = blocks[i]!
         const width = b.span === 2 ? contentWidth : (contentWidth - COLUMN_GAP) / 2
-        const view = <BlockView block={b} board={board} runtime={runtime} width={width} maxHeight={maxHeight} measuring={measuring} full={full} />
+        let view = <BlockView block={b} board={board} runtime={runtime} width={width} maxHeight={maxHeight} measuring={measuring} full={full} />
+        // Part of a text that goes on over pages: the whole text, shifted up and clipped to this page's lines.
+        if (cut)
+          view = (
+            <div className="ttx-report__piece" style={{ height: piece.to - piece.from }}>
+              <div style={{ marginTop: -piece.from }}>{view}</div>
+            </div>
+          )
         return (
           <div key={b.id} className="ttx-report__block" style={b.span === 2 ? { gridColumn: '1 / -1' } : undefined}>
             {editable ? (
               // A one-column block on the left keeps its controls in the page's left margin; others in the right one.
-              <EditableBlock block={b} index={i} count={blocks.length} controlsLeft={b.span === 1 && n === 0}>
+              <EditableBlock block={b} index={i} count={blocks.length} controlsLeft={b.span === 1 && n === 0} piece={cut ? piece : undefined}>
                 {view}
               </EditableBlock>
             ) : (
@@ -182,6 +269,9 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
       return <img className="ttx-report__image" src={uploadUrl(b.imageId)} alt="" draggable={false} style={{ maxHeight: props.maxHeight }} />
     case 'divider':
       return <hr className="ttx-report__divider" />
+    case 'pageBreak':
+      // Where the page ends; seen only in report mode.
+      return editable ? <div className="ttx-report__break">Page break</div> : <div aria-hidden />
     case 'item':
       return <ItemView block={b} source={props.board.get(b.sourceId)} {...props} />
   }
@@ -193,6 +283,7 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
  * the block and read-only. A caption names it. A removed source says so.
  */
 function ItemView({ block: b, source, runtime, width, maxHeight, measuring, full }: BlockProps & { block: Extract<Block, { kind: 'item' }>; source: AnyObject | undefined }) {
+  const printing = useContext(Printing)
   if (b.mode === 'frozen' && b.frozen) {
     const f = b.frozen
     return (
@@ -225,36 +316,41 @@ function ItemView({ block: b, source, runtime, width, maxHeight, measuring, full
   const isMap = source.type === 'map'
   // The widget's own proportions (a map's picture leaves out its header), to the block's width; but never taller than
   // a page has room for, under the caption (and a map's credits): then smaller, centered in the block, still in proportion.
+  // A printed report has no captions: they name the widget on the board, which a reader of the page does not need.
   const ratio = (isMap ? source.h - MAP_HEADER_PX : source.h) / source.w
-  const room = maxHeight - CAPTION_H - (isMap ? CREDITS_H : 0)
+  const room = maxHeight - (printing ? 0 : CAPTION_H) - (isMap ? CREDITS_H : 0)
   const { width: shownWidth, height } = fitItem(width, ratio, room)
   return (
     <figure className="ttx-report__item">
-      <figcaption className="ttx-report__caption">
-        <Icon size={14} aria-hidden />
-        <span>{label}</span>
-      </figcaption>
+      {!printing && (
+        <figcaption className="ttx-report__caption">
+          <Icon size={14} aria-hidden />
+          <span>{label}</span>
+        </figcaption>
+      )}
       {measuring ? (
         <div style={{ height: height + (isMap ? CREDITS_H : 0) }} />
       ) : isMap ? (
         <MapPicture runtime={runtime} map={source as MapBoardObject} width={shownWidth} height={height} />
       ) : (
-        <EmbeddedView runtime={runtime} source={source} width={shownWidth} height={height} />
+        <EmbeddedView runtime={runtime} source={printing && source.type === 'notebook' ? ({ ...source, view: 'card' } as AnyObject) : source} width={shownWidth} height={height} />
       )}
     </figure>
   )
 }
 
-/** One line under a map picture for its credits, in CSS px (styles.css .ttx-report__credits). */
+/** One line under a map picture for its credits, in CSS px (reports/reports.css .ttx-report__credits). */
 const CREDITS_H = 16
-/** An item's caption above it, with its gap, at most, in CSS px (styles.css .ttx-report__caption). */
+/** An item's caption above it, with its gap, at most, in CSS px (reports/reports.css .ttx-report__caption). */
 const CAPTION_H = 24
 /** A frozen card's padding, tag and credits around its picture, in CSS px. */
 const FROZEN_CHROME_H = 64
 
 /** A map in a report: a picture of it as this person sees it, and its credits, which a picture does not carry. */
 function MapPicture({ runtime, map, width, height }: { runtime: Runtime; map: MapBoardObject; width: number; height: number }) {
-  const { url, credits } = useMapPicture(runtime, map)
+  // For print, the same picture drawn sharper: about 300 dpi at the width it is printed.
+  const print = useContext(Printing)
+  const { url, credits } = useMapPicture(runtime, map, print ? { pixelRatio: printRatio(map.w, map.h - MAP_HEADER_PX, width) } : {})
   return (
     <>
       {url ? <img className="ttx-report__map" src={url} alt="" draggable={false} style={{ width, height }} /> : <div className="ttx-report__map is-loading" style={{ width, height }} />}

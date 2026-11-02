@@ -68,6 +68,8 @@ export interface OpDef<Args = any, Plan = Args> {
   hidden?: boolean
   /** 'high': only a user may run it, not an agent. */
   risk?: 'low' | 'high'
+  /** Tool ids its prepare needs (OpContext.tools). Agents and the palette get the op only where they all are. */
+  tools?: string[]
   /** Repeated dispatches of this op on one target in one gesture (a drag, typing) are one op log entry. */
   gesture?: boolean
   /** Hints for natural-language mode. */

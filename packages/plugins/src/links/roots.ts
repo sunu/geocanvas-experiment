@@ -1,4 +1,5 @@
 import type { AnyObject, OpContext } from '@ttx/core'
+import type { CodeBoardObject } from '../code.js'
 import type { EventBoardObject } from '../events.js'
 import type { InputBoardObject } from '../inputs.js'
 import { complete, event, type Facts } from '../templates/seeds.js'
@@ -7,7 +8,7 @@ import { complete, event, type Facts } from '../templates/seeds.js'
  * Roots (plans/plan-013.md): the objects others can follow, and the facts each gives its followers. A root is a
  * content node when one exists (an event card), or an input node for seeds that have none (an area).
  */
-export const ROOT_TYPES = ['event', 'input']
+export const ROOT_TYPES = ['event', 'input', 'code']
 
 /** The facts of a root as it is, or as an op is about to make it. Empty for a root with nothing picked yet. */
 export async function factsOf(ctx: OpContext, root: AnyObject): Promise<Facts> {
@@ -20,6 +21,13 @@ export async function factsOf(ctx: OpContext, root: AnyObject): Promise<Facts> {
     if (!value) return {}
     const { name, ...area } = value
     return complete(ctx, { area, ...(name && { name }) })
+  }
+  if (root.type === 'code') {
+    // No lookups: the output is what the code gave, and its features' box is the area.
+    const { title, output } = root as CodeBoardObject
+    if (!output) return {}
+    const [west, south, east, north] = output.bbox ?? []
+    return { name: title, code: output, ...(west !== undefined && { area: { west, south: south!, east: east!, north: north! } }) }
   }
   throw new Error(`A ${root.type} cannot be followed: only ${ROOT_TYPES.join(' and ')} objects can`)
 }

@@ -1,6 +1,6 @@
 # Plan 007 — Op runtime, plugins, tools and command palette on our own canvas
 
-Date: 2026-10-28. Status: implemented on `feat/ops-runtime`.
+Date: 2026-10-28. Status: built, in `main`.
 
 ## 1. Context
 

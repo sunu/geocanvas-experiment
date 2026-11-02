@@ -10,7 +10,9 @@ import { NameButton } from '../board/NameButton'
 import type { ConnectionStatus } from '../board/connect'
 import { usePersonName } from '../board/person'
 import type { Awareness } from '../board/presence'
+import { PresenceAvatars } from './PresenceAvatars'
 import { useViewState } from '../canvas/viewState'
+import { HubButton } from '../code/HubButton'
 import type { useBridgeStatus } from '../mcp/bridge'
 
 const BRIDGE_LABEL = { connecting: 'Connecting to the MCP companion…', connected: 'An external agent can work on this board', disconnected: 'The MCP companion is not running' }
@@ -26,7 +28,8 @@ interface Props {
 }
 
 /**
- * The User Menu of the Figma file: the board's own controls (undo and redo, zoom, the sync light) and who you are on it. There are
+ * The User Menu of the Figma file: the board's own controls (undo and redo, zoom, the sync light), the others on the board
+ * as avatars in their colors, and who you are on it. There are
  * no accounts yet, so the person is the name this browser picked, which can be changed. While an object is open in focus mode, undo and zoom belong to its draft and the
  * canvas, so they wait.
  */
@@ -46,6 +49,7 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
           {bridge === 'connected' ? <PlugsConnectedIcon className="size-4" /> : <PlugsIcon className="size-4" />}
         </span>
       )}
+      <HubButton />
       <Hint label="Undo" keys={`${MOD}Z`}>
         <Button variant="ghost" size="icon-sm" aria-label="Undo" disabled={focused} onClick={() => runtime.undo()}>
           <ArrowCounterClockwiseIcon className="size-4" />
@@ -68,6 +72,7 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
           <DropdownMenuItem onSelect={() => view('core.view.resetZoom')}>Reset zoom (100%)</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <PresenceAvatars awareness={awareness} />
       <Avatar>
         <AvatarFallback className="bg-muted text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</AvatarFallback>
       </Avatar>
