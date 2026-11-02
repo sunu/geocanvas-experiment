@@ -89,6 +89,7 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
   const [editing, setEditingState] = useState<{ id: string; at: number; point?: { x: number; y: number }; resumed?: boolean } | null>(null)
   // Where the caret is while a text is typed in (TextEditor), so an editor that remounts in another part goes on there.
   const caret = useRef<number | undefined>(undefined)
+  const [formatSlot, setFormatSlot] = useState<HTMLElement | null>(null)
   const [drop, setDrop] = useState<number | null>(null)
   const [dragging, setDragging] = useState<ReportEditingState['dragging']>(null)
   // The rich text editor's chunk, so a new text takes typing at once.
@@ -109,6 +110,8 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
     editing: editing?.id ?? null,
     editingAt: editing?.at ?? 0,
     caret,
+    formatSlot,
+    setFormatSlot,
     point: editing?.point,
     resumed: !!editing?.resumed,
     setEditing,

@@ -16,6 +16,14 @@ interface Node {
 /** Links go only to the web and mail: a report's JSON comes from people and agents, so `javascript:` must not reach an href. */
 const SAFE_HREF = /^(?:https?:|mailto:)/i
 
+/** A link as someone types it: a web address when it names no scheme; null for any but the web and mail. */
+export function linkHref(typed: string): string | null {
+  const t = typed.trim()
+  if (!t) return null
+  const href = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`
+  return SAFE_HREF.test(href) ? href : null
+}
+
 function withMark(children: ReactNode, m: Mark): ReactNode {
   switch (m.type) {
     case 'bold':

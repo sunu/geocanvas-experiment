@@ -30,11 +30,22 @@ describe('looksLikeMarkdown', () => {
 
 describe('shouldFormatPaste', () => {
   const md = '# Title\n\ntext'
-  it('formats plain text and a code editor, not rich text', () => {
-    expect(shouldFormatPaste(['text/plain'], md)).toBe(true)
-    expect(shouldFormatPaste(['text/plain', 'text/html', 'vscode-editor-data'], md)).toBe(true)
-    expect(shouldFormatPaste(['text/plain', 'text/html'], md)).toBe(false)
-  })
+  it('formats plain text', () => expect(shouldFormatPaste(md)).toBe(true))
+
+  it.each([
+    ['a code editor', '<meta charset="utf-8"><div style="color: #d4d4d4"><div><span style="color: #569cd6"># Title</span></div><br><div><span>text</span></div></div>'],
+    ["GitHub's file view", '<pre><code># Title\n\ntext</code></pre>'],
+    ['a chat box', '<div dir="auto"># Title</div><div dir="auto"><br></div><div dir="auto">text</div>'],
+  ])('formats markdown in HTML that only styles it: %s', (_name, html) => expect(shouldFormatPaste(md, html)).toBe(true))
+
+  it.each([
+    ['a web page', '<h1>Title</h1><p>text</p>'],
+    ['bold in a document', '<p><b>Title</b> text</p>'],
+    ['a list', '<ul><li>Title</li></ul>'],
+    ['a link', '<p><a href="https://example.org">Title</a></p>'],
+  ])('leaves rich text to the editor: %s', (_name, html) => expect(shouldFormatPaste(md, html)).toBe(false))
+
+  it('leaves text that is not markdown', () => expect(shouldFormatPaste('Heavy rain fell on Monday.', '<div>Heavy rain fell on Monday.</div>')).toBe(false))
 })
 
 describe('clampHeadings', () => {

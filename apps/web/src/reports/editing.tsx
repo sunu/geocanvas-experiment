@@ -1,4 +1,4 @@
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowsInLineHorizontalIcon, ArrowsOutLineHorizontalIcon, DotsSixVerticalIcon, XIcon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
 import type { Block, ReportBoardObject, RichDoc } from '@ttx/plugins'
@@ -28,6 +28,9 @@ export interface ReportEditingState {
   resumed: boolean
   /** Where the caret is in the text being typed in (a position in the editor's document), kept as it moves. */
   caret: { current: number | undefined }
+  /** The report toolbar's place for a text's formatting tools, while a text is typed in (RichTextEditor fills it). */
+  formatSlot: HTMLElement | null
+  setFormatSlot(el: HTMLElement | null): void
   /** While a block is dragged: the index in the blocks it would be dropped before. */
   drop: number | null
   setDrop(index: number | null): void
@@ -38,6 +41,12 @@ export interface ReportEditingState {
 
 export const ReportEditing = createContext<ReportEditingState | null>(null)
 export const useReportEditing = () => useContext(ReportEditing)
+
+/**
+ * Marks what belongs to a text's formatting tools (FormatBar), its menus and popovers included (they are portaled):
+ * focus that moves there from the editor does not end typing (RichTextEditor's blur).
+ */
+export const FORMAT_ATTR = 'data-report-format'
 
 /** Run a report op as its own undo step. */
 export function runReportOp(runtime: Runtime, reportId: string, opId: string, args: Record<string, unknown>) {
@@ -334,9 +343,19 @@ const partsOf = (id: string) =>
   }))
 
 // The editor is most of Tiptap, so it is its own chunk: report mode starts loading it when it opens (preloadEditor), so
-// it is there when someone types; the canvas never loads it. A block shows as it is until it has loaded.
-export const preloadEditor = () => import('./RichTextEditor')
-const RichTextEditor = lazy(preloadEditor)
+// it is there when someone types; the canvas never loads it. A block shows as it is until it has loaded. Not React.lazy,
+// which shows its fallback for a few hundred ms the first time even when the chunk has loaded, and keys typed then
+// went nowhere.
+type RichTextEditorType = typeof import('./RichTextEditor').default
+let loadedEditor: RichTextEditorType | undefined
+export const preloadEditor = () => import('./RichTextEditor').then((m) => (loadedEditor = m.default))
+function useEditorChunk() {
+  const [editor, setEditor] = useState(() => loadedEditor)
+  useEffect(() => {
+    if (!editor) void preloadEditor().then((e) => setEditor(() => e))
+  }, [editor])
+  return editor
+}
 
 /**
  * Typing in a text (the rich text editor, RichTextEditor.tsx). For a text that goes on over pages, the editor takes the
@@ -351,6 +370,7 @@ function TextEditor({ block: b, piece }: { block: Extract<Block, { kind: 'text' 
     (doc) => t.ed.runtime.dispatch('report.setText', { kind: 'objects', ids: [t.ed.report.id] }, { blockId: b.id, doc }),
     () => b.doc,
   )
+  const RichTextEditor = useEditorChunk()
   const shown = piece && piece.to - piece.from
   const box = useRef<HTMLDivElement>(null)
   // A part of a text starts scrolled to that part; the caret is placed after (RichTextEditor's `start`).
@@ -384,7 +404,7 @@ function TextEditor({ block: b, piece }: { block: Extract<Block, { kind: 'text' 
   followNow.current = follow
   return (
     <div ref={box} className="ttx-report__textedit" style={shown ? { height: shown, overflowY: 'auto' } : undefined}>
-      <Suspense fallback={<div className="ttx-report__text"><RichText doc={t.value} /></div>}>
+      {RichTextEditor ? (
         <RichTextEditor
           doc={t.value}
           start={{ pos: ed.caret.current, point: ed.point }}
@@ -395,8 +415,14 @@ function TextEditor({ block: b, piece }: { block: Extract<Block, { kind: 'text' 
             followNow.current()
           }}
           onBlur={() => moving.current || gone.current || t.stop()}
+          toolbar={ed.formatSlot}
+          onDone={t.stop}
         />
-      </Suspense>
+      ) : (
+        <div className="ttx-report__text">
+          <RichText doc={t.value} />
+        </div>
+      )}
     </div>
   )
 }

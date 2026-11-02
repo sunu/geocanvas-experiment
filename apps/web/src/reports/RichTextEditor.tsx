@@ -1,7 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { EditorContent, Extension, getSchema, useEditor, type Editor, type JSONContent } from '@tiptap/react'
 import { Plugin } from '@tiptap/pm/state'
 import { docText, textDoc, type RichDoc } from '@ttx/plugins'
+import { FORMAT_ATTR } from './editing'
+import { FormatBar } from './FormatBar'
 import { clampHeadings, shouldFormatPaste } from './markdownPaste'
 import { richTextExtensions, richTextKit } from './richTextExtensions'
 
@@ -21,7 +24,7 @@ const MarkdownPaste = Extension.create({
           handlePaste: (_view, e) => {
             const data = e.clipboardData
             const text = data?.getData('text/plain') ?? ''
-            if (!data || Date.now() - plainAt < 1000 || !shouldFormatPaste(data.types, text)) return false
+            if (!data || Date.now() - plainAt < 1000 || !shouldFormatPaste(text, data.getData('text/html'))) return false
             editor.commands.insertContent(clampHeadings(text), { contentType: 'markdown' })
             return true
           },
@@ -67,7 +70,8 @@ function caretOf(editor: Editor): Caret {
  * The rich text editor of a report's text block (Tiptap). It keeps its own content while editing and reports each
  * change as the editor's JSON; the report is written by the caller. Loaded on its own (`React.lazy`), since it is most
  * of the weight and only report mode needs it. The caret starts at `start`: the position given, else under the point
- * where the text was pressed, else at the end.
+ * where the text was pressed, else at the end. Its formatting tools (FormatBar) go in `toolbar`, the report toolbar's
+ * place for them; focus that moves to them does not end typing.
  */
 export default function RichTextEditor({
   doc,
@@ -75,12 +79,16 @@ export default function RichTextEditor({
   onChange,
   onCaret,
   onBlur,
+  toolbar,
+  onDone,
 }: {
   doc: RichDoc
   start?: { pos?: number; point?: { x: number; y: number } }
   onChange: (doc: RichDoc) => void
   onCaret?: (caret: Caret) => void
   onBlur: () => void
+  toolbar?: HTMLElement | null
+  onDone: () => void
 }) {
   const content = useMemo(() => editable(doc), []) // eslint-disable-line react-hooks/exhaustive-deps -- the editor owns the content from here on
   const editor = useEditor({
@@ -92,16 +100,22 @@ export default function RichTextEditor({
       onCaret?.(caretOf(editor))
     },
     onSelectionUpdate: ({ editor }) => onCaret?.(caretOf(editor)),
-    onBlur,
+    onBlur: ({ event }) => {
+      if ((event.relatedTarget as Element | null)?.closest(`[${FORMAT_ATTR}]`)) return
+      onBlur()
+    },
   })
   // Focus is taken as the editor mounts, and again on the next frame if something took it meanwhile (see useFocusSoon):
-  // the caret where the text was pressed, as the editor draws the text where its picture was.
-  useEffect(() => {
+  // the caret where the text was pressed, as the editor draws the text where its picture was. In a layout effect, before
+  // the browser handles the next key: when typing follows the text onto the next page, the editor mounts again there,
+  // and keys that came while none had the focus were lost.
+  useLayoutEffect(() => {
     if (!editor) return
     const place = () => {
       if (editor.isDestroyed || editor.isFocused) return
       const pressed = start?.point && editor.view.posAtCoords({ left: start.point.x, top: start.point.y })?.pos
       editor.commands.focus(start?.pos ?? pressed ?? 'end')
+      editor.view.focus() // now: Tiptap's focus command waits a frame (it scrolls the caret into view then)
     }
     place()
     const frame = requestAnimationFrame(place)
@@ -109,5 +123,10 @@ export default function RichTextEditor({
     // Once, as typing starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
-  return <EditorContent editor={editor} />
+  return (
+    <>
+      <EditorContent editor={editor} />
+      {editor && toolbar && createPortal(<FormatBar editor={editor} onDone={onDone} />, toolbar)}
+    </>
+  )
 }
