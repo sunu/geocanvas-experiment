@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
 import { AGENT } from '@ttx/plugins'
+import { usePeopleNames } from '../board/people'
 import { agentKey, useAgentActivities, useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { objectName } from '../canvas/registry'
 import { TAB_ID } from './browserAgent'
@@ -106,7 +107,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
           <span className="ml-auto inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" role="status">
             <span className="size-2 shrink-0 rounded-full bg-[var(--agent)]" aria-hidden />
             <span className="truncate">
-              For {working[0].actor.name ?? 'someone'}: {thread.status(working[0]).activity}…
+              For {thread.nameOf(working[0].actor)}: {thread.status(working[0]).activity}…
             </span>
           </span>
         )}
@@ -195,13 +196,15 @@ export function useChatThread(runtime: Runtime, chat: Chat, awareness: Awareness
   // What an agent does now (thinking, a search) for each person, as its cursor's tag says.
   const activities = useAgentActivities(awareness)
   const undone = useUndoneReplies(runtime)
+  // People's current names: a message keeps the name its sender had then.
+  const nameOf = usePeopleNames(runtime.board.doc)
   const queue = chat.pending()
   const pending = new Set(queue.map((m) => m.id))
   /** Where a message is: answered now (with what the agent does), queued behind others, or neither (-1). */
   const status = (m: UserMessage) => ({ ahead: queuePosition(queue, m), activity: activities.get(agentKey(AGENT.id, m.actor.id)) })
   // The messages answered now, for the collapsed panel's header.
   const working = queue.filter((m) => queuePosition(queue, m) === 0 && activities.has(agentKey(AGENT.id, m.actor.id)))
-  return { entries, thinking, undone, pending, status, working }
+  return { entries, thinking, undone, pending, status, working, nameOf }
 }
 
 export type ChatThread = ReturnType<typeof useChatThread>
@@ -232,7 +235,7 @@ function compactChat(runtime: Runtime, chat: Chat, mode: AgentMode) {
  * changed, to open them: where the canvas is not there to show them (the phone's layout).
  */
 export function ChatEntries({ runtime, thread, onOpen, onlyOf }: { runtime: Runtime; thread: ChatThread; onOpen?(id: string): void; onlyOf?: string }) {
-  const { entries, thinking, undone, pending, status } = thread
+  const { entries, thinking, undone, pending, status, nameOf } = thread
   const [showEarlier, setShowEarlier] = useState(false)
   // With `onlyOf`, that person's exchanges and the compactions.
   const all = useMemo(
@@ -251,11 +254,11 @@ export function ChatEntries({ runtime, thread, onOpen, onlyOf }: { runtime: Runt
       )}
       {shown.map(({ message, reply }) =>
         reply?.compacted ? (
-          <CompactionEntry key={reply.id} reply={reply} by={message?.actor ?? askerOf(entries, reply)} />
+          <CompactionEntry key={reply.id} reply={reply} by={nameOf(message?.actor ?? askerOf(entries, reply), '')} />
         ) : (
           <div key={(message ?? reply)!.id} className="ttx-chat__exchange" data-exchange={message?.id}>
-            {message && <UserEntry message={message} lost={isLost(message, pending, thinking)} status={reply ? undefined : status(message)} />}
-            {reply && <AgentEntry reply={reply} asker={message?.actor} runtime={runtime} undone={undone.has(reply.id)} onOpen={onOpen} />}
+            {message && <UserEntry message={message} name={nameOf(message.actor)} lost={isLost(message, pending, thinking)} status={reply ? undefined : status(message)} />}
+            {reply && <AgentEntry reply={reply} asker={message && { name: nameOf(message.actor), color: message.actor.color }} runtime={runtime} undone={undone.has(reply.id)} onOpen={onOpen} />}
           </div>
         ),
       )}
@@ -268,10 +271,10 @@ const askerOf = (entries: ChatEntry[], reply: AgentReply): Actor | undefined =>
   entries.find((e): e is UserMessage => e.kind === 'user' && e.id === reply.replyTo)?.actor
 
 /** Where the chat was compacted: who did it, and the agent's summary of the chat before, to read. */
-function CompactionEntry({ reply, by }: { reply: AgentReply; by?: Actor }) {
+function CompactionEntry({ reply, by }: { reply: AgentReply; by: string }) {
   return (
     <div className="ttx-chat__compaction">
-      <div className="ttx-chat__compaction-line">Chat compacted{by ? ` by ${by.name ?? 'someone'}` : ''}</div>
+      <div className="ttx-chat__compaction-line">Chat compacted{by ? ` by ${by}` : ''}</div>
       {reply.compacted?.summary && (
         <details>
           <summary>Summary</summary>
@@ -344,11 +347,11 @@ function isLost(message: UserMessage, pending: Set<string>, thinking: boolean): 
   return !!message.browserTab && message.browserTab !== TAB_ID && pending.has(message.id) && !thinking && Date.now() - message.at > LOST_AFTER_MS
 }
 
-function UserEntry({ message, lost, status }: { message: UserMessage; lost: boolean; status?: { ahead: number; activity?: string } }) {
+function UserEntry({ message, name, lost, status }: { message: UserMessage; name: string; lost: boolean; status?: { ahead: number; activity?: string } }) {
   return (
     <div className="ttx-chat__entry">
       <div className="ttx-chat__who" style={{ color: message.actor.color }}>
-        {message.actor.name ?? 'Someone'}
+        {name}
         {message.selection.length > 0 && <span className="ttx-chat__chip">{message.selection.length} selected</span>}
         {message.browserTab && <span className="ttx-chat__chip" title="Answered by an agent in the sender's browser, on their own key">own key</span>}
       </div>
@@ -374,7 +377,7 @@ function UserEntry({ message, lost, status }: { message: UserMessage; lost: bool
   )
 }
 
-function AgentEntry({ reply, asker, runtime, undone, onOpen }: { reply: AgentReply; asker?: Actor; runtime: Runtime; undone: boolean; onOpen?(id: string): void }) {
+function AgentEntry({ reply, asker, runtime, undone, onOpen }: { reply: AgentReply; asker?: { name: string; color?: string }; runtime: Runtime; undone: boolean; onOpen?(id: string): void }) {
   // Undo refuses when someone changed the turn's objects since (agent.undoTurn); say why.
   const [undoError, setUndoError] = useState<string>()
   const undo = async () => {
@@ -389,7 +392,7 @@ function AgentEntry({ reply, asker, runtime, undone, onOpen }: { reply: AgentRep
         Agent
         {asker && (
           <span className="ttx-chat__to" style={{ color: asker.color }}>
-            → {asker.name ?? 'Someone'}
+            → {asker.name}
           </span>
         )}
       </div>
