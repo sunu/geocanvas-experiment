@@ -10,16 +10,18 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Textarea } from '@/components/ui/textarea'
 import { usePluginsOff } from '../board/plugins'
 import { tools } from '../tools/registry'
-import { keepSkill, sameSkill, useMySkills } from './mySkills'
+import { forgetSkill, keepSkill, sameSkill, useMySkills, type KeptSkill } from './mySkills'
 
 /**
- * The Skills tab of Settings (plans/plan-026.md): the agent's built-in skills, read only, and this board's own,
- * which people write here for everyone on the board (agent.setSkill, a hidden op: never an agent).
+ * The Skills tab of Settings (plans/plan-026.md): the agent's built-in skills, read only, this board's own, which
+ * people write here for everyone on the board (agent.setSkill, a hidden op: never an agent), and My skills, kept in
+ * this browser to add to other boards (mySkills.ts).
  */
 export function SkillsSettings({ runtime }: { runtime: Runtime }) {
   const board = useBoardSkills(runtime)
   const choices = useToolChoices(runtime)
-  const [open, setOpen] = useState<{ builtIn: string } | { id: string } | 'new' | null>(null)
+  const mine = useMySkills()
+  const [open, setOpen] = useState<{ builtIn: string } | { mine: string } | { id: string } | 'new' | null>(null)
 
   if (open === 'new') return <SkillForm runtime={runtime} choices={choices} onDone={() => setOpen(null)} />
   if (open && 'id' in open) {
@@ -29,7 +31,11 @@ export function SkillsSettings({ runtime }: { runtime: Runtime }) {
   }
   if (open && 'builtIn' in open) {
     const skill = SKILLS.find((s) => s.name === open.builtIn)
-    if (skill) return <BuiltInSkill skill={skill} choices={choices} onBack={() => setOpen(null)} />
+    if (skill) return <ReadOnlySkill skill={skill} label="Built-in, read only" choices={choices} onBack={() => setOpen(null)} />
+  }
+  if (open && 'mine' in open) {
+    const skill = mine.find((s) => s.name === open.mine)
+    if (skill) return <ReadOnlySkill skill={skill} label="In this browser" choices={choices} onBack={() => setOpen(null)} />
   }
 
   return (
@@ -51,6 +57,13 @@ export function SkillsSettings({ runtime }: { runtime: Runtime }) {
           <p className="m-0 rounded-md border border-dashed p-3 text-sm text-muted-foreground">No skills on this board yet.</p>
         )}
       </section>
+      {mine.length > 0 && (
+        <section className="grid gap-2">
+          <h3 className="m-0 text-sm font-medium">My skills</h3>
+          <p className="m-0 text-sm text-muted-foreground">Kept in this browser only. Add them to any board.</p>
+          <SkillList skills={mine} choices={choices} onOpen={(s) => setOpen({ mine: s.name })} actions={(s) => <MySkillActions runtime={runtime} skill={s} board={board} />} />
+        </section>
+      )}
       <section className="grid gap-2">
         <h3 className="m-0 flex items-center gap-1.5 text-sm font-medium">
           Built-in <LockSimpleIcon className="size-3.5 text-muted-foreground" aria-label="Read only" />
@@ -65,6 +78,32 @@ export function SkillsSettings({ runtime }: { runtime: Runtime }) {
 function useBoardSkills(runtime: Runtime): BoardSkill[] {
   const skills = useMemo(() => new BoardSkills(runtime.board.doc), [runtime])
   return useSyncExternalStore(skills.subscribe, skills.list)
+}
+
+/** Add a kept skill to this board, or update the board's copy; or forget it in this browser. */
+function MySkillActions({ runtime, skill, board }: { runtime: Runtime; skill: KeptSkill; board: BoardSkill[] }) {
+  const [error, setError] = useState<string>()
+  const onBoard = board.find((b) => b.name === skill.name)
+  const same = !!onBoard && sameSkill(onBoard, skill)
+  async function add() {
+    const { at: _at, ...fields } = skill
+    runtime.beginGesture()
+    const r = await runtime.invoke('agent.setSkill', { kind: 'canvas' }, { ...(onBoard && { id: onBoard.id }), skill: fields })
+    setError(r.status === 'applied' ? undefined : (r.error ?? 'Not added'))
+  }
+  return (
+    <span className="grid justify-items-end gap-1">
+      <span className="flex gap-1">
+        <Button size="xs" variant="outline" disabled={same || (!onBoard && board.length >= MAX_BOARD_SKILLS)} onClick={() => void add()}>
+          {same ? 'On this board' : onBoard ? 'Update on board' : 'Add to board'}
+        </Button>
+        <Button size="xs" variant="ghost" title="Remove it from this browser; boards keep their copy" onClick={() => forgetSkill(skill.name)}>
+          Forget
+        </Button>
+      </span>
+      {error && <span className="text-sm text-destructive">{error}</span>}
+    </span>
+  )
 }
 
 /** The ops and tools a skill can name, with their titles, and which of them are on this board. */
@@ -90,18 +129,19 @@ function useToolChoices(runtime: Runtime): ToolChoices {
   }, [runtime, off])
 }
 
-function SkillList<S extends Skill>({ skills, choices, onOpen }: { skills: S[]; choices: ToolChoices; onOpen(skill: S): void }) {
+function SkillList<S extends Skill>({ skills, choices, onOpen, actions }: { skills: S[]; choices: ToolChoices; onOpen(skill: S): void; actions?(skill: S): React.ReactNode }) {
   return (
     <ul className="m-0 grid list-none gap-1 p-0">
       {skills.map((s) => {
         const missing = s.requires.filter((id) => !choices.on.has(id))
         return (
-          <li key={s.name}>
-            <button type="button" className="grid w-full gap-0.5 rounded-md p-2 text-left hover:bg-muted" onClick={() => onOpen(s)}>
+          <li key={s.name} className="flex items-start gap-2">
+            <button type="button" className="grid min-w-0 flex-1 gap-0.5 rounded-md p-2 text-left hover:bg-muted" onClick={() => onOpen(s)}>
               <span className="text-sm font-medium">{s.name}</span>
               <span className="text-sm text-muted-foreground">{s.description}</span>
               {missing.length > 0 && <span className="text-sm text-muted-foreground">Not offered: needs {missing.map(choices.title).join(', ')}</span>}
             </button>
+            {actions && <span className="pt-2">{actions(s)}</span>}
           </li>
         )
       })}
@@ -140,12 +180,12 @@ function Field({ label, children, error }: { label: string; children: React.Reac
   )
 }
 
-function BuiltInSkill({ skill, choices, onBack }: { skill: Skill; choices: ToolChoices; onBack(): void }) {
+function ReadOnlySkill({ skill, label, choices, onBack }: { skill: Skill; label: string; choices: ToolChoices; onBack(): void }) {
   return (
     <div className="grid gap-3">
       <BackButton onClick={onBack} />
       <h3 className="m-0 flex items-center gap-1.5 text-base font-medium">
-        {skill.name} <Badge variant="secondary">Built-in, read only</Badge>
+        {skill.name} <Badge variant="secondary">{label}</Badge>
       </h3>
       <Field label="Description">
         <span className="text-sm">{skill.description}</span>
