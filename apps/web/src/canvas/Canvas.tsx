@@ -588,11 +588,33 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
     if (!followedView || !el || focusRef.current) return
     stopAnimation.current?.()
     stopAnimation.current = animateCamera(cameraRef.current, fitView(followedView, el.clientWidth, el.clientHeight), setCamera)
+    // On leaving focus too: the camera goes to the presenter's view, not back to where this person was.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followedKey, size])
+  }, [followedKey, size, focusId])
+
+  // A follower opens what the presenter has in focus, on their own draft, and leaves focus with them. One with
+  // unshared changes stays in focus and stops following, so nothing is lost.
+  const followedFocus = followed?.presenting.focus
+  const isFollowing = !!followed
+  useEffect(() => {
+    if (!isFollowing) return
+    const enter = (id: string) => {
+      try {
+        enterFocus(id, { following: true })
+      } catch {
+        // Not on this board yet, or a type this tab cannot focus: follow the canvas only.
+      }
+    }
+    const f = focusRef.current
+    if (f?.id === followedFocus) return
+    if (!f) return void (followedFocus && enter(followedFocus))
+    if (f.draft?.hasUnshared()) return void unfollow()
+    leaveFocus(false, followedFocus ? () => enter(followedFocus) : undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followedFocus, isFollowing])
 
   /** Open an object in focus mode: zoom until it fills the screen, then lay it out at that size, on a draft unless its type is live. */
-  function enterFocus(id: string) {
+  function enterFocus(id: string, { following = false } = {}) {
     if (focusRef.current) return
     const o = board.get(id)
     const ui = o && objectUI(o.type)
@@ -602,7 +624,8 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
     const fullScreen = !!ui.fullScreen
     const area = focusArea(el.clientWidth, el.clientHeight, { full: fullScreen })
     const saved = cameraRef.current
-    unfollow()
+    // Opening something themselves ends following; opening what the presenter opened is following.
+    if (!following) unfollow()
     setEditing(null)
     setPaletteOpen(false)
     setSelection(new Set([id]))
@@ -642,6 +665,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
   function requestExit() {
     const f = focusRef.current
     if (!f) return
+    unfollow()
     if (f.draft?.hasUnshared()) setAsking(true)
     else leaveFocus(false)
   }
@@ -654,6 +678,8 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
     stopAnimation.current?.()
     setAsking(false)
     setFocus(null)
+    // `then` may run before the next render (the object is gone) and open focus again (a follower).
+    focusRef.current = null
     const o = board.get(f.id)
     if (!o) {
       setCamera(f.saved)
