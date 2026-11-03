@@ -14,7 +14,7 @@ import {
   type TurnUndo,
   type ViewController,
 } from '@ttx/core'
-import { areaOfView, callOp, MAP_HEADER_PX, TurnLog } from '@ttx/plugins'
+import { areaOfView, callOp, MAP_HEADER_PX, readToolsOn, TurnLog } from '@ttx/plugins'
 
 /**
  * What an external agent (Claude, Codex) does on this tab's board, through the local MCP companion (apps/mcp,
@@ -78,10 +78,13 @@ export class Executor {
     opts.doc.on('update', () => this.revision++)
   }
 
-  /** Every op an agent may run (not hidden, not only for people, and with the tools it needs) and every read-only tool. */
+  /** Every op an agent may run (not hidden, not only for people, with the tools it needs, not of a plugin turned off) and every read-only tool. */
   manifest(): Manifest {
-    const ops = this.runtime.registry.ops().filter((op) => !op.hidden && op.risk !== 'high' && (op.tools ?? []).every((id) => this.tools.tool(id)))
-    const reads = exportToolDefs(this.tools.list()).map((t) => ({ ...t, annotations: { readOnlyHint: true as const } }))
+    const disabled = this.runtime.disabledPlugins()
+    const ops = this.runtime.registry
+      .ops()
+      .filter((op) => !op.hidden && op.risk !== 'high' && (op.tools ?? []).every((id) => this.tools.tool(id)) && this.runtime.registry.opEnabled(op, disabled))
+    const reads = exportToolDefs(readToolsOn(this.runtime, this.tools)).map((t) => ({ ...t, annotations: { readOnlyHint: true as const } }))
     const tools = [...exportTools(ops), ...reads]
     return { fingerprint: hash(stableJson(tools)), tools }
   }
@@ -116,7 +119,7 @@ export class Executor {
 
   /** Run one tool of the manifest by name: a read-only tool, or an op as the agent for this tab's person. */
   async call(name: string, input: unknown, client?: string) {
-    const read = this.tools.list().find((t) => toolNameOf(t.id) === name)
+    const read = readToolsOn(this.runtime, this.tools).find((t) => toolNameOf(t.id) === name)
     if (read) return bounded(await this.tools.run(read.id, input))
     this.runtime.view = this.opts.view()
     const recent = this.lastAdd && Date.now() - this.lastAdd.at < NEXT_TO_MS ? this.runtime.board.get(this.lastAdd.id) : undefined
