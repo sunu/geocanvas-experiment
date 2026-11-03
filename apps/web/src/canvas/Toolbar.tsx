@@ -1,4 +1,4 @@
-import { ArrowUpRightIcon, BuildingsIcon, CaretDownIcon, CircleIcon, CodeIcon, CursorIcon, FilePdfIcon, FileTextIcon, FolderOpenIcon, FrameCornersIcon, HandIcon, ImageIcon, LineSegmentIcon, MapTrifoldIcon, NoteIcon, PathIcon, SquareIcon, SquaresFourIcon, TerminalWindowIcon, TextTIcon, UploadSimpleIcon, WarningIcon, type Icon } from '@phosphor-icons/react'
+import { ArrowUpRightIcon, BuildingsIcon, CaretDownIcon, CircleIcon, CodeIcon, CursorIcon, FilePdfIcon, FileTextIcon, FolderOpenIcon, FrameCornersIcon, GithubLogoIcon, HandIcon, ImageIcon, LineSegmentIcon, MapTrifoldIcon, NoteIcon, PathIcon, SquareIcon, SquaresFourIcon, TerminalWindowIcon, TextTIcon, UploadSimpleIcon, WarningIcon, type Icon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Hint } from '@/components/Hint'
 import { toolTypes } from './registry'
-import { CONFLICT_FACE, COUNTRY_FACE, HISTORY_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
+import { CONFLICT_FACE, COUNTRY_FACE, HDX_FACE, HISTORY_FACE, IFRCGO_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
 
 /** 'select', or the object type to draw. */
 export type Tool = string
@@ -30,7 +30,7 @@ interface Item {
   key?: string
 }
 
-/** The toolbar's groups, in order, between separators. The country widgets and the ReliefWeb feed are named and drawn as on the canvas (widgetFaces.ts).*/
+/** The toolbar's groups, in order, between separators. The country widgets, the ReliefWeb feed and the IFRC GO card are named and drawn as on the canvas (widgetFaces.ts).*/
 const SELECT: Item[] = [
   { label: 'Select', Icon: CursorIcon, tool: 'select', key: 'V' },
   { label: 'Move', Icon: HandIcon, tool: 'hand', key: 'H' },
@@ -42,6 +42,8 @@ const EVENT_CONTEXT: Item[] = [
   { ...CONFLICT_FACE, tool: 'conflict' },
   { ...HISTORY_FACE, tool: 'history' },
   { ...RELIEFWEB_FACE, tool: 'reliefweb' },
+  { ...IFRCGO_FACE, tool: 'ifrcgo' },
+  { ...HDX_FACE, tool: 'hdx' },
 ]
 const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },
@@ -50,6 +52,7 @@ const MAP_AND_REPORT: Item[] = [
   { label: 'Add Jupyter notebook', text: 'Notebook', Icon: CodeIcon, tool: 'notebook', key: 'N' },
   { label: 'Add Python code, run on your JupyterHub', text: 'Code', Icon: TerminalWindowIcon, tool: 'code', key: 'C' },
   { label: 'Add report', text: 'Report', Icon: FileTextIcon, tool: 'report', key: 'P' },
+  { label: 'Add GitHub issue or pull request', text: 'GitHub', Icon: GithubLogoIcon, tool: 'github', key: 'G' },
 ]
 /** What you draw on the board yourself. */
 const BOARD_TOOLS: Item[] = [

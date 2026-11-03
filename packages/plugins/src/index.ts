@@ -58,6 +58,9 @@ export {
   type ReportBoardObject,
   type RichDoc,
 } from './reports.js'
+export { githubPlugin, githubUrl, parseGithubUrl, type GithubBoardObject, type GithubRef } from './github.js'
+export { hdxPlugin, hdxUrl, parseHdxUrl, type HdxBoardObject, type HdxRef } from './hdx.js'
+export { ifrcgoPlugin, goUrl, parseGoUrl, type GoRef, type IfrcGoBoardObject } from './ifrcgo.js'
 export { reliefwebPlugin, feedFor, glidesOf, GLIDE, type ReliefWebBoardObject } from './reliefweb.js'
 export { openeoCollections, openeoCoverage, openeoPreview, previewOpenEOGraph } from './openeoTools.js'
 export { describeGraph, EXAMPLE_GRAPH, graphProblems, MAX_AREA_SQ_DEG, type ProcessGraph } from './openeoGraph.js'

@@ -1,0 +1,47 @@
+/* --- HDX dataset card: the facts, the files ------------------------------------------------------------- */
+
+.ttx-hdx__flag {
+  padding: 1px 6px;
+  background: var(--ttx-neutral);
+  color: var(--ttx-on-status);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ttx-hdx__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.ttx-hdx__facts > div {
+  display: contents;
+}
+
+.ttx-hdx__facts dt {
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-hdx__facts dd {
+  margin: 0;
+}
+
+.ttx-hdx__files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ttx-border);
+}
+
+.ttx-hdx__files a {
+  color: var(--ttx-ink);
+  text-decoration: none;
+}
+
+.ttx-hdx__files a:hover {
+  color: var(--ttx-accent);
+  text-decoration: underline;
+}

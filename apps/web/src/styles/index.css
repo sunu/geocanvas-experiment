@@ -22,6 +22,10 @@
 @import '../code/code.css';
 @import '../reliefweb/reliefweb.css';
 @import '../hapi/hapi.css';
+@import '../cards/cards.css';
+@import '../github/github.css';
+@import '../ifrcgo/ifrcgo.css';
+@import '../hdx/hdx.css';
 @import '../inputs/inputs.css';
 @import '../history/history.css';
 /* After the Options panel's rules (canvas/focus.css): a map's location tools and layer list sit inside it. */
