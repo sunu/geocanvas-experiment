@@ -1,4 +1,5 @@
-import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon, CaretDownIcon, PlugsConnectedIcon, PlugsIcon } from '@phosphor-icons/react'
+import { useState } from 'react'
+import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon, CaretDownIcon, GearIcon, PlugsConnectedIcon, PlugsIcon } from '@phosphor-icons/react'
 import type { Actor, Runtime } from '@ttx/core'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import type { ConnectionStatus } from '../board/connect'
 import { usePersonName } from '../board/person'
 import type { Awareness } from '../board/presence'
 import { PresenceAvatars } from './PresenceAvatars'
+import { SettingsDialog } from './SettingsDialog'
 import { useViewState } from '../canvas/viewState'
 import { HubButton } from '../code/HubButton'
 import type { useBridgeStatus } from '../mcp/bridge'
@@ -37,6 +39,7 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
   const name = usePersonName(actor, awareness)
   const { zoom, focused } = useViewState()
   const view = (opId: string) => runtime.dispatch(opId, { kind: 'canvas' }, {})
+  const [settings, setSettings] = useState(false)
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
     <div className="ttx-ui ttx-shell fixed top-2 right-2 z-[1000002] flex items-center gap-2 rounded-xl border bg-card p-3 font-sans shadow-sm">
@@ -50,6 +53,12 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
         </span>
       )}
       <HubButton />
+      <Hint label="Board settings">
+        <Button variant="ghost" size="icon-sm" aria-label="Board settings" onClick={() => setSettings(true)}>
+          <GearIcon className="size-4" />
+        </Button>
+      </Hint>
+      <SettingsDialog runtime={runtime} open={settings} onOpenChange={setSettings} />
       <Hint label="Undo" keys={`${MOD}Z`}>
         <Button variant="ghost" size="icon-sm" aria-label="Undo" disabled={focused} onClick={() => runtime.undo()}>
           <ArrowCounterClockwiseIcon className="size-4" />
