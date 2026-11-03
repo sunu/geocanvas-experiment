@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
 import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
-import { failedCalls, type AgentReply, type Chat, type OplogEntry, type Runtime, type TurnUndo, type UserMessage } from '@ttx/core'
+import { exchanges, failedCalls, lastCompaction, type Actor, type AgentReply, type Chat, type ChatEntry, type OplogEntry, type Runtime, type TurnUndo, type UserMessage } from '@ttx/core'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
 import { Separator } from '@/components/ui/separator'
@@ -158,22 +158,55 @@ export function sendMessage(runtime: Runtime, chat: Chat, text: string, selectio
 }
 
 /**
- * The thread's entries and the agent's thinking line. With `onOpen`, each reply also lists the objects it added and
+ * The thread's exchanges, each reply under the message it answers, and the agent's thinking line. The exchanges before
+ * the last compaction are hidden until "Show earlier". With `onOpen`, each reply also lists the objects it added and
  * changed, to open them: where the canvas is not there to show them (the phone's layout).
  */
 export function ChatEntries({ runtime, thread, onOpen }: { runtime: Runtime; thread: ChatThread; onOpen?(id: string): void }) {
   const { entries, thinking, activity, undone, pending } = thread
+  const [showEarlier, setShowEarlier] = useState(false)
+  const all = useMemo(() => exchanges(entries), [entries])
+  const compaction = lastCompaction(entries).reply
+  const start = compaction ? all.findIndex((x) => x.reply === compaction) : 0
+  const shown = showEarlier ? all : all.slice(start)
   return (
     <>
-      {entries.map((e) =>
-        e.kind === 'user' ? (
-          <UserEntry key={e.id} message={e} lost={isLost(e, pending, thinking)} />
+      {!showEarlier && start > 0 && (
+        <button type="button" className="ttx-chat__earlier" onClick={() => setShowEarlier(true)}>
+          Show {start} earlier
+        </button>
+      )}
+      {shown.map(({ message, reply }) =>
+        reply?.compacted ? (
+          <CompactionEntry key={reply.id} reply={reply} by={message?.actor ?? askerOf(entries, reply)} />
         ) : (
-          <AgentEntry key={e.id} reply={e} runtime={runtime} undone={undone.has(e.id)} onOpen={onOpen} />
+          <div key={(message ?? reply)!.id} className="ttx-chat__exchange">
+            {message && <UserEntry message={message} lost={isLost(message, pending, thinking)} />}
+            {reply && <AgentEntry reply={reply} asker={message?.actor} runtime={runtime} undone={undone.has(reply.id)} onOpen={onOpen} />}
+          </div>
         ),
       )}
       {thinking && <p className="ttx-chat__thinking">{activity ? `Agent: ${activity}…` : 'Agent is thinking…'}</p>}
     </>
+  )
+}
+
+/** Who sent the message a reply answers, when it is in the chat. */
+const askerOf = (entries: ChatEntry[], reply: AgentReply): Actor | undefined =>
+  entries.find((e): e is UserMessage => e.kind === 'user' && e.id === reply.replyTo)?.actor
+
+/** Where the chat was compacted: who did it, and the agent's summary of the chat before, to read. */
+function CompactionEntry({ reply, by }: { reply: AgentReply; by?: Actor }) {
+  return (
+    <div className="ttx-chat__compaction">
+      <div className="ttx-chat__compaction-line">Chat compacted{by ? ` by ${by.name ?? 'someone'}` : ''}</div>
+      {reply.compacted?.summary && (
+        <details>
+          <summary>Summary</summary>
+          <div className="ttx-chat__text">{reply.compacted.summary}</div>
+        </details>
+      )}
+    </div>
   )
 }
 
@@ -253,7 +286,7 @@ function UserEntry({ message, lost }: { message: UserMessage; lost: boolean }) {
   )
 }
 
-function AgentEntry({ reply, runtime, undone, onOpen }: { reply: AgentReply; runtime: Runtime; undone: boolean; onOpen?(id: string): void }) {
+function AgentEntry({ reply, asker, runtime, undone, onOpen }: { reply: AgentReply; asker?: Actor; runtime: Runtime; undone: boolean; onOpen?(id: string): void }) {
   // Undo refuses when someone changed the turn's objects since (agent.undoTurn); say why.
   const [undoError, setUndoError] = useState<string>()
   const undo = async () => {
@@ -266,6 +299,11 @@ function AgentEntry({ reply, runtime, undone, onOpen }: { reply: AgentReply; run
       <div className="ttx-chat__who">
         <SparkleIcon size={12} weight="fill" />
         Agent
+        {asker && (
+          <span className="ttx-chat__to" style={{ color: asker.color }}>
+            → {asker.name ?? 'Someone'}
+          </span>
+        )}
       </div>
       <div className="ttx-chat__text">{reply.text}</div>
       {/* What went well shows on the canvas, on the agent's cursor and the objects it worked on; what failed has nowhere else to go. */}
