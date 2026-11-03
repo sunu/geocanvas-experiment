@@ -1,8 +1,9 @@
 import type * as Y from 'yjs'
-import { Agent, chatCompletions } from '@ttx/plugins'
+import { Agent, chatCompletions, coreToolNames, leanToolNames } from '@ttx/plugins'
 import type { Awareness } from '../board/presence'
 import { tools } from '../tools/registry'
 import { loadKey } from './keys'
+import { browserComplete } from './webllm'
 
 /** The browser's tools the agent gets: the room agent's, and running code. */
 // code.execute runs on the person's own JupyterHub, from this tab (plans/plan-021.md); the room's agent has none.
@@ -15,7 +16,8 @@ export const TAB_ID = crypto.randomUUID()
  * The board's agent on the person's own key, in this tab. It is the room's agent (Agent in @ttx/plugins) with its
  * own runtime on this tab's doc, so its writes stay out of the person's ⌘Z, and they sync like anyone's. It answers
  * only this tab's messages, so a reload never runs an old turn again. The key goes only to the provider; the
- * geocoding and Montandon tools use the Worker's proxies, as the rest of the app does.
+ * geocoding and Montandon tools use the Worker's proxies, as the rest of the app does. With a model in the browser
+ * (webllm.ts), no request leaves the tab for the model, and each turn starts with fewer tools, for its short context.
  */
 export function startBrowserAgent(doc: Y.Doc, awareness: Awareness) {
   return new Agent({
@@ -24,10 +26,12 @@ export function startBrowserAgent(doc: Y.Doc, awareness: Awareness) {
     complete: (messages, defs) => {
       const config = loadKey()
       if (!config) throw new Error('No key is saved in this browser. Add one in the agent settings.')
+      if (config.provider === 'browser') return browserComplete(config, () => awareness.setLocalStateField('activity', 'Loading model…'))(messages, defs)
       return chatCompletions({ url: config.url, apiKey: config.apiKey || undefined, model: config.model })(messages, defs)
     },
     tools: tools.list().filter((t) => AGENT_TOOLS.includes(t.id)),
     accepts: (m) => m.browserTab === TAB_ID,
+    startTools: (runtime) => (loadKey()?.provider === 'browser' ? leanToolNames() : coreToolNames(runtime)),
     // On the person's presence, so everyone sees "Agent is thinking…".
     onBusy: (busy) => awareness.setLocalStateField('status', busy ? 'thinking' : null),
     // What it does now, on the same presence: the person it acts for is this one.

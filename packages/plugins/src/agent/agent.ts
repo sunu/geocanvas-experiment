@@ -2,7 +2,7 @@ import type * as Y from 'yjs'
 import { Chat, Runtime, ToolRunner, type Actor, type ToolDef, type UserMessage } from '@ttx/core'
 import { boardGet } from '../agentTools.js'
 import { plugins } from '../plugins.js'
-import { runTurn } from './loop.js'
+import { coreToolNames, runTurn } from './loop.js'
 import type { Complete } from './complete.js'
 
 export const AGENT: Actor = { kind: 'agent', id: 'agent', name: 'Agent', color: '#8e51ff' }
@@ -33,6 +33,7 @@ export class Agent {
   private onBusy: (busy: boolean) => void
   private onActivity: (activity: { for: string; title: string } | null) => void
   private keepAlive: (work: Promise<void>) => void
+  private startTools: (runtime: Runtime) => Set<string>
   private busy = false
   private turns: number[] = []
 
@@ -57,6 +58,8 @@ export class Agent {
     onActivity?: (activity: { for: string; title: string } | null) => void
     /** Given the promise of the running turns, so the room stays in memory until they end. */
     keepAlive?: (work: Promise<void>) => void
+    /** The tools loaded at the start of each turn (runTurn's startTools). Default: coreToolNames. */
+    startTools?: (runtime: Runtime) => Set<string>
   }) {
     this.complete = opts.complete
     this.accepts = opts.accepts ?? forRoom
@@ -65,6 +68,7 @@ export class Agent {
     this.onBusy = opts.onBusy ?? (() => {})
     this.onActivity = opts.onActivity ?? (() => {})
     this.keepAlive = opts.keepAlive ?? (() => {})
+    this.startTools = opts.startTools ?? coreToolNames
     this.runtime = new Runtime({ doc: opts.doc, plugins, actor: AGENT })
     this.tools = new ToolRunner([boardGet(this.runtime), ...(opts.tools ?? [])])
     // Templates look things up in prepare (events.get, data.geocode).
@@ -110,7 +114,7 @@ export class Agent {
         const tools = extra.length ? new ToolRunner([...this.tools.list(), ...extra]) : this.tools
         this.runtime.tools = tools
         try {
-          this.chat.reply(await runTurn(this.runtime, message, this.complete, tools, history, onActivity))
+          this.chat.reply(await runTurn(this.runtime, message, this.complete, tools, history, onActivity, this.startTools))
         } finally {
           this.runtime.tools = this.tools
           if (tools !== this.tools) tools.dispose()
