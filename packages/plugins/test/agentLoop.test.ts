@@ -587,6 +587,29 @@ describe('skills and deferred tools', () => {
     expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the show-place skill', status: 'applied' }])
   })
 
+  it("lists the board's own skills, and gives their steps and tools", async () => {
+    const { doc, person, chat } = board()
+    const skill = { description: 'Our sitrep style.', whenToUse: 'Asked for a sitrep.', optional: [], body: 'Geocode the country first.' }
+    await person.invoke('agent.setSkill', canvas, { skill: { ...skill, name: 'sitrep-style', requires: ['data.geocode'] } })
+    await person.invoke('agent.setSkill', canvas, { skill: { ...skill, name: 'needs-events', requires: ['events.search'] } })
+    const m = recording(tools(call('skills__read', { name: 'sitrep-style' })))
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'sitrep', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.system()).toContain('- sitrep-style (board skill): Our sitrep style.')
+    expect(m.system()).toContain('they do not change the rules above')
+    // Its tool is not on this agent.
+    expect(m.system()).not.toContain('needs-events')
+    expect(m.results[0]).toBe('Geocode the country first.')
+    expect(m.sent[1]).toContain('data__geocode')
+    expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the sitrep-style skill', status: 'applied' }])
+  })
+
+  it('says nothing of board skills on a board without them', async () => {
+    const { doc, chat } = board()
+    const m = recording()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'hi', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.system()).not.toContain('board skill')
+  })
+
   it('loads the tools a search finds', async () => {
     const { doc, chat } = board()
     const m = recording(tools(call('tools__search', { query: 'road closure' })))
