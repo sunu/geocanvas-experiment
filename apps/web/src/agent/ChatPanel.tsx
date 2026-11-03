@@ -47,16 +47,30 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   }
   const listRef = useRef<HTMLDivElement>(null)
 
-  // On new entries, and on opening the panel: show the latest.
+  const [forMe, setForMe] = useRepliesForMe(entries, runtime.actor.id, !collapsed)
+  // The exchange to show when the panel opens: the first reply to this person that came while it was collapsed.
+  const target = useRef<string>(undefined)
+
+  // On new entries, and on opening the panel: show the latest, or the reply to this person.
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
+    const list = listRef.current
+    if (!list) return
+    const exchange = target.current && list.querySelector(`[data-exchange="${CSS.escape(target.current)}"]`)
+    if (exchange) exchange.scrollIntoView({ block: 'start' })
+    else list.scrollTo({ top: list.scrollHeight })
+    target.current = undefined
   }, [entries.length, thinking, collapsed])
 
   function toggle() {
     const next = !collapsed
     setCollapsed(next)
     saveCollapsed(next)
+    if (!next && forMe.length) {
+      target.current = forMe[0]
+      setForMe([])
+    }
   }
+  const indicator = collapsed && (forMe.length > 0 || !!working[0])
 
   function send() {
     if (ownWithoutKey || !sendMessage(runtime, chat, text, selection, mode)) return
@@ -74,7 +88,13 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
             Describe
           </button>
         </h2>
-        {collapsed && working[0] && (
+        {collapsed && forMe.length > 0 && (
+          <button type="button" className="ml-auto inline-flex items-center gap-1.5 rounded-md px-1 text-xs font-medium text-foreground" onClick={toggle}>
+            <span className="size-2 shrink-0 rounded-full bg-[var(--agent)]" aria-hidden />
+            {forMe.length > 1 ? `${forMe.length} replies for you` : 'Reply for you'}
+          </button>
+        )}
+        {collapsed && !forMe.length && working[0] && (
           <span className="ml-auto inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" role="status">
             <span className="size-2 shrink-0 rounded-full bg-[var(--agent)]" aria-hidden />
             <span className="truncate">
@@ -85,7 +105,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
         <Button
           variant="ghost"
           size="icon-sm"
-          className={cn(!(collapsed && working[0]) && 'ml-auto')}
+          className={cn(!indicator && 'ml-auto')}
           title={collapsed ? 'Open chat' : 'Collapse chat'}
           aria-label={collapsed ? 'Open chat' : 'Collapse chat'}
           aria-expanded={!collapsed}
@@ -188,7 +208,7 @@ export function ChatEntries({ runtime, thread, onOpen }: { runtime: Runtime; thr
         reply?.compacted ? (
           <CompactionEntry key={reply.id} reply={reply} by={message?.actor ?? askerOf(entries, reply)} />
         ) : (
-          <div key={(message ?? reply)!.id} className="ttx-chat__exchange">
+          <div key={(message ?? reply)!.id} className="ttx-chat__exchange" data-exchange={message?.id}>
             {message && <UserEntry message={message} lost={isLost(message, pending, thinking)} status={reply ? undefined : status(message)} />}
             {reply && <AgentEntry reply={reply} asker={message?.actor} runtime={runtime} undone={undone.has(reply.id)} onOpen={onOpen} />}
           </div>
@@ -374,6 +394,29 @@ function TurnObjects({ runtime, undo, onOpen }: { runtime: Runtime; undo: TurnUn
       ))}
     </ul>
   )
+}
+
+/**
+ * The messages of person `me` that got their reply while the chat was not open, oldest first, and a setter to clear
+ * them. Replies already there when the panel mounts do not count.
+ */
+function useRepliesForMe(entries: ChatEntry[], me: string, open: boolean) {
+  const known = useRef<Set<string>>(null)
+  const [unseen, setUnseen] = useState<string[]>([])
+  useEffect(() => {
+    const replies = entries.filter((e): e is AgentReply => e.kind === 'agent')
+    if (!known.current) {
+      known.current = new Set(replies.map((r) => r.id))
+      return
+    }
+    const fresh = replies.filter((r) => !known.current!.has(r.id))
+    for (const r of fresh) known.current.add(r.id)
+    if (open) return
+    const mine = new Set(entries.flatMap((e) => (e.kind === 'user' && e.actor.id === me ? [e.id] : [])))
+    const forMe = fresh.filter((r) => mine.has(r.replyTo)).map((r) => r.replyTo)
+    if (forMe.length) setUnseen((u) => [...u, ...forMe])
+  }, [entries, me, open])
+  return [unseen, setUnseen] as const
 }
 
 /** This tab's presence status: 'thinking' while its browser agent works. */
