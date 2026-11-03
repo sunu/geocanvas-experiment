@@ -1,0 +1,24 @@
+[
+  {
+    "date": "2026-11-03",
+    "new": [
+      "What’s new, and which build you are on.",
+      "Copy link to any object, from its right-click menu.",
+      "Write your own agent skills for a board, in Settings.",
+      "Turn plugins off for a board, in Settings.",
+      "Run a small model in your browser."
+    ],
+    "improved": ["One shared chat with a queue, your own requests and a compact button."],
+    "fixed": ["A map follows the latest view until you move it."]
+  },
+  {
+    "date": "2026-10-30",
+    "new": [
+      "Reports with pages, editing and PDF export.",
+      "Code cells that run Python on your JupyterHub.",
+      "Disaster history for a country, and past disasters in an area.",
+      "Flood exposure, depth and damage in Scenario mode.",
+      "A phone layout."
+    ]
+  }
+]

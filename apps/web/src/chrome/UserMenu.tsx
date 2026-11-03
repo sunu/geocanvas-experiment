@@ -14,6 +14,7 @@ import { usePersonName } from '../board/person'
 import type { Awareness } from '../board/presence'
 import { PresenceAvatars } from './PresenceAvatars'
 import { SettingsDialog } from './SettingsDialog'
+import { WhatsNewButton } from '../whatsnew/WhatsNewButton'
 import { useViewState } from '../canvas/viewState'
 import { startPresenting, stopPresenting, usePresentation } from '../canvas/presentation'
 import { HubStatusDot } from '../code/HubSettings'
@@ -56,6 +57,7 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
           {bridge === 'connected' ? <PlugsConnectedIcon className="size-4" /> : <PlugsIcon className="size-4" />}
         </span>
       )}
+      <WhatsNewButton />
       <Hint label="Settings: plugins and skills on this board, your JupyterHub">
         <Button variant="ghost" size="icon-sm" aria-label="Settings" className="relative" onClick={() => setSettings(true)}>
           <GearIcon className="size-4" />
