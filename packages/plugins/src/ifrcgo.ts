@@ -32,6 +32,8 @@ export type IfrcGoBoardObject = AnyObject & { type: 'ifrcgo'; url?: string }
 export const ifrcgoPlugin = definePlugin({
   id: 'ifrcgo',
   title: 'IFRC GO',
+  description: 'Cards for emergencies on IFRC GO, from a pasted link.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

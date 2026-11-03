@@ -37,6 +37,8 @@ export type HdxBoardObject = AnyObject & { type: 'hdx'; url?: string }
 export const hdxPlugin = definePlugin({
   id: 'hdx',
   title: 'HDX',
+  description: 'Cards that preview a dataset on the Humanitarian Data Exchange, from a pasted link.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

@@ -34,6 +34,8 @@ export type GithubBoardObject = AnyObject & { type: 'github'; url?: string }
 export const githubPlugin = definePlugin({
   id: 'github',
   title: 'GitHub',
+  description: 'Cards for public GitHub issues and pull requests, from a pasted link.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {
