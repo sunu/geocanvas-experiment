@@ -5,6 +5,7 @@ import type { ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
 import { templatesOn, typeOn, usePluginsOff } from '../board/plugins'
+import { objectFromHash, withoutObject } from '../board/room'
 import { cursorSender, publishSelection, useAgentActivities, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
@@ -115,7 +116,14 @@ function trackDrag(
  * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
  * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
  */
-export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runtime; chat: Chat; awareness: Awareness; onUploads(): void }) {
+export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
+  runtime: Runtime
+  chat: Chat
+  awareness: Awareness
+  /** Resolves once the room's doc has synced, so a linked object is on the board. */
+  synced: Promise<void>
+  onUploads(): void
+}) {
   const board = runtime.board as Board
   const objects = useObjects(board)
   const pluginsOff = usePluginsOff(runtime)
@@ -623,6 +631,36 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       runtime.view?.zoomTo([id])
     })
   }
+
+  /** Show one object in the middle of the view, selected (a board link's object). */
+  function show(id: string) {
+    const f = focusRef.current
+    if (f?.draft?.hasUnshared()) return setNotice('Share or discard your changes in focus to see the linked object.')
+    if (!board.get(id)) return setNotice('The linked object is no longer on the board.')
+    if (f) return goTo(id)
+    setSelection(new Set([id]))
+    runtime.view?.zoomTo([id])
+  }
+  const showRef = useRef(show)
+  showRef.current = show
+
+  // A link to an object (#room=<id>&obj=<object id>): show it once the board has synced, and again for each link
+  // pasted into this tab. The object is then taken out of the URL, so the same link pasted again shows it again.
+  useEffect(() => {
+    let live = true
+    const onHash = () => {
+      const id = objectFromHash(location.hash)
+      if (!id || !live) return
+      history.replaceState(null, '', withoutObject(location.hash))
+      showRef.current(id)
+    }
+    void synced.then(onHash)
+    window.addEventListener('hashchange', onHash)
+    return () => {
+      live = false
+      window.removeEventListener('hashchange', onHash)
+    }
+  }, [synced])
 
   // The draft lives as long as its focus. Closed after the object's view has let go of it.
   useEffect(() => {
