@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Textarea } from '@/components/ui/textarea'
 import { usePluginsOff } from '../board/plugins'
 import { tools } from '../tools/registry'
+import { keepSkill, sameSkill, useMySkills } from './mySkills'
 
 /**
  * The Skills tab of Settings (plans/plan-026.md): the agent's built-in skills, read only, and this board's own,
@@ -43,7 +44,7 @@ export function SkillsSettings({ runtime }: { runtime: Runtime }) {
             <PlusIcon /> New skill
           </Button>
         </div>
-        <p className="m-0 text-sm text-muted-foreground">For everyone on this board. Only people can write them.</p>
+        <p className="m-0 text-sm text-muted-foreground">For everyone on this board. Only people can write them. What you save is also kept in My skills.</p>
         {board.length ? (
           <SkillList skills={board} choices={choices} onOpen={(s) => setOpen({ id: s.id })} />
         ) : (
@@ -175,15 +176,18 @@ function SkillForm({ runtime, choices, skill, onDone }: { runtime: Runtime; choi
   const [errors, setErrors] = useState<Partial<Record<keyof Draft | 'form', string>>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  const mine = useMySkills()
+  const kept = !!skill && mine.some((m) => sameSkill(m, skill))
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }))
 
-  async function run(opId: string, args: unknown) {
+  async function run(opId: string, args: unknown, onApplied?: () => void) {
     setBusy(true)
     runtime.beginGesture()
     const r = await runtime.invoke(opId, { kind: 'canvas' }, args)
     setBusy(false)
-    if (r.status === 'applied') onDone()
-    else setErrors({ form: r.error ?? 'Not saved' })
+    if (r.status !== 'applied') return setErrors({ form: r.error ?? 'Not saved' })
+    onApplied?.()
+    onDone()
   }
 
   function save(e: React.FormEvent) {
@@ -195,7 +199,8 @@ function SkillForm({ runtime, choices, skill, onDone }: { runtime: Runtime; choi
       return setErrors(byField)
     }
     setErrors({})
-    void run('agent.setSkill', { ...(skill && { id: skill.id }), skill: parsed.data })
+    // What you save is also kept in this browser, to add to other boards.
+    void run('agent.setSkill', { ...(skill && { id: skill.id }), skill: parsed.data }, () => keepSkill(parsed.data))
   }
 
   return (
@@ -238,6 +243,11 @@ function SkillForm({ runtime, choices, skill, onDone }: { runtime: Runtime; choi
         <Button type="button" size="sm" variant="ghost" onClick={onDone}>
           Cancel
         </Button>
+        {skill && (
+          <Button type="button" size="sm" variant="ghost" disabled={kept} title="Keep it in this browser, to add it to other boards" onClick={() => keepSkill(skill)}>
+            {kept ? 'In my skills' : 'Keep in my skills'}
+          </Button>
+        )}
         {skill && (
           <Button
             type="button"
