@@ -1,5 +1,5 @@
 /*
- * The app's service worker (plans/plan-018.md). The build prepends VERSION and PRECACHE (vite.config.ts,
+ * The app's service worker (plans/plan-018.md). The build prepends VERSION, BUILD (the commit) and PRECACHE (vite.config.ts,
  * src/pwa/precache.ts) and serves it at /sw.js. It only makes the app itself load fast and without a network:
  * - pages: from the network, else (offline, or no answer within NETWORK_MS) the page cached at install;
  * - /assets/*: from the cache, else the network, then kept: their names carry content hashes, so they never change;
@@ -29,6 +29,8 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data === 'skipWaiting') self.skipWaiting()
+  // The page asks a waiting worker which commit it is, for the update notice (register.ts).
+  else if (event.data === 'build') event.source?.postMessage({ build: BUILD })
 })
 
 self.addEventListener('fetch', (event) => {

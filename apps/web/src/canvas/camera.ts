@@ -58,3 +58,9 @@ export function fitRect(r: Rect, w: number, h: number, margin = 48): Camera {
   const z = Math.min(1, Math.max(MIN_ZOOM, Math.min((w - 2 * margin) / Math.max(r.w, 1), (h - 2 * margin) / Math.max(r.h, 1))))
   return { x: w / 2 - (r.x + r.w / 2) * z, y: h / 2 - (r.y + r.h / 2) * z, z }
 }
+
+/** The camera that shows all of world rectangle `r` in a w × h viewport, centered, at any zoom (a presenter's view). */
+export function fitView(r: Rect, w: number, h: number): Camera {
+  const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min(w / Math.max(r.w, 1), h / Math.max(r.h, 1))))
+  return { x: w / 2 - (r.x + r.w / 2) * z, y: h / 2 - (r.y + r.h / 2) * z, z }
+}

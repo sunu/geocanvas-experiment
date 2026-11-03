@@ -5,13 +5,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SkillsSettings } from '../agent/SkillsSettings'
 import { usePluginsOff } from '../board/plugins'
 import { HubSettings } from '../code/HubSettings'
+import { WhatsNewPanel } from '../whatsnew/WhatsNewDialog'
+import { useNewsUnseen } from '../whatsnew/seen'
 
 /**
  * Settings, from the gear in the user menu. Plugins is the board's, for everyone on it: turn optional plugins on or
  * off (board.setPlugins). A plugin that is off is not offered in the toolbar, the palette or to agents; the objects
  * it made stay on the board. Skills are the agent's: the built-in ones to read, and the board's own, for everyone on
  * it (agent/SkillsSettings.tsx); not shown while the agent is off. JupyterHub is this person's own login, kept in this
- * browser (code/hub.ts).
+ * browser (code/hub.ts). What's new is the list of changes and the build this tab runs (whatsnew/), with a dot while
+ * there is news this browser has not seen; showing it marks the news seen.
  */
 /**
  * A tab's panel: it scrolls on its own. Without Tailwind's preflight, `hidden` does not win over a display class, so
@@ -21,6 +24,7 @@ const PANEL = 'min-h-0 min-w-0 content-start gap-3 overflow-y-auto data-[state=i
 
 export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runtime; open: boolean; onOpenChange(open: boolean): void }) {
   const off = usePluginsOff(runtime)
+  const unseen = useNewsUnseen()
   const stored = runtime.board.disabledPlugins
   const plugins = runtime.registry.plugins.filter((p) => p.optional)
   const title = (id: string) => runtime.registry.plugins.find((p) => p.id === id)?.title ?? id
@@ -43,6 +47,10 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
             <TabsTrigger value="plugins">Plugins</TabsTrigger>
             {!off.has('agent') && <TabsTrigger value="skills">Skills</TabsTrigger>}
             <TabsTrigger value="hub">JupyterHub</TabsTrigger>
+            <TabsTrigger value="news" className="gap-1.5">
+              What’s new
+              {unseen && <span className="size-2 rounded-full bg-teal-600" aria-label="New" />}
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="plugins" className={`grid ${PANEL}`}>
             <p className="text-sm text-muted-foreground">
@@ -75,6 +83,9 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
           <TabsContent value="hub" className={`grid ${PANEL}`}>
             <p className="text-sm text-muted-foreground">Only for you, in this browser. Code cells run on your own hub, as you.</p>
             <HubSettings />
+          </TabsContent>
+          <TabsContent value="news" className={`grid ${PANEL}`}>
+            <WhatsNewPanel />
           </TabsContent>
         </Tabs>
       </DialogContent>

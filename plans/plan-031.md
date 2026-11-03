@@ -1,67 +1,43 @@
-# Plan 031: IFRC GO emergencies and HDX datasets on the board
+# Plan 031: GitHub issues and pull requests on the board
 
-Status: IFRC GO card and HDX card built. Showing an HDX file on a map is not (it needs a proxy, below).
+Status: built (card, no private repositories).
 
-Builds on plan-030 (a card from a pasted link; the board stores the link, each browser reads the item). Both
-sources were checked on 2026-10-30 with real requests, not from documentation.
+Someone pastes a link to a GitHub issue or pull request, and a card shows a summary and its status. For the team
+using the board to plan and track work (feedback, tickets); it is not part of the exercise participants' sitrep
+workflow, so it is one small widget, not a general link importer. If participants need other links unfurled
+(ReliefWeb, HDX), generalize it then.
 
-## IFRC GO: built
+## Decisions
 
-**Feasible, and cheap.** `goadmin.ifrc.org/api/v2` answers anonymous GETs with `access-control-allow-origin: *`
-and a preflight that allows GET, so a browser reads it directly: no Worker route, no key. No rate limit is stated
-and none showed in the headers; a card costs 2 requests.
+- **The board stores the link, nothing else** (the rule for every widget: store references, not data). A `github`
+  object has an optional `url`, always `https://github.com/<owner>/<repo>/issues/<n>` or `/pull/<n>`. The op
+  `github.setUrl` takes any spelling a person pastes (`/files`, `#issuecomment-…`, `www.`, `http`) and stores the
+  canonical one, so two spellings of one item are one string. `github.add` takes only the canonical form.
+- **Browsers read `api.github.com` directly.** It sends `Access-Control-Allow-Origin: *`, so no Worker route and no
+  secret. Cost: unauthenticated requests are limited to 60 an hour per IP address, and a team in one office shares
+  that. An issue costs 2 requests (the issue, its timeline), a pull request 3 (the pull, check runs, commit status);
+  answers are cached per page and the refresh button asks again. A reached limit is reported with its reset time.
+  A token would raise it to 5,000 an hour but would have to live in the Worker, which then reads for everyone with
+  the board link. The Worker proxy is the way to add one later, with the private-repository decision.
+- **Public repositories only.** Private ones answer 404; the card says only public ones can be shown. Reading a
+  private repository through a Worker token would show its issues to anyone with the board link (there is no access
+  control on boards).
+- **Status.** Issue: open, closed, or closed as not planned. Pull request: draft, open, merged or closed, with
+  one checks result from the head commit: failing if any check run failed (timed out, cancelled and action required
+  count) or the commit status failed, else running if any is not finished, else passing; nothing is shown for a
+  commit with no checks, or when both requests failed. GitHub reports a commit with no statuses as `pending` with a
+  total of 0, which is read as none.
+- **Linked pull requests.** For an issue, the pull requests in its timeline's `cross-referenced` events (newest
+  first, each once, at most 5, from any repository). The REST API does not say which of them close the issue
+  (GraphQL's `closedByPullRequestsReferences` does, but needs a token), so the card says "mention it". A failing
+  timeline request leaves the list out, not the card.
+- **A link to an issue that is a pull request** (GitHub serves both at `/issues/<n>`) is shown as a pull request.
+- **Text.** The first 280 characters of the body as plain text (template comments, images, code blocks, tags and
+  markdown marks removed). Never rendered as HTML or markdown, since the page shares the board's origin.
+- **The agent** can add a card and set its link (ops are tools). It cannot read the item: that would need a
+  read-only tool in the room's Worker (`ToolDef`), which shares the same rate limit.
 
-- **Links.** `https://go.ifrc.org/emergencies/<id>` (the web app's routes also have `/overview`, `/details`,
-  `/reports`…, read as the emergency). Not read: `emergencies/slug/<slug>` (needs a lookup), `emergencies/all`,
-  countries, appeals (an appeal has no page of its own, only `appeals/all`), field reports.
-- **One emergency.** `GET /api/v2/event/<id>/` has everything the card shows: severity, `key_figures`,
-  `appeals` (type, code, status, `amount_requested`, `amount_funded`, `num_beneficiaries`, in Swiss francs) and
-  `field_reports`. Its `dtype` is a bare id, while the list endpoint (`/event/?id=<id>`) has the hazard's name but
-  no key figures, so the hazard's name is a second request (`/disaster_type/<id>/`, kept per page for all cards).
-  A missing or non-public emergency answers 404.
-- **Contacts are in the answer** (names, job titles, emails of IFRC staff). The card never copies them, and a test
-  checks that.
-- **Not tied to Montandon.** Montandon's IFRC events and GO's emergencies are different ids; linking one to the
-  other is not built.
-- **Shared with the GitHub card** (`apps/web/src/cards/`, extracted when this second card made them the same
-  concept): the link field, `useCardItem` (load, refresh, loading state) and `perPage` (the cache). What each
-  source shows is its own, so there is no common card model yet.
+## Not built
 
-## HDX: built (a preview of a dataset's metadata)
-
-A dataset page is `https://data.humdata.org/dataset/<name>` (and `…/resource/<id>`); the CKAN API gives it as JSON.
-The card is the same shape as the other two: `hdx` type, `hdx.setUrl`, `apps/web/src/hdx/`.
-
-- **Reads work from a browser.** `GET /api/3/action/package_show?id=<name>` is anonymous for public datasets and
-  sends `access-control-allow-origin: *` (also on the error answer and on a preflight, which allows GET and the
-  `Content-Type` header). One request per card. No rate limit is stated and none showed in the headers; HDX HAPI's
-  60 a minute, which the Worker already handles, is a different service.
-- **What the card shows**: title, publisher, countries, the period the data covers (`dataset_date` is always
-  `[start TO end]`; the card shows the two dates), the update frequency (`data_update_frequency`, in days as text,
-  named as HDX names it: -1 Never, -2 As needed, 0 Live, 1 Every day, 7 Every week… 365 Every year; 71 of the 100
-  flood datasets checked are -1), the last change, license, the first words of the description (`notes`, Markdown),
-  caveats, source, and the first five files with format and size (HDX file names often end with the format: it is
-  not repeated). Useful for a situation report: who published it, how fresh it is, its license.
-- **Files on request.** A dataset with `is_requestdata_type` has an empty `resources` list (checked on
-  `afghanistan-schools`); the card says the files are asked for through HDX. An `archived` dataset says so.
-- **Links to files are built, not copied.** A file links to `…/dataset/<name>/resource/<id>` on HDX, made from the
-  dataset's link and the file's id (only when the id is a UUID), never from the `url` or `download_url` in the
-  answer.
-- **Not found and private.** A missing dataset answers 404 with a JSON body (CORS still open); a private one is
-  expected to answer 403 (not tried): the card says it may be private.
-- **Names.** HDX names are lowercase (`COD-AB-NPL` answers 404), so an uppercase link is not read. A name can change
-  on HDX; the card stores the name from the link.
-
-### Files are not readable from a browser
-
-A resource's download link redirects (302) to a signed Amazon S3 address, and the first answer allows only
-`https://data.humdata.org` as origin, so a browser on another origin cannot follow it. A "show this file on a map"
-button therefore needs a Worker proxy, with its size limit, allow-list of hosts and abuse risk (anyone with a board
-link could use it): a separate decision. The card links to the files without it. HDX HAPI's metadata
-(`metadata/resource`, shown by the country widgets) already names datasets, so those can be put on the board by
-pasting their links.
-
-### Not built
-
-HDX's own data previews (some resources have `dataset_preview_enabled`; how they are served was not looked at); a
-file's page as its own card; private datasets; a dataset's other pages (organization, group, search).
+Review state of a pull request; which pull requests close an issue; private repositories and a token; GitHub
+Enterprise; pasting a link on the bare canvas to make a card (the card's own field takes it today).

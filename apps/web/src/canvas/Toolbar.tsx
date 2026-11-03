@@ -1,27 +1,4 @@
-import {
-  ArrowUpRightIcon,
-  CaretDownIcon,
-  CircleIcon,
-  CodeIcon,
-  CursorIcon,
-  FilePdfIcon,
-  FileTextIcon,
-  FolderOpenIcon,
-  FrameCornersIcon,
-  GithubLogoIcon,
-  HandIcon,
-  ImageIcon,
-  LineSegmentIcon,
-  MapTrifoldIcon,
-  NoteIcon,
-  SquareIcon,
-  SquaresFourIcon,
-  TerminalWindowIcon,
-  TextTIcon,
-  UploadSimpleIcon,
-  WarningIcon,
-  type Icon,
-} from '@phosphor-icons/react'
+import { ArrowUpRightIcon, BuildingsIcon, CaretDownIcon, CircleIcon, CodeIcon, CursorIcon, FilePdfIcon, FileTextIcon, FolderOpenIcon, FrameCornersIcon, GithubLogoIcon, HandIcon, ImageIcon, LineSegmentIcon, MapTrifoldIcon, NoteIcon, PathIcon, SquareIcon, SquaresFourIcon, TerminalWindowIcon, TextTIcon, UploadSimpleIcon, WarningIcon, type Icon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -70,6 +47,8 @@ const EVENT_CONTEXT: Item[] = [
 ]
 const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },
+  { label: 'Add a route map: routes by road around closed roads and flooded areas', text: 'Routes', Icon: PathIcon, tool: 'map:routes' },
+  { label: 'Add a flood exposure map: buildings, facilities, depth and damage in flood areas', text: 'Exposure', Icon: BuildingsIcon, tool: 'map:exposure' },
   { label: 'Add Jupyter notebook', text: 'Notebook', Icon: CodeIcon, tool: 'notebook', key: 'N' },
   { label: 'Add Python code, run on your JupyterHub', text: 'Code', Icon: TerminalWindowIcon, tool: 'code', key: 'C' },
   { label: 'Add report', text: 'Report', Icon: FileTextIcon, tool: 'report', key: 'P' },

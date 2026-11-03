@@ -1,43 +1,48 @@
-# Plan 030: GitHub issues and pull requests on the board
+# Plan 030: maps made for an analysis
 
-Status: built (card, no private repositories).
+Scenario mode (plan-014, plan-015, plan-016) put the analyses of a map in a Scenario tab of the map in focus: routes,
+closures, affected areas, exposure, flood depth and damage. Their answers showed only there or in a small legend, every
+map carried the tab whether it was for routes or not, and comparing two scenarios meant switching things off and on.
 
-Someone pastes a link to a GitHub issue or pull request, and a card shows a summary and its status. For the team
-using the board to plan and track work (feedback, tickets); it is not part of the exercise participants' sitrep
-workflow, so it is one small widget, not a general link importer. If participants need other links unfurled
-(ReliefWeb, HDX), generalize it then.
+A first try (`feat/route-widget`, not merged) made each analysis a separate widget linked to its map. It worked but was
+clunky: two objects and an arrow for one question, the map picked by hand, the answer on one object and the tools on
+another. This plan instead makes the analysis what the map is for.
+
+Status: built on `feat/map-analysis`.
 
 ## Decisions
 
-- **The board stores the link, nothing else** (the rule for every widget: store references, not data). A `github`
-  object has an optional `url`, always `https://github.com/<owner>/<repo>/issues/<n>` or `/pull/<n>`. The op
-  `github.setUrl` takes any spelling a person pastes (`/files`, `#issuecomment-…`, `www.`, `http`) and stores the
-  canonical one, so two spellings of one item are one string. `github.add` takes only the canonical form.
-- **Browsers read `api.github.com` directly.** It sends `Access-Control-Allow-Origin: *`, so no Worker route and no
-  secret. Cost: unauthenticated requests are limited to 60 an hour per IP address, and a team in one office shares
-  that. An issue costs 2 requests (the issue, its timeline), a pull request 3 (the pull, check runs, commit status);
-  answers are cached per page and the refresh button asks again. A reached limit is reported with its reset time.
-  A token would raise it to 5,000 an hour but would have to live in the Worker, which then reads for everyone with
-  the board link. The Worker proxy is the way to add one later, with the private-repository decision.
-- **Public repositories only.** Private ones answer 404; the card says only public ones can be shown. Reading a
-  private repository through a Worker token would show its issues to anyone with the board link (there is no access
-  control on boards).
-- **Status.** Issue: open, closed, or closed as not planned. Pull request: draft, open, merged or closed, with
-  one checks result from the head commit: failing if any check run failed (timed out, cancelled and action required
-  count) or the commit status failed, else running if any is not finished, else passing; nothing is shown for a
-  commit with no checks, or when both requests failed. GitHub reports a commit with no statuses as `pending` with a
-  total of 0, which is read as none.
-- **Linked pull requests.** For an issue, the pull requests in its timeline's `cross-referenced` events (newest
-  first, each once, at most 5, from any repository). The REST API does not say which of them close the issue
-  (GraphQL's `closedByPullRequestsReferences` does, but needs a token), so the card says "mention it". A failing
-  timeline request leaves the list out, not the card.
-- **A link to an issue that is a pull request** (GitHub serves both at `/issues/<n>`) is shown as a pull request.
-- **Text.** The first 280 characters of the body as plain text (template comments, images, code blocks, tags and
-  markdown marks removed). Never rendered as HTML or markdown, since the page shares the board's origin.
-- **The agent** can add a card and set its link (ops are tools). It cannot read the item: that would need a
-  read-only tool in the room's Worker (`ToolDef`), which shares the same rate limit.
+- **One map type with an `analysis` field** (`routes` or `exposure`; none for a plain map), not new types: every map
+  feature (layers, notes, drawings, basemap, views, snapshots, reports) works on all of them, and the scenario data
+  (`scenario.routes`, `closures`, `exposure`) stays where it was. Set when the map is added, or later with
+  `map.setAnalysis` (the scenario stays).
+- **Presented as separate maps**: the toolbar has Map, **Routes** (a route map) and **Exposure** (a flood exposure
+  map), the header names it, and the agent reads "route map" in the board summary. A toolbar tool's variant
+  (`map:routes`) sets the type's `variantField` (`analysis`; `shape` for boxes).
+- **One analysis per map.** A route map can hold several routes. Comparing scenarios is duplicating a map and changing
+  one thing (with and without the bridge, 100 against 500 years).
+- **The answer is on the map, on the canvas**: its summary at the top left (`routing/AnalysisSummary.tsx`, which
+  replaces the route legend): a route map's routes with length, time and what closures add; a flood exposure map's
+  buildings and facilities, what the what-ifs add, and with a flood the buildings under water and destroyed. It says
+  what to do when there is nothing yet. Snapshots on the canvas show it; report pictures do not yet.
+- **The tools are on the map while it is edited** (a double-click on the canvas), not only in focus: a route map has
+  route, close a road, close an area, import; a flood exposure map close an area and import (`ScenarioToolbar`'s
+  `tools`). A plain map has the drawing box in focus, as before.
+- **Options in focus**: a plain map has its Map options only (no Scenario tab); an analysis map has two tabs, its
+  analysis first (Routes or Exposure: only that analysis's sections), then Map (`map/mode.ts`; the pick is
+  forgotten when the map leaves focus).
+- **A flood exposure map always counts** (no start or stop button); a flood is picked in its Exposure section.
+- **Maps from before** keep working: one with routes is taken as a route map, one with exposure counted as a flood
+  exposure map (`analysisOf`), so they keep their tab and summary.
 
-## Not built
+Measured in headless Chrome: a route map over Beira (Port → Hospital by truck, 2.4 km, 4 min, summary on the canvas)
+and a flood exposure map over Bharatpur with a what-if area (59,764 buildings, 121 health facilities, 128 schools; a
+100-year flood: 388 under water, about 209 destroyed); double-clicking the exposure map on the canvas showed its two
+tools.
 
-Review state of a pull request; which pull requests close an issue; private repositories and a token; GitHub
-Enterprise; pasting a link on the bare canvas to make a card (the card's own field takes it today).
+## Next steps
+
+- Population exposure on flood exposure maps (WorldPop 2020 in the flood areas, by depth class): WorldPop's files are
+  BigTIFF, which the GloFAS reader (plan-016) does not read yet.
+- The summary in report pictures at print resolution (reports draw maps as pictures).
+- Duplicate as "compare": a button that duplicates an analysis map beside it.

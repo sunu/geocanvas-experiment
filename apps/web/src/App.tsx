@@ -4,6 +4,7 @@ import { usePluginsOff } from './board/plugins'
 import { chat, provider, room, runtime, uploads } from './board/session'
 import { Canvas } from './canvas/Canvas'
 import { ChatPanel } from './agent/ChatPanel'
+import { PresentingBar } from './chrome/PresentingBar'
 import { TitleBar } from './chrome/TitleBar'
 import { UserMenu } from './chrome/UserMenu'
 import { startBridge, useBridgeStatus } from './mcp/bridge'
@@ -38,6 +39,7 @@ export function App() {
     <>
       <Canvas runtime={runtime} chat={chat} awareness={provider.awareness} synced={synced} onUploads={() => setUploadsOpen(true)} />
       <TitleBar runtime={runtime} />
+      <PresentingBar awareness={provider.awareness} />
       {agentOn && <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} />}
       {/* The open gallery takes the user menu's corner and has its own close button. */}
       {uploadsOpen ? (

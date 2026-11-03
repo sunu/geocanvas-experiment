@@ -6,7 +6,7 @@ import { defineOp, definePlugin, type AnyObject } from '@ttx/core'
  * metadata. No React here: the card is registered in apps/web/src/hdx/ui.tsx. The board stores only the link; each
  * browser reads the dataset from HDX's CKAN API (apps/web/src/hdx/api.ts), which allows CORS and anonymous reads for
  * public datasets, so there is no proxy and no key. The files themselves are not read: their downloads redirect to
- * addresses that a browser on another origin cannot follow (plans/plan-031.md).
+ * addresses that a browser on another origin cannot follow (plans/plan-032.md).
  */
 
 export interface HdxRef {

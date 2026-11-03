@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import type { PickingInfo } from '@deck.gl/core'
+import type { Layer, PickingInfo } from '@deck.gl/core'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import type { ObjectViewProps } from '../canvas/registry'
 import { useReportLoading } from '../canvas/loading'
 import { stableJson, Views, type Runtime, type SavedView } from '@ttx/core'
-import { MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
+import { analysisOf, ANALYSIS_TITLE, MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import { tools } from '../tools/registry'
 import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
@@ -18,6 +18,7 @@ import { drawShape } from './draw'
 import { boundsOf, deckLayers, shapeLayer, useLayerStates } from './layers'
 import { creditsOf, pictureRequest, WORLD } from './picture'
 import { useViewState } from '../canvas/viewState'
+import { presentation, presentMap, unfollow, useFollowedMap } from '../canvas/presentation'
 import { registerLiveMap } from './live'
 import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
@@ -31,11 +32,7 @@ import { ScenarioOnMap, useScenario } from '../routing/ScenarioOnMap'
 // labels (Arabic, Hebrew) itself, so no RTL plugin is needed.
 setWorkerUrl(workerUrl)
 
-/** Where a map starts for a person who has no view of it and nobody else has one either. */
-/**
- * Still where a new map starts. The map saves its first view about a second after it appears (a resize ends a
- * move), so "no view yet" does not last; the zoom does.
- */
+/** Still where a new map starts: nobody has a view of it, or nobody has moved it from the whole world. */
 const atStart = (view: { zoom: number } | undefined) => !view || view.zoom <= WORLD.zoom + 0.01
 
 /** A view is saved this long after the map stops moving, so a series of pans is one write. */
@@ -112,8 +109,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Routes are found on Overture's roads, whose license asks for attribution like a layer's. A forecast's caption (model,
   // run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
   const credits = creditsOf(states, scenario)
-  /** In focus: Map mode (data, notes, drawings) or Scenario mode (routes, closures); the Options panel's tabs pick it. */
-  const mode = useMapMode(o.id)
+  /** What the map is for (plans/plan-030.md): a route map, a flood exposure map, or none (a plain map). */
+  const analysis = analysisOf(o)
+  /** Map mode (data, notes, drawings) or, on an analysis map, its analysis; the Options panel's tabs pick it in focus. */
+  const picked = useMapMode(o.id, analysis ? 'scenario' : 'map')
+  const mode = analysis ? picked : 'map'
+  /** The analysis's tools are on the map while it is edited (double-click) or in focus, in the analysis's mode. */
+  const analysisActive = !!analysis && (editing || !!focused) && mode === 'scenario'
   /** The latest states, for map events. */
   const statesRef = useRef(states)
   /** MapLibre layers can be added: the style has loaded, and no basemap change is under way. */
@@ -130,7 +132,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const highlight = (codeFocus.hovered ?? codeFocus.open)?.layerId
   const highlightRef = useRef(highlight)
   const pickingRef = useRef(true)
-  pickingRef.current = !tool && !(focused && mode === 'scenario')
+  pickingRef.current = !tool && !analysisActive
   const [shapeColor, setShapeColor] = useState<ShapeColor>('red')
   /** The sticky being written in. */
   const [writing, setWriting] = useState<string>()
@@ -155,6 +157,11 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const live = !paused && (pooled || editing || focused)
   const view = mine ?? latest ?? WORLD
   const snapshot = useSnapshot(live || paused ? undefined : pictureRequest(o, view, layers, shapes, scenario))
+  // Presentation mode (canvas/presentation.ts): what the presenter's map shows, while this person follows them.
+  const followed = useFollowedMap(o.id)
+  const followedRef = useRef(followed)
+  followedRef.current = followed
+  const followedKey = followed && `${followed.center[0]},${followed.center[1]},${followed.zoom},${followed.bearing}`
 
   useEffect(() => {
     if (!live) return
@@ -182,7 +189,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     }
     const overlay = new MapboxOverlay({
       interleaved: false,
-      layers: [...deckLayers(statesRef.current, { highlight: highlightRef.current }), shapeLayer(shapesRef.current), ...scenarioRef.current],
+      layers: [...deckLayers(statesRef.current, { highlight: highlightRef.current }), shapeLayer(shapesRef.current), ...ownCopies(scenarioRef.current)],
       onHover: (info) => {
         if (!pickingRef.current) return
         const element = codeElement(info)
@@ -216,6 +223,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       setHover(undefined)
       hoverCode(undefined, 'map')
     })
+    // A presenter shares what this map shows whenever it moves, whoever moved it. A follower who moves it themselves
+    // stops following, as on the canvas.
+    map.on('move', () => {
+      if (presentation().presenting !== null) presentMap({ id: o.id, ...shown(map) })
+    })
+    map.on('movestart', (e: { originalEvent?: Event }) => {
+      if (e.originalEvent && followedRef.current) unfollow()
+    })
     mapRef.current = map
     overlayRef.current = overlay
     setLiveMap(map)
@@ -232,7 +247,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
 
   // Leaving edit mode ends writing; leaving focus puts the drawing box's tool away, since it is a focus tool.
   useEffect(() => {
-    if (!focused) setMapMode(o.id, 'map')
+    if (!focused) setMapMode(o.id, undefined)
     if (!focused || mode !== 'map') setTool(undefined)
     if (!editing) setWriting(undefined)
   }, [editing, focused, mode, o.id])
@@ -299,7 +314,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     if (!map) return
     const me = runtime.actor.id
     /** `at` of my view as this map last wrote or showed it: a change with another `at` came from elsewhere. */
-    let shownAt = views.get(me, o.id)?.at
+    let shownAt = (views.get(me, o.id) ?? views.latest(o.id)?.view)?.at
     /** The map is moving to a view from elsewhere: do not save that move back. */
     let moving = false
     let pending: SavedView | undefined
@@ -320,15 +335,19 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     const saved = views.get(me, o.id)
     if (saved && !sameView(shown(map), saved)) map.jumpTo({ center: saved.center, zoom: saved.zoom, bearing: saved.bearing })
     const onMoveStart = () => clearTimeout(timer)
-    const onMoveEnd = () => {
+    const onMoveEnd = (e: { originalEvent?: Event }) => {
       if (moving) return void (moving = false)
+      // Only the person's own gestures are their view. A resize (the first one comes about a second after the map
+      // appears) would otherwise save where the map started as their view, and they would stop following the latest.
+      if (!e.originalEvent) return
       pending = { ...shown(map), at: Date.now() }
       timer = setTimeout(save, SAVE_AFTER_MS)
     }
     map.on('movestart', onMoveStart)
     map.on('moveend', onMoveEnd)
     const unsubscribe = views.subscribe(() => {
-      const view = views.get(me, o.id)
+      // Until this person moves the map themselves, it follows the latest view anyone saved.
+      const view = views.get(me, o.id) ?? views.latest(o.id)?.view
       if (!view || view.at === shownAt) return
       shownAt = view.at
       clearTimeout(timer)
@@ -344,6 +363,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       save()
     }
   }, [views, runtime, o.id, live])
+
+  // A follower's map goes where the presenter's is. With no originalEvent, the move is not saved as their view.
+  useEffect(() => {
+    const map = mapRef.current
+    const f = followedRef.current
+    if (!map || !f) return
+    map.easeTo({ center: f.center, zoom: f.zoom, bearing: f.bearing, duration: 150 })
+  }, [followedKey, live])
 
   // The basemap's attribution and the data layers' in one control. MapLibre takes custom attributions
   // only when a control is made, so a new set of credits replaces the control.
@@ -363,7 +390,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Only when a layer or its result changed: new deck.gl layers make deck.gl redraw all their data, and the canvas
   // re-renders the map on every camera move.
   useEffect(() => {
-    overlayRef.current?.setProps({ layers: [...deckLayers(states, { highlight }), shapeLayer(shapes), ...scenario.deck] })
+    overlayRef.current?.setProps({ layers: [...deckLayers(states, { highlight }), shapeLayer(shapes), ...ownCopies(scenario.deck)] })
     highlightRef.current = highlight
     statesRef.current = states
     shapesRef.current = shapes
@@ -391,7 +418,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
 
   return (
     <div className="ttx-map">
-      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title="Map" />
+      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title={analysis ? ANALYSIS_TITLE[analysis] : 'Map'} />
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {liveMap && (
@@ -407,7 +434,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
         )}
         {/* Notes and shapes are added in focus only; a double-click on the canvas lets the map pan, nothing more. */}
         {focused && mode === 'map' && <DrawingBox tool={tool} color={shapeColor} onTool={setTool} onColor={setShapeColor} />}
-        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} exposure={scenario.exposure} active={!!focused && mode === 'scenario'} />
+        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} exposure={scenario.exposure} analysis={analysis} active={analysisActive} />
         {!live && snapshot && (
           <>
             <img className="ttx-map__snapshot" src={snapshot} alt="" draggable={false} />
@@ -432,6 +459,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     </div>
   )
 }
+
+/**
+ * Copies of the scenario's deck.gl layers for one overlay. A layer belongs to the deck that first draws it: the map is
+ * rebuilt when it becomes live or not (leaving focus), and handing the old overlay's layers to the new one failed
+ * deck.gl's assertion, so routes, closures and exposure vanished from the map. A copy keeps the same id and props
+ * (data included), so deck.gl carries its state over and does not process the data again.
+ */
+const ownCopies = (layers: Layer[]) => layers.map((l) => l.clone({}))
 
 /** What `map` shows now, as a view. */
 function shown(map: MapLibreMap): Omit<SavedView, 'at'> {

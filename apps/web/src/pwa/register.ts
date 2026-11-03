@@ -7,6 +7,8 @@ import { useSyncExternalStore } from 'react'
  */
 
 let waiting: ServiceWorker | undefined
+/** The commit of the waiting version, once it has answered. */
+let waitingBuild: string | undefined
 const listeners = new Set<() => void>()
 
 export function registerServiceWorker() {
@@ -14,6 +16,13 @@ export function registerServiceWorker() {
   // Only a switch the person asked for reloads: the first install also takes control (clients.claim), with nothing to reload.
   let switching = false
   navigator.serviceWorker.addEventListener('controllerchange', () => switching && location.reload())
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const build = (event.data as { build?: unknown } | null)?.build
+    // The worker has no commit ('') when the build had none.
+    if (typeof build !== 'string' || !build) return
+    waitingBuild = build
+    for (const l of listeners) l()
+  })
   applyUpdate = () => {
     switching = true
     waiting?.postMessage('skipWaiting')
@@ -24,6 +33,7 @@ export function registerServiceWorker() {
       // With no controller this is the first install: there is no older version to replace.
       if (!worker || !navigator.serviceWorker.controller) return
       waiting = worker
+      worker.postMessage('build')
       for (const l of listeners) l()
     }
     offer(registration.waiting)
@@ -44,4 +54,11 @@ export const useUpdateReady = () =>
   useSyncExternalStore(
     (l) => (listeners.add(l), () => listeners.delete(l)),
     () => !!waiting,
+  )
+
+/** The commit of the version that is ready, once known. */
+export const useWaitingBuild = () =>
+  useSyncExternalStore(
+    (l) => (listeners.add(l), () => listeners.delete(l)),
+    () => waitingBuild,
   )

@@ -29,7 +29,7 @@
 }
 
 /*
- * The scenario's routes on the map (routing/RouteLegend.tsx), top left. On the canvas, so square and flat: a border,
+ * The scenario's routes on the map (routing/AnalysisSummary.tsx), top left. On the canvas, so square and flat: a border,
  * no shadow. Above deck.gl's canvas (2); not in the way of the pointer.
  */
 .ttx-routelegend {
@@ -73,6 +73,10 @@
 /* The flood depth line: the deepest of the depth colors (exposure/useExposure.ts DEPTH_COLORS). */
 .ttx-routelegend__depth {
   background: #08519c;
+}
+
+.ttx-routelegend__empty {
+  color: var(--ttx-muted);
 }
 
 .ttx-routelegend__title {
