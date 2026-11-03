@@ -15,6 +15,7 @@ export type Awareness = WebsocketProvider['awareness']
  * worked out in each browser from the op log instead (canvas/agentCursor.ts); presence only says what the agent
  * does now (`activity`: thinking, or a tool's title) and, for the room's agent, whom it works for (`for`). `hub: true`
  * says the tab has a working JupyterHub login, so the room's agent may ask it to run code (code/relay.ts); never the login.
+ * `presenting` says the person presents the board: the world rectangle they see, which those who join follow.
  */
 
 /** One person's (or the agent's) shared state, as this browser receives it. */
@@ -27,6 +28,20 @@ export interface Peer {
   /** Ids of the objects they have selected. */
   selection: string[]
   status?: 'thinking'
+  /** They present: the world rectangle they see, and when they started (presentation mode, canvas/presentation.ts). */
+  presenting?: Presenting
+}
+
+export interface Presenting {
+  view: { x: number; y: number; w: number; h: number }
+  since: number
+}
+
+function presentingFrom(value: unknown): Presenting | undefined {
+  const p = value as Partial<Presenting> | null | undefined
+  const v = p?.view
+  if (!v || typeof p.since !== 'number' || ![v.x, v.y, v.w, v.h].every(Number.isFinite) || v.w <= 0 || v.h <= 0) return undefined
+  return { view: v, since: p.since }
 }
 
 /** Everyone else with a user, from awareness states (clientId -> state). */
@@ -38,9 +53,17 @@ export function peersFrom(states: Map<number, Record<string, unknown>>, selfId: 
     const cursor = state.cursor as Peer['cursor'] | null | undefined
     const selection = Array.isArray(state.selection) ? (state.selection as string[]) : []
     const status = state.status === 'thinking' ? ('thinking' as const) : undefined
-    peers.push({ clientId, user, ...(cursor && { cursor }), selection, ...(status && { status }) })
+    const presenting = user.kind !== 'agent' ? presentingFrom(state.presenting) : undefined
+    peers.push({ clientId, user, ...(cursor && { cursor }), selection, ...(status && { status }), ...(presenting && { presenting }) })
   }
   return peers
+}
+
+/** Who presents to the board: the person who started last, when two do at once. */
+export function presenterOf(peers: Peer[]): (Peer & { presenting: Presenting }) | undefined {
+  let found: (Peer & { presenting: Presenting }) | undefined
+  for (const p of peers) if (p.presenting && (!found || p.presenting.since > found.presenting.since)) found = p as Peer & { presenting: Presenting }
+  return found
 }
 
 /** The key of an agent's cursor (canvas/agentCursor.ts): one per agent and person it acts for. */
@@ -131,24 +154,28 @@ export function publishSelection(awareness: Awareness, ids: Iterable<string>) {
 export const CURSOR_INTERVAL = 100
 
 /**
- * Shares this person's cursor, at most once per CURSOR_INTERVAL. The last position is always sent,
- * so others see where the pointer stopped. null hides the cursor (pointer left the canvas).
+ * Sets one presence field at most once per `interval`. The last value is always sent, so others see where it
+ * stopped. Each update wakes the room for a moment.
  */
-export function cursorSender(awareness: Pick<Awareness, 'setLocalStateField'>, interval = CURSOR_INTERVAL) {
+export function fieldSender<T>(awareness: Pick<Awareness, 'setLocalStateField'>, field: string, interval = CURSOR_INTERVAL) {
   let last = 0
-  let pending: { x: number; y: number } | null | undefined
+  let pending: T | null | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
   const flush = () => {
     timer = undefined
     last = Date.now()
-    awareness.setLocalStateField('cursor', pending ?? null)
+    awareness.setLocalStateField(field, pending ?? null)
     pending = undefined
   }
-  return (point: { x: number; y: number } | null) => {
-    pending = point
+  return (value: T | null) => {
+    pending = value
     if (timer) return
     const wait = interval - (Date.now() - last)
     if (wait <= 0) flush()
     else timer = setTimeout(flush, wait)
   }
 }
+
+/** Shares this person's cursor in world coordinates; null hides it (pointer left the canvas). */
+export const cursorSender = (awareness: Pick<Awareness, 'setLocalStateField'>, interval = CURSOR_INTERVAL) =>
+  fieldSender<{ x: number; y: number }>(awareness, 'cursor', interval)
