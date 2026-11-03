@@ -26,7 +26,7 @@ export function useRunCell(runtime: Runtime, id: string) {
     if (r.status === 'failed') setProblem(r.error)
   }
   const canRun = hub.status === 'ready'
-  const why = hub.status === 'checking' ? 'Checking your JupyterHub login…' : hub.status === 'error' ? hub.error : 'Connect your JupyterHub in the user menu to run code'
+  const why = hub.status === 'checking' ? 'Checking your JupyterHub login…' : hub.status === 'error' ? hub.error : 'Connect your JupyterHub in Settings (the gear in the user menu) to run code'
   return { run, running, problem, canRun, why: canRun ? undefined : why }
 }
 

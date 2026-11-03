@@ -26,7 +26,7 @@ export interface RelayDeps {
 export async function answer(req: RelayRequest, deps: RelayDeps): Promise<RelayReply> {
   if (!RELAYED.has(req.tool)) return { id: req.id, error: `This tab does not run ${req.tool} for the room's agent.` }
   if (!deps.sentHere(req.messageId)) return { id: req.id, error: 'This tab runs code only for messages sent from it.' }
-  if (!deps.hubReady()) return { id: req.id, error: "The asker's tab has no JupyterHub login: connect one in the user menu." }
+  if (!deps.hubReady()) return { id: req.id, error: "The asker's tab has no JupyterHub login: connect one in Settings (the gear in the user menu)." }
   try {
     return { id: req.id, result: await deps.run(req.tool, req.input) }
   } catch (err) {

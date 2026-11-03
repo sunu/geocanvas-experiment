@@ -46,7 +46,8 @@ Decisions:
 - `board/plugins.ts`: `usePluginsOff(runtime)` (updates when the setting changes), `typeOn` and `templatesOn`.
 - The toolbar, the tool keys, file drops, the map's Add layer sections (events, HDX HAPI, notebooks), Add to report
   and the event card's ReliefWeb button check the setting.
-- `chrome/SettingsDialog.tsx`: the gear in the user menu opens Board settings. Each optional plugin has a checkbox.
+- `chrome/SettingsDialog.tsx`: the gear in the user menu opens Settings. Its Plugins tab has a checkbox for each
+  optional plugin; its JupyterHub tab has the person's own hub login, which was a button in the user menu before.
   A plugin that is off because a plugin it needs is off has a disabled checkbox and the text "Needs …".
 
 ## Limits

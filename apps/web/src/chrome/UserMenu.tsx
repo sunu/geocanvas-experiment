@@ -14,7 +14,7 @@ import type { Awareness } from '../board/presence'
 import { PresenceAvatars } from './PresenceAvatars'
 import { SettingsDialog } from './SettingsDialog'
 import { useViewState } from '../canvas/viewState'
-import { HubButton } from '../code/HubButton'
+import { HubStatusDot } from '../code/HubSettings'
 import type { useBridgeStatus } from '../mcp/bridge'
 
 const BRIDGE_LABEL = { connecting: 'Connecting to the MCP companion…', connected: 'An external agent can work on this board', disconnected: 'The MCP companion is not running' }
@@ -52,10 +52,10 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
           {bridge === 'connected' ? <PlugsConnectedIcon className="size-4" /> : <PlugsIcon className="size-4" />}
         </span>
       )}
-      <HubButton />
-      <Hint label="Board settings">
-        <Button variant="ghost" size="icon-sm" aria-label="Board settings" onClick={() => setSettings(true)}>
+      <Hint label="Settings: plugins on this board, your JupyterHub">
+        <Button variant="ghost" size="icon-sm" aria-label="Settings" className="relative" onClick={() => setSettings(true)}>
           <GearIcon className="size-4" />
+          <HubStatusDot />
         </Button>
       </Hint>
       <SettingsDialog runtime={runtime} open={settings} onOpenChange={setSettings} />

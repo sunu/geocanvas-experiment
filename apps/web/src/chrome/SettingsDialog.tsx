@@ -1,11 +1,14 @@
 import type { Runtime } from '@ttx/core'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { usePluginsOff } from '../board/plugins'
+import { HubSettings } from '../code/HubSettings'
 
 /**
- * The board's settings, for everyone on it. Plugins: turn optional plugins on or off (board.setPlugins). A plugin
- * that is off is not offered in the toolbar, the palette or to agents; the objects it made stay on the board.
+ * Settings, from the gear in the user menu. Plugins is the board's, for everyone on it: turn optional plugins on or
+ * off (board.setPlugins). A plugin that is off is not offered in the toolbar, the palette or to agents; the objects
+ * it made stay on the board. JupyterHub is this person's own login, kept in this browser (code/hub.ts).
  */
 export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runtime; open: boolean; onOpenChange(open: boolean): void }) {
   const off = usePluginsOff(runtime)
@@ -21,35 +24,42 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Board settings</DialogTitle>
-          <DialogDescription>These settings are for everyone on this board.</DialogDescription>
+          <DialogTitle>Settings</DialogTitle>
+          <DialogDescription className="sr-only">Plugins on this board, and your JupyterHub login.</DialogDescription>
         </DialogHeader>
-        <section aria-labelledby="ttx-settings-plugins" className="grid gap-3">
-          <div>
-            <h3 id="ttx-settings-plugins" className="text-sm font-medium">
-              Plugins
-            </h3>
-            <p className="text-sm text-muted-foreground">A plugin that is off is not offered in the toolbar, the palette or to agents. What it already added stays on the board.</p>
-          </div>
-          <ul className="m-0 grid max-h-[60vh] list-none gap-2 overflow-y-auto p-0">
-            {plugins.map((p) => {
-              // Off because a plugin it needs is off: turn that one on first.
-              const needs = !stored.includes(p.id) && off.has(p.id) ? p.dependsOn?.filter((d) => off.has(d)) : undefined
-              return (
-                <li key={p.id}>
-                  <label className="flex items-start gap-3 rounded-md p-2 hover:bg-muted">
-                    <Checkbox className="mt-0.5" checked={!off.has(p.id)} disabled={!!needs?.length} onCheckedChange={(on) => set(p.id, on === true)} />
-                    <span className="grid gap-0.5">
-                      <span className="text-sm font-medium">{p.title}</span>
-                      {p.description && <span className="text-sm text-muted-foreground">{p.description}</span>}
-                      {!!needs?.length && <span className="text-sm text-muted-foreground">Needs {needs.map(title).join(', ')}</span>}
-                    </span>
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
+        <Tabs defaultValue="plugins" className="gap-3">
+          <TabsList className="w-full">
+            <TabsTrigger value="plugins">Plugins</TabsTrigger>
+            <TabsTrigger value="hub">JupyterHub</TabsTrigger>
+          </TabsList>
+          <TabsContent value="plugins" className="grid gap-3">
+            <p className="text-sm text-muted-foreground">
+              For everyone on this board. A plugin that is off is not offered in the toolbar, the palette or to agents. What it already added stays on the board.
+            </p>
+            <ul className="m-0 grid max-h-[60vh] list-none gap-2 overflow-y-auto p-0">
+              {plugins.map((p) => {
+                // Off because a plugin it needs is off: turn that one on first.
+                const needs = !stored.includes(p.id) && off.has(p.id) ? p.dependsOn?.filter((d) => off.has(d)) : undefined
+                return (
+                  <li key={p.id}>
+                    <label className="flex items-start gap-3 rounded-md p-2 hover:bg-muted">
+                      <Checkbox className="mt-0.5" checked={!off.has(p.id)} disabled={!!needs?.length} onCheckedChange={(on) => set(p.id, on === true)} />
+                      <span className="grid gap-0.5">
+                        <span className="text-sm font-medium">{p.title}</span>
+                        {p.description && <span className="text-sm text-muted-foreground">{p.description}</span>}
+                        {!!needs?.length && <span className="text-sm text-muted-foreground">Needs {needs.map(title).join(', ')}</span>}
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          </TabsContent>
+          <TabsContent value="hub" className="grid gap-3">
+            <p className="text-sm text-muted-foreground">Only for you, in this browser. Code cells run on your own hub, as you.</p>
+            <HubSettings />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   )

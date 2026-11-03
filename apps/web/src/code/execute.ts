@@ -68,7 +68,7 @@ export const codeExecuteTool = defineTool({
   ...codeExecuteSpec,
   async run({ source, fresh }): Promise<ExecResult> {
     const session = hubSession()
-    if (!session) throw new Error(hubState().error ?? 'Running code needs a JupyterHub login in this browser: connect one in the user menu.')
+    if (!session) throw new Error(hubState().error ?? 'Running code needs a JupyterHub login in this browser: connect one in Settings (the gear in the user menu).')
     const kept = memo.get(source)
     if (!fresh && kept && Date.now() - kept.at < MEMO_MS) return kept.result
     const raw = await session.run(source, { timeoutMs: RUN_TIMEOUT_MS })
