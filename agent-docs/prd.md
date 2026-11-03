@@ -44,7 +44,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Right-click menu, rename a widget by its name, frames | Built | Frames group objects; dragging a frame moves what is in it. |
 | Cards from pasted links: GitHub issues and pull requests, IFRC GO emergencies | In review (#90) |  |
 | Undo and redo of your own edits, one step per gesture | Built |  |
-| Board settings: turn optional plugins on or off | Built | Per board, for everyone (`plans/plan-024.md`). A plugin that is off is not offered in the toolbar, the palette or to agents; its objects stay. Map, links and agent are always on. |
+| Board settings: turn optional plugins on or off | Built | Per board, for everyone (`plans/plan-024.md`). A plugin that is off is not offered in the toolbar, the palette or to agents; its objects stay. The board's agent and external agents (MCP) can be turned off apart. Core, map and links are always on. |
 | Uploads to R2 and the uploads gallery | Built | Images up to 10 MB, PDFs up to 25 MB, map data (GeoJSON, GeoParquet, zipped shapefile) up to 50 MB. One bucket per Worker. Tabular uploads come with the Table (step 12). Deleting a branch does not delete its bucket yet. |
 | Dark mode: system setting plus app toggle | Planned (step 11) | New CSS uses `--ttx-*` tokens only, so this step changes tokens and nothing else. |
 

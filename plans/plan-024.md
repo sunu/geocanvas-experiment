@@ -23,8 +23,9 @@ Decisions:
 ### Which plugins can be off
 
 - `Plugin.optional: true` marks a plugin that a board can turn off. `Plugin.description` is one line for Settings.
-- Optional: events, notebooks, reliefweb, hapi, history, images, openeo, pdfs, inputs, templates, reports, code.
-- Always on: core, map, links, agent. Many plugins depend on map; making map optional is a later step.
+- Optional: events, notebooks, reliefweb, hapi, history, images, openeo, pdfs, inputs, templates, reports, code,
+  agent and mcp (see Agents).
+- Always on: core, map, links. Many plugins depend on map; making map optional is a later step.
 - `Registry.disabled(ids)` gives the optional plugins in `ids` and each optional plugin that depends on one of them.
 
 ### What "off" removes
@@ -49,6 +50,16 @@ Decisions:
 - `chrome/SettingsDialog.tsx`: the gear in the user menu opens Settings. Its Plugins tab has a checkbox for each
   optional plugin; its JupyterHub tab has the person's own hub login, which was a button in the user menu before.
   A plugin that is off because a plugin it needs is off has a disabled checkbox and the text "Needs …".
+
+### Agents
+
+- **Agent** (`agent`): the board's agent in the chat, in the room's Durable Object or on a person's own key. When it
+  is off, `Agent` replies `AGENT_OFF` to each message and calls no model. The app shows no chat panel, no "describe
+  in words" on a map, no "Ask agent to fix" on a code cell, and on the phone no Ask tab.
+- **External agents (MCP)** (`mcp`, a plugin with no ops): when it is off, the MCP executor gives an empty manifest
+  and refuses each call, snapshot and undo (`MCP_OFF`). The user menu shows no MCP light.
+- The two are separate, so a board can turn off the chat agent and keep a person's own Claude or Codex, or turn off
+  both.
 
 ## Limits
 
