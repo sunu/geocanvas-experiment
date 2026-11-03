@@ -4,6 +4,7 @@ import { Draft, type Chat, type ChatEntry, type Runtime, type TargetRef } from '
 import type { ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
+import { templatesOn, typeOn, usePluginsOff } from '../board/plugins'
 import { cursorSender, publishSelection, useAgentActivities, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
@@ -117,6 +118,7 @@ function trackDrag(
 export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runtime; chat: Chat; awareness: Awareness; onUploads(): void }) {
   const board = runtime.board as Board
   const objects = useObjects(board)
+  const pluginsOff = usePluginsOff(runtime)
   const peers = usePeers(awareness)
   const agentTouched = useAgentTouched(runtime)
   const me = (awareness.getLocalState() as { user?: { id?: string } } | null)?.user?.id
@@ -496,7 +498,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
         // ⇧ with a key picks the tool listed as '⇧<key>' (the arrow is ⇧L), else the plain one.
         const k = e.key.toUpperCase()
         const t = (e.shiftKey && tools().find((t) => t.key === `⇧${k}`)) || tools().find((t) => t.key.toUpperCase() === k)
-        if (t) setTool(t.tool)
+        if (t && typeOn(runtime, runtime.disabledPlugins(), t.tool)) setTool(t.tool)
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
@@ -817,6 +819,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
         onFiles={(files) => placeFiles(runtime, files, viewCenter())}
         onUploads={onUploads}
         onTemplates={() => setPaletteOpen('templates')}
+        on={(t) => typeOn(runtime, pluginsOff, t)}
+        templates={templatesOn(runtime, pluginsOff)}
       />}
 
       {paletteOpen && (

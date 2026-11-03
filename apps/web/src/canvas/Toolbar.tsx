@@ -95,6 +95,10 @@ interface Props {
   onUploads(): void
   /** The Templates button: the palette with templates only. */
   onTemplates(): void
+  /** False for a tool whose plugin is turned off on the board (board/plugins.ts). */
+  on(tool: Tool): boolean
+  /** False when every template needs a plugin that is off. */
+  templates: boolean
 }
 
 /** A category of the toolbar, named for screen readers: its buttons in a row. */
@@ -181,7 +185,7 @@ function ToolGroup({ name, items, tool, onTool }: GroupProps) {
  * weight and a one-word name under each, the selected tool filled, each with a tooltip for its key. Arrange, delete and the command palette have no
  * button here: they are on the keys (], [, Delete, ⌘K).
  */
-export function Toolbar({ tool, onTool, onFiles, onUploads, onTemplates }: Props) {
+export function Toolbar({ tool, onTool, onFiles, onUploads, onTemplates, on, templates }: Props) {
   const pdfInput = useRef<HTMLInputElement>(null)
   const separator = <Separator orientation="vertical" className="data-[orientation=vertical]:h-8" />
   const button = ({ label, text, Icon, tool: type, key }: Item) => (
@@ -204,14 +208,14 @@ export function Toolbar({ tool, onTool, onFiles, onUploads, onTemplates }: Props
         {separator}
         <Section name="Explore">
           {/* An action, not a tool: it opens the palette's list of templates. */}
-          <Hint label="Insert a template, e.g. a situation report">
-            <Button variant="ghost" size="sm" className={BTN} aria-label="Insert a template" onClick={onTemplates}>
-              <Face Icon={SquaresFourIcon} text="Templates" />
-            </Button>
-          </Hint>
-          {button(EVENT)}
-          {EVENT_CONTEXT.map(button)}
-          {MAP_AND_REPORT.map(button)}
+          {templates && (
+            <Hint label="Insert a template, e.g. a situation report">
+              <Button variant="ghost" size="sm" className={BTN} aria-label="Insert a template" onClick={onTemplates}>
+                <Face Icon={SquaresFourIcon} text="Templates" />
+              </Button>
+            </Hint>
+          )}
+          {[EVENT, ...EVENT_CONTEXT, ...MAP_AND_REPORT].filter((i) => on(i.tool)).map(button)}
         </Section>
         {separator}
         <Section name="Board">
@@ -229,16 +233,20 @@ export function Toolbar({ tool, onTool, onFiles, onUploads, onTemplates }: Props
               </DropdownMenuTrigger>
             </Hint>
             <DropdownMenuContent align="center" side="top" sideOffset={8}>
-              <DropdownMenuItem onSelect={() => onTool(IMAGE.tool)}>
-                <IMAGE.Icon />
-                Image
-                <DropdownMenuShortcut>{IMAGE.key}</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => pdfInput.current?.click()}>
-                <FilePdfIcon />
-                PDF
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {on(IMAGE.tool) && (
+                <DropdownMenuItem onSelect={() => onTool(IMAGE.tool)}>
+                  <IMAGE.Icon />
+                  Image
+                  <DropdownMenuShortcut>{IMAGE.key}</DropdownMenuShortcut>
+                </DropdownMenuItem>
+              )}
+              {on('pdf') && (
+                <DropdownMenuItem onSelect={() => pdfInput.current?.click()}>
+                  <FilePdfIcon />
+                  PDF
+                </DropdownMenuItem>
+              )}
+              {(on(IMAGE.tool) || on('pdf')) && <DropdownMenuSeparator />}
               <DropdownMenuItem title="Files uploaded to this board, to put back or share" onSelect={onUploads}>
                 <FolderOpenIcon />
                 See previous uploads

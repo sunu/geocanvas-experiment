@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import type { Board } from '../board/board'
+import { usePluginsOff } from '../board/plugins'
 import { addToReport, boardReports } from '../reports/reports'
 import type { PanelInfo } from './registry'
 
@@ -59,6 +60,7 @@ export function ObjectPanel({
   notify(text: string): void
 }) {
   const { updated, prompt } = useObjectHistory(runtime, chat, object.id)
+  const reportsOn = !usePluginsOff(runtime).has('reports')
   const rows = [...info.metadata, ...(updated ? ([['Updated', new Date(updated).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })]] as [string, string][]) : [])]
   return (
     <aside
@@ -101,7 +103,7 @@ export function ObjectPanel({
           <ArrowsOutSimpleIcon />
           Open
         </Button>
-        {object.type !== 'report' && <AddToReport runtime={runtime} id={object.id} onSelect={onSelect} notify={notify} />}
+        {reportsOn && object.type !== 'report' && <AddToReport runtime={runtime} id={object.id} onSelect={onSelect} notify={notify} />}
       </div>
     </aside>
   )
