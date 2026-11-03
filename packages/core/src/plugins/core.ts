@@ -248,6 +248,17 @@ const setTitle = defineOp({
   apply: (tx, { title }) => tx.setTitle(title),
 })
 
+const setPlugins = defineOp({
+  id: 'board.setPlugins',
+  title: 'Turn plugins on or off',
+  description: 'Set the optional plugins turned off on this board, for everyone. Their objects stay. Undo does not cover it.',
+  target: { kind: 'canvas' },
+  args: z.object({ disabled: z.array(z.string()).describe('Ids of the plugins to turn off; the others are on') }),
+  // Hidden: people change it in Settings, never an agent.
+  hidden: true,
+  apply: (tx, { disabled }) => tx.setDisabledPlugins([...new Set(disabled)].sort()),
+})
+
 const viewOps = [
   defineOp({
     id: 'core.view.fitAll',
@@ -287,5 +298,5 @@ export const corePlugin = definePlugin({
   id: 'core',
   title: 'Core',
   objectTypes: [boxType, textType, stickyType, frameType],
-  ops: [setRect, move, rename, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), setTitle, ...viewOps],
+  ops: [setRect, move, rename, remove, duplicate, ...layerOps, setColor, setText, setFontSize, stepSize(1), stepSize(-1), setTitle, setPlugins, ...viewOps],
 })

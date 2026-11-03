@@ -70,6 +70,8 @@ export interface OpDef<Args = any, Plan = Args> {
   risk?: 'low' | 'high'
   /** Tool ids its prepare needs (OpContext.tools). Agents and the palette get the op only where they all are. */
   tools?: string[]
+  /** Object types it adds besides its own plugin's (a template's nodes). Not offered while one of their plugins is disabled. */
+  adds?: string[]
   /** Repeated dispatches of this op on one target in one gesture (a drag, typing) are one op log entry. */
   gesture?: boolean
   /** Hints for natural-language mode. */

@@ -34,18 +34,51 @@ export class Registry {
   private types = new Map<string, ObjectTypeDef>()
   private schemas = new Map<string, z.ZodObject>()
   private opDefs = new Map<string, OpDef<any, any>>()
+  /** The plugin of each op and object type; a '<type>.add' op belongs to its type's plugin. */
+  private owners = new Map<string, string>()
 
   constructor(plugins: Plugin[]) {
     this.plugins = sortByDependencies(plugins)
     for (const p of this.plugins) {
       addAll(this.types, p.objectTypes, (d) => d.type, p.id)
       addAll(this.opDefs, p.ops, (d) => d.id, p.id)
+      for (const t of p.objectTypes ?? []) this.owners.set(`type:${t.type}`, p.id)
+      for (const op of p.ops ?? []) this.owners.set(op.id, p.id)
     }
     for (const t of this.types.values()) {
       this.schemas.set(t.type, placement.extend(t.fields.shape))
       if (t.addable === false) continue
-      addAll(this.opDefs, [addOp(t)], (d) => d.id, 'registry')
+      const add = addOp(t)
+      addAll(this.opDefs, [add], (d) => d.id, 'registry')
+      this.owners.set(add.id, this.pluginOfType(t.type)!)
     }
+  }
+
+  pluginOfType(type: string): string | undefined {
+    return this.owners.get(`type:${type}`)
+  }
+
+  pluginOfOp(id: string): string | undefined {
+    return this.owners.get(id)
+  }
+
+  /**
+   * The plugins turned off on a board: the optional ones among `ids` (Board.disabledPlugins), and every plugin
+   * that depends on one of them. A plugin that is not optional is never turned off.
+   */
+  disabled(ids: readonly string[]): Set<string> {
+    const out = new Set(this.plugins.filter((p) => p.optional && ids.includes(p.id)).map((p) => p.id))
+    // Sorted by dependencies, so one pass reaches every plugin that depends on a disabled one.
+    for (const p of this.plugins) if (p.optional && p.dependsOn?.some((d) => out.has(d))) out.add(p.id)
+    return out
+  }
+
+  /** False for an op of a disabled plugin, or one that adds a type of a disabled plugin (OpDef.adds). */
+  opEnabled(op: OpDef<any, any>, disabled: ReadonlySet<string>): boolean {
+    if (!disabled.size) return true
+    const own = this.pluginOfOp(op.id)
+    if (own && disabled.has(own)) return false
+    return !op.adds?.some((type) => disabled.has(this.pluginOfType(type) ?? ''))
   }
 
   objectType(type: string): ObjectTypeDef | undefined {

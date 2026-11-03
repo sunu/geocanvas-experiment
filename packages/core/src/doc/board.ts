@@ -77,4 +77,10 @@ export class Board<O extends AnyObject = AnyObject> {
     const t = this.meta.get('title')
     return typeof t === 'string' && t ? t : undefined
   }
+
+  /** Ids of the optional plugins turned off on this board (Registry.disabled adds the plugins that need them). */
+  get disabledPlugins(): string[] {
+    const ids = this.meta.get('disabledPlugins')
+    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
+  }
 }
