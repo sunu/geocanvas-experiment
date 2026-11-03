@@ -603,6 +603,19 @@ describe('skills and deferred tools', () => {
     expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the sitrep-style skill', status: 'applied' }])
   })
 
+  it('tells a model that sent fields outside args, and places its call when it sends them again', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('history__add', { country: 'MOZ' }, 'flat')), tools(call('history__add', { args: { country: 'MOZ' } }, 'wrapped')))
+    const message = chat.send({ actor: ada, text: 'disaster history of Mozambique', selection: [], center: { x: 2000, y: 2000 } })
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, m.complete)
+    expect(m.results[0]).toMatch(/under \\"args\\".*country/)
+    const cards = person(doc).board.list().filter((o) => o.type === 'history')
+    expect(cards).toHaveLength(1)
+    expect(cards[0]).toMatchObject({ country: 'MOZ' })
+    expect(cards[0]!.x).toBeGreaterThan(1000)
+    expect(reply.calls.map((c) => c.status)).toEqual(['failed', 'applied'])
+  })
+
   it('says nothing of board skills on a board without them', async () => {
     const { doc, chat } = board()
     const m = recording()
