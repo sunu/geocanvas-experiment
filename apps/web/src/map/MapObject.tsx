@@ -18,6 +18,7 @@ import { drawShape } from './draw'
 import { boundsOf, deckLayers, shapeLayer, useLayerStates } from './layers'
 import { creditsOf, pictureRequest, WORLD } from './picture'
 import { useViewState } from '../canvas/viewState'
+import { presentation, presentMap, unfollow, useFollowedMap } from '../canvas/presentation'
 import { registerLiveMap } from './live'
 import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
@@ -151,6 +152,11 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const live = !paused && (pooled || editing || focused)
   const view = mine ?? latest ?? WORLD
   const snapshot = useSnapshot(live || paused ? undefined : pictureRequest(o, view, layers, shapes, scenario))
+  // Presentation mode (canvas/presentation.ts): what the presenter's map shows, while this person follows them.
+  const followed = useFollowedMap(o.id)
+  const followedRef = useRef(followed)
+  followedRef.current = followed
+  const followedKey = followed && `${followed.center[0]},${followed.center[1]},${followed.zoom},${followed.bearing}`
 
   useEffect(() => {
     if (!live) return
@@ -211,6 +217,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     map.on('mouseout', () => {
       setHover(undefined)
       hoverCode(undefined, 'map')
+    })
+    // A presenter shares what this map shows whenever it moves, whoever moved it. A follower who moves it themselves
+    // stops following, as on the canvas.
+    map.on('move', () => {
+      if (presentation().presenting !== null) presentMap({ id: o.id, ...shown(map) })
+    })
+    map.on('movestart', (e: { originalEvent?: Event }) => {
+      if (e.originalEvent && followedRef.current) unfollow()
     })
     mapRef.current = map
     overlayRef.current = overlay
@@ -344,6 +358,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       save()
     }
   }, [views, runtime, o.id, live])
+
+  // A follower's map goes where the presenter's is. With no originalEvent, the move is not saved as their view.
+  useEffect(() => {
+    const map = mapRef.current
+    const f = followedRef.current
+    if (!map || !f) return
+    map.easeTo({ center: f.center, zoom: f.zoom, bearing: f.bearing, duration: 150 })
+  }, [followedKey, live])
 
   // The basemap's attribution and the data layers' in one control. MapLibre takes custom attributions
   // only when a control is made, so a new set of credits replaces the control.
