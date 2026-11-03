@@ -84,6 +84,22 @@
   border-left: 2px solid var(--agent);
 }
 
+.ttx-chat__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+.ttx-chat__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--agent);
+}
+
 .ttx-chat__to {
   font-weight: 500;
 }

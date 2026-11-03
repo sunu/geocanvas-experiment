@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
 import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
-import { exchanges, failedCalls, lastCompaction, type Actor, type AgentReply, type Chat, type ChatEntry, type OplogEntry, type Runtime, type TurnUndo, type UserMessage } from '@ttx/core'
+import { exchanges, failedCalls, lastCompaction, queuePosition, type Actor, type AgentReply, type Chat, type ChatEntry, type OplogEntry, type Runtime, type TurnUndo, type UserMessage } from '@ttx/core'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
-import { useAgentActivities, useOwnSelection, usePeers, type Awareness } from '../board/presence'
+import { AGENT } from '@ttx/plugins'
+import { agentKey, useAgentActivities, useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { objectName } from '../canvas/registry'
 import { TAB_ID } from './browserAgent'
 import { forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
@@ -21,7 +22,7 @@ const LOST_AFTER_MS = 120_000
  */
 export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat: Chat; awareness: Awareness }) {
   const thread = useChatThread(runtime, chat, awareness)
-  const { entries, thinking, activity } = thread
+  const { entries, thinking, working } = thread
   const selection = useOwnSelection(awareness)
   const [text, setText] = useState('')
   const [mode, setMode] = useState<AgentMode>(loadMode)
@@ -73,16 +74,18 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
             Describe
           </button>
         </h2>
-        {collapsed && thinking && (
-          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
-            <span className="size-2 rounded-full bg-[var(--agent)]" aria-hidden />
-            {activity ?? 'Thinking'}…
+        {collapsed && working[0] && (
+          <span className="ml-auto inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" role="status">
+            <span className="size-2 shrink-0 rounded-full bg-[var(--agent)]" aria-hidden />
+            <span className="truncate">
+              For {working[0].actor.name ?? 'someone'}: {thread.status(working[0]).activity}…
+            </span>
           </span>
         )}
         <Button
           variant="ghost"
           size="icon-sm"
-          className={cn(!(collapsed && thinking) && 'ml-auto')}
+          className={cn(!(collapsed && working[0]) && 'ml-auto')}
           title={collapsed ? 'Open chat' : 'Collapse chat'}
           aria-label={collapsed ? 'Open chat' : 'Collapse chat'}
           aria-expanded={!collapsed}
@@ -130,17 +133,22 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   )
 }
 
-/** What the chat shows, read from the doc and presence: its entries, and what the agents are doing now. */
+/** What the chat shows, read from the doc and presence: its entries, and what the agents are doing now and for whom. */
 export function useChatThread(runtime: Runtime, chat: Chat, awareness: Awareness) {
   const entries = useSyncExternalStore(chat.subscribe, chat.list)
   // The room's agent, or a person whose browser agent works; or this tab's own.
   const peerThinking = usePeers(awareness).some((p) => p.status === 'thinking')
   const thinking = useOwnStatus(awareness) === 'thinking' || peerThinking
-  // What an agent does now (thinking, a search), as its cursor's tag says.
-  const activity: string | undefined = useAgentActivities(awareness).values().next().value
+  // What an agent does now (thinking, a search) for each person, as its cursor's tag says.
+  const activities = useAgentActivities(awareness)
   const undone = useUndoneReplies(runtime)
-  const pending = new Set(chat.pending().map((m) => m.id))
-  return { entries, thinking, activity, undone, pending }
+  const queue = chat.pending()
+  const pending = new Set(queue.map((m) => m.id))
+  /** Where a message is: answered now (with what the agent does), queued behind others, or neither (-1). */
+  const status = (m: UserMessage) => ({ ahead: queuePosition(queue, m), activity: activities.get(agentKey(AGENT.id, m.actor.id)) })
+  // The messages answered now, for the collapsed panel's header.
+  const working = queue.filter((m) => queuePosition(queue, m) === 0 && activities.has(agentKey(AGENT.id, m.actor.id)))
+  return { entries, thinking, undone, pending, status, working }
 }
 
 export type ChatThread = ReturnType<typeof useChatThread>
@@ -158,12 +166,12 @@ export function sendMessage(runtime: Runtime, chat: Chat, text: string, selectio
 }
 
 /**
- * The thread's exchanges, each reply under the message it answers, and the agent's thinking line. The exchanges before
+ * The thread's exchanges, each reply under the message it answers, and each unanswered message's place in its queue. The exchanges before
  * the last compaction are hidden until "Show earlier". With `onOpen`, each reply also lists the objects it added and
  * changed, to open them: where the canvas is not there to show them (the phone's layout).
  */
 export function ChatEntries({ runtime, thread, onOpen }: { runtime: Runtime; thread: ChatThread; onOpen?(id: string): void }) {
-  const { entries, thinking, activity, undone, pending } = thread
+  const { entries, thinking, undone, pending, status } = thread
   const [showEarlier, setShowEarlier] = useState(false)
   const all = useMemo(() => exchanges(entries), [entries])
   const compaction = lastCompaction(entries).reply
@@ -181,12 +189,11 @@ export function ChatEntries({ runtime, thread, onOpen }: { runtime: Runtime; thr
           <CompactionEntry key={reply.id} reply={reply} by={message?.actor ?? askerOf(entries, reply)} />
         ) : (
           <div key={(message ?? reply)!.id} className="ttx-chat__exchange">
-            {message && <UserEntry message={message} lost={isLost(message, pending, thinking)} />}
+            {message && <UserEntry message={message} lost={isLost(message, pending, thinking)} status={reply ? undefined : status(message)} />}
             {reply && <AgentEntry reply={reply} asker={message?.actor} runtime={runtime} undone={undone.has(reply.id)} onOpen={onOpen} />}
           </div>
         ),
       )}
-      {thinking && <p className="ttx-chat__thinking">{activity ? `Agent: ${activity}…` : 'Agent is thinking…'}</p>}
     </>
   )
 }
@@ -272,7 +279,7 @@ function isLost(message: UserMessage, pending: Set<string>, thinking: boolean): 
   return !!message.browserTab && message.browserTab !== TAB_ID && pending.has(message.id) && !thinking && Date.now() - message.at > LOST_AFTER_MS
 }
 
-function UserEntry({ message, lost }: { message: UserMessage; lost: boolean }) {
+function UserEntry({ message, lost, status }: { message: UserMessage; lost: boolean; status?: { ahead: number; activity?: string } }) {
   return (
     <div className="ttx-chat__entry">
       <div className="ttx-chat__who" style={{ color: message.actor.color }}>
@@ -281,7 +288,23 @@ function UserEntry({ message, lost }: { message: UserMessage; lost: boolean }) {
         {message.browserTab && <span className="ttx-chat__chip" title="Answered by an agent in the sender's browser, on their own key">own key</span>}
       </div>
       <div className="ttx-chat__text">{message.text}</div>
-      {lost && <div className="ttx-chat__undone">No answer: the sender's tab closed.</div>}
+      {lost ? (
+        <div className="ttx-chat__undone">No answer: the sender's tab closed.</div>
+      ) : (
+        status &&
+        status.ahead >= 0 && (
+          <div className="ttx-chat__status" role="status">
+            {status.ahead > 0 ? (
+              `Queued · ${status.ahead} ahead`
+            ) : (
+              <>
+                <span className="ttx-chat__dot" aria-hidden />
+                {status.activity ?? 'Waiting for the agent'}…
+              </>
+            )}
+          </div>
+        )
+      )}
     </div>
   )
 }
