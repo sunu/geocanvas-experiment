@@ -199,6 +199,8 @@ const newBlock = z.discriminatedUnion('kind', [
 export const reportsPlugin = definePlugin({
   id: 'reports',
   title: 'Reports',
+  description: 'Reports to write, print and save as PDF.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

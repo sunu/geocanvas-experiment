@@ -50,6 +50,8 @@ const forCountry = (what: string, country?: string) => (country ? `${what} in ${
 export const hapiPlugin = definePlugin({
   id: 'hapi',
   title: 'HDX HAPI',
+  description: "A country's context, who's where and conflict, from HDX HAPI.",
+  optional: true,
   dependsOn: ['core', 'map'],
   objectTypes: [
     {

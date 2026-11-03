@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/context-menu'
 import type { Board } from '../board/board'
 import { CodeMenu } from '../code/CodeMenu'
+import { usePluginsOff } from '../board/plugins'
 import { addToReport, boardReports } from '../reports/reports'
 
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
@@ -49,9 +50,9 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
   const available = new Set(runtime.availableOps(target).map((op) => op.id))
   const unlink = available.has('link.remove')
   const refresh = available.has('link.refresh')
-  // Reports (agent-docs/tasks/reports.md §4): not for a selection of reports only.
+  // Reports (agent-docs/tasks/reports.md §4): not for a selection of reports only, nor when reports are turned off.
   const board = runtime.board as Board
-  const canReport = ids.some((id) => board.get(id)?.type !== 'report')
+  const canReport = !usePluginsOff(runtime).has('reports') && ids.some((id) => board.get(id)?.type !== 'report')
   const reports = canReport ? boardReports(board, ids) : []
   const report = async (reportId?: string) => {
     const r = await addToReport(runtime, ids, reportId)

@@ -17,6 +17,8 @@ const page = z.number().int().min(1).describe('Page number, from 1')
 export const pdfsPlugin = definePlugin({
   id: 'pdfs',
   title: 'PDFs',
+  description: 'PDFs uploaded to the board.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

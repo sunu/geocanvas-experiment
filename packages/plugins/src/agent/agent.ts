@@ -13,6 +13,9 @@ export const TURNS_PER_HOUR = 20
 /** A message for the room's agent: one that no browser tab answers. */
 export const forRoom = (m: UserMessage) => !m.browserTab
 
+/** The reply to each message while the agent plugin is turned off on the board. */
+export const AGENT_OFF = 'The agent is turned off on this board (Settings).'
+
 /**
  * The board's agent. It answers the chat messages that `accepts` gives it, in order, one at a time, and writes
  * to the board through its own runtime. The room's Durable Object runs one on the server's key
@@ -83,6 +86,11 @@ export class Agent {
       // Called from the chat's observer: write after it returns, not inside it.
       await Promise.resolve()
       for (let message = this.pending()[0]; message; message = this.pending()[0]) {
+        // Turned off in Settings: the app has no chat then, but an older tab can still send.
+        if (this.runtime.disabledPlugins().has('agent')) {
+          this.chat.reply({ replyTo: message.id, text: AGENT_OFF, calls: [] })
+          continue
+        }
         if (!this.complete) {
           this.chat.reply({ replyTo: message.id, text: 'The agent is not configured: the server has no OPENROUTER_API_KEY.', calls: [] })
           continue

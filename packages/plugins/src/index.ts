@@ -1,5 +1,6 @@
 export { plugins } from './plugins.js'
 export { agentPlugin } from './agent.js'
+export { mcpPlugin } from './mcp.js'
 export { CODE_EXECUTE_TOOL, codeExecuteSpec, codePlugin, followersOf, type CodeBoardObject } from './code.js'
 export {
   ACCEPTS,
@@ -142,9 +143,9 @@ export {
   type Horizon,
 } from './weather.js'
 export { areaOfView, viewOfArea, MAP_HEADER_PX, type Area, type CenterZoom } from './mapView.js'
-export { Agent, AGENT, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
+export { Agent, AGENT, AGENT_OFF, forRoom, TURNS_PER_HOUR } from './agent/agent.js'
 export { decodeRelay, encodeRelay, NO_ANSWER, RELAY_MESSAGE, RELAY_TIMEOUT_MS, RelayCalls, relayedTool, type RelayReply, type RelayRequest } from './agent/relay.js'
-export { agentTools, availableSkills, coreToolNames, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn, SEARCH_RESULTS, searchTools, THINKING } from './agent/loop.js'
+export { agentTools, availableSkills, coreToolNames, readToolsOn, HISTORY_ENTRIES, HISTORY_MS, MAX_STEPS, runTurn, SEARCH_RESULTS, searchTools, THINKING } from './agent/loop.js'
 export { parseSkill, SKILLS, type Skill } from './skills/index.js'
 export { callOp, firstAddSpot, GAP, MAX_SIZE_FACTOR, TurnLog, type OpCall } from './agent/call.js'
 export { chatCompletions, openRouter, OPENROUTER_URL, type Complete, type FunctionTool, type Message, type ToolCall } from './agent/complete.js'

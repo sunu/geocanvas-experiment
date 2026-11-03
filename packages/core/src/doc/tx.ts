@@ -101,6 +101,12 @@ export class BoardTx {
     else this.board.meta.delete('title')
   }
 
+  /** Turn optional plugins off on this board, for everyone. Ids not listed are on. */
+  setDisabledPlugins(ids: string[]) {
+    if (ids.length) this.board.meta.set('disabledPlugins', ids)
+    else this.board.meta.delete('disabledPlugins')
+  }
+
   /** Change a person's view of an object, e.g. the agent moves the map of the person who asked. */
   setView(person: string, objectId: string, view: Omit<SavedView, 'at'>) {
     if (!this.board.objects.has(objectId)) throw new Error(`Object ${objectId} does not exist`)

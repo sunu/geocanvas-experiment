@@ -3,7 +3,7 @@ import * as Y from 'yjs'
 import { z } from 'zod'
 import { defineOp, definePlugin, defineTool, Runtime, Views, type Actor, type OplogEntry, type ViewController } from '@ttx/core'
 import { plugins } from '@ttx/plugins'
-import { bounded, EXTERNAL_AGENT, Executor, MAX_RESULT_CHARS } from '../src/mcp/executor'
+import { bounded, EXTERNAL_AGENT, Executor, MAX_RESULT_CHARS, MCP_OFF } from '../src/mcp/executor'
 
 const ada: Actor = { kind: 'user', id: 'ada', name: 'Ada' }
 const canvas = { kind: 'canvas' } as const
@@ -50,6 +50,17 @@ describe('the MCP executor', () => {
     expect(names).not.toContain('pin__clearAll')
     expect(tools.find((t) => t.name === 'test__echo')!.annotations).toEqual({ readOnlyHint: true })
     expect(tools.find((t) => t.name === 'box__add')!.annotations).toBeUndefined()
+  })
+
+  it('refuses everything while external agents are turned off, and works with only the chat agent off', async () => {
+    const { person, executor } = setup()
+    person.dispatch('board.setPlugins', canvas, { disabled: ['agent'] })
+    expect(await executor.call('box__add', { args: {} })).toMatchObject({ status: 'applied' })
+    person.dispatch('board.setPlugins', canvas, { disabled: ['agent', 'mcp'] })
+    expect(executor.manifest().tools).toEqual([])
+    await expect(executor.call('box__add', { args: {} })).rejects.toThrow(MCP_OFF)
+    expect(() => executor.snapshot()).toThrow(MCP_OFF)
+    await expect(executor.undo()).rejects.toThrow(MCP_OFF)
   })
 
   it("adds in the middle of the person's view, then side by side, as the agent for the person", async () => {

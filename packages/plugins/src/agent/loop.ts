@@ -10,6 +10,7 @@ import {
   type ChatEntry,
   type Runtime,
   type ToolCallRecord,
+  type ToolDef,
   type ToolDefinition,
   type ToolRunner,
   type UserMessage,
@@ -40,13 +41,22 @@ Rules:
 - Only some tools are loaded. To do something none of them does, read the skill for it, or call tools__search with a few words for what you need: it loads the tools it finds.
 - When you are done, reply in one or two short sentences: say what you did, or why you could not.`
 
+/** The read-only tools an agent may call on this board: not those of a plugin turned off there. */
+export function readToolsOn(runtime: Runtime, tools: ToolRunner): ToolDef[] {
+  const disabled = runtime.disabledPlugins()
+  return tools.list().filter((t) => !t.plugin || !disabled.has(t.plugin))
+}
+
 /**
- * Every op an agent may call (not hidden, not a view op: the agent has no camera, and not one whose tools it lacks),
- * and the read-only tools.
+ * Every op an agent may call (not hidden, not a view op: the agent has no camera, not one whose tools it lacks,
+ * and not one of a plugin turned off on the board), and the read-only tools.
  */
 export function agentTools(runtime: Runtime, tools: ToolRunner): FunctionTool[] {
-  const ops = runtime.registry.ops().filter((op) => !op.hidden && !op.applyView && (op.tools ?? []).every((id) => tools.tool(id)))
-  const defs: ToolDefinition[] = [...exportTools(ops), ...exportToolDefs(tools.list())]
+  const disabled = runtime.disabledPlugins()
+  const ops = runtime.registry
+    .ops()
+    .filter((op) => !op.hidden && !op.applyView && (op.tools ?? []).every((id) => tools.tool(id)) && runtime.registry.opEnabled(op, disabled))
+  const defs: ToolDefinition[] = [...exportTools(ops), ...exportToolDefs(readToolsOn(runtime, tools))]
   const names = new Set<string>()
   for (const d of defs) {
     if (names.has(d.name)) throw new Error(`Two agent tools are named ${d.name}`)
@@ -234,7 +244,7 @@ export async function runTurn(
       calls.push({ tool: name, title: 'Search tools', status: 'applied' })
       return JSON.stringify(found.length ? { loaded: found.map((t) => ({ name: t.function.name, description: t.function.description })) } : { loaded: [], note: 'No tool matches. Try other words.' })
     }
-    const read = readTools.list().find((t) => toolNameOf(t.id) === name)
+    const read = readToolsOn(runtime, readTools).find((t) => toolNameOf(t.id) === name)
     if (read) {
       onActivity(read.title)
       try {

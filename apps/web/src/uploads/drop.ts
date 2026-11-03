@@ -34,7 +34,14 @@ async function placeFile(runtime: Runtime, file: File, at: { x: number; y: numbe
   const key = addPending({ name: file.name, rect: { x: at.x - size.w / 2, y: at.y - h / 2, w: size.w, h } })
   const room = roomFromHash(location.hash)
   // GeoJSON goes on a new map; other map data goes on a map, from its Add layer options.
-  const refused = !room ? 'This board has no room to upload to' : kind === 'data' && !isGeoJsonFile(file) ? 'Add GeoParquet and zipped shapefiles to a map, from its Add layer options' : refusal(file)
+  const off = runtime.disabledPlugins().has(runtime.registry.pluginOfType(TYPE_OF[kind]) ?? '')
+  const refused = !room
+    ? 'This board has no room to upload to'
+    : off
+      ? `${runtime.registry.objectType(TYPE_OF[kind])!.title} widgets are turned off on this board (Settings)`
+      : kind === 'data' && !isGeoJsonFile(file)
+        ? 'Add GeoParquet and zipped shapefiles to a map, from its Add layer options'
+        : refusal(file)
   if (refused) return updatePending(key, { error: refused })
   try {
     const id = await uploadFile(file, room!, runtime.actor.id, (sent) => updatePending(key, { progress: sent }))

@@ -55,6 +55,7 @@ export function conflictByArea(rows: Row[], level: AdminLevel, field: 'events' |
 
 export const choroplethTool = defineTool({
   id: CHOROPLETH_TOOL,
+  plugin: 'hapi',
   title: 'HDX HAPI by area',
   description: `A figure from HDX HAPI for each province or district of a country, by P-code: ${Object.entries(INDICATORS)
     .map(([k, d]) => `${k} (${d.label})`)

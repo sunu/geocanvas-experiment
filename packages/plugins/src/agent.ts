@@ -65,6 +65,8 @@ function revert(tx: BoardTx, { created, before }: TurnUndo) {
 export const agentPlugin = definePlugin({
   id: 'agent',
   title: 'Agent',
+  description: 'The board\'s agent in the chat, on the server or on your own key.',
+  optional: true,
   dependsOn: ['core'],
   ops: [undoTurn, revertOp],
 })

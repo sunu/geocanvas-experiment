@@ -8,6 +8,7 @@ import { overviewOf } from '@ttx/plugins/monty/search'
 import { sourceLabel } from '@ttx/plugins/monty/sources'
 import { feedFor, glidesOf, type EventBoardObject } from '@ttx/plugins'
 import type { DisasterEvent, DisasterType, EventSummary, ImpactTotals, SourceReport } from '@ttx/plugins/monty/types'
+import { usePluginsOff } from '../board/plugins'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import { useReportLoading } from '../canvas/loading'
 
@@ -24,6 +25,8 @@ const GAP = 24
  */
 export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewProps<EventBoardObject>) {
   const bodyRef = useRef<HTMLDivElement>(null)
+  // ReliefWeb feeds are not offered while their plugin is turned off on the board.
+  const feedsOn = !usePluginsOff(runtime).has('reliefweb')
 
   // While editing, the wheel scrolls the results, not the canvas camera. The canvas listens natively,
   // so stop the native event here.
@@ -38,7 +41,7 @@ export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewP
   // invoke, not dispatch: objects that follow this event re-render in the same step, which can need lookups.
   const pick = (eventId: string) => {
     onDone()
-    void runtime.invoke('event.setEvent', { kind: 'objects', ids: [o.id] }, { eventId }).then((r) => r.status === 'applied' && addFeedOnPick(eventId))
+    void runtime.invoke('event.setEvent', { kind: 'objects', ids: [o.id] }, { eventId }).then((r) => r.status === 'applied' && feedsOn && addFeedOnPick(eventId))
   }
 
   /** A ReliefWeb feed to the right of the event, for its GLIDE numbers, for everyone. */
@@ -73,7 +76,7 @@ export function EventObject({ runtime, object: o, editing, onDone }: ObjectViewP
         {editing ? (
           <EventPicker selected={o.eventId} onPick={pick} />
         ) : o.eventId ? (
-          <EventDetails eventId={o.eventId} onAddFeed={addFeed} />
+          <EventDetails eventId={o.eventId} onAddFeed={feedsOn ? addFeed : undefined} />
         ) : (
           <div className="ttx-event__empty">Double-click to search for an event</div>
         )}
@@ -145,7 +148,7 @@ export function EventPicker({ selected, onPick }: { selected?: string; onPick(id
   )
 }
 
-function EventDetails({ eventId, onAddFeed }: { eventId: string; onAddFeed(event: DisasterEvent): void }) {
+function EventDetails({ eventId, onAddFeed }: { eventId: string; onAddFeed?(event: DisasterEvent): void }) {
   const { event, error } = useEvent(eventId)
   if (error !== undefined) return <div className="ttx-event__empty">Could not load the event: {errorText(error)}</div>
   if (!event) return <div className="ttx-event__empty">Loading…</div>
@@ -164,7 +167,7 @@ function EventDetails({ eventId, onAddFeed }: { eventId: string; onAddFeed(event
       {event.hazard && <div className="ttx-event__hazard">{event.hazard.label}</div>}
       <Impacts impacts={event.impacts} />
       <Sources sources={event.sources} />
-      <FeedButton event={event} onAddFeed={onAddFeed} />
+      {onAddFeed && <FeedButton event={event} onAddFeed={onAddFeed} />}
     </div>
   )
 }

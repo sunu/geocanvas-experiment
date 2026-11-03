@@ -27,6 +27,10 @@ export interface ObjectTypeDef {
 export interface Plugin {
   id: string
   title: string
+  /** One line for the board's Settings, Plugins. */
+  description?: string
+  /** A board can turn it off (Board.disabledPlugins): its ops and tools are then not offered. Its objects stay. */
+  optional?: boolean
   dependsOn?: string[]
   objectTypes?: ObjectTypeDef[]
   ops?: OpDef<any, any>[]

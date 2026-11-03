@@ -86,6 +86,8 @@ const layersOf = (eventId: string, parts: FootprintPart[]) => parts.map(({ title
 export const eventsPlugin = definePlugin({
   id: 'events',
   title: 'Events',
+  description: 'Disaster events from Montandon, and their footprints on maps.',
+  optional: true,
   dependsOn: ['core', 'map'],
   objectTypes: [
     {

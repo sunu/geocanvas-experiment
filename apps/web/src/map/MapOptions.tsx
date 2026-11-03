@@ -28,6 +28,7 @@ import type { EventFootprint } from '@ttx/plugins/monty/client'
 import type { Board } from '../board/board'
 import { useObjects } from '../board/connect'
 import type { ObjectViewProps } from '../canvas/registry'
+import { usePluginsOff } from '../board/plugins'
 import { monty } from '../events/monty'
 import { isGeoJson, notebookFactory, notebookResultTitle } from '../notebooks/api'
 import { LayerList } from './LayerList'
@@ -93,6 +94,8 @@ export function MapOptions(props: ObjectViewProps<MapBoardObject>) {
 function MapTab({ runtime, object: o }: ObjectViewProps<MapBoardObject>) {
   const map = () => liveMap(o.id)
   const layers = o.layers ?? NO_LAYERS
+  // The plugins turned off on the board: their sections of Add layer are left out.
+  const off = usePluginsOff(runtime)
   // The map runs the same tools; the tool runner shares the runs and caches the results.
   const states = useLayerStates(layers)
   const [forecast, setForecast] = useState<{ busy?: boolean; error?: string }>({})
@@ -254,9 +257,9 @@ function MapTab({ runtime, object: o }: ObjectViewProps<MapBoardObject>) {
           ))}
         </div>
       </Accordion>
-      <BoardEvents board={runtime.board as Board} onPick={addFootprint} />
-      <CountryData board={runtime.board as Board} onPick={addChoropleth} />
-      <NotebookResults board={runtime.board as Board} onPick={(runId, name, title) => addAndFit('map.addNotebookResult', { runId, name, title })} />
+      {!off.has('events') && <BoardEvents board={runtime.board as Board} onPick={addFootprint} />}
+      {!off.has('hapi') && <CountryData board={runtime.board as Board} onPick={addChoropleth} />}
+      {!off.has('notebooks') && <NotebookResults board={runtime.board as Board} onPick={(runId, name, title) => addAndFit('map.addNotebookResult', { runId, name, title })} />}
       <section className="ttx-options__section">
         <h3>Basemap</h3>
         <select aria-label="Basemap" value={o.basemap} onChange={(e) => mapOp(runtime, o.id, 'map.setBasemap', { basemap: e.target.value })}>
