@@ -1,8 +1,8 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
-import { EditableBlock, paragraphs, useReportEditing } from './editing'
+import { EditableBlock, useReportEditing } from './editing'
 import { SquaresFourIcon } from '@phosphor-icons/react'
 import { uploadUrl, type AnyObject, type Runtime } from '@ttx/core'
-import { MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject } from '@ttx/plugins'
+import { docText, MAP_HEADER_PX, pageSize, type Block, type MapBoardObject, type ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { ObjectLabelSlot, ObjectNameContext } from '../canvas/ObjectHeader'
 import { objectUI } from '../canvas/registry'
@@ -10,6 +10,7 @@ import { useMapPicture } from '../map/picture'
 import { fitItem, paginate, rowsOf, type Piece, type Row, type RowSize } from './pages'
 import { printRatio } from './print'
 import { labelOf, titleOf } from './reports'
+import { RichText } from './RichText'
 
 /**
  * True inside the print view (ReportPrint.tsx): maps are drawn at print resolution, and a notebook shows its summary
@@ -79,11 +80,19 @@ export function ReportPages({
   )
   const shown = which === 'first' ? pages.slice(0, 1) : pages
   const contentWidth = page.w - 2 * MARGIN
+  // Each part of a row by its place among the row's parts: a part keeps its key (and an editor in it stays) when the
+  // line its page ends at moves as the text grows.
+  const part = new Map<Piece, number>()
+  const parts = new Map<number, number>()
+  for (const p of pages.flat()) {
+    part.set(p, parts.get(p.row) ?? 0)
+    parts.set(p.row, (parts.get(p.row) ?? 0) + 1)
+  }
   const rowView = (row: Row, piece?: Piece) => {
     const height = piece ? (sizes.rows[piece.row]?.height ?? 0) : 0
     return (
       <RowView
-        key={piece ? `${row.join()}:${piece.from}` : row.join()}
+        key={piece ? `${row.join()}:${part.get(piece)}` : row.join()}
         row={row}
         piece={piece && { from: piece.from, to: piece.to, height }}
         blocks={blocks}
@@ -123,7 +132,8 @@ export function ReportPages({
 
 /**
  * A measured row's size: its height, where a text alone in its row may be cut between pages (between its lines, from
- * each paragraph's top and line height), and whether it is a page break.
+ * the top and line height of each paragraph, heading and code block, also in lists and quotes), and whether it is a
+ * page break.
  */
 function sizeOf(row: HTMLElement, blocks: Block[]): RowSize {
   const height = row.offsetHeight
@@ -133,7 +143,7 @@ function sizeOf(row: HTMLElement, blocks: Block[]): RowSize {
   if (b.kind !== 'text') return { height }
   const top = row.getBoundingClientRect().top
   const cuts: number[] = []
-  for (const p of row.querySelectorAll<HTMLElement>('.ttx-report__text p')) {
+  for (const p of row.querySelectorAll<HTMLElement>('.ttx-report__text :is(p, h2, h3, h4, pre)')) {
     const at = p.getBoundingClientRect().top - top
     const line = parseFloat(getComputedStyle(p).lineHeight)
     if (at > 0) cuts.push(Math.round(at))
@@ -249,19 +259,9 @@ function BlockView({ block: b, ...props }: BlockProps & { block: Block }) {
       )
     }
     case 'text': {
-      // Each paragraph keeps its index (`data-p`), where a press puts the caret when typing starts.
-      const ps = paragraphs(b.doc)
-        .map((p, i) => ({ p, i }))
-        .filter(({ p }, _, all) => p || all.length === 1)
       return (
         <div className="ttx-report__text">
-          {ps.some(({ p }) => p)
-            ? ps.map(({ p, i }) => (
-                <p key={i} data-p={i}>
-                  {p}
-                </p>
-              ))
-            : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
+          {docText(b.doc) ? <RichText doc={b.doc} /> : editable && <p className="ttx-report__placeholder">Empty text. Click to type.</p>}
         </div>
       )
     }

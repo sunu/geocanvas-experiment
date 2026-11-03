@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowsInLineHorizontalIcon, ArrowsOutLineHorizontalIcon, DotsSixVerticalIcon, XIcon } from '@phosphor-icons/react'
 import type { Runtime } from '@ttx/core'
-import { docText, textDoc, type Block, type ReportBoardObject, type RichDoc } from '@ttx/plugins'
+import type { Block, ReportBoardObject, RichDoc } from '@ttx/plugins'
 import { dropIndex, moveIndex } from './pages'
+import { RichText } from './RichText'
 
 /**
  * Editing a report in report mode (agent-docs/tasks/reports.md §5.1b, step 5b): which block this person has selected
@@ -17,14 +18,19 @@ export interface ReportEditingState {
   select(id: string | null): void
   editing: string | null
   /**
-   * Type in a block: for a text that goes on over pages, in its part that starts `at` px from its top; in a text, with
-   * the caret at character `caret` of what is typed (blank lines between paragraphs), else at the end.
+   * Type in a block: for a text that goes on over pages, in its part that holds `at` px from its top; in a text, with
+   * the caret under the pointer (`point`, where it was pressed), else at the end. `resumed`: typing goes on in another
+   * part of a text over pages, in the same editing session (one undo step), with the caret where it was (`caret`).
    */
-  setEditing(id: string | null, where?: { at?: number; caret?: number; draft?: string }): void
+  setEditing(id: string | null, where?: { at?: number; point?: { x: number; y: number }; resumed?: boolean }): void
   editingAt: number
-  caret?: number
-  /** The text as typed, when typing goes on in another part of a text over pages: the same editing session. */
-  draft?: string
+  point?: { x: number; y: number }
+  resumed: boolean
+  /** Where the caret is in the text being typed in (a position in the editor's document), kept as it moves. */
+  caret: { current: number | undefined }
+  /** The report toolbar's place for a text's formatting tools, while a text is typed in (RichTextEditor fills it). */
+  formatSlot: HTMLElement | null
+  setFormatSlot(el: HTMLElement | null): void
   /** While a block is dragged: the index in the blocks it would be dropped before. */
   drop: number | null
   setDrop(index: number | null): void
@@ -35,6 +41,12 @@ export interface ReportEditingState {
 
 export const ReportEditing = createContext<ReportEditingState | null>(null)
 export const useReportEditing = () => useContext(ReportEditing)
+
+/**
+ * Marks what belongs to a text's formatting tools (FormatBar), its menus and popovers included (they are portaled):
+ * focus that moves there from the editor does not end typing (RichTextEditor's blur).
+ */
+export const FORMAT_ATTR = 'data-report-format'
 
 /** Run a report op as its own undo step. */
 export function runReportOp(runtime: Runtime, reportId: string, opId: string, args: Record<string, unknown>) {
@@ -82,7 +94,8 @@ export function EditableBlock({
   const at = piece?.from ?? 0
   /** The block was selected already when this press began: then the click types in it. */
   const wasSelected = useRef(false)
-  const typing = ed.editing === b.id && ed.editingAt === at
+  // Typing is in the part that holds where it started (`editingAt`), which stays right if the parts' ends move.
+  const typing = ed.editing === b.id && (!piece || (ed.editingAt >= piece.from && (ed.editingAt < piece.to || last)))
   return (
     <div
       data-block-id={b.id}
@@ -98,9 +111,9 @@ export function EditableBlock({
       // Typing starts on the click, after the press: started on the press, the editor would lose its focus at once
       // to the press's own mousedown, which moves focus, and end.
       onClick={(e) => {
-        if (wasSelected.current && typeable && !typing && !(e.target as HTMLElement).closest('.ttx-report__controls')) ed.setEditing(b.id, { at, caret: caretAt(e, b) })
+        if (wasSelected.current && typeable && !typing && !(e.target as HTMLElement).closest('.ttx-report__controls')) ed.setEditing(b.id, { at, point: { x: e.clientX, y: e.clientY } })
       }}
-      onDoubleClick={(e) => typeable && !typing && ed.setEditing(b.id, { at, caret: caretAt(e, b) })}
+      onDoubleClick={(e) => typeable && !typing && ed.setEditing(b.id, { at, point: { x: e.clientX, y: e.clientY } })}
     >
       {first && ed.drop === index && <div className="ttx-report__drop" aria-hidden />}
       {last && ed.drop === count && index === count - 1 && <div className="ttx-report__drop is-after" aria-hidden />}
@@ -108,26 +121,6 @@ export function EditableBlock({
       {first && <BlockControls block={b} index={index} />}
     </div>
   )
-}
-
-/** A rich text block's paragraphs as plain text, until the editor comes (step 6). */
-export const paragraphs = (doc: RichDoc) => (doc.content ?? []).map((p) => docText({ type: 'doc', content: [p] }))
-
-/**
- * Where in a text block's typed text a press was: the character under the pointer in its paragraph (`data-p`, the
- * paragraph's index), counted in the text as the editor holds it, paragraphs joined by a blank line.
- */
-function caretAt(e: React.MouseEvent, b: Block): number | undefined {
-  if (b.kind !== 'text') return undefined
-  const pos = document.caretPositionFromPoint?.(e.clientX, e.clientY)
-  const range = pos ? undefined : document.caretRangeFromPoint?.(e.clientX, e.clientY)
-  const node = pos?.offsetNode ?? range?.startContainer
-  const offset = pos?.offset ?? range?.startOffset ?? 0
-  const p = (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('p[data-p]')
-  if (!p) return undefined
-  const ps = paragraphs(b.doc)
-  const i = Number(p.dataset.p)
-  return ps.slice(0, i).reduce((n, t) => n + t.length + 2, 0) + Math.min(offset, ps[i]?.length ?? 0)
 }
 
 function BlockControls({ block: b, index }: { block: Block; index: number }) {
@@ -277,18 +270,18 @@ function startDrag(e: React.PointerEvent, ed: ReportEditingState, id: string, fr
  * (report.setText, a gesture op: one undo step per editing session). Others' changes to the same block meanwhile wait
  * until this person stops editing.
  */
-function useTyping(block: Block, write: (value: string) => void, initial: () => string) {
+function useTyping<T>(block: Block, write: (value: T) => void, initial: () => T) {
   const ed = useReportEditing()!
-  const [value, setValue] = useState(() => ed.draft ?? initial())
+  const [value, setValue] = useState<T>(initial)
   const begun = useRef(false)
   useEffect(() => {
     // One undo step for the whole editing session, also when it goes on in another part of a text over pages.
-    if (ed.draft === undefined) ed.runtime.beginGesture()
+    if (!ed.resumed) ed.runtime.beginGesture()
     begun.current = true
   }, [ed.runtime])
   return {
     value,
-    onChange: (v: string) => {
+    onChange: (v: T) => {
       setValue(v)
       if (begun.current) write(v)
     },
@@ -349,90 +342,87 @@ const partsOf = (id: string) =>
     to: Number(el.dataset.pieceTo),
   }))
 
-/**
- * How far down a text the caret is, in the text's own px (as pagination measures it): the caret's character found in
- * the text as shown on another page (its paragraph, `data-p`, and the character in it, whitespace collapsed as the
- * shown text has it), at the middle of its line. Undefined when the text is not shown elsewhere (one part only).
- */
-function caretY(b: Block, value: string, caret: number): number | undefined {
-  const shown = document.querySelector<HTMLElement>(`.ttx-reportmode [data-block-id="${CSS.escape(b.id)}"] div.ttx-report__text`)
-  if (!shown) return undefined
-  let i = 0
-  let start = 0
-  for (const m of value.matchAll(/\n\s*\n/g)) {
-    if (caret <= m.index) break
-    i++
-    start = m.index + m[0].length
-  }
-  const offset = value.slice(start, Math.max(start, caret)).replace(/^\s+/, '').replace(/\s+/g, ' ').length
-  const box = shown.getBoundingClientRect()
-  const k = box.height / (shown.offsetHeight || 1) // the page's zoom
-  const p = shown.querySelector(`p[data-p="${i}"]`)
-  const node = p?.firstChild
-  // A paragraph not shown yet (just started, empty): the end of the text.
-  if (!node) return (box.height - 1) / k
-  const range = document.createRange()
-  range.setStart(node, Math.min(offset, node.textContent?.length ?? 0))
-  const r = range.getClientRects()[0] ?? range.getBoundingClientRect()
-  return (r.top + r.height / 2 - box.top) / k
+// The editor is most of Tiptap, so it is its own chunk: report mode starts loading it when it opens (preloadEditor), so
+// it is there when someone types; the canvas never loads it. A block shows as it is until it has loaded. Not React.lazy,
+// which shows its fallback for a few hundred ms the first time even when the chunk has loaded, and keys typed then
+// went nowhere.
+type RichTextEditorType = typeof import('./RichTextEditor').default
+let loadedEditor: RichTextEditorType | undefined
+export const preloadEditor = () => import('./RichTextEditor').then((m) => (loadedEditor = m.default))
+function useEditorChunk() {
+  const [editor, setEditor] = useState(() => loadedEditor)
+  useEffect(() => {
+    if (!editor) void preloadEditor().then((e) => setEditor(() => e))
+  }, [editor])
+  return editor
 }
 
 /**
- * Typing in a text. For a text that goes on over pages, the editor takes the place of the part pressed (`piece`): it is
- * that part's height, starts scrolled to it, and scrolls inside itself, so what is typed past the page's bottom stays in
- * sight; the other pages show the text as it is typed, and it flows over the pages again when typing ends.
+ * Typing in a text (the rich text editor, RichTextEditor.tsx). For a text that goes on over pages, the editor takes the
+ * place of the part pressed (`piece`): it is that part's height, starts scrolled to it, and scrolls inside itself, so
+ * what is typed past the page's bottom stays in sight; the other pages show the text as it is typed, and it flows over
+ * the pages again when typing ends.
  */
 function TextEditor({ block: b, piece }: { block: Extract<Block, { kind: 'text' }>; piece?: { from: number; to: number } }) {
   const ed = useReportEditing()!
-  // The caret where the text was pressed (or where typing reached, from another page), else at the end; a part of a
-  // text starts scrolled to that part. Only where typing starts: the part's place moves as the text grows.
-  const area = useFocusSoon<HTMLTextAreaElement>((el) => {
-    if (piece) el.scrollTop = piece.from
-    const caret = ed.caret ?? el.value.length
-    el.setSelectionRange(caret, caret)
-  })
-  const t = useTyping(
+  const t = useTyping<RichDoc>(
     b,
-    (text) => t.ed.runtime.dispatch('report.setText', { kind: 'objects', ids: [t.ed.report.id] }, { blockId: b.id, doc: textDoc(text) }),
-    () => paragraphs(b.doc).join('\n\n'),
+    (doc) => t.ed.runtime.dispatch('report.setText', { kind: 'objects', ids: [t.ed.report.id] }, { blockId: b.id, doc }),
+    () => b.doc,
   )
+  const RichTextEditor = useEditorChunk()
   const shown = piece && piece.to - piece.from
+  const box = useRef<HTMLDivElement>(null)
+  // A part of a text starts scrolled to that part; the caret is placed after (RichTextEditor's `start`).
+  useLayoutEffect(() => {
+    if (piece && box.current) box.current.scrollTop = piece.from
+    // Only where typing starts: the part's place moves as the text grows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // The caret follows the text over pages: once what is typed runs past this page's part (or the text, typed past the
-  // page's bottom, is cut there), typing goes on in the part that now holds the caret, in the same session.
+  // page's bottom, is cut there), typing goes on in the part that now holds the caret, in the same session. Checked
+  // when the caret moves, and when the pages change around it.
+  const caretY = useRef<number>(undefined)
   const moving = useRef(false)
-  useEffect(() => {
-    const el = area.current
-    if (!el || moving.current || document.activeElement !== el) return
-    const y = caretY(b, el.value, el.selectionStart)
+  const follow = () => {
+    const y = caretY.current
+    if (y === undefined || moving.current) return
     const from = piece?.from ?? 0
-    if (y === undefined || (y >= from && (!piece || y < piece.to))) return
+    if (y >= from && (!piece || y < piece.to)) return
     const next = partsOf(b.id).find((p) => y >= p.from && y < p.to)
     if (!next || next.from === from) return
     moving.current = true
-    ed.setEditing(b.id, { at: next.from, caret: el.selectionStart, draft: el.value })
-  })
-  // Grow with the text, so the page's layout (and its pagination) follows as people type; a part of a text keeps its height.
-  useEffect(() => {
-    const el = area.current
-    if (!el) return
-    if (shown) {
-      el.style.height = `${shown}px`
-      return
-    }
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [t.value, shown])
+    ed.setEditing(b.id, { at: next.from, resumed: true })
+  }
+  // An editor taken off the page (its part moved) blurs on the way out; that does not end typing. Set before the DOM
+  // goes, in a layout effect's cleanup.
+  const gone = useRef(false)
+  useLayoutEffect(() => () => void (gone.current = true), [])
+  useEffect(follow)
+  // The editor keeps the callbacks it was made with: follow through a ref, with this render's part of the text.
+  const followNow = useRef(follow)
+  followNow.current = follow
   return (
-    <textarea
-      ref={area}
-      className="ttx-report__text ttx-report__editor"
-      style={shown ? { height: shown } : undefined}
-      aria-label="Text"
-      placeholder="Type text. A blank line starts a new paragraph."
-      value={t.value}
-      onChange={(e) => t.onChange(e.target.value)}
-      onKeyDown={(e) => e.key === 'Tab' && t.stop()}
-      onBlur={() => moving.current || t.stop()}
-    />
+    <div ref={box} className="ttx-report__textedit" style={shown ? { height: shown, overflowY: 'auto' } : undefined}>
+      {RichTextEditor ? (
+        <RichTextEditor
+          doc={t.value}
+          start={{ pos: ed.caret.current, point: ed.point }}
+          onChange={t.onChange}
+          onCaret={(c) => {
+            ed.caret.current = c.pos
+            caretY.current = c.y
+            followNow.current()
+          }}
+          onBlur={() => moving.current || gone.current || t.stop()}
+          toolbar={ed.formatSlot}
+          onDone={t.stop}
+        />
+      ) : (
+        <div className="ttx-report__text">
+          <RichText doc={t.value} />
+        </div>
+      )}
+    </div>
   )
 }
