@@ -292,6 +292,23 @@ const viewOps = [
     args: z.object({}),
     applyView: (view, _args, target) => view.focus(idsOf(target)[0]!),
   }),
+  // The view ops above need a camera, which the room's agent does not have. This one asks the runner's browser
+  // (for an agent, the asker's) to show the object, through the doc (nav.ts).
+  defineOp({
+    id: 'core.view.show',
+    title: 'Show to me',
+    description:
+      "Move the asker's view of the canvas to one object, in the middle of the screen, selected. Find the object by its name on the board, or by the id after `obj=` in a board link. Only the asker's view moves.",
+    target: { kind: 'objects', min: 1, max: 1 },
+    args: z.object({}),
+    nl: { aliases: ['go to', 'take me to', 'navigate to'] },
+    prepare(ctx) {
+      const person = ctx.actor.kind === 'user' ? ctx.actor.id : ctx.actor.onBehalfOf
+      if (!person) throw new Error('No person to show it to')
+      return { person }
+    },
+    apply: (tx, { person }, target) => tx.showTo(person, idsOf(target)[0]!),
+  }),
 ]
 
 export const corePlugin = definePlugin({
