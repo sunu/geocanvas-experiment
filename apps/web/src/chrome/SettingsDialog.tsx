@@ -22,17 +22,18 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="grid-rows-[auto_minmax(0,1fr)] sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="sr-only">Plugins on this board, and your JupyterHub login.</DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="plugins" className="gap-3">
-          <TabsList className="w-full">
+        {/* Tabs on the left; on a narrow window, in a row above. */}
+        <Tabs defaultValue="plugins" orientation="vertical" className="min-h-0 gap-4 max-sm:flex-col">
+          <TabsList className="w-40 shrink-0 self-start max-sm:w-full max-sm:flex-row">
             <TabsTrigger value="plugins">Plugins</TabsTrigger>
             <TabsTrigger value="hub">JupyterHub</TabsTrigger>
           </TabsList>
-          <TabsContent value="plugins" className="grid gap-3">
+          <TabsContent value="plugins" className="grid min-w-0 content-start gap-3">
             <p className="text-sm text-muted-foreground">
               For everyone on this board. A plugin that is off is not offered in the toolbar, the palette or to agents. What it already added stays on the board.
             </p>
@@ -55,7 +56,7 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
               })}
             </ul>
           </TabsContent>
-          <TabsContent value="hub" className="grid gap-3">
+          <TabsContent value="hub" className="grid min-w-0 content-start gap-3">
             <p className="text-sm text-muted-foreground">Only for you, in this browser. Code cells run on your own hub, as you.</p>
             <HubSettings />
           </TabsContent>
