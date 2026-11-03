@@ -13,4 +13,5 @@ export { corePlugin, boxType, BOX_SHAPES, frameType, stickyType, textType, type 
 export * from './style.js'
 export { Chat, type AgentReply, type ChatEntry, type ToolCallRecord, type TurnUndo, type UserMessage } from './chat.js'
 export { Views, type SavedView } from './views.js'
+export { BoardSkills, MAX_BOARD_SKILLS, skillSchema, type BoardSkill, type Skill } from './skills.js'
 export { Uploads, MAX_UPLOAD_BYTES, UPLOAD_ID, UPLOAD_TYPES, uploadUrl, type Upload, type UploadKind } from './uploads.js'
