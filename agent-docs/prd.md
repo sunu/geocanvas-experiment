@@ -106,6 +106,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Room agent in the Durable Object | Built | OpenRouter tool loop, 12 model calls per turn, 20 turns per room per hour. Undo per turn. Its adds are kept off what is already there. |
 | Skills and deferred tools | Built | Domain rules load as skills when a request needs them; most tool schemas load on demand (plan-017). |
+| Skills in Settings, and board skills | Built | The Skills tab of Settings shows the built-in skills, read only. People write skills for one board there, for everyone on it; agents and MCP clients cannot write them (plan-026). |
 | The agent at work: its cursor, current step and busy widgets | Built | Drawn by each browser from the op log, at no model cost. |
 | Ambient agent: a summary and next moves for a frame, outside the chat | In review (#63) |  |
 | Evaluation: Nepal 2026 flash flood | In review (#20) |  |
@@ -175,5 +176,5 @@ One PR per step.
 - `agent-docs/tasks/in-focus-widgets.md`: focus mode design, widget fields and ops, steps 1–16, decisions.
 - `agent-docs/tasks/reports.md`: reports: the widget, report mode, live and frozen items, PDF export options, the report URL, steps 1–10.
 - `agent-docs/tasks/board-templates.md`: landing page and New board. `agent-docs/tasks/weather-forecast.md`: forecast layers.
-- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames, `plan-014.md` scenario routing, `plan-015.md` flood exposure, `plan-016.md` flood depth and damage, `plan-017.md` agent skills, `plan-018.md` phone layout (experiment), `plan-019.md` synced and detached report items (proposal), `plan-020.md` disaster history.
+- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames, `plan-014.md` scenario routing, `plan-015.md` flood exposure, `plan-016.md` flood depth and damage, `plan-017.md` agent skills, `plan-018.md` phone layout (experiment), `plan-019.md` synced and detached report items (proposal), `plan-020.md` disaster history, `plan-026.md` skills in Settings and board skills.
 - Figma "Atlantis Pod Week Hack - AHD TTX": source of truth for chrome; wireframes for every feature.
