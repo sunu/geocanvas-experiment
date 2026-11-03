@@ -260,8 +260,9 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
     }
 
     if (tool !== 'select') {
-      // 'box:ellipse' is the box tool drawing an ellipse (canvas/Toolbar.tsx).
-      const [type, shape] = tool.split(':') as [string, string | undefined]
+      // 'box:ellipse' is the box tool drawing an ellipse, 'map:routes' the route map (canvas/Toolbar.tsx): the variant sets
+      // the type's variantField.
+      const [type, variant] = tool.split(':') as [string, string | undefined]
       const p = screenPoint(e)
       const p0 = toWorld(cameraRef.current, p.x, p.y)
       let drawn: Rect | null = null
@@ -276,7 +277,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
           setDraft(null)
           const d = runtime.registry.objectType(type)!.defaultSize
           const r = drawn && drawn.w >= MIN_SIZE && drawn.h >= MIN_SIZE ? drawn : { x: p0.x - d.w / 2, y: p0.y - d.h / 2, ...d }
-          const newId = runtime.dispatch(`${type}.add`, { kind: 'canvas' }, shape ? { ...r, shape } : r).created?.[0]
+          const newId = runtime.dispatch(`${type}.add`, { kind: 'canvas' }, variant ? { ...r, [objectUI(type)?.variantField ?? 'shape']: variant } : r).created?.[0]
           setTool('select')
           if (!newId) return
           setSelection(new Set([newId]))

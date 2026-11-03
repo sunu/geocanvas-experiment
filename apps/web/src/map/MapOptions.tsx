@@ -22,6 +22,7 @@ import {
   type Shape,
   SHAPE_COLORS,
   URL_FORMATS,
+  analysisOf,
 } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import type { EventFootprint } from '@ttx/plugins/monty/client'
@@ -65,17 +66,20 @@ function Accordion({ title, children }: { title: string; children: React.ReactNo
 }
 
 /**
- * The map's Options in focus, in two modes (mode.ts): Map, its data, notes and drawings; and Scenario, routes and what
- * closes roads (routing/ScenarioPanel.tsx). The tab also picks the toolbar on the map.
+ * The map's Options in focus. A plain map has its data, notes and drawings. A route map or a flood exposure map
+ * (plans/plan-030.md) has two tabs (mode.ts): its analysis first (routes, what closes roads, exposure:
+ * routing/ScenarioPanel.tsx), then Map. The tab also picks the toolbar on the map.
  */
 export function MapOptions(props: ObjectViewProps<MapBoardObject>) {
   const id = props.object.id
-  const mode = useMapMode(id)
+  const analysis = analysisOf(props.object)
+  const mode = useMapMode(id, analysis ? 'scenario' : 'map')
+  if (!analysis) return <MapTab {...props} />
   return (
     <Tabs value={mode} onValueChange={(v) => setMapMode(id, v as MapMode)} className="mt-3 gap-0">
       <TabsList className="ttx-ui w-full">
+        <TabsTrigger value="scenario">{analysis === 'routes' ? 'Routes' : 'Exposure'}</TabsTrigger>
         <TabsTrigger value="map">Map</TabsTrigger>
-        <TabsTrigger value="scenario">Scenario</TabsTrigger>
       </TabsList>
       <TabsContent value="map">
         <MapTab {...props} />

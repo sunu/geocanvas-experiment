@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type IControl, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import type { PickingInfo } from '@deck.gl/core'
+import type { Layer, PickingInfo } from '@deck.gl/core'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { MapTrifoldIcon } from '@phosphor-icons/react'
 import { ObjectHeader } from '../canvas/ObjectHeader'
 import type { ObjectViewProps } from '../canvas/registry'
 import { useReportLoading } from '../canvas/loading'
 import { stableJson, Views, type Runtime, type SavedView } from '@ttx/core'
-import { MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
+import { analysisOf, ANALYSIS_TITLE, MAP_HEADER_PX, SHAPE_COLORS, viewOfArea, type Basemap, type Bbox, type MapAnnotation, type MapBoardObject, type MapLayer, type PlaceFeatures, type ShapeColor } from '@ttx/plugins'
 import { countryName } from '@ttx/plugins/monty/countries'
 import { tools } from '../tools/registry'
 import { codab, dataLayerOf, fillLayerIds, syncAdminLayers, type AdminAreas } from './adminAreas'
@@ -109,8 +109,13 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Routes are found on Overture's roads, whose license asks for attribution like a layer's. A forecast's caption (model,
   // run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
   const credits = creditsOf(states, scenario)
-  /** In focus: Map mode (data, notes, drawings) or Scenario mode (routes, closures); the Options panel's tabs pick it. */
-  const mode = useMapMode(o.id)
+  /** What the map is for (plans/plan-030.md): a route map, a flood exposure map, or none (a plain map). */
+  const analysis = analysisOf(o)
+  /** Map mode (data, notes, drawings) or, on an analysis map, its analysis; the Options panel's tabs pick it in focus. */
+  const picked = useMapMode(o.id, analysis ? 'scenario' : 'map')
+  const mode = analysis ? picked : 'map'
+  /** The analysis's tools are on the map while it is edited (double-click) or in focus, in the analysis's mode. */
+  const analysisActive = !!analysis && (editing || !!focused) && mode === 'scenario'
   /** The latest states, for map events. */
   const statesRef = useRef(states)
   /** MapLibre layers can be added: the style has loaded, and no basemap change is under way. */
@@ -127,7 +132,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const highlight = (codeFocus.hovered ?? codeFocus.open)?.layerId
   const highlightRef = useRef(highlight)
   const pickingRef = useRef(true)
-  pickingRef.current = !tool && !(focused && mode === 'scenario')
+  pickingRef.current = !tool && !analysisActive
   const [shapeColor, setShapeColor] = useState<ShapeColor>('red')
   /** The sticky being written in. */
   const [writing, setWriting] = useState<string>()
@@ -184,7 +189,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     }
     const overlay = new MapboxOverlay({
       interleaved: false,
-      layers: [...deckLayers(statesRef.current, { highlight: highlightRef.current }), shapeLayer(shapesRef.current), ...scenarioRef.current],
+      layers: [...deckLayers(statesRef.current, { highlight: highlightRef.current }), shapeLayer(shapesRef.current), ...ownCopies(scenarioRef.current)],
       onHover: (info) => {
         if (!pickingRef.current) return
         const element = codeElement(info)
@@ -242,7 +247,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
 
   // Leaving edit mode ends writing; leaving focus puts the drawing box's tool away, since it is a focus tool.
   useEffect(() => {
-    if (!focused) setMapMode(o.id, 'map')
+    if (!focused) setMapMode(o.id, undefined)
     if (!focused || mode !== 'map') setTool(undefined)
     if (!editing) setWriting(undefined)
   }, [editing, focused, mode, o.id])
@@ -385,7 +390,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Only when a layer or its result changed: new deck.gl layers make deck.gl redraw all their data, and the canvas
   // re-renders the map on every camera move.
   useEffect(() => {
-    overlayRef.current?.setProps({ layers: [...deckLayers(states, { highlight }), shapeLayer(shapes), ...scenario.deck] })
+    overlayRef.current?.setProps({ layers: [...deckLayers(states, { highlight }), shapeLayer(shapes), ...ownCopies(scenario.deck)] })
     highlightRef.current = highlight
     statesRef.current = states
     shapesRef.current = shapes
@@ -413,7 +418,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
 
   return (
     <div className="ttx-map">
-      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title="Map" />
+      <ObjectHeader icon={<MapTrifoldIcon size={14} aria-hidden />} title={analysis ? ANALYSIS_TITLE[analysis] : 'Map'} />
       <div ref={bodyRef} className="ttx-map__body" style={{ pointerEvents: editing ? 'auto' : 'none' }}>
         <div ref={glRef} className="ttx-map__gl" />
         {liveMap && (
@@ -429,7 +434,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
         )}
         {/* Notes and shapes are added in focus only; a double-click on the canvas lets the map pan, nothing more. */}
         {focused && mode === 'map' && <DrawingBox tool={tool} color={shapeColor} onTool={setTool} onColor={setShapeColor} />}
-        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} exposure={scenario.exposure} active={!!focused && mode === 'scenario'} />
+        <ScenarioOnMap runtime={runtime} map={liveMap} mapId={o.id} routes={scenario.routes} exposure={scenario.exposure} analysis={analysis} active={analysisActive} />
         {!live && snapshot && (
           <>
             <img className="ttx-map__snapshot" src={snapshot} alt="" draggable={false} />
@@ -454,6 +459,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     </div>
   )
 }
+
+/**
+ * Copies of the scenario's deck.gl layers for one overlay. A layer belongs to the deck that first draws it: the map is
+ * rebuilt when it becomes live or not (leaving focus), and handing the old overlay's layers to the new one failed
+ * deck.gl's assertion, so routes, closures and exposure vanished from the map. A copy keeps the same id and props
+ * (data included), so deck.gl carries its state over and does not process the data again.
+ */
+const ownCopies = (layers: Layer[]) => layers.map((l) => l.clone({}))
 
 /** What `map` shows now, as a view. */
 function shown(map: MapLibreMap): Omit<SavedView, 'at'> {

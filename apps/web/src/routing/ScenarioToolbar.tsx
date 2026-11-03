@@ -18,11 +18,14 @@ const ACCEPT = '.geojson,.json,application/geo+json,application/json'
  * and import affected areas from a GeoJSON file (also dropped on the map). One tool at a time; Esc cancels.
  */
 export function ScenarioToolbar({
+  tools,
   tool,
   onTool,
   onImport,
   status,
 }: {
+  /** The tools shown, in TOOLS' order; all by default. */
+  tools?: ScenarioTool[]
   tool: ScenarioTool | undefined
   onTool(t: ScenarioTool | undefined): void
   onImport(file: File): void
@@ -35,7 +38,7 @@ export function ScenarioToolbar({
   return (
     <div className="ttx-map__tools" role="toolbar" aria-label="Scenario tools" onPointerDown={(e) => e.stopPropagation()}>
       <div className="ttx-map__toolrow">
-        {TOOLS.map(({ tool: t, label, hint, Icon }) => (
+        {TOOLS.filter((t) => !tools || tools.includes(t.tool)).map(({ tool: t, label, hint, Icon }) => (
           <button
             key={t}
             type="button"

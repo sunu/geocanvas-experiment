@@ -41,6 +41,8 @@ export interface ObjectUI<O extends BoardObject = BoardObject> {
   widthOnly?: boolean
   /** Removed when editing ends with nothing in it. */
   isEmpty?(object: O): boolean
+  /** The field a toolbar tool's variant sets ('type:variant'): a box's `shape` ('box:ellipse', the default), a map's `analysis` ('map:routes'). */
+  variantField?: string
   /** What the object panel (canvas/ObjectPanel.tsx) says about one of them when it is the only selection. A type without it has no panel. */
   panel?(object: O, board: Board): PanelInfo
 }

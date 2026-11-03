@@ -22,7 +22,7 @@ export function pictureRequest(
   view: { center: [number, number]; zoom: number; bearing: number },
   layers: MapLayer[],
   shapes: MapAnnotation[],
-  scenario: Pick<SnapshotRequest, 'routes' | 'closures'>,
+  scenario: Pick<SnapshotRequest, 'routes' | 'closures' | 'exposure'>,
   pixelRatio?: number,
 ): SnapshotRequest {
   return {
@@ -34,6 +34,7 @@ export function pictureRequest(
     shapes,
     routes: scenario.routes,
     closures: scenario.closures,
+    ...(scenario.exposure && { exposure: scenario.exposure }),
     ...(pixelRatio && { pixelRatio }),
   }
 }

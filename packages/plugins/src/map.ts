@@ -46,7 +46,23 @@ export type MapArea = z.infer<typeof area>
  * them have none. Each is replaced as a whole, so two people adding a layer at the same moment keep only one of the two, and two
  * people typing in two stickies of one map at the same moment can lose each other's last keystrokes.
  */
-export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[]; annotations?: MapAnnotation[]; scenario?: MapScenario }
+export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[]; annotations?: MapAnnotation[]; scenario?: MapScenario; analysis?: MapAnalysis }
+
+/**
+ * What a map is for (plans/plan-030.md): a plain map (no `analysis`), a route map (routes around closed roads) or a
+ * flood exposure map (buildings, facilities, depth and damage in its flood areas). The toolbar offers each as its own
+ * map; they are one type, so every map feature works on all of them. Comparing scenarios is duplicating a map.
+ */
+export const MAP_ANALYSES = ['routes', 'exposure'] as const
+export type MapAnalysis = (typeof MAP_ANALYSES)[number]
+export const ANALYSIS_TITLE: Record<MapAnalysis, string> = { routes: 'Route map', exposure: 'Flood exposure map' }
+
+/** A map's analysis; maps from before `analysis` that have routes or exposure counts are taken as such. */
+export function analysisOf(map: Pick<MapBoardObject, 'analysis' | 'scenario'>): MapAnalysis | undefined {
+  if (map.analysis) return map.analysis
+  if (map.scenario?.routes.length) return 'routes'
+  if (map.scenario?.exposure?.buildings) return 'exposure'
+}
 
 const oneMap = { kind: 'objects', types: ['map'], min: 1, max: 1 } as const
 
@@ -163,11 +179,13 @@ export const mapPlugin = definePlugin({
         layers: z.array(mapLayer).optional(),
         annotations: z.array(mapAnnotation).optional(),
         scenario: mapScenario.optional(),
+        analysis: z.enum(MAP_ANALYSES).optional().describe('What the map is for: routes (routes around closed roads) or exposure (buildings and damage in flood areas); none for a plain map'),
       }),
       defaultSize: { w: 520, h: 360 },
       layer: 'bottom',
       summarize: (o) => {
         const { basemap, layers, annotations = [], scenario = NO_SCENARIO } = o as MapBoardObject
+        const analysis = analysisOf(o as MapBoardObject)
         const layer = (l: MapLayer) =>
           `${l.title} (${l.id}${l.filter ? `, only ${l.filter.property} ${l.filter.op} ${JSON.stringify(l.filter.value)}` : ''}${l.blocks ? ', blocks roads' : ''})`
         const stickies = annotations.flatMap((a) => (a.kind === 'sticky' ? [`${JSON.stringify(a.text.slice(0, 100))} at ${a.lngLat.join(', ')} (${a.id})`] : []))
@@ -177,6 +195,7 @@ export const mapPlugin = definePlugin({
           (c) => `${c.geometry.type.toLowerCase()}${c.note ? ` ${JSON.stringify(c.note.slice(0, 100))}` : ''}${c.off ? ', switched off' : ''} (${c.id})`,
         )
         return [
+          analysis && ANALYSIS_TITLE[analysis].toLowerCase(),
           `basemap ${basemap}`,
           layers?.length && `layers: ${layers.map(layer).join(', ')}`,
           stickies.length && `sticky notes: ${stickies.join(', ')}`,
@@ -192,6 +211,19 @@ export const mapPlugin = definePlugin({
     },
   ],
   ops: [
+    defineOp({
+      id: 'map.setAnalysis',
+      title: 'Set what the map is for',
+      description:
+        "Make a map a route map (routes around closed roads), a flood exposure map (buildings, facilities, depth and damage in its flood areas), or a plain map (''), for everyone. Its scenario (routes, closures, affected areas) stays.",
+      target: oneMap,
+      args: z.object({ analysis: z.union([z.literal(''), z.enum(MAP_ANALYSES)]).describe("'routes', 'exposure', or '' for a plain map") }),
+      prepare: (ctx, { analysis }) => ({ id: mapOf(ctx).id, analysis }),
+      apply(tx, { id, analysis }) {
+        if (analysis) tx.update({ [id]: { analysis } })
+        else tx.clear(id, ['analysis'])
+      },
+    }),
     defineOp({
       id: 'map.setBasemap',
       title: 'Set basemap',
