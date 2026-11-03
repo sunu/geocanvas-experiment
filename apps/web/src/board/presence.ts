@@ -24,12 +24,32 @@ export interface Peer {
   /** The person (connect.ts) or the agent, with a name and color. */
   user: Actor & { name: string; color: string }
   /** World point, or absent when their pointer is off the canvas. */
-  cursor?: { x: number; y: number }
+  cursor?: PeerCursor
   /** Ids of the objects they have selected. */
   selection: string[]
   status?: 'thinking'
   /** They present: the world rectangle they see, and when they started (presentation mode, canvas/presentation.ts). */
   presenting?: Presenting
+}
+
+/**
+ * A cursor in world coordinates. In focus mode the object is laid out at the screen's size, so world points do not
+ * match it: a cursor there is also anchored to the object (`in`), by its share of the box and, on a map, the place
+ * under it. Its x and y are then the same share of the object's stored rectangle, so it lands on the object on the canvas.
+ */
+export interface PeerCursor {
+  x: number
+  y: number
+  in?: { id: string; u: number; v: number; lngLat?: [number, number] }
+}
+
+function cursorFrom(value: unknown): PeerCursor | undefined {
+  const c = value as PeerCursor | null | undefined
+  if (!c || !Number.isFinite(c.x) || !Number.isFinite(c.y)) return undefined
+  const a = c.in
+  if (!a || typeof a.id !== 'string' || !Number.isFinite(a.u) || !Number.isFinite(a.v)) return { x: c.x, y: c.y }
+  const lngLat = Array.isArray(a.lngLat) && Number.isFinite(a.lngLat[0]) && Number.isFinite(a.lngLat[1]) ? ([a.lngLat[0], a.lngLat[1]] as [number, number]) : undefined
+  return { x: c.x, y: c.y, in: { id: a.id, u: a.u, v: a.v, ...(lngLat && { lngLat }) } }
 }
 
 export interface Presenting {
@@ -67,7 +87,7 @@ export function peersFrom(states: Map<number, Record<string, unknown>>, selfId: 
   for (const [clientId, state] of states) {
     const user = state.user as Peer['user'] | undefined
     if (clientId === selfId || !user?.name || !user.color) continue
-    const cursor = state.cursor as Peer['cursor'] | null | undefined
+    const cursor = cursorFrom(state.cursor)
     const selection = Array.isArray(state.selection) ? (state.selection as string[]) : []
     const status = state.status === 'thinking' ? ('thinking' as const) : undefined
     const presenting = user.kind !== 'agent' ? presentingFrom(state.presenting) : undefined
@@ -195,4 +215,4 @@ export function fieldSender<T>(awareness: Pick<Awareness, 'setLocalStateField'>,
 
 /** Shares this person's cursor in world coordinates; null hides it (pointer left the canvas). */
 export const cursorSender = (awareness: Pick<Awareness, 'setLocalStateField'>, interval = CURSOR_INTERVAL) =>
-  fieldSender<{ x: number; y: number }>(awareness, 'cursor', interval)
+  fieldSender<PeerCursor>(awareness, 'cursor', interval)

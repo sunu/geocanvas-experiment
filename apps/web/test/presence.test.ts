@@ -45,6 +45,20 @@ describe('peersFrom', () => {
   })
 })
 
+describe('peersFrom cursors in focus', () => {
+  const user = { name: 'Heron', color: '#2f9e44' }
+
+  it("keeps a cursor's anchor in a focused object, and drops a malformed one", () => {
+    const anchored = { x: 10, y: 20, in: { id: 'm1', u: 0.5, v: 0.25, lngLat: [85.3, 27.7] } }
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { user, cursor: anchored }],
+      [3, { user, cursor: { x: 1, y: 2, in: { id: 'm1', u: 'left' } } }],
+      [4, { user, cursor: { x: 'a', y: 2 } }],
+    ])
+    expect(peersFrom(states, 1).map((p) => p.cursor)).toEqual([anchored, { x: 1, y: 2 }, undefined])
+  })
+})
+
 describe('presenterOf', () => {
   const user = { kind: 'user' as const, id: 'heron', name: 'Heron', color: '#2f9e44' }
   const view = { x: 0, y: 0, w: 1, h: 1 }
