@@ -616,6 +616,16 @@ describe('skills and deferred tools', () => {
     expect(reply.calls.map((c) => c.status)).toEqual(['failed', 'applied'])
   })
 
+  it('places an add sent with no args at all', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('map__add', {})))
+    const message = chat.send({ actor: ada, text: 'add a map', selection: [], center: { x: 2000, y: 2000 } })
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, m.complete)
+    const map = person(doc).board.list().find((o) => o.type === 'map')!
+    expect(map.x).toBeGreaterThan(1000)
+    expect(map.y).toBeGreaterThan(1000)
+  })
+
   it('says nothing of board skills on a board without them', async () => {
     const { doc, chat } = board()
     const m = recording()
