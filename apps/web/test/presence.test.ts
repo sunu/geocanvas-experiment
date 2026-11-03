@@ -33,6 +33,16 @@ describe('peersFrom', () => {
     ])
     expect(peersFrom(states, 1).map((p) => p.presenting)).toEqual([presenting, undefined, undefined, undefined])
   })
+
+  it("keeps the presenter's focus and map view, and drops a malformed map", () => {
+    const view = { x: 0, y: 0, w: 800, h: 600 }
+    const map = { id: 'm1', center: [85.3, 27.7], zoom: 9, bearing: 0 }
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { user, presenting: { view, since: 5, focus: 'm1', map } }],
+      [3, { user, presenting: { view, since: 5, focus: 7, map: { ...map, zoom: 'far' } } }],
+    ])
+    expect(peersFrom(states, 1).map((p) => p.presenting)).toEqual([{ view, since: 5, focus: 'm1', map }, { view, since: 5 }])
+  })
 })
 
 describe('presenterOf', () => {

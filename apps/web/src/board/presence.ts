@@ -35,13 +35,30 @@ export interface Peer {
 export interface Presenting {
   view: { x: number; y: number; w: number; h: number }
   since: number
+  /** The object they have in focus. */
+  focus?: string
+  /** The map they moved last, and what it shows now. */
+  map?: PresentedMap
+}
+
+export interface PresentedMap {
+  id: string
+  /** [longitude, latitude] */
+  center: [number, number]
+  zoom: number
+  bearing: number
 }
 
 function presentingFrom(value: unknown): Presenting | undefined {
   const p = value as Partial<Presenting> | null | undefined
   const v = p?.view
   if (!v || typeof p.since !== 'number' || ![v.x, v.y, v.w, v.h].every(Number.isFinite) || v.w <= 0 || v.h <= 0) return undefined
-  return { view: v, since: p.since }
+  const m = p.map
+  const map =
+    m && typeof m.id === 'string' && Array.isArray(m.center) && [m.center[0], m.center[1], m.zoom, m.bearing].every(Number.isFinite)
+      ? { id: m.id, center: [m.center[0], m.center[1]] as [number, number], zoom: m.zoom, bearing: m.bearing }
+      : undefined
+  return { view: v, since: p.since, ...(typeof p.focus === 'string' && { focus: p.focus }), ...(map && { map }) }
 }
 
 /** Everyone else with a user, from awareness states (clientId -> state). */
