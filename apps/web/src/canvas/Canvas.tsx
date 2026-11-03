@@ -29,6 +29,7 @@ import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
 import { publishViewState } from './viewState'
 import { publishViewport } from './viewport'
+import { liveMap } from '../map/live'
 import { bindPresence, presentation, presentView, setFollowed, unfollow, usePresentation } from './presentation'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
@@ -791,6 +792,31 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
     return r
   }
 
+  /**
+   * This person's cursor for presence (board/presence.ts `PeerCursor`). In focus, anchored to the focused object: its
+   * share of the box, the place under it on a map, and that share of the object's stored rectangle as the world point.
+   * Off the object (over the Options panel), none.
+   */
+  function cursorAt(e: ReactPointerEvent) {
+    const p = screenPoint(e)
+    const f = focusRef.current
+    if (!f) return toWorld(cameraRef.current, p.x, p.y)
+    const stored = board.get(f.id)
+    if (!f.rect || !stored) return null
+    const box = toScreen(cameraRef.current, f.rect)
+    const u = (p.x - box.x) / box.w
+    const v = (p.y - box.y) / box.h
+    if (u < 0 || u > 1 || v < 0 || v > 1) return null
+    const map = liveMap(f.id)
+    let lngLat: [number, number] | undefined
+    if (map) {
+      const r = map.getCanvas().getBoundingClientRect()
+      const at = map.unproject([e.clientX - r.left, e.clientY - r.top])
+      lngLat = [at.lng, at.lat]
+    }
+    return { x: stored.x + u * stored.w, y: stored.y + v * stored.h, in: { id: f.id, u, v, ...(lngLat && { lngLat }) } }
+  }
+
   const viewCenter = () => {
     const el = rootRef.current!
     return toWorld(cameraRef.current, el.clientWidth / 2, el.clientHeight / 2)
@@ -826,10 +852,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
       style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius, '--ttx-presenter': followed?.user.color } as CSSProperties}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
-      onPointerMove={(e) => {
-        const p = screenPoint(e)
-        sendCursor(toWorld(cameraRef.current, p.x, p.y))
-      }}
+      onPointerMove={(e) => sendCursor(cursorAt(e))}
       onPointerLeave={() => sendCursor(null)}
     >
       <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})`, '--ttx-zoom': camera.z } as CSSProperties}>
