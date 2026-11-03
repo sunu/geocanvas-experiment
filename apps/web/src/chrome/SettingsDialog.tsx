@@ -31,7 +31,7 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
             </h3>
             <p className="text-sm text-muted-foreground">A plugin that is off is not offered in the toolbar, the palette or to agents. What it already added stays on the board.</p>
           </div>
-          <ul className="grid max-h-[60vh] gap-2 overflow-y-auto">
+          <ul className="m-0 grid max-h-[60vh] list-none gap-2 overflow-y-auto p-0">
             {plugins.map((p) => {
               // Off because a plugin it needs is off: turn that one on first.
               const needs = !stored.includes(p.id) && off.has(p.id) ? p.dependsOn?.filter((d) => off.has(d)) : undefined
