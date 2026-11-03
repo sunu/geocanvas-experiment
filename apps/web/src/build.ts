@@ -1,26 +1,29 @@
 /**
- * Which build this is (issue #125). Every push deploys, so the commit is the version: there are no release numbers.
- * vite.config.ts injects it as `__TTX_BUILD__`; `npm run dev` is `dev`.
+ * Which build this is (issue #125). Every push deploys, so the commit is the version: there are no release numbers and
+ * no channels. vite.config.ts injects it as `__TTX_BUILD__` for a build that has a commit (CI); the dev server and a
+ * local build have none, and nothing is shown for them.
  */
 export interface Build {
-  /** The short commit, or `dev` (npm run dev) or `local` (a build outside CI). */
+  /** The short commit. */
   sha: string
-  /** When it was built, ISO UTC. Not in dev. */
+  /** When it was built, ISO UTC. */
   time?: string
   /** The branch, for a branch Worker; not for main. */
   branch?: string
 }
 
-declare const __TTX_BUILD__: Build | undefined
+declare const __TTX_BUILD__: Build | null | undefined
 
-/** The running build. Tests and tools that do not go through Vite have no define: they are `dev`. */
-export const BUILD: Build = typeof __TTX_BUILD__ === 'undefined' ? { sha: 'dev' } : __TTX_BUILD__
+/** The running build, if it has a commit. Tests and tools that do not go through Vite have no define. */
+export const BUILD: Build | undefined = (typeof __TTX_BUILD__ === 'undefined' ? null : __TTX_BUILD__) ?? undefined
 
-/** The build a CI run or a local `vite build` makes (GITHUB_SHA and GITHUB_REF_NAME are set by GitHub Actions). */
-export function buildFromEnv(env: Record<string, string | undefined>, now: Date): Build {
+/** The build a CI run makes (GITHUB_SHA and GITHUB_REF_NAME are set by GitHub Actions); none without a commit. */
+export function buildFromEnv(env: Record<string, string | undefined>, now: Date): Build | undefined {
+  const sha = env.GITHUB_SHA?.slice(0, 7)
+  if (!sha) return undefined
   const branch = env.GITHUB_REF_NAME
   return {
-    sha: env.GITHUB_SHA?.slice(0, 7) || 'local',
+    sha,
     time: now.toISOString(),
     ...(branch && branch !== 'main' ? { branch } : {}),
   }

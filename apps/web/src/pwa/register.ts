@@ -18,7 +18,8 @@ export function registerServiceWorker() {
   navigator.serviceWorker.addEventListener('controllerchange', () => switching && location.reload())
   navigator.serviceWorker.addEventListener('message', (event) => {
     const build = (event.data as { build?: unknown } | null)?.build
-    if (typeof build !== 'string') return
+    // The worker has no commit ('') when the build had none.
+    if (typeof build !== 'string' || !build) return
     waitingBuild = build
     for (const l of listeners) l()
   })

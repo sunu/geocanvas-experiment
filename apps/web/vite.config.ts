@@ -36,22 +36,22 @@ const mcpPairing: Plugin = {
  * The service worker (src/pwa/sw.js), written into the build as /sw.js with the build's version and the files to cache
  * when it installs (src/pwa/precache.ts). Not in dev: it is registered in production builds only.
  */
-const serviceWorker = (build: Build): Plugin => ({
+const serviceWorker = (build: Build | undefined): Plugin => ({
   name: 'ttx-service-worker',
   apply: 'build',
   generateBundle(_options, bundle) {
     const files = bundle as unknown as Record<string, BundleFile>
-    // BUILD is the commit the page shows: the update notice asks the waiting worker for it (src/pwa/register.ts).
-    const head = `const VERSION = ${JSON.stringify(buildVersion(files))}\nconst BUILD = ${JSON.stringify(build.sha)}\nconst PRECACHE = ${JSON.stringify(precacheList(files))}\n`
+    // BUILD is the commit the page shows ('' without one): the update notice asks the waiting worker for it (src/pwa/register.ts).
+    const head = `const VERSION = ${JSON.stringify(buildVersion(files))}\nconst BUILD = ${JSON.stringify(build?.sha ?? '')}\nconst PRECACHE = ${JSON.stringify(precacheList(files))}\n`
     this.emitFile({ type: 'asset', fileName: 'sw.js', source: head + readFileSync(new URL('./src/pwa/sw.js', import.meta.url), 'utf8') })
   },
 })
 
 export default defineConfig(({ command }) => {
-  // The commit and time of a build (src/build.ts); `npm run dev` is `dev`.
-  const build: Build = command === 'build' ? buildFromEnv(process.env, new Date()) : { sha: 'dev' }
+  // The commit and time of a build (src/build.ts), when it has one: not the dev server.
+  const build = command === 'build' ? buildFromEnv(process.env, new Date()) : undefined
   return {
-    define: { __TTX_BUILD__: JSON.stringify(build) },
+    define: { __TTX_BUILD__: JSON.stringify(build ?? null) },
     plugins: [react(), tailwindcss(), mcpPairing, mdText, serviceWorker(build)],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     server: {
