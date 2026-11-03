@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
 import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
 import type { AgentReply, Chat, OplogEntry, Runtime, TurnUndo, UserMessage } from '@ttx/core'
-import { OPENROUTER_URL } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
 import { Separator } from '@/components/ui/separator'
@@ -10,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAgentActivities, useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { objectName } from '../canvas/registry'
 import { TAB_ID } from './browserAgent'
-import { DEFAULT_MODEL, forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
+import { forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
 
 /** A message for a browser agent with no reply after this long, and nobody thinking: its tab has closed. */
 const LOST_AFTER_MS = 120_000
@@ -26,16 +25,24 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   const selection = useOwnSelection(awareness)
   const [text, setText] = useState('')
   const [mode, setMode] = useState<AgentMode>(loadMode)
-  const [hasKey, setHasKey] = useState(() => keyIsUsable(loadKey()))
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  // Collapsed: only the header. The draft, mode and key settings stay in this state.
+  const [key, setKey] = useState(loadKey)
+  const hasKey = keyIsUsable(key)
+  // Collapsed: only the header. The draft and mode stay in this state.
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const ownWithoutKey = mode === 'own' && !hasKey
 
-  function chooseMode(next: AgentMode) {
+  function pickModel(next: AgentMode, config?: KeyConfig) {
+    if (config) {
+      saveKey(config)
+      setKey(loadKey())
+    }
     setMode(next)
     saveMode(next)
-    if (next === 'own' && !hasKey) setSettingsOpen(true)
+  }
+  function forget() {
+    forgetKey()
+    setKey(null)
+    pickModel('room')
   }
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -86,19 +93,6 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
       </header>
       {!collapsed && (
         <>
-          {settingsOpen && (
-            <KeySettings
-              onSave={(config) => {
-                saveKey(config)
-                setHasKey(keyIsUsable(config))
-                setSettingsOpen(false)
-              }}
-              onForget={() => {
-                forgetKey()
-                setHasKey(false)
-              }}
-            />
-          )}
           {(entries.length > 0 || thinking) && (
             <div className="ttx-chat__list" ref={listRef}>
               <ChatEntries runtime={runtime} thread={thread} />
@@ -128,7 +122,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
           </div>
           <Separator />
           <footer className="shrink-0 rounded-b-xl bg-panel-footer px-3 py-1">
-            <ModelPicker />
+            <ModelPicker mode={mode} config={key} onUse={pickModel} onForget={forget} />
           </footer>
         </>
       )}
@@ -256,54 +250,6 @@ function UserEntry({ message, lost }: { message: UserMessage; lost: boolean }) {
       <div className="ttx-chat__text">{message.text}</div>
       {lost && <div className="ttx-chat__undone">No answer: the sender's tab closed.</div>}
     </div>
-  )
-}
-
-/** The form for the person's own key. The key is kept in this browser only (keys.ts). */
-function KeySettings({ onSave, onForget }: { onSave: (config: KeyConfig) => void; onForget: () => void }) {
-  const [config, setConfig] = useState<KeyConfig>(() => loadKey() ?? { provider: 'openrouter', url: OPENROUTER_URL, model: DEFAULT_MODEL, apiKey: '' })
-  const set = (fields: Partial<KeyConfig>) => setConfig((c) => ({ ...c, ...fields }))
-  const url = config.provider === 'openrouter' ? OPENROUTER_URL : config.url
-  const valid = keyIsUsable(config)
-
-  function submit(e: FormEvent) {
-    e.preventDefault()
-    if (valid) onSave({ ...config, url, model: config.model.trim(), apiKey: config.apiKey.trim() })
-  }
-
-  return (
-    <form className="ttx-chat__keys" onSubmit={submit}>
-      <label>
-        Provider
-        <select value={config.provider} onChange={(e) => set({ provider: e.target.value as KeyConfig['provider'] })}>
-          <option value="openrouter">OpenRouter</option>
-          <option value="openai-compatible">OpenAI-compatible URL</option>
-        </select>
-      </label>
-      {config.provider === 'openai-compatible' && (
-        <label>
-          Base URL
-          <input value={config.url === OPENROUTER_URL ? '' : config.url} onChange={(e) => set({ url: e.target.value })} placeholder="https://api.openai.com/v1" />
-        </label>
-      )}
-      <label>
-        Model
-        <input value={config.model} onChange={(e) => set({ model: e.target.value })} placeholder={DEFAULT_MODEL} />
-      </label>
-      <label>
-        API key
-        <input type="password" autoComplete="off" value={config.apiKey} onChange={(e) => set({ apiKey: e.target.value })} placeholder={config.provider === 'openrouter' ? 'sk-or-…' : 'Not needed for a local server'} />
-      </label>
-      <p>Your key stays in this browser. It is sent only to {url || 'the URL above'}, never to this board's server.</p>
-      <div className="ttx-chat__keys-actions">
-        <button type="button" onClick={onForget}>
-          Forget key
-        </button>
-        <button type="submit" disabled={!valid}>
-          Save
-        </button>
-      </div>
-    </form>
   )
 }
 
