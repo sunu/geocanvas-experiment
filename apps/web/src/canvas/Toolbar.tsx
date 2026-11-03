@@ -29,7 +29,7 @@ import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Hint } from '@/components/Hint'
 import { toolTypes } from './registry'
-import { CONFLICT_FACE, COUNTRY_FACE, HISTORY_FACE, IFRCGO_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
+import { CONFLICT_FACE, COUNTRY_FACE, HDX_FACE, HISTORY_FACE, IFRCGO_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
 
 /** 'select', or the object type to draw. */
 export type Tool = string
@@ -66,6 +66,7 @@ const EVENT_CONTEXT: Item[] = [
   { ...HISTORY_FACE, tool: 'history' },
   { ...RELIEFWEB_FACE, tool: 'reliefweb' },
   { ...IFRCGO_FACE, tool: 'ifrcgo' },
+  { ...HDX_FACE, tool: 'hdx' },
 ]
 const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },

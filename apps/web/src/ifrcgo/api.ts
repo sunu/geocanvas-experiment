@@ -1,6 +1,6 @@
 import type { GoRef } from '@ttx/plugins'
 import { perPage } from '../cards/perPage'
-import { cutAtWord } from '../cards/text'
+import { cutAtWord, SUMMARY_CHARS } from '../cards/text'
 import { decode } from '../reliefweb/feed'
 
 /**
@@ -54,7 +54,6 @@ export interface GoEmergency {
   updatedAt: string
 }
 
-const SUMMARY_CHARS = 280
 const MAX_FIGURES = 4
 const MAX_REPORTS = 3
 

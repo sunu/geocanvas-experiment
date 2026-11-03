@@ -1,6 +1,6 @@
 import type { GithubRef } from '@ttx/plugins'
 import { perPage } from '../cards/perPage'
-import { cutAtWord } from '../cards/text'
+import { bodySummary } from '../cards/text'
 
 /**
  * A public GitHub issue or pull request, read straight from api.github.com, which sends CORS headers: no Worker
@@ -52,7 +52,6 @@ export interface GithubItem {
 
 /** Pull requests listed under an issue. */
 const MAX_LINKED = 5
-const SUMMARY_CHARS = 280
 
 const FAILED = new Set(['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure', 'stale'])
 
@@ -62,22 +61,6 @@ export function checksState(runs: { status: string; conclusion: string | null }[
   if (runs.some((r) => r.conclusion && FAILED.has(r.conclusion)) || statuses === 'failure' || statuses === 'error') return 'failing'
   if (runs.some((r) => r.status !== 'completed') || statuses === 'pending') return 'pending'
   return runs.length || statuses ? 'passing' : 'none'
-}
-
-/** The first words of an issue's text with the markup taken out: comments from templates, images, links, headings, tags. */
-export function bodySummary(markdown: string | null | undefined): string | undefined {
-  const text = (markdown ?? '')
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
-    .replace(/^\s*[-*]\s+\[[ xX]\]\s+/gm, '')
-    .replace(/[*_`>]+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return text ? cutAtWord(text, SUMMARY_CHARS) : undefined
 }
 
 interface Person {

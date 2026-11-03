@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseGithubUrl } from '@ttx/plugins'
-import { bodySummary, checksState, linkedPulls, loadGithub } from '../src/github/api'
+import { bodySummary } from '../src/cards/text'
+import { checksState, linkedPulls, loadGithub } from '../src/github/api'
 
 afterEach(() => {
   vi.unstubAllGlobals()

@@ -72,6 +72,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | **Input** (date or location) | Stretch (step 16) | — | Feeds a map's location or a chart's data fetch. |
 | ReliefWeb feed | Built | No | Added beside an event with GLIDE numbers. |
 | GitHub issue or pull request | Built | No | A pasted link to a public item: state, labels, checks, and the pull requests that mention an issue. Private repositories and review state are not built (plan-030). |
+| HDX dataset | Built | No | A pasted link to a dataset: publisher, period covered, update frequency, license, files (plan-031). The files themselves cannot be read from a browser, so none go onto a map from the card. |
 | IFRC GO emergency | Built | No | A pasted link to an emergency: severity, key figures, appeals with funding, field reports (plan-031). |
 | Country context, Who's where, Conflict (HDX HAPI) | Built | No | Province and district tables are not built. |
 | Disaster history (EM-DAT, through Montandon) | Built | No | A country's disasters since 1900 (plan-020). Past disasters in an area (DesInventar) is a map layer. |

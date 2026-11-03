@@ -1,6 +1,6 @@
-# Plan 031: IFRC GO emergencies on the board, and what HDX links would take
+# Plan 031: IFRC GO emergencies and HDX datasets on the board
 
-Status: IFRC GO card built. HDX card not built (feasibility below).
+Status: IFRC GO card and HDX card built. Showing an HDX file on a map is not (it needs a proxy, below).
 
 Builds on plan-030 (a card from a pasted link; the board stores the link, each browser reads the item). Both
 sources were checked on 2026-10-30 with real requests, not from documentation.
@@ -27,31 +27,41 @@ and none showed in the headers; a card costs 2 requests.
   concept): the link field, `useCardItem` (load, refresh, loading state) and `perPage` (the cache). What each
   source shows is its own, so there is no common card model yet.
 
-## HDX: feasible, not built
+## HDX: built (a preview of a dataset's metadata)
 
-A dataset page is `https://data.humdata.org/dataset/<name>` (and `…/resource/<id>`); the CKAN API gives it as
-JSON.
+A dataset page is `https://data.humdata.org/dataset/<name>` (and `…/resource/<id>`); the CKAN API gives it as JSON.
+The card is the same shape as the other two: `hdx` type, `hdx.setUrl`, `apps/web/src/hdx/`.
 
 - **Reads work from a browser.** `GET /api/3/action/package_show?id=<name>` is anonymous for public datasets and
   sends `access-control-allow-origin: *` (also on the error answer and on a preflight, which allows GET and the
   `Content-Type` header). One request per card. No rate limit is stated and none showed in the headers; HDX HAPI's
   60 a minute, which the Worker already handles, is a different service.
-- **What a card could show** (from a real dataset, `cod-ab-npl`): `title`, `organization.title`, `notes`
-  (Markdown), `dataset_date` (the period the data covers, as `[start TO end]`), `data_update_frequency` (days),
-  `last_modified`, `license_title`, `caveats`, `methodology`, `dataset_source`, the countries (`groups`), and
-  `resources` (name, format, size, download link). Useful for a situation report: who published it, how fresh it
-  is, its license.
-- **Files are not readable from a browser.** A resource's download link redirects (302) to a signed Amazon S3
-  address, and the first answer allows only `https://data.humdata.org` as origin, so a browser on another origin
-  cannot follow it. A "show this file on a map" button therefore needs a Worker proxy (with its size limit,
-  allow-list of hosts and abuse risk: anyone with a board link could use it), which is a separate decision. A card
-  can link to the files without it.
-- **HAPI already links to HDX datasets** (`metadata/resource`, shown by the country widgets), so those datasets
-  can be named on the board today; a card would let a person paste any dataset.
-- **Open questions:** dataset names can change (the id in the CKAN answer does not; the card could store the
-  name from the link and show the title it reads); datasets with `is_requestdata_type` (files on request) or
-  `private` answer differently, which was not tried; `dataset_date` needs parsing for display.
+- **What the card shows**: title, publisher, countries, the period the data covers (`dataset_date` is always
+  `[start TO end]`; the card shows the two dates), the update frequency (`data_update_frequency`, in days as text,
+  named as HDX names it: -1 Never, -2 As needed, 0 Live, 1 Every day, 7 Every week… 365 Every year; 71 of the 100
+  flood datasets checked are -1), the last change, license, the first words of the description (`notes`, Markdown),
+  caveats, source, and the first five files with format and size (HDX file names often end with the format: it is
+  not repeated). Useful for a situation report: who published it, how fresh it is, its license.
+- **Files on request.** A dataset with `is_requestdata_type` has an empty `resources` list (checked on
+  `afghanistan-schools`); the card says the files are asked for through HDX. An `archived` dataset says so.
+- **Links to files are built, not copied.** A file links to `…/dataset/<name>/resource/<id>` on HDX, made from the
+  dataset's link and the file's id (only when the id is a UUID), never from the `url` or `download_url` in the
+  answer.
+- **Not found and private.** A missing dataset answers 404 with a JSON body (CORS still open); a private one is
+  expected to answer 403 (not tried): the card says it may be private.
+- **Names.** HDX names are lowercase (`COD-AB-NPL` answers 404), so an uppercase link is not read. A name can change
+  on HDX; the card stores the name from the link.
 
-Estimate if wanted: about a day, on the shape of the IFRC GO card (parse, canonical link, `package_show`, a summary
-of the metadata, a link per resource). The open parts are datasets that need a request or are private, and showing
-`notes` (Markdown) as text.
+### Files are not readable from a browser
+
+A resource's download link redirects (302) to a signed Amazon S3 address, and the first answer allows only
+`https://data.humdata.org` as origin, so a browser on another origin cannot follow it. A "show this file on a map"
+button therefore needs a Worker proxy, with its size limit, allow-list of hosts and abuse risk (anyone with a board
+link could use it): a separate decision. The card links to the files without it. HDX HAPI's metadata
+(`metadata/resource`, shown by the country widgets) already names datasets, so those can be put on the board by
+pasting their links.
+
+### Not built
+
+HDX's own data previews (some resources have `dataset_preview_enabled`; how they are served was not looked at); a
+file's page as its own card; private datasets; a dataset's other pages (organization, group, search).
