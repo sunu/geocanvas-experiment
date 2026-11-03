@@ -35,6 +35,16 @@ export interface ToolCallRecord {
   error?: string
 }
 
+/**
+ * The calls of a turn that failed and were not done later in it: a model that got an error often sends the call
+ * again, right, and listing the first try would make a turn that worked look failed. A later call counts when it is
+ * the same tool on the same objects and was applied.
+ */
+export function failedCalls(calls: ToolCallRecord[]): ToolCallRecord[] {
+  const same = (a: ToolCallRecord, b: ToolCallRecord) => a.tool === b.tool && (a.ids ?? []).join() === (b.ids ?? []).join()
+  return calls.filter((c, i) => c.status === 'failed' && !calls.slice(i + 1).some((later) => later.status === 'applied' && same(c, later)))
+}
+
 /** What undoing an agent turn needs (ops agent.undoTurn and agent.revert). */
 export interface TurnUndo {
   /** Objects the turn added. */

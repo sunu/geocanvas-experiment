@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
 import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
-import type { AgentReply, Chat, OplogEntry, Runtime, TurnUndo, UserMessage } from '@ttx/core'
+import { failedCalls, type AgentReply, type Chat, type OplogEntry, type Runtime, type TurnUndo, type UserMessage } from '@ttx/core'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
 import { Separator } from '@/components/ui/separator'
@@ -260,7 +260,7 @@ function AgentEntry({ reply, runtime, undone, onOpen }: { reply: AgentReply; run
     const record = await runtime.invoke('agent.undoTurn', { kind: 'canvas' }, { replyId: reply.id })
     setUndoError(record.error)
   }
-  const failed = reply.calls.filter((c) => c.status === 'failed')
+  const failed = failedCalls(reply.calls)
   return (
     <div className="ttx-chat__entry ttx-chat__entry--agent">
       <div className="ttx-chat__who">
