@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Runtime, ToolRunner } from '@ttx/core'
-import { agentTools, availableSkills, boardGet, eventsSearch, openeoCollections, openeoCoverage, openeoPreview, plugins } from '../src/index'
+import { Chat, Runtime, ToolRunner } from '@ttx/core'
+import { Agent, AGENT_OFF, agentTools, availableSkills, boardGet, eventsSearch, openeoCollections, openeoCoverage, openeoPreview, plugins } from '../src/index'
 import type { MontyClient } from '../src/monty/client'
 
 const canvas = { kind: 'canvas' } as const
@@ -81,5 +81,18 @@ describe('plugins turned off on a board', () => {
     expect(after.has('event__add')).toBe(false)
     expect(after.has('map__add')).toBe(true)
     expect(availableSkills(after).map((s) => s.name)).not.toContain('satellite-imagery')
+  })
+
+  it('stop the agent answering, without a model call', async () => {
+    const doc = new Y.Doc()
+    const person = new Runtime({ doc, plugins, actor: { kind: 'user', id: 'ada' } })
+    person.dispatch('board.setPlugins', canvas, { disabled: ['agent'] })
+    let calls = 0
+    new Agent({ doc, complete: async () => (calls++, { role: 'assistant', content: 'Hi' }) })
+    const chat = new Chat(doc)
+    chat.send({ actor: { kind: 'user', id: 'ada' }, text: 'add a map', selection: [] })
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0))
+    expect(calls).toBe(0)
+    expect(chat.list().at(-1)).toMatchObject({ kind: 'agent', text: AGENT_OFF })
   })
 })
