@@ -4,13 +4,13 @@ import * as Y from 'yjs'
  * Requests to show an object to one person, in the doc's `nav` map: person id → the latest request. The canvas
  * camera stays local and is never synced; this carries only "show this person that object", so the room's agent,
  * which has no camera, can move the view of the person who asked (core.view.show). Each person's browser shows the
- * object when a newer request comes. Like views, not undone: the undo manager tracks `objects` only.
+ * object when its request changes after the page has synced. Like views, not undone: the undo manager tracks `objects` only.
  */
 
 export interface ShowRequest {
   /** The object to show. */
   id: string
-  /** When it was asked (ms). A browser follows only requests newer than its page. */
+  /** When it was asked (ms), so asking for the same object again is a change that browsers see. */
   at: number
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type * as Y from 'yjs'
-import { Draft, type Chat, type ChatEntry, type Runtime, type TargetRef } from '@ttx/core'
+import { Draft, Nav, type Chat, type ChatEntry, type Runtime, type TargetRef } from '@ttx/core'
 import type { ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
@@ -661,6 +661,20 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
       window.removeEventListener('hashchange', onHash)
     }
   }, [synced])
+
+  // An agent asked to show this person an object (core.view.show). Listened to from the sync on, so the request
+  // the doc already had is not shown again on load. Not by time: the Worker's clock and this browser's differ.
+  useEffect(() => {
+    let stop: (() => void) | undefined
+    let live = true
+    void synced.then(() => {
+      if (live) stop = new Nav(board.doc).subscribe(runtime.actor.id, (r) => showRef.current(r.id))
+    })
+    return () => {
+      live = false
+      stop?.()
+    }
+  }, [board, runtime, synced])
 
   // The draft lives as long as its focus. Closed after the object's view has let go of it.
   useEffect(() => {
