@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon, CaretDownIcon, GearIcon, PlugsConnectedIcon, PlugsIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon, CaretDownIcon, GearIcon, MegaphoneIcon, PlugsConnectedIcon, PlugsIcon } from '@phosphor-icons/react'
 import type { Actor, Runtime } from '@ttx/core'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,8 @@ import { usePersonName } from '../board/person'
 import type { Awareness } from '../board/presence'
 import { PresenceAvatars } from './PresenceAvatars'
 import { SettingsDialog } from './SettingsDialog'
+import { WhatsNewDialog } from '../whatsnew/WhatsNewDialog'
+import { useNewsUnseen } from '../whatsnew/seen'
 import { useViewState } from '../canvas/viewState'
 import { HubStatusDot } from '../code/HubSettings'
 import type { useBridgeStatus } from '../mcp/bridge'
@@ -41,6 +43,8 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
   const { zoom, focused } = useViewState()
   const view = (opId: string) => runtime.dispatch(opId, { kind: 'canvas' }, {})
   const [settings, setSettings] = useState(false)
+  const [news, setNews] = useState(false)
+  const unseen = useNewsUnseen()
   const pluginsOff = usePluginsOff(runtime)
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
@@ -54,6 +58,13 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
           {bridge === 'connected' ? <PlugsConnectedIcon className="size-4" /> : <PlugsIcon className="size-4" />}
         </span>
       )}
+      <Hint label="What’s new, and which build you are on">
+        <Button variant="ghost" size="icon-sm" aria-label="What’s new" className="relative" onClick={() => setNews(true)}>
+          <MegaphoneIcon className="size-4" />
+          {unseen && <span className="absolute top-1 right-1 size-2 rounded-full bg-teal-600" aria-label="New" />}
+        </Button>
+      </Hint>
+      <WhatsNewDialog open={news} onOpenChange={setNews} />
       <Hint label="Settings: plugins and skills on this board, your JupyterHub">
         <Button variant="ghost" size="icon-sm" aria-label="Settings" className="relative" onClick={() => setSettings(true)}>
           <GearIcon className="size-4" />

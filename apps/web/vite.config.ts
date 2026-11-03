@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import { DEFAULT_PORT, TOKEN_FILE } from '../mcp/src/pairing.ts'
 import { mdText } from '../../packages/plugins/mdText.ts'
+import { buildFromEnv, type Build } from './src/build.ts'
 import { buildVersion, precacheList, type BundleFile } from './src/pwa/precache.ts'
 
 /**
@@ -35,35 +36,41 @@ const mcpPairing: Plugin = {
  * The service worker (src/pwa/sw.js), written into the build as /sw.js with the build's version and the files to cache
  * when it installs (src/pwa/precache.ts). Not in dev: it is registered in production builds only.
  */
-const serviceWorker: Plugin = {
+const serviceWorker = (build: Build): Plugin => ({
   name: 'ttx-service-worker',
   apply: 'build',
   generateBundle(_options, bundle) {
     const files = bundle as unknown as Record<string, BundleFile>
-    const head = `const VERSION = ${JSON.stringify(buildVersion(files))}\nconst PRECACHE = ${JSON.stringify(precacheList(files))}\n`
+    // BUILD is the commit the page shows: the update notice asks the waiting worker for it (src/pwa/register.ts).
+    const head = `const VERSION = ${JSON.stringify(buildVersion(files))}\nconst BUILD = ${JSON.stringify(build.sha)}\nconst PRECACHE = ${JSON.stringify(precacheList(files))}\n`
     this.emitFile({ type: 'asset', fileName: 'sw.js', source: head + readFileSync(new URL('./src/pwa/sw.js', import.meta.url), 'utf8') })
   },
-}
+})
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), mcpPairing, mdText, serviceWorker],
-  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  server: {
-    port: 5173,
-    // The sync Worker (npm run sync), which also proxies Montandon searches, geocoding and Notebook Factory, and stores uploads.
-    proxy: {
-      '/connect': { target: 'ws://localhost:8787', ws: true },
-      '/agent': 'http://localhost:8787',
-      '/monty': 'http://localhost:8787',
-      '/tools': 'http://localhost:8787',
-      '/notebooks': 'http://localhost:8787',
-      '/reliefweb': 'http://localhost:8787',
-      '/floodmaps': 'http://localhost:8787',
-      '/hapi': 'http://localhost:8787',
-      '/uploads': 'http://localhost:8787',
-      '/openeo': 'http://localhost:8787',
+export default defineConfig(({ command }) => {
+  // The commit and time of a build (src/build.ts); `npm run dev` is `dev`.
+  const build: Build = command === 'build' ? buildFromEnv(process.env, new Date()) : { sha: 'dev' }
+  return {
+    define: { __TTX_BUILD__: JSON.stringify(build) },
+    plugins: [react(), tailwindcss(), mcpPairing, mdText, serviceWorker(build)],
+    resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+    server: {
+      port: 5173,
+      // The sync Worker (npm run sync), which also proxies Montandon searches, geocoding and Notebook Factory, and stores uploads.
+      proxy: {
+        '/connect': { target: 'ws://localhost:8787', ws: true },
+        '/agent': 'http://localhost:8787',
+        '/monty': 'http://localhost:8787',
+        '/tools': 'http://localhost:8787',
+        '/notebooks': 'http://localhost:8787',
+        '/reliefweb': 'http://localhost:8787',
+        '/floodmaps': 'http://localhost:8787',
+        '/hapi': 'http://localhost:8787',
+        '/uploads': 'http://localhost:8787',
+        '/openeo': 'http://localhost:8787',
+      },
     },
-  },
-  // deck.gl-geotiff decodes COG tiles in a worker that uses top-level await.
-  worker: { format: 'es' },
+    // deck.gl-geotiff decodes COG tiles in a worker that uses top-level await.
+    worker: { format: 'es' },
+  }
 })
