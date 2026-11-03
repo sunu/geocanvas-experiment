@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
-import type { AgentReply, Chat, OplogEntry, Runtime, TurnUndo, UserMessage } from '@ttx/core'
-import { OPENROUTER_URL } from '@ttx/plugins'
+import { ArrowCounterClockwiseIcon, ArrowUpIcon, BroomIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, UserIcon, WarningIcon } from '@phosphor-icons/react'
+import { exchanges, failedCalls, lastCompaction, queuePosition, type Actor, type AgentReply, type Chat, type ChatEntry, type OplogEntry, type Runtime, type TurnUndo, type UserMessage } from '@ttx/core'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
-import { useAgentActivities, useOwnSelection, usePeers, type Awareness } from '../board/presence'
+import { AGENT } from '@ttx/plugins'
+import { usePeopleNames } from '../board/people'
+import { agentKey, useAgentActivities, useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { objectName } from '../canvas/registry'
 import { TAB_ID } from './browserAgent'
-import { DEFAULT_MODEL, forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
+import { forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, loadOnlyMine, saveCollapsed, saveKey, saveMode, saveOnlyMine, type AgentMode, type KeyConfig } from './keys'
 
 /** A message for a browser agent with no reply after this long, and nobody thinking: its tab has closed. */
 const LOST_AFTER_MS = 120_000
@@ -22,32 +23,62 @@ const LOST_AFTER_MS = 120_000
  */
 export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat: Chat; awareness: Awareness }) {
   const thread = useChatThread(runtime, chat, awareness)
-  const { entries, thinking, activity } = thread
+  const { entries, thinking, working } = thread
   const selection = useOwnSelection(awareness)
   const [text, setText] = useState('')
   const [mode, setMode] = useState<AgentMode>(loadMode)
-  const [hasKey, setHasKey] = useState(() => keyIsUsable(loadKey()))
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  // Collapsed: only the header. The draft, mode and key settings stay in this state.
+  const [key, setKey] = useState(loadKey)
+  const hasKey = keyIsUsable(key)
+  // Collapsed: only the header. The draft and mode stay in this state.
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const ownWithoutKey = mode === 'own' && !hasKey
 
-  function chooseMode(next: AgentMode) {
+  function pickModel(next: AgentMode, config?: KeyConfig) {
+    if (config) {
+      saveKey(config)
+      setKey(loadKey())
+    }
     setMode(next)
     saveMode(next)
-    if (next === 'own' && !hasKey) setSettingsOpen(true)
+  }
+  function forget() {
+    forgetKey()
+    setKey(null)
+    pickModel('room')
   }
   const listRef = useRef<HTMLDivElement>(null)
 
-  // On new entries, and on opening the panel: show the latest.
+  const [forMe, setForMe] = useRepliesForMe(entries, runtime.actor.id, !collapsed)
+  // The exchange to show when the panel opens: the first reply to this person that came while it was collapsed.
+  const target = useRef<string>(undefined)
+
+  // On new entries, and on opening the panel: show the latest, or the reply to this person.
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
+    const list = listRef.current
+    if (!list) return
+    const exchange = target.current && list.querySelector(`[data-exchange="${CSS.escape(target.current)}"]`)
+    if (exchange) exchange.scrollIntoView({ block: 'start' })
+    else list.scrollTo({ top: list.scrollHeight })
+    target.current = undefined
   }, [entries.length, thinking, collapsed])
 
   function toggle() {
     const next = !collapsed
     setCollapsed(next)
     saveCollapsed(next)
+    if (!next && forMe.length) {
+      target.current = forMe[0]
+      setForMe([])
+    }
+  }
+  const indicator = collapsed && (forMe.length > 0 || !!working[0])
+  // Something to compact (a message since the last compaction), and no compaction on its way.
+  const since = entries.slice(lastCompaction(entries).index + 1)
+  const canCompact = since.some((e) => e.kind === 'user' && !e.compact) && !since.some((e) => e.kind === 'user' && e.compact && thread.pending.has(e.id))
+  const [onlyMine, setOnlyMine] = useState(loadOnlyMine)
+  function toggleMine() {
+    setOnlyMine(!onlyMine)
+    saveOnlyMine(!onlyMine)
   }
 
   function send() {
@@ -66,16 +97,49 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
             Describe
           </button>
         </h2>
-        {collapsed && thinking && (
-          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
-            <span className="size-2 rounded-full bg-[var(--agent)]" aria-hidden />
-            {activity ?? 'Thinking'}…
+        {collapsed && forMe.length > 0 && (
+          <button type="button" className="ml-auto inline-flex items-center gap-1.5 rounded-md px-1 text-xs font-medium text-foreground" onClick={toggle}>
+            <span className="size-2 shrink-0 rounded-full bg-[var(--agent)]" aria-hidden />
+            {forMe.length > 1 ? `${forMe.length} replies for you` : 'Reply for you'}
+          </button>
+        )}
+        {collapsed && !forMe.length && working[0] && (
+          <span className="ml-auto inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" role="status">
+            <span className="size-2 shrink-0 rounded-full bg-[var(--agent)]" aria-hidden />
+            <span className="truncate">
+              For {thread.nameOf(working[0].actor)}: {thread.status(working[0]).activity}…
+            </span>
           </span>
+        )}
+        {!collapsed && canCompact && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="ml-auto"
+            title="Compact chat: the agent summarizes it, and the earlier messages are hidden for everyone"
+            aria-label="Compact chat"
+            onClick={() => compactChat(runtime, chat, ownWithoutKey ? 'room' : mode)}
+          >
+            <BroomIcon className="size-4" />
+          </Button>
+        )}
+        {!collapsed && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={cn(!canCompact && 'ml-auto', onlyMine && 'bg-accent')}
+            title={onlyMine ? 'Show everyone’s requests' : 'Show only my requests'}
+            aria-label="Show only my requests"
+            aria-pressed={onlyMine}
+            onClick={toggleMine}
+          >
+            <UserIcon className="size-4" weight={onlyMine ? 'fill' : 'regular'} />
+          </Button>
         )}
         <Button
           variant="ghost"
           size="icon-sm"
-          className={cn(!(collapsed && thinking) && 'ml-auto')}
+          className={cn(collapsed && !indicator && 'ml-auto')}
           title={collapsed ? 'Open chat' : 'Collapse chat'}
           aria-label={collapsed ? 'Open chat' : 'Collapse chat'}
           aria-expanded={!collapsed}
@@ -86,22 +150,9 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
       </header>
       {!collapsed && (
         <>
-          {settingsOpen && (
-            <KeySettings
-              onSave={(config) => {
-                saveKey(config)
-                setHasKey(keyIsUsable(config))
-                setSettingsOpen(false)
-              }}
-              onForget={() => {
-                forgetKey()
-                setHasKey(false)
-              }}
-            />
-          )}
           {(entries.length > 0 || thinking) && (
             <div className="ttx-chat__list" ref={listRef}>
-              <ChatEntries runtime={runtime} thread={thread} />
+              <ChatEntries runtime={runtime} thread={thread} onlyOf={onlyMine ? runtime.actor.id : undefined} />
             </div>
           )}
           <div className="flex shrink-0 flex-col gap-3 px-4 pt-0 pb-4">
@@ -128,7 +179,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
           </div>
           <Separator />
           <footer className="shrink-0 rounded-b-xl bg-panel-footer px-3 py-1">
-            <ModelPicker />
+            <ModelPicker mode={mode} config={key} onUse={pickModel} onForget={forget} />
           </footer>
         </>
       )}
@@ -136,17 +187,24 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   )
 }
 
-/** What the chat shows, read from the doc and presence: its entries, and what the agents are doing now. */
+/** What the chat shows, read from the doc and presence: its entries, and what the agents are doing now and for whom. */
 export function useChatThread(runtime: Runtime, chat: Chat, awareness: Awareness) {
   const entries = useSyncExternalStore(chat.subscribe, chat.list)
   // The room's agent, or a person whose browser agent works; or this tab's own.
   const peerThinking = usePeers(awareness).some((p) => p.status === 'thinking')
   const thinking = useOwnStatus(awareness) === 'thinking' || peerThinking
-  // What an agent does now (thinking, a search), as its cursor's tag says.
-  const activity: string | undefined = useAgentActivities(awareness).values().next().value
+  // What an agent does now (thinking, a search) for each person, as its cursor's tag says.
+  const activities = useAgentActivities(awareness)
   const undone = useUndoneReplies(runtime)
-  const pending = new Set(chat.pending().map((m) => m.id))
-  return { entries, thinking, activity, undone, pending }
+  // People's current names: a message keeps the name its sender had then.
+  const nameOf = usePeopleNames(runtime.board.doc)
+  const queue = chat.pending()
+  const pending = new Set(queue.map((m) => m.id))
+  /** Where a message is: answered now (with what the agent does), queued behind others, or neither (-1). */
+  const status = (m: UserMessage) => ({ ahead: queuePosition(queue, m), activity: activities.get(agentKey(AGENT.id, m.actor.id)) })
+  // The messages answered now, for the collapsed panel's header.
+  const working = queue.filter((m) => queuePosition(queue, m) === 0 && activities.has(agentKey(AGENT.id, m.actor.id)))
+  return { entries, thinking, undone, pending, status, working, nameOf }
 }
 
 export type ChatThread = ReturnType<typeof useChatThread>
@@ -164,22 +222,66 @@ export function sendMessage(runtime: Runtime, chat: Chat, text: string, selectio
 }
 
 /**
- * The thread's entries and the agent's thinking line. With `onOpen`, each reply also lists the objects it added and
+ * Ask the agent to compact the chat: it summarizes the chat for its later requests, and the exchanges before are hidden
+ * for everyone (they stay in the doc, with their Undo buttons, behind "Show earlier").
+ */
+function compactChat(runtime: Runtime, chat: Chat, mode: AgentMode) {
+  chat.send({ actor: runtime.actor, text: 'Compact the chat', selection: [], compact: true, ...(mode === 'own' && { browserTab: TAB_ID }) })
+}
+
+/**
+ * The thread's exchanges, each reply under the message it answers, and each unanswered message's place in its queue. The exchanges before
+ * the last compaction are hidden until "Show earlier". With `onlyOf`, only that person's. With `onOpen`, each reply also lists the objects it added and
  * changed, to open them: where the canvas is not there to show them (the phone's layout).
  */
-export function ChatEntries({ runtime, thread, onOpen }: { runtime: Runtime; thread: ChatThread; onOpen?(id: string): void }) {
-  const { entries, thinking, activity, undone, pending } = thread
+export function ChatEntries({ runtime, thread, onOpen, onlyOf }: { runtime: Runtime; thread: ChatThread; onOpen?(id: string): void; onlyOf?: string }) {
+  const { entries, thinking, undone, pending, status, nameOf } = thread
+  const [showEarlier, setShowEarlier] = useState(false)
+  // With `onlyOf`, that person's exchanges and the compactions.
+  const all = useMemo(
+    () => exchanges(entries).filter((x) => !onlyOf || x.reply?.compacted || x.message?.actor.id === onlyOf),
+    [entries, onlyOf],
+  )
+  const compaction = lastCompaction(entries).reply
+  const start = compaction ? all.findIndex((x) => x.reply === compaction) : 0
+  const shown = showEarlier ? all : all.slice(start)
   return (
     <>
-      {entries.map((e) =>
-        e.kind === 'user' ? (
-          <UserEntry key={e.id} message={e} lost={isLost(e, pending, thinking)} />
+      {!showEarlier && start > 0 && (
+        <button type="button" className="ttx-chat__earlier" onClick={() => setShowEarlier(true)}>
+          Show {start} earlier
+        </button>
+      )}
+      {shown.map(({ message, reply }) =>
+        reply?.compacted ? (
+          <CompactionEntry key={reply.id} reply={reply} by={nameOf(message?.actor ?? askerOf(entries, reply), '')} />
         ) : (
-          <AgentEntry key={e.id} reply={e} runtime={runtime} undone={undone.has(e.id)} onOpen={onOpen} />
+          <div key={(message ?? reply)!.id} className="ttx-chat__exchange" data-exchange={message?.id}>
+            {message && <UserEntry message={message} name={nameOf(message.actor)} lost={isLost(message, pending, thinking)} status={reply ? undefined : status(message)} />}
+            {reply && <AgentEntry reply={reply} asker={message && { name: nameOf(message.actor), color: message.actor.color }} runtime={runtime} undone={undone.has(reply.id)} onOpen={onOpen} />}
+          </div>
         ),
       )}
-      {thinking && <p className="ttx-chat__thinking">{activity ? `Agent: ${activity}…` : 'Agent is thinking…'}</p>}
     </>
+  )
+}
+
+/** Who sent the message a reply answers, when it is in the chat. */
+const askerOf = (entries: ChatEntry[], reply: AgentReply): Actor | undefined =>
+  entries.find((e): e is UserMessage => e.kind === 'user' && e.id === reply.replyTo)?.actor
+
+/** Where the chat was compacted: who did it, and the agent's summary of the chat before, to read. */
+function CompactionEntry({ reply, by }: { reply: AgentReply; by: string }) {
+  return (
+    <div className="ttx-chat__compaction">
+      <div className="ttx-chat__compaction-line">Chat compacted{by ? ` by ${by}` : ''}</div>
+      {reply.compacted?.summary && (
+        <details>
+          <summary>Summary</summary>
+          <div className="ttx-chat__text">{reply.compacted.summary}</div>
+        </details>
+      )}
+    </div>
   )
 }
 
@@ -245,81 +347,54 @@ function isLost(message: UserMessage, pending: Set<string>, thinking: boolean): 
   return !!message.browserTab && message.browserTab !== TAB_ID && pending.has(message.id) && !thinking && Date.now() - message.at > LOST_AFTER_MS
 }
 
-function UserEntry({ message, lost }: { message: UserMessage; lost: boolean }) {
+function UserEntry({ message, name, lost, status }: { message: UserMessage; name: string; lost: boolean; status?: { ahead: number; activity?: string } }) {
   return (
     <div className="ttx-chat__entry">
       <div className="ttx-chat__who" style={{ color: message.actor.color }}>
-        {message.actor.name ?? 'Someone'}
+        {name}
         {message.selection.length > 0 && <span className="ttx-chat__chip">{message.selection.length} selected</span>}
         {message.browserTab && <span className="ttx-chat__chip" title="Answered by an agent in the sender's browser, on their own key">own key</span>}
       </div>
       <div className="ttx-chat__text">{message.text}</div>
-      {lost && <div className="ttx-chat__undone">No answer: the sender's tab closed.</div>}
+      {lost ? (
+        <div className="ttx-chat__undone">No answer: the sender's tab closed.</div>
+      ) : (
+        status &&
+        status.ahead >= 0 && (
+          <div className="ttx-chat__status" role="status">
+            {status.ahead > 0 ? (
+              `Queued · ${status.ahead} ahead`
+            ) : (
+              <>
+                <span className="ttx-chat__dot" aria-hidden />
+                {status.activity ?? 'Waiting for the agent'}…
+              </>
+            )}
+          </div>
+        )
+      )}
     </div>
   )
 }
 
-/** The form for the person's own key. The key is kept in this browser only (keys.ts). */
-function KeySettings({ onSave, onForget }: { onSave: (config: KeyConfig) => void; onForget: () => void }) {
-  const [config, setConfig] = useState<KeyConfig>(() => loadKey() ?? { provider: 'openrouter', url: OPENROUTER_URL, model: DEFAULT_MODEL, apiKey: '' })
-  const set = (fields: Partial<KeyConfig>) => setConfig((c) => ({ ...c, ...fields }))
-  const url = config.provider === 'openrouter' ? OPENROUTER_URL : config.url
-  const valid = keyIsUsable(config)
-
-  function submit(e: FormEvent) {
-    e.preventDefault()
-    if (valid) onSave({ ...config, url, model: config.model.trim(), apiKey: config.apiKey.trim() })
-  }
-
-  return (
-    <form className="ttx-chat__keys" onSubmit={submit}>
-      <label>
-        Provider
-        <select value={config.provider} onChange={(e) => set({ provider: e.target.value as KeyConfig['provider'] })}>
-          <option value="openrouter">OpenRouter</option>
-          <option value="openai-compatible">OpenAI-compatible URL</option>
-        </select>
-      </label>
-      {config.provider === 'openai-compatible' && (
-        <label>
-          Base URL
-          <input value={config.url === OPENROUTER_URL ? '' : config.url} onChange={(e) => set({ url: e.target.value })} placeholder="https://api.openai.com/v1" />
-        </label>
-      )}
-      <label>
-        Model
-        <input value={config.model} onChange={(e) => set({ model: e.target.value })} placeholder={DEFAULT_MODEL} />
-      </label>
-      <label>
-        API key
-        <input type="password" autoComplete="off" value={config.apiKey} onChange={(e) => set({ apiKey: e.target.value })} placeholder={config.provider === 'openrouter' ? 'sk-or-…' : 'Not needed for a local server'} />
-      </label>
-      <p>Your key stays in this browser. It is sent only to {url || 'the URL above'}, never to this board's server.</p>
-      <div className="ttx-chat__keys-actions">
-        <button type="button" onClick={onForget}>
-          Forget key
-        </button>
-        <button type="submit" disabled={!valid}>
-          Save
-        </button>
-      </div>
-    </form>
-  )
-}
-
-function AgentEntry({ reply, runtime, undone, onOpen }: { reply: AgentReply; runtime: Runtime; undone: boolean; onOpen?(id: string): void }) {
+function AgentEntry({ reply, asker, runtime, undone, onOpen }: { reply: AgentReply; asker?: { name: string; color?: string }; runtime: Runtime; undone: boolean; onOpen?(id: string): void }) {
   // Undo refuses when someone changed the turn's objects since (agent.undoTurn); say why.
   const [undoError, setUndoError] = useState<string>()
   const undo = async () => {
     const record = await runtime.invoke('agent.undoTurn', { kind: 'canvas' }, { replyId: reply.id })
     setUndoError(record.error)
   }
-  const failed = reply.calls.filter((c) => c.status === 'failed')
+  const failed = failedCalls(reply.calls)
   return (
     <div className="ttx-chat__entry ttx-chat__entry--agent">
       <div className="ttx-chat__who">
         <SparkleIcon size={12} weight="fill" />
         Agent
+        {asker && (
+          <span className="ttx-chat__to" style={{ color: asker.color }}>
+            → {asker.name}
+          </span>
+        )}
       </div>
       <div className="ttx-chat__text">{reply.text}</div>
       {/* What went well shows on the canvas, on the agent's cursor and the objects it worked on; what failed has nowhere else to go. */}
@@ -367,6 +442,29 @@ function TurnObjects({ runtime, undo, onOpen }: { runtime: Runtime; undo: TurnUn
       ))}
     </ul>
   )
+}
+
+/**
+ * The messages of person `me` that got their reply while the chat was not open, oldest first, and a setter to clear
+ * them. Replies already there when the panel mounts do not count.
+ */
+function useRepliesForMe(entries: ChatEntry[], me: string, open: boolean) {
+  const known = useRef<Set<string>>(null)
+  const [unseen, setUnseen] = useState<string[]>([])
+  useEffect(() => {
+    const replies = entries.filter((e): e is AgentReply => e.kind === 'agent')
+    if (!known.current) {
+      known.current = new Set(replies.map((r) => r.id))
+      return
+    }
+    const fresh = replies.filter((r) => !known.current!.has(r.id))
+    for (const r of fresh) known.current.add(r.id)
+    if (open) return
+    const mine = new Set(entries.flatMap((e) => (e.kind === 'user' && e.actor.id === me ? [e.id] : [])))
+    const forMe = fresh.filter((r) => mine.has(r.replyTo)).map((r) => r.replyTo)
+    if (forMe.length) setUnseen((u) => [...u, ...forMe])
+  }, [entries, me, open])
+  return [unseen, setUnseen] as const
 }
 
 /** This tab's presence status: 'thinking' while its browser agent works. */

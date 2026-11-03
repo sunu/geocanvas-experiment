@@ -18,6 +18,7 @@ import { drawShape } from './draw'
 import { boundsOf, deckLayers, shapeLayer, useLayerStates } from './layers'
 import { creditsOf, pictureRequest, WORLD } from './picture'
 import { useViewState } from '../canvas/viewState'
+import { presentation, presentMap, unfollow, useFollowedMap } from '../canvas/presentation'
 import { registerLiveMap } from './live'
 import { MapStickies } from './MapStickies'
 import { useLiveMap } from './pool'
@@ -31,11 +32,7 @@ import { ScenarioOnMap, useScenario } from '../routing/ScenarioOnMap'
 // labels (Arabic, Hebrew) itself, so no RTL plugin is needed.
 setWorkerUrl(workerUrl)
 
-/** Where a map starts for a person who has no view of it and nobody else has one either. */
-/**
- * Still where a new map starts. The map saves its first view about a second after it appears (a resize ends a
- * move), so "no view yet" does not last; the zoom does.
- */
+/** Still where a new map starts: nobody has a view of it, or nobody has moved it from the whole world. */
 const atStart = (view: { zoom: number } | undefined) => !view || view.zoom <= WORLD.zoom + 0.01
 
 /** A view is saved this long after the map stops moving, so a series of pans is one write. */
@@ -112,7 +109,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   // Routes are found on Overture's roads, whose license asks for attribution like a layer's. A forecast's caption (model,
   // run, valid time, "not a warning") is shown with the credits, so it is on the map itself.
   const credits = creditsOf(states, scenario)
-  /** What the map is for (plans/plan-024.md): a route map, a flood exposure map, or none (a plain map). */
+  /** What the map is for (plans/plan-030.md): a route map, a flood exposure map, or none (a plain map). */
   const analysis = analysisOf(o)
   /** Map mode (data, notes, drawings) or, on an analysis map, its analysis; the Options panel's tabs pick it in focus. */
   const picked = useMapMode(o.id, analysis ? 'scenario' : 'map')
@@ -160,6 +157,11 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
   const live = !paused && (pooled || editing || focused)
   const view = mine ?? latest ?? WORLD
   const snapshot = useSnapshot(live || paused ? undefined : pictureRequest(o, view, layers, shapes, scenario))
+  // Presentation mode (canvas/presentation.ts): what the presenter's map shows, while this person follows them.
+  const followed = useFollowedMap(o.id)
+  const followedRef = useRef(followed)
+  followedRef.current = followed
+  const followedKey = followed && `${followed.center[0]},${followed.center[1]},${followed.zoom},${followed.bearing}`
 
   useEffect(() => {
     if (!live) return
@@ -220,6 +222,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     map.on('mouseout', () => {
       setHover(undefined)
       hoverCode(undefined, 'map')
+    })
+    // A presenter shares what this map shows whenever it moves, whoever moved it. A follower who moves it themselves
+    // stops following, as on the canvas.
+    map.on('move', () => {
+      if (presentation().presenting !== null) presentMap({ id: o.id, ...shown(map) })
+    })
+    map.on('movestart', (e: { originalEvent?: Event }) => {
+      if (e.originalEvent && followedRef.current) unfollow()
     })
     mapRef.current = map
     overlayRef.current = overlay
@@ -304,7 +314,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     if (!map) return
     const me = runtime.actor.id
     /** `at` of my view as this map last wrote or showed it: a change with another `at` came from elsewhere. */
-    let shownAt = views.get(me, o.id)?.at
+    let shownAt = (views.get(me, o.id) ?? views.latest(o.id)?.view)?.at
     /** The map is moving to a view from elsewhere: do not save that move back. */
     let moving = false
     let pending: SavedView | undefined
@@ -325,15 +335,19 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     const saved = views.get(me, o.id)
     if (saved && !sameView(shown(map), saved)) map.jumpTo({ center: saved.center, zoom: saved.zoom, bearing: saved.bearing })
     const onMoveStart = () => clearTimeout(timer)
-    const onMoveEnd = () => {
+    const onMoveEnd = (e: { originalEvent?: Event }) => {
       if (moving) return void (moving = false)
+      // Only the person's own gestures are their view. A resize (the first one comes about a second after the map
+      // appears) would otherwise save where the map started as their view, and they would stop following the latest.
+      if (!e.originalEvent) return
       pending = { ...shown(map), at: Date.now() }
       timer = setTimeout(save, SAVE_AFTER_MS)
     }
     map.on('movestart', onMoveStart)
     map.on('moveend', onMoveEnd)
     const unsubscribe = views.subscribe(() => {
-      const view = views.get(me, o.id)
+      // Until this person moves the map themselves, it follows the latest view anyone saved.
+      const view = views.get(me, o.id) ?? views.latest(o.id)?.view
       if (!view || view.at === shownAt) return
       shownAt = view.at
       clearTimeout(timer)
@@ -349,6 +363,14 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
       save()
     }
   }, [views, runtime, o.id, live])
+
+  // A follower's map goes where the presenter's is. With no originalEvent, the move is not saved as their view.
+  useEffect(() => {
+    const map = mapRef.current
+    const f = followedRef.current
+    if (!map || !f) return
+    map.easeTo({ center: f.center, zoom: f.zoom, bearing: f.bearing, duration: 150 })
+  }, [followedKey, live])
 
   // The basemap's attribution and the data layers' in one control. MapLibre takes custom attributions
   // only when a control is made, so a new set of credits replaces the control.

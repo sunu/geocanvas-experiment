@@ -35,6 +35,8 @@ export function feedFor(objects: readonly AnyObject[], glides: string[]): Relief
 export const reliefwebPlugin = definePlugin({
   id: 'reliefweb',
   title: 'ReliefWeb',
+  description: "The latest ReliefWeb updates for an event's disaster.",
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

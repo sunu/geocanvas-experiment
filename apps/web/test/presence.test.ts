@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { agentActivities, CURSOR_INTERVAL, cursorSender, peersFrom } from '../src/board/presence'
+import { agentActivities, CURSOR_INTERVAL, cursorSender, peersFrom, presenterOf } from '../src/board/presence'
 
 describe('peersFrom', () => {
   const user = { name: 'Heron', color: '#2f9e44' }
@@ -21,6 +21,56 @@ describe('peersFrom', () => {
     const agent = { kind: 'agent', id: 'agent', name: 'Agent', color: '#7c3aed' }
     const states = new Map<number, Record<string, unknown>>([[5, { user: agent, status: 'thinking' }]])
     expect(peersFrom(states, 1)).toEqual([{ clientId: 5, user: agent, selection: [], status: 'thinking' }])
+  })
+
+  it('keeps what a person presents, and drops it when malformed or from an agent', () => {
+    const presenting = { view: { x: 0, y: 0, w: 800, h: 600 }, since: 5 }
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { user, presenting }],
+      [3, { user, presenting: { view: { x: 0, y: 0, w: 0, h: 600 }, since: 5 } }],
+      [4, { user, presenting: null }],
+      [5, { user: { kind: 'agent', id: 'agent', name: 'Agent', color: '#7c3aed' }, presenting }],
+    ])
+    expect(peersFrom(states, 1).map((p) => p.presenting)).toEqual([presenting, undefined, undefined, undefined])
+  })
+
+  it("keeps the presenter's focus and map view, and drops a malformed map", () => {
+    const view = { x: 0, y: 0, w: 800, h: 600 }
+    const map = { id: 'm1', center: [85.3, 27.7], zoom: 9, bearing: 0 }
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { user, presenting: { view, since: 5, focus: 'm1', map } }],
+      [3, { user, presenting: { view, since: 5, focus: 7, map: { ...map, zoom: 'far' } } }],
+    ])
+    expect(peersFrom(states, 1).map((p) => p.presenting)).toEqual([{ view, since: 5, focus: 'm1', map }, { view, since: 5 }])
+  })
+})
+
+describe('peersFrom cursors in focus', () => {
+  const user = { name: 'Heron', color: '#2f9e44' }
+
+  it("keeps a cursor's anchor in a focused object, and drops a malformed one", () => {
+    const anchored = { x: 10, y: 20, in: { id: 'm1', u: 0.5, v: 0.25, lngLat: [85.3, 27.7] } }
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { user, cursor: anchored }],
+      [3, { user, cursor: { x: 1, y: 2, in: { id: 'm1', u: 'left' } } }],
+      [4, { user, cursor: { x: 'a', y: 2 } }],
+    ])
+    expect(peersFrom(states, 1).map((p) => p.cursor)).toEqual([anchored, { x: 1, y: 2 }, undefined])
+  })
+})
+
+describe('presenterOf', () => {
+  const user = { kind: 'user' as const, id: 'heron', name: 'Heron', color: '#2f9e44' }
+  const view = { x: 0, y: 0, w: 1, h: 1 }
+
+  it('picks whoever started presenting last', () => {
+    const peers = [
+      { clientId: 2, user, selection: [], presenting: { view, since: 1 } },
+      { clientId: 3, user, selection: [], presenting: { view, since: 9 } },
+      { clientId: 4, user, selection: [] },
+    ]
+    expect(presenterOf(peers)?.clientId).toBe(3)
+    expect(presenterOf([peers[2]!])).toBeUndefined()
   })
 })
 

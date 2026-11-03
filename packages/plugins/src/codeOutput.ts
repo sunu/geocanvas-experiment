@@ -59,7 +59,10 @@ export type CodeError = z.infer<typeof codeError>
 export const codeRun = z.object({
   status: z.enum(['ok', 'error']),
   at: z.number(),
+  /** The runner's name then. */
   by: z.string(),
+  /** The person who ran it (for an agent, the person it acted for), to show their current name (People). */
+  byId: z.string().optional(),
   ms: z.number(),
   sourceHash: z.string(),
   stdout: z.string().optional(),

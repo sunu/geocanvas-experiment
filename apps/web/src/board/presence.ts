@@ -15,6 +15,7 @@ export type Awareness = WebsocketProvider['awareness']
  * worked out in each browser from the op log instead (canvas/agentCursor.ts); presence only says what the agent
  * does now (`activity`: thinking, or a tool's title) and, for the room's agent, whom it works for (`for`). `hub: true`
  * says the tab has a working JupyterHub login, so the room's agent may ask it to run code (code/relay.ts); never the login.
+ * `presenting` says the person presents the board: the world rectangle they see, which those who join follow.
  */
 
 /** One person's (or the agent's) shared state, as this browser receives it. */
@@ -23,10 +24,61 @@ export interface Peer {
   /** The person (connect.ts) or the agent, with a name and color. */
   user: Actor & { name: string; color: string }
   /** World point, or absent when their pointer is off the canvas. */
-  cursor?: { x: number; y: number }
+  cursor?: PeerCursor
   /** Ids of the objects they have selected. */
   selection: string[]
   status?: 'thinking'
+  /** They present: the world rectangle they see, and when they started (presentation mode, canvas/presentation.ts). */
+  presenting?: Presenting
+}
+
+/**
+ * A cursor in world coordinates. In focus mode the object is laid out at the screen's size, so world points do not
+ * match it: a cursor there is also anchored to the object (`in`), by its share of the box and, on a map, the place
+ * under it. Its x and y are then the same share of the object's stored rectangle, so it lands on the object on the canvas.
+ */
+export interface PeerCursor {
+  x: number
+  y: number
+  in?: { id: string; u: number; v: number; lngLat?: [number, number] }
+}
+
+function cursorFrom(value: unknown): PeerCursor | undefined {
+  const c = value as PeerCursor | null | undefined
+  if (!c || !Number.isFinite(c.x) || !Number.isFinite(c.y)) return undefined
+  const a = c.in
+  if (!a || typeof a.id !== 'string' || !Number.isFinite(a.u) || !Number.isFinite(a.v)) return { x: c.x, y: c.y }
+  const lngLat = Array.isArray(a.lngLat) && Number.isFinite(a.lngLat[0]) && Number.isFinite(a.lngLat[1]) ? ([a.lngLat[0], a.lngLat[1]] as [number, number]) : undefined
+  return { x: c.x, y: c.y, in: { id: a.id, u: a.u, v: a.v, ...(lngLat && { lngLat }) } }
+}
+
+export interface Presenting {
+  view: { x: number; y: number; w: number; h: number }
+  since: number
+  /** The object they have in focus. */
+  focus?: string
+  /** The map they moved last, and what it shows now. */
+  map?: PresentedMap
+}
+
+export interface PresentedMap {
+  id: string
+  /** [longitude, latitude] */
+  center: [number, number]
+  zoom: number
+  bearing: number
+}
+
+function presentingFrom(value: unknown): Presenting | undefined {
+  const p = value as Partial<Presenting> | null | undefined
+  const v = p?.view
+  if (!v || typeof p.since !== 'number' || ![v.x, v.y, v.w, v.h].every(Number.isFinite) || v.w <= 0 || v.h <= 0) return undefined
+  const m = p.map
+  const map =
+    m && typeof m.id === 'string' && Array.isArray(m.center) && [m.center[0], m.center[1], m.zoom, m.bearing].every(Number.isFinite)
+      ? { id: m.id, center: [m.center[0], m.center[1]] as [number, number], zoom: m.zoom, bearing: m.bearing }
+      : undefined
+  return { view: v, since: p.since, ...(typeof p.focus === 'string' && { focus: p.focus }), ...(map && { map }) }
 }
 
 /** Everyone else with a user, from awareness states (clientId -> state). */
@@ -35,12 +87,20 @@ export function peersFrom(states: Map<number, Record<string, unknown>>, selfId: 
   for (const [clientId, state] of states) {
     const user = state.user as Peer['user'] | undefined
     if (clientId === selfId || !user?.name || !user.color) continue
-    const cursor = state.cursor as Peer['cursor'] | null | undefined
+    const cursor = cursorFrom(state.cursor)
     const selection = Array.isArray(state.selection) ? (state.selection as string[]) : []
     const status = state.status === 'thinking' ? ('thinking' as const) : undefined
-    peers.push({ clientId, user, ...(cursor && { cursor }), selection, ...(status && { status }) })
+    const presenting = user.kind !== 'agent' ? presentingFrom(state.presenting) : undefined
+    peers.push({ clientId, user, ...(cursor && { cursor }), selection, ...(status && { status }), ...(presenting && { presenting }) })
   }
   return peers
+}
+
+/** Who presents to the board: the person who started last, when two do at once. */
+export function presenterOf(peers: Peer[]): (Peer & { presenting: Presenting }) | undefined {
+  let found: (Peer & { presenting: Presenting }) | undefined
+  for (const p of peers) if (p.presenting && (!found || p.presenting.since > found.presenting.since)) found = p as Peer & { presenting: Presenting }
+  return found
 }
 
 /** The key of an agent's cursor (canvas/agentCursor.ts): one per agent and person it acts for. */
@@ -131,24 +191,28 @@ export function publishSelection(awareness: Awareness, ids: Iterable<string>) {
 export const CURSOR_INTERVAL = 100
 
 /**
- * Shares this person's cursor, at most once per CURSOR_INTERVAL. The last position is always sent,
- * so others see where the pointer stopped. null hides the cursor (pointer left the canvas).
+ * Sets one presence field at most once per `interval`. The last value is always sent, so others see where it
+ * stopped. Each update wakes the room for a moment.
  */
-export function cursorSender(awareness: Pick<Awareness, 'setLocalStateField'>, interval = CURSOR_INTERVAL) {
+export function fieldSender<T>(awareness: Pick<Awareness, 'setLocalStateField'>, field: string, interval = CURSOR_INTERVAL) {
   let last = 0
-  let pending: { x: number; y: number } | null | undefined
+  let pending: T | null | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
   const flush = () => {
     timer = undefined
     last = Date.now()
-    awareness.setLocalStateField('cursor', pending ?? null)
+    awareness.setLocalStateField(field, pending ?? null)
     pending = undefined
   }
-  return (point: { x: number; y: number } | null) => {
-    pending = point
+  return (value: T | null) => {
+    pending = value
     if (timer) return
     const wait = interval - (Date.now() - last)
     if (wait <= 0) flush()
     else timer = setTimeout(flush, wait)
   }
 }
+
+/** Shares this person's cursor in world coordinates; null hides it (pointer left the canvas). */
+export const cursorSender = (awareness: Pick<Awareness, 'setLocalStateField'>, interval = CURSOR_INTERVAL) =>
+  fieldSender<PeerCursor>(awareness, 'cursor', interval)

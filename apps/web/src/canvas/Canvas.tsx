@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type * as Y from 'yjs'
-import { Draft, type Chat, type ChatEntry, type Runtime, type TargetRef } from '@ttx/core'
+import { Draft, Nav, type Chat, type ChatEntry, type Runtime, type TargetRef } from '@ttx/core'
 import type { ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
-import { cursorSender, publishSelection, useAgentActivities, usePeers, type Awareness } from '../board/presence'
+import { templatesOn, typeOn, usePluginsOff } from '../board/plugins'
+import { objectFromHash, withoutObject } from '../board/room'
+import { cursorSender, presenterOf, publishSelection, useAgentActivities, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
-import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
+import { bounds, fitRect, fitView, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
 import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -16,7 +18,7 @@ import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { useAgentTouched } from '../board/agentActivity'
 import { Links } from './Links'
-import { AgentCursorLayer, Peers } from './Peers'
+import { AgentCursorLayer, FocusCursor, Peers } from './Peers'
 import { useAgentCursors, type Point } from './agentCursor'
 import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
@@ -27,6 +29,8 @@ import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
 import { publishViewState } from './viewState'
 import { publishViewport } from './viewport'
+import { liveMap } from '../map/live'
+import { bindPresence, presentation, presentView, setFollowed, unfollow, usePresentation } from './presentation'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
 const MIN_SIZE = 16
@@ -114,9 +118,17 @@ function trackDrag(
  * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
  * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
  */
-export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runtime; chat: Chat; awareness: Awareness; onUploads(): void }) {
+export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
+  runtime: Runtime
+  chat: Chat
+  awareness: Awareness
+  /** Resolves once the room's doc has synced, so a linked object is on the board. */
+  synced: Promise<void>
+  onUploads(): void
+}) {
   const board = runtime.board as Board
   const objects = useObjects(board)
+  const pluginsOff = usePluginsOff(runtime)
   const peers = usePeers(awareness)
   const agentTouched = useAgentTouched(runtime)
   const me = (awareness.getLocalState() as { user?: { id?: string } } | null)?.user?.id
@@ -199,13 +211,16 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   useEffect(() => {
     const show = (r: Rect | undefined) => {
       const el = rootRef.current
-      if (r && el) setCamera(fitRect(r, el.clientWidth, el.clientHeight))
+      if (!r || !el) return
+      unfollow()
+      setCamera(fitRect(r, el.clientWidth, el.clientHeight))
     }
     runtime.view = {
       fitAll: () => show(bounds(board.list())),
       zoomTo: (ids) => show(bounds(ids.map((id) => board.get(id)).filter((o) => !!o))),
       resetZoom: () => {
         const el = rootRef.current
+        unfollow()
         if (el) setCamera((c) => zoomAt(c, 1 / c.z, el.clientWidth / 2, el.clientHeight / 2))
       },
       focus: (id) => enterFocusRef.current(id),
@@ -239,6 +254,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     if (e.button === 1 || spaceHeld || tool === 'hand') {
       const start = cameraRef.current
       following.current = false
+      unfollow()
       trackDrag(e, (dx, dy) => setCamera({ ...start, x: start.x + dx, y: start.y + dy }))
       return
     }
@@ -424,6 +440,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       if (focusRef.current) return
       e.preventDefault()
       following.current = false
+      unfollow()
       const r = root.getBoundingClientRect()
       if (e.ctrlKey || e.metaKey) {
         setCamera((c) => zoomAt(c, Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top))
@@ -466,6 +483,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       if (e.key === 'Escape') {
         if (editingId) setEditing(null)
         else {
+          unfollow()
           setSelection(new Set())
           setTool('select')
         }
@@ -497,7 +515,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
         // ⇧ with a key picks the tool listed as '⇧<key>' (the arrow is ⇧L), else the plain one.
         const k = e.key.toUpperCase()
         const t = (e.shiftKey && tools().find((t) => t.key === `⇧${k}`)) || tools().find((t) => t.key.toUpperCase() === k)
-        if (t) setTool(t.tool)
+        if (t && typeOn(runtime, runtime.disabledPlugins(), t.tool)) setTool(t.tool)
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
@@ -526,7 +544,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   useEffect(() => {
     const r = agentCursors.target
     const el = rootRef.current
-    if (!r || !el || !following.current || focusRef.current) return
+    if (!r || !el || !following.current || focusRef.current || presentation().following !== null) return
     const s = toScreen(cameraRef.current, r)
     const m = FOLLOW_MARGIN
     if (s.x >= m && s.y >= m && s.x + s.w <= el.clientWidth - m && s.y + s.h <= el.clientHeight - m) return
@@ -536,14 +554,69 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
 
   /** Move the camera so world point `p` is in the middle, at the same zoom (an off-screen agent's marker). */
   function goToPoint(p: Point) {
+    unfollow()
     const el = rootRef.current!
     const from = cameraRef.current
     stopAnimation.current?.()
     stopAnimation.current = animateCamera(from, { x: el.clientWidth / 2 - p.x * from.z, y: el.clientHeight / 2 - p.y * from.z, z: from.z }, setCamera)
   }
 
+  // Presentation mode (canvas/presentation.ts). The presenter shares the world rectangle they see; in focus, the
+  // focused object's rectangle on the board, since followers cannot see the presenter's draft.
+  const { presenting, following: followingId } = usePresentation()
+  useEffect(() => bindPresence(awareness), [awareness])
+  const focusedRect = focus ? byId.get(focus.id) : undefined
+  useEffect(() => {
+    if (presenting === null || !size.w || !size.h) return
+    const tl = toWorld(camera, 0, 0)
+    const view = focusedRect
+      ? { x: focusedRect.x, y: focusedRect.y, w: focusedRect.w, h: focusedRect.h }
+      : { x: tl.x, y: tl.y, w: size.w / camera.z, h: size.h / camera.z }
+    presentView(view, focusedRect?.id)
+  }, [presenting, camera, size, focusedRect])
+
+  // A follower's camera shows all of the presenter's view. Following ends when the presenter stops or leaves, and
+  // when this person moves the view themselves (unfollow above).
+  const presenter = presenterOf(peers)
+  const followed = followingId !== null && presenter?.clientId === followingId ? presenter : undefined
+  const followedView = followed?.presenting.view
+  const followedKey = followedView && `${followedView.x},${followedView.y},${followedView.w},${followedView.h}`
+  useEffect(() => {
+    if (followingId !== null && !followed) unfollow()
+    setFollowed(followed?.presenting)
+  }, [followingId, followed])
+  useEffect(() => {
+    const el = rootRef.current
+    if (!followedView || !el || focusRef.current) return
+    stopAnimation.current?.()
+    stopAnimation.current = animateCamera(cameraRef.current, fitView(followedView, el.clientWidth, el.clientHeight), setCamera)
+    // On leaving focus too: the camera goes to the presenter's view, not back to where this person was.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followedKey, size, focusId])
+
+  // A follower opens what the presenter has in focus, on their own draft, and leaves focus with them. One with
+  // unshared changes stays in focus and stops following, so nothing is lost.
+  const followedFocus = followed?.presenting.focus
+  const isFollowing = !!followed
+  useEffect(() => {
+    if (!isFollowing) return
+    const enter = (id: string) => {
+      try {
+        enterFocus(id, { following: true })
+      } catch {
+        // Not on this board yet, or a type this tab cannot focus: follow the canvas only.
+      }
+    }
+    const f = focusRef.current
+    if (f?.id === followedFocus) return
+    if (!f) return void (followedFocus && enter(followedFocus))
+    if (f.draft?.hasUnshared()) return void unfollow()
+    leaveFocus(false, followedFocus ? () => enter(followedFocus) : undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followedFocus, isFollowing])
+
   /** Open an object in focus mode: zoom until it fills the screen, then lay it out at that size, on a draft unless its type is live. */
-  function enterFocus(id: string) {
+  function enterFocus(id: string, { following = false } = {}) {
     if (focusRef.current) return
     const o = board.get(id)
     const ui = o && objectUI(o.type)
@@ -553,6 +626,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     const fullScreen = !!ui.fullScreen
     const area = focusArea(el.clientWidth, el.clientHeight, { full: fullScreen })
     const saved = cameraRef.current
+    // Opening something themselves ends following; opening what the presenter opened is following.
+    if (!following) unfollow()
     setEditing(null)
     setPaletteOpen(false)
     setSelection(new Set([id]))
@@ -592,6 +667,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   function requestExit() {
     const f = focusRef.current
     if (!f) return
+    unfollow()
     if (f.draft?.hasUnshared()) setAsking(true)
     else leaveFocus(false)
   }
@@ -604,6 +680,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     stopAnimation.current?.()
     setAsking(false)
     setFocus(null)
+    // `then` may run before the next render (the object is gone) and open focus again (a follower).
+    focusRef.current = null
     const o = board.get(f.id)
     if (!o) {
       setCamera(f.saved)
@@ -622,6 +700,50 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       runtime.view?.zoomTo([id])
     })
   }
+
+  /** Show one object in the middle of the view, selected (a board link's object). */
+  function show(id: string) {
+    const f = focusRef.current
+    if (f?.draft?.hasUnshared()) return setNotice('Share or discard your changes in focus to see the linked object.')
+    if (!board.get(id)) return setNotice('The linked object is no longer on the board.')
+    if (f) return goTo(id)
+    setSelection(new Set([id]))
+    runtime.view?.zoomTo([id])
+  }
+  const showRef = useRef(show)
+  showRef.current = show
+
+  // A link to an object (#room=<id>&obj=<object id>): show it once the board has synced, and again for each link
+  // pasted into this tab. The object is then taken out of the URL, so the same link pasted again shows it again.
+  useEffect(() => {
+    let live = true
+    const onHash = () => {
+      const id = objectFromHash(location.hash)
+      if (!id || !live) return
+      history.replaceState(null, '', withoutObject(location.hash))
+      showRef.current(id)
+    }
+    void synced.then(onHash)
+    window.addEventListener('hashchange', onHash)
+    return () => {
+      live = false
+      window.removeEventListener('hashchange', onHash)
+    }
+  }, [synced])
+
+  // An agent asked to show this person an object (core.view.show). Listened to from the sync on, so the request
+  // the doc already had is not shown again on load. Not by time: the Worker's clock and this browser's differ.
+  useEffect(() => {
+    let stop: (() => void) | undefined
+    let live = true
+    void synced.then(() => {
+      if (live) stop = new Nav(board.doc).subscribe(runtime.actor.id, (r) => showRef.current(r.id))
+    })
+    return () => {
+      live = false
+      stop?.()
+    }
+  }, [board, runtime, synced])
 
   // The draft lives as long as its focus. Closed after the object's view has let go of it.
   useEffect(() => {
@@ -671,6 +793,31 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     return r
   }
 
+  /**
+   * This person's cursor for presence (board/presence.ts `PeerCursor`). In focus, anchored to the focused object: its
+   * share of the box, the place under it on a map, and that share of the object's stored rectangle as the world point.
+   * Off the object (over the Options panel), none.
+   */
+  function cursorAt(e: ReactPointerEvent) {
+    const p = screenPoint(e)
+    const f = focusRef.current
+    if (!f) return toWorld(cameraRef.current, p.x, p.y)
+    const stored = board.get(f.id)
+    if (!f.rect || !stored) return null
+    const box = toScreen(cameraRef.current, f.rect)
+    const u = (p.x - box.x) / box.w
+    const v = (p.y - box.y) / box.h
+    if (u < 0 || u > 1 || v < 0 || v > 1) return null
+    const map = liveMap(f.id)
+    let lngLat: [number, number] | undefined
+    if (map) {
+      const r = map.getCanvas().getBoundingClientRect()
+      const at = map.unproject([e.clientX - r.left, e.clientY - r.top])
+      lngLat = [at.lng, at.lat]
+    }
+    return { x: stored.x + u * stored.w, y: stored.y + v * stored.h, in: { id: f.id, u, v, ...(lngLat && { lngLat }) } }
+  }
+
   const viewCenter = () => {
     const el = rootRef.current!
     return toWorld(cameraRef.current, el.clientWidth / 2, el.clientHeight / 2)
@@ -700,16 +847,13 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     <div
       ref={rootRef}
       onContextMenuCapture={onContextMenuCapture}
-      className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''} ${focus?.keepChat ? 'keeps-chat' : ''}`}
+      className={`ttx-canvas ${followed ? 'is-following' : ''} ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''} ${focus?.keepChat ? 'keeps-chat' : ''}`}
       // The type in focus, for its own look of the whole view (canvas/focus.css: report mode has no dotted canvas).
       data-focus={focused?.type}
-      style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius } as CSSProperties}
+      style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius, '--ttx-presenter': followed?.user.color } as CSSProperties}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
-      onPointerMove={(e) => {
-        const p = screenPoint(e)
-        sendCursor(toWorld(cameraRef.current, p.x, p.y))
-      }}
+      onPointerMove={(e) => sendCursor(cursorAt(e))}
       onPointerLeave={() => sendCursor(null)}
     >
       <div className="ttx-world" style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})`, '--ttx-zoom': camera.z } as CSSProperties}>
@@ -754,6 +898,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
         {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentMarked} />}
+        {/* In focus, only the presenter's cursor, on this person's layout of the object (presentation mode). */}
+        {focus?.rect && presenter && <FocusCursor peer={presenter} objectId={focus.id} box={toScreen(camera, focus.rect)} rootRef={rootRef} />}
         {!focus && <AgentCursorLayer {...agentCursors} activities={agentActivities} camera={camera} rootRef={rootRef} onGoTo={goToPoint} />}
         {/* Not around objects dragged over a report: they are drawn smaller there (ObjectView `dropping`). */}
         {!focus && [...selected].filter((id) => !dropOn?.dragged.has(id)).map((id) => {
@@ -818,6 +964,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
         onFiles={(files) => placeFiles(runtime, files, viewCenter())}
         onUploads={onUploads}
         onTemplates={() => setPaletteOpen('templates')}
+        on={(t) => typeOn(runtime, pluginsOff, t)}
+        templates={templatesOn(runtime, pluginsOff)}
       />}
 
       {paletteOpen && (

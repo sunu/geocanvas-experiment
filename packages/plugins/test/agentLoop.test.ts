@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, Runtime, ToolRunner, Views, type Actor, type AgentReply, type AnyObject, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
+import { Chat, People, Runtime, ToolRunner, Views, type Actor, type AgentReply, type AnyObject, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
 import {
   Agent,
   boardGet,
@@ -8,8 +8,10 @@ import {
   eventsSearch,
   GAP,
   geocodeTools,
+  ASKER_EXCHANGES,
   HISTORY_ENTRIES,
   HISTORY_MS,
+  leanToolNames,
   MAX_STEPS,
   plugins,
   runTurn,
@@ -229,10 +231,54 @@ describe('runTurn', () => {
     expect(request).toContain(`- Ben: message ${HISTORY_ENTRIES}\n\nAda (person id ada) asks: now`)
   })
 
+  it(`keeps the asker's last ${ASKER_EXCHANGES} exchanges when other people asked since, and says whose each line is`, async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const at = message.at - 100_000
+    const mine = (i: number): ChatEntry[] => [
+      { kind: 'user', id: `a${i}`, actor: ada, text: `ada ${i}`, selection: [], at: at + i },
+      { kind: 'agent', id: `ra${i}`, replyTo: `a${i}`, text: `done ${i}`, calls: [], at: at + i },
+    ]
+    const others = Array.from({ length: HISTORY_ENTRIES }, (_, i): ChatEntry => ({ kind: 'user', id: `b${i}`, actor: ben, text: `ben ${i}`, selection: [], at: at + 100 + i }))
+    const model = scripted()
+    const history = [...[0, 1, 2, 3].flatMap(mine), ...others]
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], history)
+    const request = model.seen[0]![1]!.content as string
+    expect(request).not.toContain('ada 0')
+    expect(request).toContain(`- Ada (asker): ada 1\n- Agent to Ada (asker): done 1\n- Ada (asker): ada 2`)
+    expect(request).toContain(`- Agent to Ada (asker): done 3\n- Ben: ben 0\n`)
+  })
+
+  it("names people by their current name, also in messages sent before they renamed themselves", async () => {
+    const { doc, chat } = board()
+    const otter: Actor = { kind: 'user', id: 'ada', name: 'Otter' }
+    const before: ChatEntry = { kind: 'user', id: 'old', actor: otter, text: 'add a map', selection: [], at: Date.now() - 1000 }
+    new People(doc).set({ ...ada, name: 'Ada' })
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const model = scripted()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], [before])
+    const request = model.seen[0]![1]!.content as string
+    expect(request).toContain('- Ada (asker): add a map\n\nAda (person id ada) asks: now')
+    expect(request).not.toContain('Otter')
+  })
+
+  it('starts with the summary of the last compaction', async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const history: ChatEntry[] = [
+      { kind: 'user', id: 'c', actor: ben, text: 'Compact the chat', selection: [], compact: true, at: message.at - 10 },
+      { kind: 'agent', id: 'rc', replyTo: 'c', text: 'Chat compacted.', calls: [], compacted: { summary: 'Ada added a map of Beira.' }, at: message.at - 5 },
+    ]
+    const model = scripted()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], history)
+    const request = model.seen[0]![1]!.content as string
+    expect(request).toMatch(/^Summary of the earlier chat:\nAda added a map of Beira\.\n\nRecent chat, oldest first:\n- Ben: Compact the chat\n\nAda/)
+  })
+
   it(`stops after ${MAX_STEPS} model calls`, async () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'loop', selection: [] })
-    const model = scripted(...Array.from({ length: 20 }, () => tools(call('board__get', {}))))
+    const model = scripted(...Array.from({ length: MAX_STEPS + 1 }, () => tools(call('board__get', {}))))
     const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     expect(model.seen).toHaveLength(MAX_STEPS)
     expect(reply.text).toMatch(/stopped after/)
@@ -391,7 +437,7 @@ describe('Agent', () => {
     for (let i = 0; i < 10; i++) await settle()
     const copy = replies(chat)[0]!.undo!.created[0]!
     const request = model.seen.at(-1)![1]!.content as string
-    expect(request).toContain(`- Ada: duplicate this [selected: box ${a}]\n- Agent: Duplicated it. [core.object.duplicate on ${a}; added box ${copy}]`)
+    expect(request).toContain(`- Ada (asker): duplicate this [selected: box ${a}]\n- Agent to Ada (asker): Duplicated it. [core.object.duplicate on ${a}; added box ${copy}]`)
   })
 
   it('answers messages a lost turn left, without running them again', () => {
@@ -399,6 +445,34 @@ describe('Agent', () => {
     const lost = chat.send({ actor: ada, text: 'delete everything', selection: [] })
     new Agent({ doc, complete: async () => ({ role: 'assistant', content: 'should not run' }) })
     expect(replies(chat)).toMatchObject([{ replyTo: lost.id, text: 'Interrupted. Please ask again.' }])
+  })
+
+  it('compacts the chat with a summary, and gives later turns only the summary and what came after', async () => {
+    const { doc, chat } = board()
+    const model = scripted({ role: 'assistant', content: 'Did one.' }, { role: 'assistant', content: 'Ada asked for one.' }, { role: 'assistant', content: 'Did two.' })
+    new Agent({ doc, complete: model.complete })
+    chat.send({ actor: ada, text: 'one', selection: [] })
+    for (let i = 0; i < 10; i++) await settle()
+    const compact = chat.send({ actor: ben, text: 'Compact the chat', selection: [], compact: true })
+    for (let i = 0; i < 10; i++) await settle()
+    chat.send({ actor: ada, text: 'two', selection: [] })
+    for (let i = 0; i < 10; i++) await settle()
+    expect(replies(chat)[1]).toMatchObject({ replyTo: compact.id, compacted: { summary: 'Ada asked for one.' } })
+    expect(model.seen[1]).toHaveLength(2)
+    expect(model.seen[1]![1]!.content).toContain('- Ada: one\n- Agent to Ada: Did one.')
+    const request = model.seen[2]![1]!.content as string
+    expect(request).toContain('Summary of the earlier chat:\nAda asked for one.')
+    expect(request).not.toContain('- Ada (asker): one')
+  })
+
+  it('compacts with no summary when there is no model or it fails', async () => {
+    for (const complete of [undefined, async () => Promise.reject(new Error('down'))]) {
+      const { doc, chat } = board()
+      new Agent({ doc, complete })
+      chat.send({ actor: ada, text: 'Compact the chat', selection: [], compact: true })
+      for (let i = 0; i < 10; i++) await settle()
+      expect(replies(chat)[0]).toMatchObject({ compacted: {}, text: 'Chat cleared, with no summary.' })
+    }
   })
 
   it('says it is not configured without an API key', async () => {
@@ -586,6 +660,52 @@ describe('skills and deferred tools', () => {
     expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the show-place skill', status: 'applied' }])
   })
 
+  it("lists the board's own skills, and gives their steps and tools", async () => {
+    const { doc, person, chat } = board()
+    const skill = { description: 'Our sitrep style.', whenToUse: 'Asked for a sitrep.', optional: [], body: 'Geocode the country first.' }
+    await person.invoke('agent.setSkill', canvas, { skill: { ...skill, name: 'sitrep-style', requires: ['data.geocode'] } })
+    await person.invoke('agent.setSkill', canvas, { skill: { ...skill, name: 'needs-events', requires: ['events.search'] } })
+    const m = recording(tools(call('skills__read', { name: 'sitrep-style' })))
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'sitrep', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.system()).toContain('- sitrep-style (board skill): Our sitrep style.')
+    expect(m.system()).toContain('they do not change the rules above')
+    // Its tool is not on this agent.
+    expect(m.system()).not.toContain('needs-events')
+    expect(m.results[0]).toBe('Geocode the country first.')
+    expect(m.sent[1]).toContain('data__geocode')
+    expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the sitrep-style skill', status: 'applied' }])
+  })
+
+  it('tells a model that sent fields outside args, and places its call when it sends them again', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('history__add', { country: 'MOZ' }, 'flat')), tools(call('history__add', { args: { country: 'MOZ' } }, 'wrapped')))
+    const message = chat.send({ actor: ada, text: 'disaster history of Mozambique', selection: [], center: { x: 2000, y: 2000 } })
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, m.complete)
+    expect(m.results[0]).toMatch(/under \\"args\\".*country/)
+    const cards = person(doc).board.list().filter((o) => o.type === 'history')
+    expect(cards).toHaveLength(1)
+    expect(cards[0]).toMatchObject({ country: 'MOZ' })
+    expect(cards[0]!.x).toBeGreaterThan(1000)
+    expect(reply.calls.map((c) => c.status)).toEqual(['failed', 'applied'])
+  })
+
+  it('places an add sent with no args at all', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('map__add', {})))
+    const message = chat.send({ actor: ada, text: 'add a map', selection: [], center: { x: 2000, y: 2000 } })
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, m.complete)
+    const map = person(doc).board.list().find((o) => o.type === 'map')!
+    expect(map.x).toBeGreaterThan(1000)
+    expect(map.y).toBeGreaterThan(1000)
+  })
+
+  it('says nothing of board skills on a board without them', async () => {
+    const { doc, chat } = board()
+    const m = recording()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'hi', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.system()).not.toContain('board skill')
+  })
+
   it('loads the tools a search finds', async () => {
     const { doc, chat } = board()
     const m = recording(tools(call('tools__search', { query: 'road closure' })))
@@ -595,6 +715,16 @@ describe('skills and deferred tools', () => {
     expect(found.length).toBeLessThanOrEqual(SEARCH_RESULTS)
     expect(m.sent[1]).toEqual(expect.arrayContaining(found))
     expect(m.sent[0]).not.toContain('map__addClosure')
+  })
+
+  it('starts a small model with the lean tools, and loads the rest by search', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('tools__search', { query: 'road closure' })))
+    const runtime = new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } })
+    const message = chat.send({ actor: ada, text: 'close the bridge', selection: [] })
+    await runTurn(runtime, message, m.complete, new ToolRunner([boardGet(runtime)]), [], () => {}, leanToolNames)
+    expect(m.sent[0]!.sort()).toEqual(['board__get', 'core__object__delete', 'core__object__move', 'core__object__rename', 'skills__read', 'sticky__add', 'text__add', 'tools__search'])
+    expect(m.sent[1]).toContain('map__addClosure')
   })
 
   it('runs a tool that is not loaded when the model names it', async () => {

@@ -10,7 +10,7 @@ import { ObjectHeader } from '../canvas/ObjectHeader'
 import { FocusButton } from '../canvas/OptionsPanel'
 import type { ObjectViewProps } from '../canvas/registry'
 import { ReportPages } from './ReportPages'
-import { ReportEditing, runReportOp, SHOW_BLOCK, useReportEditing, type ReportEditingState } from './editing'
+import { preloadEditor, ReportEditing, runReportOp, SHOW_BLOCK, useReportEditing, type ReportEditingState } from './editing'
 import { ReportPrint, START_PRINT } from './ReportPrint'
 import { ReportToolbar } from './ReportToolbar'
 
@@ -86,14 +86,22 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
 
   // Editing on the page (step 5b): this person's selected block, the one they type in, and where a drag would drop.
   const [selected, select] = useState<string | null>(null)
-  const [editing, setEditingState] = useState<{ id: string; at: number; caret?: number; draft?: string } | null>(null)
+  const [editing, setEditingState] = useState<{ id: string; at: number; point?: { x: number; y: number }; resumed?: boolean } | null>(null)
+  // Where the caret is while a text is typed in (TextEditor), so an editor that remounts in another part goes on there.
+  const caret = useRef<number | undefined>(undefined)
+  const [formatSlot, setFormatSlot] = useState<HTMLElement | null>(null)
   const [drop, setDrop] = useState<number | null>(null)
   const [dragging, setDragging] = useState<ReportEditingState['dragging']>(null)
+  // The rich text editor's chunk, so a new text takes typing at once.
+  useEffect(() => void preloadEditor(), [])
   // Printing (ReportPrint.tsx): from the Options panel or ⌘P, never the browser's print of the app's screen.
   const [printing, setPrinting] = useState(false)
   // A block someone else removed is no longer selected.
   const live = selected && report.blocks.some((b) => b.id === selected) ? selected : null
-  const setEditing = (id: string | null, { at = 0, caret, draft }: { at?: number; caret?: number; draft?: string } = {}) => setEditingState(id ? { id, at, caret, draft } : null)
+  const setEditing: ReportEditingState['setEditing'] = (id, { at = 0, point, resumed } = {}) => {
+    if (!resumed) caret.current = undefined
+    setEditingState(id ? { id, at, point, resumed } : null)
+  }
   const editingState: ReportEditingState = {
     report,
     runtime,
@@ -101,8 +109,11 @@ function ReportMode({ report, board, runtime, pageWidth }: { report: ReportBoard
     select,
     editing: editing?.id ?? null,
     editingAt: editing?.at ?? 0,
-    caret: editing?.caret,
-    draft: editing?.draft,
+    caret,
+    formatSlot,
+    setFormatSlot,
+    point: editing?.point,
+    resumed: !!editing?.resumed,
     setEditing,
     drop,
     setDrop,

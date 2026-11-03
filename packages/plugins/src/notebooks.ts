@@ -31,6 +31,8 @@ const runId = z.string().min(1)
 export const notebooksPlugin = definePlugin({
   id: 'notebooks',
   title: 'Notebooks',
+  description: 'Published Notebook Factory runs, and their results on maps.',
+  optional: true,
   dependsOn: ['core', 'map'],
   objectTypes: [
     {

@@ -528,3 +528,13 @@
   font-size: 13px;
   z-index: 1000004;
 }
+
+/* Following a presenter (canvas/presentation.ts): a border in their color says the view is theirs, as in Figma. */
+.ttx-canvas.is-following::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 3px solid var(--ttx-presenter);
+  pointer-events: none;
+}

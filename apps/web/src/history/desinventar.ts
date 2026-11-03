@@ -108,6 +108,7 @@ const polygonOf = ([w, s, e, n]: Bbox) => ({ type: 'Polygon', coordinates: [[[w,
 export function desinventarTool(search: StacSearch) {
   return defineTool({
     id: 'history.desinventar',
+    plugin: 'history',
     title: 'Past disasters (DesInventar)',
     description:
       'Local disaster records in an area from DesInventar (through Montandon): one point per event and place (ward, ' +

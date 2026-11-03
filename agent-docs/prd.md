@@ -44,6 +44,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | Right-click menu, rename a widget by its name, frames | Built | Frames group objects; dragging a frame moves what is in it. |
 | Cards from pasted links: GitHub issues and pull requests, IFRC GO emergencies | In review (#90) |  |
 | Undo and redo of your own edits, one step per gesture | Built |  |
+| Board settings: turn optional plugins on or off | Built | Per board, for everyone (`plans/plan-024.md`). A plugin that is off is not offered in the toolbar, the palette or to agents; its objects stay. The board's agent and external agents (MCP) can be turned off apart. Core, map and links are always on. |
 | Uploads to R2 and the uploads gallery | Built | Images up to 10 MB, PDFs up to 25 MB, map data (GeoJSON, GeoParquet, zipped shapefile) up to 50 MB. One bucket per Worker. Tabular uploads come with the Table (step 12). Deleting a branch does not delete its bucket yet. |
 | Dark mode: system setting plus app toggle | Planned (step 11) | New CSS uses `--ttx-*` tokens only, so this step changes tokens and nothing else. |
 
@@ -103,8 +104,9 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Room agent in the Durable Object | Built | OpenRouter tool loop, 12 model calls per turn, 20 turns per room per hour. Undo per turn. Its adds are kept off what is already there. |
+| Room agent in the Durable Object | Built | OpenRouter tool loop, 30 model calls per turn, 20 turns per room per hour. Undo per turn. Its adds are kept off what is already there. |
 | Skills and deferred tools | Built | Domain rules load as skills when a request needs them; most tool schemas load on demand (plan-017). |
+| Skills in Settings, and board skills | Built | The Skills tab of Settings shows the built-in skills, read only. People write skills for one board there, for everyone on it; agents and MCP clients cannot write them (plan-026). |
 | The agent at work: its cursor, current step and busy widgets | Built | Drawn by each browser from the op log, at no model cost. |
 | Ambient agent: a summary and next moves for a frame, outside the chat | In review (#63) |  |
 | Evaluation: Nepal 2026 flash flood | In review (#20) |  |
@@ -121,7 +123,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 | --- | --- | --- |
 | Start a board from an event | Built | New board → Situation report with the event (`agent-docs/tasks/board-templates.md`). Picking an event on an event card also adds its ReliefWeb feed. Related events in its geography are not built. |
 | Templates that prepopulate widgets (SitRep first) | Built (plan-012, plan-013) | Situation report (seed: an event) and conflict explorer (seed: an area). Each template is an op, `template.<id>`; the New board dialog, the Templates button, ⌘K and the agent run it. Every seed is optional: one left out gives an empty root and blank widgets. Its objects follow the seed's root (the event card, an area input) and sit in a frame: change the root and they update. Next: a historical hazard explorer, now that disaster history is built (plan-020). |
-| Create and export reports | Next (steps 2 to 5 of 10 built, and print) | Built: a report widget on the canvas and report mode (live, full screen, the chat as an overlay): two columns, A4 or Letter, headings, plain text, images, dividers, page breaks, text that goes on over pages, items added from the board (menus, drops, the toolbar), drag to reorder, every block in the Options panel; print and save as PDF through the browser's dialog, with maps at print resolution. To do: rich text (6, Tiptap needs approval), live and frozen renderers for maps and data widgets (7; plan-019 may replace it with synced and detached items), a PDF download with no dialog (8, option 2: Workers paid plan), the report URL (9), the agent drafting a report (10). Spec: `agent-docs/tasks/reports.md`. |
+| Create and export reports | Next (steps 2 to 6 of 10 built, and print) | Built: a report widget on the canvas and report mode (live, full screen, the chat as an overlay): two columns, A4 or Letter, headings, rich text (Tiptap, with a formatting toolbar and pasted markdown formatted), images, dividers, page breaks, text that goes on over pages, items added from the board (menus, drops, the toolbar), drag to reorder, every block in the Options panel; print and save as PDF through the browser's dialog, with maps at print resolution. To do: live and frozen renderers for maps and data widgets (7; plan-019 may replace it with synced and detached items), a PDF download with no dialog (8, option 2: Workers paid plan), the report URL (9), the agent drafting a report (10). Spec: `agent-docs/tasks/reports.md`. |
 
 ### 4.7 Non-functional requirements
 
@@ -136,7 +138,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 
 1. **Milestone 1, Map in focus:** done.
 2. **Milestone 2, Map features:** steps 3–7 done, and scenario planning, weather and flood layers beyond them. The map to-dos (4.3) remain: legend on the map, Options panel organization (#71), and refining uploads, annotations and scenario planning.
-3. **Now: reports** (4.6): steps 2–5 are done, and print and save as PDF. Next the agent's report draft (10, unblocked), rich text (6, waits on Tiptap's approval), live and frozen items (7, after a decision on plan-019), a PDF download with no dialog (8, a cost decision) and the report URL (9).
+3. **Now: reports** (4.6): steps 2–6 are done (rich text with a formatting toolbar and pasted markdown), and print and save as PDF. Next the agent's report draft (10, unblocked), live and frozen items (7, after a decision on plan-019), a PDF download with no dialog (8, a cost decision) and the report URL (9).
 4. **Open pull requests to review:** cards from links (#90), the map time scrubber and event timeline design (#88), JupyterHub execution (#86), the ambient agent (#63), the Nepal evaluation (#20).
 5. **Milestone 3, Table:** steps 8–10.
 6. **Then:** dark mode (11), uploads for tables (12; uploads for map layers are built), more table sources (13), Chart (14), Notebook `.ipynb` (15), Input (16, stretch).
@@ -174,5 +176,5 @@ One PR per step.
 - `agent-docs/tasks/in-focus-widgets.md`: focus mode design, widget fields and ops, steps 1–16, decisions.
 - `agent-docs/tasks/reports.md`: reports: the widget, report mode, live and frozen items, PDF export options, the report URL, steps 1–10.
 - `agent-docs/tasks/board-templates.md`: landing page and New board. `agent-docs/tasks/weather-forecast.md`: forecast layers.
-- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames, `plan-014.md` scenario routing, `plan-015.md` flood exposure, `plan-016.md` flood depth and damage, `plan-017.md` agent skills, `plan-018.md` phone layout (experiment), `plan-019.md` synced and detached report items (proposal), `plan-020.md` disaster history.
+- `plans/plan-007.md` ops, `plan-008.md` board agent, `plan-009.md` bring your own key, `plan-010.md` MCP, `plan-011.md` who is who, `plan-012.md` templates, `plan-013.md` links and frames, `plan-014.md` scenario routing, `plan-015.md` flood exposure, `plan-016.md` flood depth and damage, `plan-017.md` agent skills, `plan-018.md` phone layout (experiment), `plan-019.md` synced and detached report items (proposal), `plan-020.md` disaster history, `plan-026.md` skills in Settings and board skills.
 - Figma "Atlantis Pod Week Hack - AHD TTX": source of truth for chrome; wireframes for every feature.

@@ -44,8 +44,9 @@ export function cleanName(input: string): string | undefined {
 
 /**
  * Give this person a new name. The actor is changed in place: it is the runtime's actor, which chat
- * messages, op log entries and presence read, so later writes carry the new name (older chat messages
- * keep the name they were sent with). Others see it at once through presence. False for an empty name.
+ * messages, op log entries and presence read, so later writes carry the new name. Others see it at once through
+ * presence, and the board's people map takes it from there (connect.ts), so older chat messages and code runs
+ * show it too. False for an empty name.
  */
 export function rename(actor: Actor, awareness: Pick<Awareness, 'setLocalStateField'>, input: string): boolean {
   const name = cleanName(input)

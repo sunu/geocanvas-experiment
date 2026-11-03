@@ -8,7 +8,7 @@ const count = (n: number) => n.toLocaleString('en-US')
 export const signedCount = (n: number) => `${n < 0 ? '−' : '+'}${count(Math.abs(n))}`
 
 /**
- * What an analysis map found (plans/plan-024.md), on the map itself at its top left, on the canvas too: a route map's
+ * What an analysis map found (plans/plan-030.md), on the map itself at its top left, on the canvas too: a route map's
  * routes with their length, what the closures add and their time; a flood exposure map's buildings and facilities in
  * its flood areas, what the what-ifs add, and with a flood its damage. So the map carries its answer, also into
  * reports, without opening it. When there is nothing yet, it says what to do.

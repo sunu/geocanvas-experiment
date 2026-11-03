@@ -154,8 +154,13 @@ export class Runtime {
     const op = this.registry.op(opId)
     const { ids, args } = (input ?? {}) as { ids?: string[]; args?: unknown }
     const target: TargetRef = op?.target.kind === 'objects' ? { kind: 'objects', ids: ids ?? [] } : { kind: 'canvas' }
+    // Models sometimes send an op's fields flat ({ text }) instead of under args: run with no args, the op would apply
+    // its defaults (an empty card at 0,0) and report success. Refuse, so the model sends the call again.
+    const stray = input == null ? [] : typeof input === 'object' && !Array.isArray(input) ? Object.keys(input).filter((k) => k !== 'ids' && k !== 'args') : ['(not an object)']
+    if (stray.length) return this.refuse(opId, target, args, actor, `Put the op's fields under "args": {"ids": [...], "args": {...}}. Not expected: ${stray.join(', ')}`)
     if (op?.hidden) return this.refuse(opId, target, args, actor, `${opId} is not a tool`)
     if (op?.risk === 'high' && actor.kind !== 'user') return this.refuse(opId, target, args, actor, `Only a user may run ${opId}`)
+    if (op && !this.registry.opEnabled(op, this.disabledPlugins())) return this.refuse(opId, target, args, actor, `${opId} is turned off on this board`)
     return this.invoke(opId, target, args ?? {}, { actor })
   }
 
@@ -185,8 +190,10 @@ export class Runtime {
 
   /** Ops that apply to a target and pass their `when` check, without hidden ones. For the palette and tools. */
   availableOps(target: TargetRef): OpDef<any, any>[] {
+    const disabled = this.disabledPlugins()
     return this.registry.ops().filter((op) => {
       if (op.hidden || op.target.kind !== target.kind) return false
+      if (!this.registry.opEnabled(op, disabled)) return false
       if (op.applyView && !this.view) return false
       if (op.tools?.some((id) => !this.tools?.tool(id))) return false
       if (matchTarget(op.target, target, this.board)) return false
@@ -196,6 +203,14 @@ export class Runtime {
         return false
       }
     })
+  }
+
+  /**
+   * The plugins turned off on this board, with those that depend on them. Their ops are not offered (availableOps,
+   * callTool, agents), but dispatch and invoke still run them, so their objects on the board keep working.
+   */
+  disabledPlugins(): Set<string> {
+    return this.registry.disabled(this.board.disabledPlugins)
   }
 
   /** Default args of an op on a target. For the palette form. */

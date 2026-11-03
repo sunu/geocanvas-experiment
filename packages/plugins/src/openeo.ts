@@ -54,6 +54,8 @@ function resolveArea(ctx: { board: { doc: ConstructorParameters<typeof Views>[0]
 export const openEOPlugin = definePlugin({
   id: 'openeo',
   title: 'openEO',
+  description: 'Satellite analysis layers from EOPF openEO, which a person approves.',
+  optional: true,
   dependsOn: ['map'],
   objectTypes: [{
     type: 'openeo',
@@ -225,6 +227,7 @@ export const openEOPlugin = definePlugin({
 /** Browser-side renderer tool: the Worker has already inserted the public tile template into the recipe. */
 export const openEOTilesTool = defineTool({
   id: 'openeo.tiles',
+  plugin: 'openeo',
   title: 'openEO XYZ tiles',
   description: 'A public XYZ tile URL for a completed openEO analysis.',
   input: z.object({ analysisId: z.string(), tiles: z.string().optional(), attribution: z.string().optional() }),

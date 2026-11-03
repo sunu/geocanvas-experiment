@@ -13,6 +13,7 @@ const isPoint = (type: string) => type === 'Point' || type === 'MultiPoint'
 export function eventFootprintTool(client: Pick<MontyClient, 'getFootprint'>) {
   return defineTool({
     id: EVENT_FOOTPRINT_TOOL,
+    plugin: 'events',
     title: 'Event footprint',
     description:
       "Where a Montandon event happened: the hazard items of every source that reports it (flood extent, cyclone track, earthquake area) and the event points. Input: the event id; with itemId only that item's area or track, with points only the points.",

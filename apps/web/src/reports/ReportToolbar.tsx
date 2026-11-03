@@ -12,13 +12,14 @@ import { roomFromHash } from '../board/room'
 import { BTN, Face, PANEL } from '../canvas/Toolbar'
 import { objectUI } from '../canvas/registry'
 import { refusal, typesOf, uploadFile } from '../uploads/upload'
-import { runReportOp, useReportEditing } from './editing'
+import { FORMAT_ATTR, runReportOp, useReportEditing } from './editing'
 import { holds, labelOf } from './reports'
 
 /**
  * Report mode's toolbar (agent-docs/tasks/reports.md §5.1b), at the bottom center in the canvas toolbar's place and look:
  * add a heading, text, an image, a divider or a page break, or objects from the board. What it adds goes after the selected block, or
- * at the end, and becomes the selected block; a new heading or text opens for typing.
+ * at the end, and becomes the selected block; a new heading or text opens for typing. While a text is typed in, the
+ * toolbar holds its formatting tools instead (FormatBar, which the rich text editor puts in `formatSlot`).
  */
 export function ReportToolbar() {
   const ed = useReportEditing()!
@@ -53,8 +54,13 @@ export function ReportToolbar() {
     }
   }
 
+  const bar = `ttx-ui absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 font-sans ${PANEL}`
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+  if (r.blocks.find((b) => b.id === ed.editing)?.kind === 'text')
+    return <div ref={ed.setFormatSlot} {...{ [FORMAT_ATTR]: '' }} role="toolbar" aria-label="Text formatting" className={bar} onPointerDown={stop} onDoubleClick={stop} />
+
   return (
-    <div className={`ttx-ui absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 font-sans ${PANEL}`} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+    <div className={bar} onPointerDown={stop} onDoubleClick={stop}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className={BTN} title="Add a heading" aria-label="Add a heading">

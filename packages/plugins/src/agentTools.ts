@@ -26,6 +26,7 @@ export function boardGet(runtime: Runtime) {
 export function eventsSearch(monty: MontyClient) {
   return defineTool({
     id: 'events.search',
+    plugin: 'events',
     title: 'Search events',
     description:
       'Search disaster events in Montandon (IFRC). The text is read as country, hazard type (flood, cyclone, earthquake, drought), year or year range, and source (GDACS, EM-DAT, ...), e.g. "nepal flood 2024" or "earthquake turkey". Results are newest first. Use an id from the results for event__add.',
@@ -58,6 +59,7 @@ export interface EventFacts {
 export function eventsGet(monty: MontyClient) {
   return defineTool({
     id: 'events.get',
+    plugin: 'events',
     title: 'Get an event',
     description:
       'One Montandon event by id: name, start and end dates, country (ISO3), GLIDE numbers, and the bbox [west, south, east, north] of its hazard areas when a source has one.',

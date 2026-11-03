@@ -4,22 +4,9 @@ import mapData from './map-data.md'
 import runCode from './run-code.md'
 import satelliteImagery from './satellite-imagery.md'
 import showPlace from './show-place.md'
+import type { Skill } from '@ttx/core'
 
-/**
- * A skill: a workflow the agent reads only when a request needs it (plans/plan-017.md, after
- * wri/project-zeno's src/agent/skills). The system prompt lists each skill's name, description and
- * when_to_use; skills__read gives the body and loads the skill's tools for the rest of the turn.
- */
-export interface Skill {
-  name: string
-  description: string
-  whenToUse: string
-  /** Op or tool ids the workflow needs. The skill is offered only when the agent has all of them. */
-  requires: string[]
-  /** Op or tool ids loaded with the skill when the agent has them. */
-  optional: string[]
-  body: string
-}
+export type { Skill }
 
 /** One skill file: `key: value` lines between `---` lines, then the body. */
 export function parseSkill(text: string): Skill {

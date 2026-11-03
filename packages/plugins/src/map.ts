@@ -49,7 +49,7 @@ export type MapArea = z.infer<typeof area>
 export type MapBoardObject = AnyObject & { type: 'map'; basemap: Basemap; layers?: MapLayer[]; annotations?: MapAnnotation[]; scenario?: MapScenario; analysis?: MapAnalysis }
 
 /**
- * What a map is for (plans/plan-024.md): a plain map (no `analysis`), a route map (routes around closed roads) or a
+ * What a map is for (plans/plan-030.md): a plain map (no `analysis`), a route map (routes around closed roads) or a
  * flood exposure map (buildings, facilities, depth and damage in its flood areas). The toolbar offers each as its own
  * map; they are one type, so every map feature works on all of them. Comparing scenarios is duplicating a map.
  */

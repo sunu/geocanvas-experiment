@@ -2,6 +2,8 @@ import { lazy, Suspense, useState } from 'react'
 import type { Runtime } from '@ttx/core'
 import { hashSource, type CodeBoardObject } from '@ttx/plugins'
 import { askAgent } from '../agent/ask'
+import { usePeopleNames } from '../board/people'
+import { usePluginsOff } from '../board/plugins'
 import { useHub } from './hub'
 
 /**
@@ -26,7 +28,7 @@ export function useRunCell(runtime: Runtime, id: string) {
     if (r.status === 'failed') setProblem(r.error)
   }
   const canRun = hub.status === 'ready'
-  const why = hub.status === 'checking' ? 'Checking your JupyterHub login…' : hub.status === 'error' ? hub.error : 'Connect your JupyterHub in the user menu to run code'
+  const why = hub.status === 'checking' ? 'Checking your JupyterHub login…' : hub.status === 'error' ? hub.error : 'Connect your JupyterHub in Settings (the gear in the user menu) to run code'
   return { run, running, problem, canRun, why: canRun ? undefined : why }
 }
 
@@ -57,13 +59,14 @@ const ago = (at: number) => {
 }
 
 /** "Ran 2 min ago by Ada · 1.2 s", and whether the code changed since. */
-export function RunStatus({ cell }: { cell: CodeBoardObject }) {
+export function RunStatus({ runtime, cell }: { runtime: Runtime; cell: CodeBoardObject }) {
+  const nameOf = usePeopleNames(runtime.board.doc)
   const run = cell.run
   if (!run) return <span>Not run yet</span>
   const edited = run.sourceHash !== hashSource(cell.source)
   return (
     <span>
-      {run.status === 'error' ? 'Failed' : 'Ran'} {ago(run.at)} by {run.by} · {(run.ms / 1000).toFixed(1)} s{edited && <strong> · edited, not run</strong>}
+      {run.status === 'error' ? 'Failed' : 'Ran'} {ago(run.at)} by {nameOf({ id: run.byId ?? '', name: run.by })} · {(run.ms / 1000).toFixed(1)} s{edited && <strong> · edited, not run</strong>}
     </span>
   )
 }
@@ -71,6 +74,7 @@ export function RunStatus({ cell }: { cell: CodeBoardObject }) {
 /** The latest run's error, with its traceback and print output, and a way to ask the agent to fix it. */
 export function RunError({ runtime, cell }: { runtime: Runtime; cell: CodeBoardObject }) {
   const [open, setOpen] = useState(false)
+  const agentOn = !usePluginsOff(runtime).has('agent')
   const error = cell.run?.status === 'error' ? cell.run.error : undefined
   if (!error) return null
   return (
@@ -79,9 +83,11 @@ export function RunError({ runtime, cell }: { runtime: Runtime; cell: CodeBoardO
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}>
           <strong>{error.ename}</strong>: {error.evalue}
         </button>
-        <button type="button" onClick={() => askAgent(runtime.actor, `Fix the error in the code "${cell.title}" and run it again.`, [cell.id])}>
-          Ask agent to fix
-        </button>
+        {agentOn && (
+          <button type="button" onClick={() => askAgent(runtime.actor, `Fix the error in the code "${cell.title}" and run it again.`, [cell.id])}>
+            Ask agent to fix
+          </button>
+        )}
       </div>
       {open && <pre>{[...error.traceback, ...(cell.run?.stdout ? ['', cell.run.stdout] : [])].join('\n')}</pre>}
     </div>

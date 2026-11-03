@@ -39,6 +39,7 @@ export const CODE_EXECUTE_TOOL = 'code.execute'
  */
 export const codeExecuteSpec = {
   id: CODE_EXECUTE_TOOL,
+  plugin: 'code',
   title: 'Run Python code',
   description:
     "Run Python code on the person's JupyterHub and get its output (features, a table, an image, text, a number) or its error, without changing the board. " +
@@ -74,7 +75,9 @@ function record(ctx: OpContext, code: string, result: ExecResult): { run: CodeRu
   const by = who(ctx)
   const sourceHash = hashSource(code)
   const stdout = result.stdout ? tail(stripAnsi(result.stdout), MAX_STDOUT) : undefined
-  const run: CodeRun = { status: result.ok ? 'ok' : 'error', at, by, ms: Math.round(result.ms), sourceHash, ...(stdout && { stdout }), ...(!result.ok && { error: result.error }) }
+  // A person's id, to show their current name; an agent's run stays "Agent".
+  const byId = ctx.actor.kind === 'user' ? ctx.actor.id : undefined
+  const run: CodeRun = { status: result.ok ? 'ok' : 'error', at, by, ...(byId && { byId }), ms: Math.round(result.ms), sourceHash, ...(stdout && { stdout }), ...(!result.ok && { error: result.error }) }
   return { run, ...(result.ok && result.output && { output: { ...result.output, at, by, sourceHash } }) }
 }
 
@@ -189,6 +192,8 @@ const addArgs = z.object({
 export const codePlugin = definePlugin({
   id: 'code',
   title: 'Code',
+  description: "Python code cells, run on the person's own JupyterHub.",
+  optional: true,
   dependsOn: ['map', 'links'],
   objectTypes: [
     {

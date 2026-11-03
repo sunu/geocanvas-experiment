@@ -23,7 +23,7 @@ export function CodeObject({ runtime, object: cell, editing, onDone }: ObjectVie
       </ObjectHeader>
       <CodeSource runtime={runtime} cell={cell} editing={editing} onRun={() => canRun && void run()} onDone={onDone} />
       <div className="ttx-code__status">
-        {running ? <span>Running…</span> : <RunStatus cell={cell} />}
+        {running ? <span>Running…</span> : <RunStatus runtime={runtime} cell={cell} />}
         {!canRun && <span className="ttx-code__hint">{why}</span>}
       </div>
       {problem && <div className="ttx-code__problem">{problem}</div>}

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Y from 'yjs'
 import { z } from 'zod'
-import { BoardTx, corePlugin, defineOp, definePlugin, exportTools, Registry, Runtime, summarizeBoard, type Actor, type OplogEntry, type ViewController } from '../src/index'
+import { BoardTx, corePlugin, Nav, defineOp, definePlugin, exportTools, Registry, Runtime, summarizeBoard, type Actor, type OplogEntry, type ViewController } from '../src/index'
 
 /** A plugin as an app would write one: its own object type and ops, through the same API as core. */
 const pinPlugin = definePlugin({
@@ -342,12 +342,35 @@ describe('tools', () => {
     for (const t of tools) expect(JSON.parse(JSON.stringify(t))).toEqual(t)
   })
 
+  it("shows an object to the person an agent acts for, with no camera of its own", async () => {
+    const rt = runtime()
+    const pin = (await rt.callTool('pin__add', { args: { label: 'Clinic' } })).created![0]!
+    const nav = new Nav(rt.board.doc)
+    const asker: Actor = { kind: 'agent', id: 'helper', onBehalfOf: 'p1' }
+    expect(rt.availableOps({ kind: 'objects', ids: [pin] }).map((op) => op.id)).toContain('core.view.show')
+    expect(await rt.callTool('core__view__show', { ids: [pin], args: {} }, asker)).toMatchObject({ status: 'applied' })
+    expect(nav.get('p1')?.id).toBe(pin)
+    expect(nav.get('helper')).toBeUndefined()
+    expect(await rt.callTool('core__view__show', { ids: [pin], args: {} }, { kind: 'agent', id: 'helper' })).toMatchObject({ status: 'failed' })
+  })
+
   it('lets an agent name the board, and gives the name first in the summary', async () => {
     const rt = runtime()
     await rt.callTool('pin__add', { args: { label: 'Clinic' } })
     expect(summarizeBoard(rt.board, rt.registry)).toMatch(/^- pin /)
     expect(await rt.callTool('board__setTitle', { args: { title: 'Clinics' } }, { kind: 'agent', id: 'helper' })).toMatchObject({ status: 'applied' })
     expect(summarizeBoard(rt.board, rt.registry)).toMatch(/^Board: "Clinics"\n- pin /)
+  })
+
+  it('refuses fields outside args, and adds nothing', async () => {
+    const rt = runtime()
+    const agent: Actor = { kind: 'agent', id: 'helper' }
+    expect(await rt.callTool('pin__add', { label: 'Clinic', x: 4 }, agent)).toMatchObject({ status: 'failed', error: expect.stringMatching(/under "args".*label, x/) })
+    expect(await rt.callTool('pin__add', [{ label: 'Clinic' }], agent)).toMatchObject({ status: 'failed', error: expect.stringMatching(/not an object/) })
+    expect(rt.board.list()).toEqual([])
+    expect(await rt.callTool('pin__add', { args: { label: 'Clinic' } }, agent)).toMatchObject({ status: 'applied' })
+    // No input at all is an op with no args.
+    expect(await rt.callTool('pin__clearAll', undefined)).toMatchObject({ status: 'applied' })
   })
 
   it('runs a tool call, and refuses hidden ops and high-risk ops from an agent', async () => {

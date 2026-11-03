@@ -11,6 +11,7 @@ import { floodmapsProxy } from './floodmaps'
 import { notebooksProxy } from './notebooks'
 import { reliefwebUpdates } from './reliefweb'
 import { json, serveUpload, storeUpload } from './uploads'
+import { passwordGate } from './password'
 import { uploadUrl, Uploads } from '@ttx/core'
 import type { Runtime, UserMessage } from '@ttx/core'
 import {
@@ -41,7 +42,8 @@ import { OpenEOClient, type OpenEOCredentials } from './openeoClient'
 import { previewOpenEOAnalysis } from './openeoPreview'
 
 /**
- * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
+ * Multiplayer on Cloudflare. Every request first passes the deployment's shared password, when
+ * SITE_PASSWORD is set (password.ts: POST /__login sets its cookie). The Worker serves the web app (static assets) and routes
  * /connect/<room> to that room's Durable Object, which speaks the standard y-websocket
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
  * /monty/search proxies Montandon STAC searches with the token added (monty.ts),
@@ -298,6 +300,8 @@ function awarenessMessage(update: Uint8Array): Uint8Array {
 
 export default {
   async fetch(request, env) {
+    const denied = await passwordGate(request, (env as Env & { SITE_PASSWORD?: string }).SITE_PASSWORD)
+    if (denied) return denied
     const path = new URL(request.url).pathname
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
     if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
@@ -321,7 +325,8 @@ export default {
     }
     if (path.startsWith('/uploads/')) return serveUpload(request, env.UPLOADS)
     const roomId = /^\/connect\/([\w-]{1,64})$/.exec(path)?.[1]
-    if (!roomId) return new Response('Not found', { status: 404 })
+    // The Worker runs first for every path (wrangler.jsonc), so it serves the web app itself.
+    if (!roomId) return env.ASSETS.fetch(request)
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a websocket', { status: 426 })
     return env.ROOMS.get(env.ROOMS.idFromName(roomId)).fetch(request)
   },

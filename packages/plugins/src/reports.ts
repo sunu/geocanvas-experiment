@@ -96,7 +96,10 @@ export function docText(doc: RichDoc): string {
   const walk = (n: unknown): string => {
     if (!n || typeof n !== 'object') return ''
     const node = n as { text?: unknown; content?: unknown[] }
-    return typeof node.text === 'string' ? node.text : (node.content ?? []).map(walk).join(node.content?.length ? ' ' : '')
+    if (typeof node.text === 'string') return node.text
+    // Marked text is several text nodes in one line ("a **b** c"): joined as they are; blocks are apart.
+    const inline = (node.content ?? []).every((c) => typeof (c as { text?: unknown })?.text === 'string')
+    return (node.content ?? []).map(walk).join(inline ? '' : ' ')
   }
   return walk(doc).replace(/\s+/g, ' ').trim()
 }
@@ -196,6 +199,8 @@ const newBlock = z.discriminatedUnion('kind', [
 export const reportsPlugin = definePlugin({
   id: 'reports',
   title: 'Reports',
+  description: 'Reports to write, print and save as PDF.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

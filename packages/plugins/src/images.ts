@@ -19,6 +19,8 @@ const imageId = z.string().regex(UPLOAD_ID).describe('Id of an uploaded image: t
 export const imagesPlugin = definePlugin({
   id: 'images',
   title: 'Images',
+  description: 'Pictures uploaded to the board.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

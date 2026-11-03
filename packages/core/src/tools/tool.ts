@@ -24,6 +24,8 @@ export interface ToolDef<Input = any, Output = any> {
   /** Kind of result, which picks how a map draws it, e.g. 'geo.features'. */
   output: string
   run(input: Input, ctx: ToolContext): Promise<Output> | Output
+  /** The plugin it belongs to, if any: agents do not get it while that plugin is turned off on the board. */
+  plugin?: string
   /** Default true: results are cached per browser by (id, parsed input). */
   cache?: boolean
 }

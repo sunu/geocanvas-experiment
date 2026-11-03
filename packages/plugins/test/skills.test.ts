@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { defineTool, Runtime, ToolRunner } from '@ttx/core'
+import { BoardSkills, defineTool, exportTools, MAX_BOARD_SKILLS, Runtime, ToolRunner } from '@ttx/core'
 import { z } from 'zod'
 import { agentTools, availableSkills, boardGet, CODE_EXECUTE_TOOL, eventsGet, eventsSearch, geocodeTools, parseSkill, plugins, SKILLS, type Geocoder } from '../src/index'
 import { openeoCollections, openeoCoverage, openeoPreview } from '../src/openeoTools'
@@ -48,5 +48,52 @@ describe('skills', () => {
     expect(browser.has('code__add')).toBe(true)
     expect(browser.has('code__execute')).toBe(true)
     expect(availableSkills(browser).map((s) => s.name)).toContain('run-code')
+  })
+})
+
+const canvas = { kind: 'canvas' } as const
+const status = async (r: Promise<{ status: string; error?: string }>) => {
+  const { status, error } = await r
+  return status === 'applied' ? status : error
+}
+const skill = (name: string) => ({ name, description: 'Write a sitrep.', whenToUse: 'Asked for a sitrep.', requires: [], optional: [], body: 'Steps.' })
+
+describe('board skills', () => {
+  const setup = () => {
+    const doc = new Y.Doc()
+    const person = new Runtime({ doc, plugins, actor: { kind: 'user', id: 'me' } })
+    return { doc, person, skills: new BoardSkills(doc) }
+  }
+
+  it('are added, replaced and removed by people', async () => {
+    const { person, skills } = setup()
+    expect(await status(person.invoke('agent.setSkill', canvas, { skill: skill('sitrep-style') }))).toBe('applied')
+    const [saved] = skills.list()
+    expect(saved).toMatchObject({ name: 'sitrep-style', by: 'me' })
+    await person.invoke('agent.setSkill', canvas, { id: saved!.id, skill: { ...skill('sitrep-style'), body: 'New steps.' } })
+    expect(skills.list().map((s) => s.body)).toEqual(['New steps.'])
+    await person.invoke('agent.removeSkill', canvas, { id: saved!.id })
+    expect(skills.list()).toEqual([])
+  })
+
+  it('refuse a name that is taken, a bad name and one skill too many', async () => {
+    const { person, skills } = setup()
+    const save = (name: string) => status(person.invoke('agent.setSkill', canvas, { skill: skill(name) }))
+    expect(await save(SKILLS[0]!.name)).toMatch(/built-in/)
+    expect(await save('Bad Name')).toMatch(/a-z, 0-9/)
+    for (let i = 0; i < MAX_BOARD_SKILLS; i++) expect(await save(`s-${i}`)).toBe('applied')
+    expect(await save('s-0')).toMatch(/has a skill named/)
+    expect(await save('one-more')).toMatch(/at most/)
+    expect(skills.list()).toHaveLength(MAX_BOARD_SKILLS)
+  })
+
+  it('are never written by an agent', async () => {
+    const { doc, skills } = setup()
+    const agent = new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } })
+    const tools = exportTools(agent.availableOps(canvas)).map((t) => t.name)
+    expect(tools.some((n) => n.includes('Skill'))).toBe(false)
+    expect(await status(agent.callTool('agent__setSkill', { args: { skill: skill('sneaky') } }))).toMatch(/not a tool/)
+    expect(await status(agent.invoke('agent.setSkill', canvas, { skill: skill('sneaky') }))).toMatch(/Only people/)
+    expect(skills.list()).toEqual([])
   })
 })
