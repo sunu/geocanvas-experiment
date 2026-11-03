@@ -350,6 +350,17 @@ describe('tools', () => {
     expect(summarizeBoard(rt.board, rt.registry)).toMatch(/^Board: "Clinics"\n- pin /)
   })
 
+  it('refuses fields outside args, and adds nothing', async () => {
+    const rt = runtime()
+    const agent: Actor = { kind: 'agent', id: 'helper' }
+    expect(await rt.callTool('pin__add', { label: 'Clinic', x: 4 }, agent)).toMatchObject({ status: 'failed', error: expect.stringMatching(/under "args".*label, x/) })
+    expect(await rt.callTool('pin__add', [{ label: 'Clinic' }], agent)).toMatchObject({ status: 'failed', error: expect.stringMatching(/not an object/) })
+    expect(rt.board.list()).toEqual([])
+    expect(await rt.callTool('pin__add', { args: { label: 'Clinic' } }, agent)).toMatchObject({ status: 'applied' })
+    // No input at all is an op with no args.
+    expect(await rt.callTool('pin__clearAll', undefined)).toMatchObject({ status: 'applied' })
+  })
+
   it('runs a tool call, and refuses hidden ops and high-risk ops from an agent', async () => {
     const rt = runtime()
     const agent: Actor = { kind: 'agent', id: 'helper' }

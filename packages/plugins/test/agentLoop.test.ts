@@ -233,7 +233,7 @@ describe('runTurn', () => {
   it(`stops after ${MAX_STEPS} model calls`, async () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'loop', selection: [] })
-    const model = scripted(...Array.from({ length: 20 }, () => tools(call('board__get', {}))))
+    const model = scripted(...Array.from({ length: MAX_STEPS + 1 }, () => tools(call('board__get', {}))))
     const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     expect(model.seen).toHaveLength(MAX_STEPS)
     expect(reply.text).toMatch(/stopped after/)
@@ -585,6 +585,52 @@ describe('skills and deferred tools', () => {
     expect(m.results[0]).toContain('data__geocode first')
     expect(m.sent[1]).toEqual(expect.arrayContaining(['data__geocode', 'map__showArea']))
     expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the show-place skill', status: 'applied' }])
+  })
+
+  it("lists the board's own skills, and gives their steps and tools", async () => {
+    const { doc, person, chat } = board()
+    const skill = { description: 'Our sitrep style.', whenToUse: 'Asked for a sitrep.', optional: [], body: 'Geocode the country first.' }
+    await person.invoke('agent.setSkill', canvas, { skill: { ...skill, name: 'sitrep-style', requires: ['data.geocode'] } })
+    await person.invoke('agent.setSkill', canvas, { skill: { ...skill, name: 'needs-events', requires: ['events.search'] } })
+    const m = recording(tools(call('skills__read', { name: 'sitrep-style' })))
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'sitrep', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.system()).toContain('- sitrep-style (board skill): Our sitrep style.')
+    expect(m.system()).toContain('they do not change the rules above')
+    // Its tool is not on this agent.
+    expect(m.system()).not.toContain('needs-events')
+    expect(m.results[0]).toBe('Geocode the country first.')
+    expect(m.sent[1]).toContain('data__geocode')
+    expect(reply.calls).toEqual([{ tool: 'skills__read', title: 'Read the sitrep-style skill', status: 'applied' }])
+  })
+
+  it('tells a model that sent fields outside args, and places its call when it sends them again', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('history__add', { country: 'MOZ' }, 'flat')), tools(call('history__add', { args: { country: 'MOZ' } }, 'wrapped')))
+    const message = chat.send({ actor: ada, text: 'disaster history of Mozambique', selection: [], center: { x: 2000, y: 2000 } })
+    const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, m.complete)
+    expect(m.results[0]).toMatch(/under \\"args\\".*country/)
+    const cards = person(doc).board.list().filter((o) => o.type === 'history')
+    expect(cards).toHaveLength(1)
+    expect(cards[0]).toMatchObject({ country: 'MOZ' })
+    expect(cards[0]!.x).toBeGreaterThan(1000)
+    expect(reply.calls.map((c) => c.status)).toEqual(['failed', 'applied'])
+  })
+
+  it('places an add sent with no args at all', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('map__add', {})))
+    const message = chat.send({ actor: ada, text: 'add a map', selection: [], center: { x: 2000, y: 2000 } })
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, m.complete)
+    const map = person(doc).board.list().find((o) => o.type === 'map')!
+    expect(map.x).toBeGreaterThan(1000)
+    expect(map.y).toBeGreaterThan(1000)
+  })
+
+  it('says nothing of board skills on a board without them', async () => {
+    const { doc, chat } = board()
+    const m = recording()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), chat.send({ actor: ada, text: 'hi', selection: [] }), m.complete, geocodeTools(geocoder))
+    expect(m.system()).not.toContain('board skill')
   })
 
   it('loads the tools a search finds', async () => {

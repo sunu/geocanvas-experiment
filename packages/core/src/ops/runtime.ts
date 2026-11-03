@@ -154,6 +154,10 @@ export class Runtime {
     const op = this.registry.op(opId)
     const { ids, args } = (input ?? {}) as { ids?: string[]; args?: unknown }
     const target: TargetRef = op?.target.kind === 'objects' ? { kind: 'objects', ids: ids ?? [] } : { kind: 'canvas' }
+    // Models sometimes send an op's fields flat ({ text }) instead of under args: run with no args, the op would apply
+    // its defaults (an empty card at 0,0) and report success. Refuse, so the model sends the call again.
+    const stray = input == null ? [] : typeof input === 'object' && !Array.isArray(input) ? Object.keys(input).filter((k) => k !== 'ids' && k !== 'args') : ['(not an object)']
+    if (stray.length) return this.refuse(opId, target, args, actor, `Put the op's fields under "args": {"ids": [...], "args": {...}}. Not expected: ${stray.join(', ')}`)
     if (op?.hidden) return this.refuse(opId, target, args, actor, `${opId} is not a tool`)
     if (op?.risk === 'high' && actor.kind !== 'user') return this.refuse(opId, target, args, actor, `Only a user may run ${opId}`)
     if (op && !this.registry.opEnabled(op, this.disabledPlugins())) return this.refuse(opId, target, args, actor, `${opId} is turned off on this board`)

@@ -1,5 +1,6 @@
 import * as Y from 'yjs'
 import type { Registry } from '../plugins/registry.js'
+import { BoardSkills, type BoardSkill } from '../skills.js'
 import { Views, type SavedView } from '../views.js'
 import type { AnyObject, Board } from './board.js'
 
@@ -105,6 +106,15 @@ export class BoardTx {
   setDisabledPlugins(ids: string[]) {
     if (ids.length) this.board.meta.set('disabledPlugins', ids)
     else this.board.meta.delete('disabledPlugins')
+  }
+
+  /** Add or replace one of the board's own skills, for everyone. Checked by the op (agent.setSkill). */
+  setSkill(id: string, skill: Omit<BoardSkill, 'id'>) {
+    new BoardSkills(this.board.doc).entries.set(id, skill)
+  }
+
+  removeSkill(id: string) {
+    new BoardSkills(this.board.doc).entries.delete(id)
   }
 
   /** Change a person's view of an object, e.g. the agent moves the map of the person who asked. */

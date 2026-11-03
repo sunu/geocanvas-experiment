@@ -47,6 +47,8 @@ export async function callOp(
   },
 ): Promise<OpCall> {
   const opId = opIdOf(name)
+  // A model that wants every default sends no args at all: place it as an add with empty args.
+  if (input.args === undefined) input = { ...input, args: {} }
   const tooBig = sizeError(runtime, opId, input.args)
   if (tooBig) return { opId, status: 'failed', error: tooBig }
   const nextTo = opts.nextTo ?? opts.turn.created.flatMap((id) => runtime.board.get(id) ?? []).at(-1)
