@@ -66,16 +66,53 @@ export function keyIsUsable(config: KeyConfig | null): boolean {
   return url !== OPENROUTER_URL || !!config.apiKey.trim()
 }
 
+/** A model a server offers. OpenRouter also gives its name, context length and price; other servers give only the id. */
+export interface ModelInfo {
+  id: string
+  name?: string
+  /** Tokens. */
+  context?: number
+  /** US dollars per million input tokens. */
+  price?: number
+}
+
 /**
- * The models an OpenAI-compatible server offers (`GET <url>/models`, which Ollama, LM Studio and llama.cpp all serve).
+ * Models to offer first for OpenRouter: the room's model, then a few known to call tools well. OpenRouter has no
+ * popularity order, so this list is chosen by hand; one that OpenRouter no longer lists is left out.
+ */
+export const SUGGESTED_MODELS = [
+  DEFAULT_MODEL,
+  'anthropic/claude-sonnet-5.5',
+  'anthropic/claude-haiku-5.5',
+  'google/gemini-3.8-flash',
+  'deepseek/deepseek-v4.1-flash',
+  'moonshotai/kimi-k3',
+  'z-ai/glm-5.3',
+]
+
+/**
+ * The models an OpenAI-compatible server offers (`GET <url>/models`, which OpenRouter, Ollama, LM Studio and llama.cpp
+ * all serve). OpenRouter's needs no key, and is asked only for models that call tools, which the agent needs.
  * Throws when the server cannot be reached or answers with an error: that is the connection check.
  */
-export async function listModels(url: string, apiKey?: string, signal?: AbortSignal): Promise<string[]> {
+export async function listModels(url: string, apiKey?: string, signal?: AbortSignal): Promise<ModelInfo[]> {
+  const base = url.trim().replace(/\/+$/, '')
   const key = apiKey?.trim()
-  const res = await fetch(`${url.replace(/\/+$/, '')}/models`, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal })
+  const res = await fetch(`${base}/models${base === OPENROUTER_URL ? '?supported_parameters=tools' : ''}`, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-  const body = (await res.json()) as { data?: { id?: unknown }[] }
-  return (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []))
+  const body = (await res.json()) as { data?: { id?: unknown; name?: unknown; context_length?: unknown; pricing?: { prompt?: unknown } }[] }
+  return (body.data ?? []).flatMap((m) => {
+    if (typeof m.id !== 'string') return []
+    const price = Number(m.pricing?.prompt)
+    return [
+      {
+        id: m.id,
+        ...(typeof m.name === 'string' && { name: m.name }),
+        ...(typeof m.context_length === 'number' && { context: m.context_length }),
+        ...(Number.isFinite(price) && m.pricing?.prompt !== undefined && { price: price * 1e6 }),
+      },
+    ]
+  })
 }
 
 export const loadMode = (): AgentMode => (read<AgentMode>(MODE) === 'own' ? 'own' : 'room')

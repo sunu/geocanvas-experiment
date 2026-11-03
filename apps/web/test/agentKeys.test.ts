@@ -14,8 +14,18 @@ describe('agent keys', () => {
   it('lists the models a server offers', async () => {
     const fetch = vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 'llama3.2:3b' }, { id: 'qwen3:8b' }, {}] })))
     vi.stubGlobal('fetch', fetch)
-    expect(await listModels('http://localhost:11434/v1/', ' k ')).toEqual(['llama3.2:3b', 'qwen3:8b'])
+    expect(await listModels('http://localhost:11434/v1/', ' k ')).toEqual([{ id: 'llama3.2:3b' }, { id: 'qwen3:8b' }])
     expect(fetch).toHaveBeenCalledWith('http://localhost:11434/v1/models', expect.objectContaining({ headers: { Authorization: 'Bearer k' } }))
+  })
+
+  it('asks OpenRouter for tool-calling models, with their name, context and price', async () => {
+    const model = { id: 'a/b', name: 'A: B', context_length: 1_000_000, pricing: { prompt: '0.0000005' } }
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ data: [model] })))
+    vi.stubGlobal('fetch', fetch)
+    const [info] = await listModels(OPENROUTER_URL)
+    expect(info).toMatchObject({ id: 'a/b', name: 'A: B', context: 1_000_000 })
+    expect(info!.price).toBeCloseTo(0.5)
+    expect(fetch).toHaveBeenCalledWith(`${OPENROUTER_URL}/models?supported_parameters=tools`, expect.objectContaining({ headers: {} }))
   })
 
   it('fails when the server answers with an error', async () => {
