@@ -1,5 +1,6 @@
 import * as Y from 'yjs'
 import type { Registry } from '../plugins/registry.js'
+import { Nav } from '../nav.js'
 import { BoardSkills, type BoardSkill } from '../skills.js'
 import { Views, type SavedView } from '../views.js'
 import type { AnyObject, Board } from './board.js'
@@ -121,6 +122,12 @@ export class BoardTx {
   setView(person: string, objectId: string, view: Omit<SavedView, 'at'>) {
     if (!this.board.objects.has(objectId)) throw new Error(`Object ${objectId} does not exist`)
     new Views(this.board.doc).set(person, objectId, view)
+  }
+
+  /** Ask a person's browser to show an object: their canvas moves to it (nav.ts). */
+  showTo(person: string, objectId: string) {
+    if (!this.board.objects.has(objectId)) throw new Error(`Object ${objectId} does not exist`)
+    new Nav(this.board.doc).show(person, objectId)
   }
 
   // --- Layer order ---------------------------------------------------------
