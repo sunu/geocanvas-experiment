@@ -6,7 +6,7 @@ import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
 import { templatesOn, typeOn, usePluginsOff } from '../board/plugins'
 import { objectFromHash, withoutObject } from '../board/room'
-import { cursorSender, fieldSender, presenterOf, publishSelection, useAgentActivities, usePeers, type Awareness, type Presenting } from '../board/presence'
+import { cursorSender, presenterOf, publishSelection, useAgentActivities, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, fitView, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
@@ -29,7 +29,7 @@ import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
 import { publishViewState } from './viewState'
 import { publishViewport } from './viewport'
-import { presentation, unfollow, usePresentation } from './presentation'
+import { bindPresence, presentation, presentView, setFollowed, unfollow, usePresentation } from './presentation'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
 const MIN_SIZE = 16
@@ -562,23 +562,16 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
   // Presentation mode (canvas/presentation.ts). The presenter shares the world rectangle they see; in focus, the
   // focused object's rectangle on the board, since followers cannot see the presenter's draft.
   const { presenting, following: followingId } = usePresentation()
-  const sendPresenting = useMemo(() => fieldSender<Presenting>(awareness, 'presenting'), [awareness])
-  const wasPresenting = useRef(false)
+  useEffect(() => bindPresence(awareness), [awareness])
   const focusedRect = focus ? byId.get(focus.id) : undefined
   useEffect(() => {
-    if (presenting === null) {
-      if (wasPresenting.current) sendPresenting(null)
-      wasPresenting.current = false
-      return
-    }
-    if (!size.w || !size.h) return
+    if (presenting === null || !size.w || !size.h) return
     const tl = toWorld(camera, 0, 0)
     const view = focusedRect
       ? { x: focusedRect.x, y: focusedRect.y, w: focusedRect.w, h: focusedRect.h }
       : { x: tl.x, y: tl.y, w: size.w / camera.z, h: size.h / camera.z }
-    sendPresenting({ view, since: presenting })
-    wasPresenting.current = true
-  }, [presenting, camera, size, focusedRect, sendPresenting])
+    presentView(view, focusedRect?.id)
+  }, [presenting, camera, size, focusedRect])
 
   // A follower's camera shows all of the presenter's view. Following ends when the presenter stops or leaves, and
   // when this person moves the view themselves (unfollow above).
@@ -588,6 +581,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
   const followedKey = followedView && `${followedView.x},${followedView.y},${followedView.w},${followedView.h}`
   useEffect(() => {
     if (followingId !== null && !followed) unfollow()
+    setFollowed(followed?.presenting)
   }, [followingId, followed])
   useEffect(() => {
     const el = rootRef.current
