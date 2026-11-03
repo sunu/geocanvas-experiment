@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OPENROUTER_URL } from '@ttx/plugins'
-import { keyIsUsable, listModels, LOCAL_SERVERS } from '../src/agent/keys'
+import { BROWSER_MODELS, keyIsUsable, listModels, LOCAL_SERVERS } from '../src/agent/keys'
 
 describe('agent keys', () => {
   afterEach(() => vi.unstubAllGlobals())
@@ -9,6 +9,11 @@ describe('agent keys', () => {
     expect(keyIsUsable({ provider: 'local', server: 'ollama', url: LOCAL_SERVERS.ollama.url, model: 'qwen3', apiKey: '' })).toBe(true)
     expect(keyIsUsable({ provider: 'local', server: 'custom', url: '', model: 'qwen3', apiKey: '' })).toBe(false)
     expect(keyIsUsable({ provider: 'openrouter', url: OPENROUTER_URL, model: 'a/b', apiKey: '' })).toBe(false)
+  })
+
+  it('takes a model in the browser only from its list, with no URL or key', () => {
+    expect(keyIsUsable({ provider: 'browser', model: BROWSER_MODELS[0]!.id, url: '', apiKey: '' })).toBe(true)
+    expect(keyIsUsable({ provider: 'browser', model: 'qwen3', url: '', apiKey: '' })).toBe(false)
   })
 
   it('lists the models a server offers', async () => {
