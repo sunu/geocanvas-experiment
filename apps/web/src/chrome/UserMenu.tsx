@@ -54,7 +54,7 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
           {bridge === 'connected' ? <PlugsConnectedIcon className="size-4" /> : <PlugsIcon className="size-4" />}
         </span>
       )}
-      <Hint label="Settings: plugins on this board, your JupyterHub">
+      <Hint label="Settings: plugins and skills on this board, your JupyterHub">
         <Button variant="ghost" size="icon-sm" aria-label="Settings" className="relative" onClick={() => setSettings(true)}>
           <GearIcon className="size-4" />
           <HubStatusDot />

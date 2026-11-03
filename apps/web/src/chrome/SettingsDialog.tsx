@@ -2,13 +2,16 @@ import type { Runtime } from '@ttx/core'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SkillsSettings } from '../agent/SkillsSettings'
 import { usePluginsOff } from '../board/plugins'
 import { HubSettings } from '../code/HubSettings'
 
 /**
  * Settings, from the gear in the user menu. Plugins is the board's, for everyone on it: turn optional plugins on or
  * off (board.setPlugins). A plugin that is off is not offered in the toolbar, the palette or to agents; the objects
- * it made stay on the board. JupyterHub is this person's own login, kept in this browser (code/hub.ts).
+ * it made stay on the board. Skills are the agent's: the built-in ones to read, and the board's own, for everyone on
+ * it (agent/SkillsSettings.tsx); not shown while the agent is off. JupyterHub is this person's own login, kept in this
+ * browser (code/hub.ts).
  */
 /**
  * A tab's panel: it scrolls on its own. Without Tailwind's preflight, `hidden` does not win over a display class, so
@@ -31,12 +34,13 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
       <DialogContent className="max-h-[85vh] grid-rows-[auto_minmax(0,1fr)] sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription className="sr-only">Plugins on this board, and your JupyterHub login.</DialogDescription>
+          <DialogDescription className="sr-only">Plugins and agent skills on this board, and your JupyterHub login.</DialogDescription>
         </DialogHeader>
         {/* Tabs on the left; on a narrow window, in a row above. */}
         <Tabs defaultValue="plugins" orientation="vertical" className="min-h-0 gap-4 max-sm:flex-col">
           <TabsList className="w-40 shrink-0 self-start max-sm:w-full max-sm:flex-row!">
             <TabsTrigger value="plugins">Plugins</TabsTrigger>
+            {!off.has('agent') && <TabsTrigger value="skills">Skills</TabsTrigger>}
             <TabsTrigger value="hub">JupyterHub</TabsTrigger>
           </TabsList>
           <TabsContent value="plugins" className={`grid ${PANEL}`}>
@@ -62,6 +66,11 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
               })}
             </ul>
           </TabsContent>
+          {!off.has('agent') && (
+            <TabsContent value="skills" className={PANEL}>
+              <SkillsSettings runtime={runtime} />
+            </TabsContent>
+          )}
           <TabsContent value="hub" className={`grid ${PANEL}`}>
             <p className="text-sm text-muted-foreground">Only for you, in this browser. Code cells run on your own hub, as you.</p>
             <HubSettings />
