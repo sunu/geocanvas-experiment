@@ -31,7 +31,8 @@ export function SettingsDialog({ runtime, open, onOpenChange }: { runtime: Runti
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] grid-rows-[auto_minmax(0,1fr)] sm:max-w-3xl">
+      {/* One size for every tab, so the dialog does not jump when the tab or a skill changes: each panel scrolls. */}
+      <DialogContent className="h-[min(640px,85vh)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="sr-only">Plugins and agent skills on this board, and your JupyterHub login.</DialogDescription>
