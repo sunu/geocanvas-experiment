@@ -434,6 +434,34 @@ describe('Agent', () => {
     expect(replies(chat)).toMatchObject([{ replyTo: lost.id, text: 'Interrupted. Please ask again.' }])
   })
 
+  it('compacts the chat with a summary, and gives later turns only the summary and what came after', async () => {
+    const { doc, chat } = board()
+    const model = scripted({ role: 'assistant', content: 'Did one.' }, { role: 'assistant', content: 'Ada asked for one.' }, { role: 'assistant', content: 'Did two.' })
+    new Agent({ doc, complete: model.complete })
+    chat.send({ actor: ada, text: 'one', selection: [] })
+    for (let i = 0; i < 10; i++) await settle()
+    const compact = chat.send({ actor: ben, text: 'Compact the chat', selection: [], compact: true })
+    for (let i = 0; i < 10; i++) await settle()
+    chat.send({ actor: ada, text: 'two', selection: [] })
+    for (let i = 0; i < 10; i++) await settle()
+    expect(replies(chat)[1]).toMatchObject({ replyTo: compact.id, compacted: { summary: 'Ada asked for one.' } })
+    expect(model.seen[1]).toHaveLength(2)
+    expect(model.seen[1]![1]!.content).toContain('- Ada: one\n- Agent to Ada: Did one.')
+    const request = model.seen[2]![1]!.content as string
+    expect(request).toContain('Summary of the earlier chat:\nAda asked for one.')
+    expect(request).not.toContain('- Ada (asker): one')
+  })
+
+  it('compacts with no summary when there is no model or it fails', async () => {
+    for (const complete of [undefined, async () => Promise.reject(new Error('down'))]) {
+      const { doc, chat } = board()
+      new Agent({ doc, complete })
+      chat.send({ actor: ada, text: 'Compact the chat', selection: [], compact: true })
+      for (let i = 0; i < 10; i++) await settle()
+      expect(replies(chat)[0]).toMatchObject({ compacted: {}, text: 'Chat cleared, with no summary.' })
+    }
+  })
+
   it('says it is not configured without an API key', async () => {
     const { doc, chat } = board()
     new Agent({ doc, complete: undefined })

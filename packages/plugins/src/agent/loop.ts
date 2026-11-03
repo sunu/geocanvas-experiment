@@ -140,8 +140,6 @@ export const ASKER_EXCHANGES = 3
  */
 function recentChat(runtime: Runtime, history: ChatEntry[], message: UserMessage): string {
   const summary = history.flatMap((e) => (e.kind === 'agent' && e.compacted?.summary ? [e.compacted.summary] : [])).at(-1)
-  const askers = new Map(history.flatMap((e) => (e.kind === 'user' ? [[e.id, e.actor] as const] : [])))
-  const name = (actor: { name?: string; id: string }) => `${actor.name ?? actor.id}${actor.id === message.actor.id ? ' (asker)' : ''}`
   const recent = history.filter((e) => message.at - e.at < HISTORY_MS && !(e.kind === 'agent' && e.compacted))
   const own = new Set(
     recent
@@ -150,21 +148,54 @@ function recentChat(runtime: Runtime, history: ChatEntry[], message: UserMessage
       .map((e) => e.id),
   )
   const shown = new Set(recent.slice(-HISTORY_ENTRIES))
-  const lines = recent
-    .filter((e) => shown.has(e) || own.has(e.kind === 'user' ? e.id : e.replyTo))
-    .map((e) => {
-      if (e.kind === 'user') {
-        const selected = e.selection.length ? ` [selected: ${e.selection.map((id) => named(runtime, id)).join(', ')}]` : ''
-        return `- ${name(e.actor)}: ${e.text}${selected}`
-      }
-      const did = [
-        ...e.calls.filter((c) => c.status === 'applied' && c.ids?.length).map((c) => `${c.tool} on ${c.ids!.join(', ')}`),
-        ...(e.undo?.created ?? []).map((id) => `added ${named(runtime, id)}`),
-      ]
-      const to = askers.get(e.replyTo)
-      return `- Agent${to ? ` to ${name(to)}` : ''}: ${e.text}${did.length ? ` [${did.join('; ')}]` : ''}`
-    })
+  const lines = chatLines(
+    runtime,
+    recent.filter((e) => shown.has(e) || own.has(e.kind === 'user' ? e.id : e.replyTo)),
+    history,
+    message.actor.id,
+  )
   return `${summary ? `Summary of the earlier chat:\n${summary}\n\n` : ''}${lines.length ? `Recent chat, oldest first:\n${lines.join('\n')}\n\n` : ''}`
+}
+
+/**
+ * One line per entry, with the ids each message selected and each reply changed and added, and whose each line is.
+ * `all` finds the person each reply answers; `asker` is marked "(asker)".
+ */
+function chatLines(runtime: Runtime, entries: ChatEntry[], all: ChatEntry[], asker?: string): string[] {
+  const askers = new Map(all.flatMap((e) => (e.kind === 'user' ? [[e.id, e.actor] as const] : [])))
+  const name = (actor: { name?: string; id: string }) => `${actor.name ?? actor.id}${actor.id === asker ? ' (asker)' : ''}`
+  return entries.map((e) => {
+    if (e.kind === 'user') {
+      const selected = e.selection.length ? ` [selected: ${e.selection.map((id) => named(runtime, id)).join(', ')}]` : ''
+      return `- ${name(e.actor)}: ${e.text}${selected}`
+    }
+    const did = [
+      ...e.calls.filter((c) => c.status === 'applied' && c.ids?.length).map((c) => `${c.tool} on ${c.ids!.join(', ')}`),
+      ...(e.undo?.created ?? []).map((id) => `added ${named(runtime, id)}`),
+    ]
+    const to = askers.get(e.replyTo)
+    return `- Agent${to ? ` to ${name(to)}` : ''}: ${e.text}${did.length ? ` [${did.join('; ')}]` : ''}`
+  })
+}
+
+const COMPACT = `You summarize the chat of a shared whiteboard for a humanitarian table-top exercise, where several people ask an agent to change the board. The summary replaces the chat for the agent's later requests. In at most 150 words, as short lines: what each person asked for and what was done, with the type and id of each object added or changed that a later request may name ("the copy", "the new map"), and what is still open. Write only the summary.`
+
+/**
+ * A summary of the chat since the last compaction, the earlier summary included, for a compaction's reply
+ * (AgentReply.compacted). One model call, with no tools.
+ */
+export async function compactChat(runtime: Runtime, complete: Complete, history: ChatEntry[]): Promise<string | undefined> {
+  const earlier = history.flatMap((e) => (e.kind === 'agent' && e.compacted?.summary ? [e.compacted.summary] : [])).at(-1)
+  const lines = chatLines(runtime, history.filter((e) => !(e.kind === 'agent' && e.compacted)), history)
+  if (!lines.length) return earlier
+  const answer = await complete(
+    [
+      { role: 'system', content: COMPACT },
+      { role: 'user', content: `${earlier ? `Summary of the chat before:\n${earlier}\n\n` : ''}The chat, oldest first:\n${lines.join('\n')}` },
+    ],
+    [],
+  )
+  return answer.content?.trim() || undefined
 }
 
 function request(runtime: Runtime, message: UserMessage, history: ChatEntry[]): string {
