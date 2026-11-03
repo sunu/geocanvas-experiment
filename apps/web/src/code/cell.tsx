@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import type { Runtime } from '@ttx/core'
 import { hashSource, type CodeBoardObject } from '@ttx/plugins'
 import { askAgent } from '../agent/ask'
+import { usePluginsOff } from '../board/plugins'
 import { useHub } from './hub'
 
 /**
@@ -71,6 +72,7 @@ export function RunStatus({ cell }: { cell: CodeBoardObject }) {
 /** The latest run's error, with its traceback and print output, and a way to ask the agent to fix it. */
 export function RunError({ runtime, cell }: { runtime: Runtime; cell: CodeBoardObject }) {
   const [open, setOpen] = useState(false)
+  const agentOn = !usePluginsOff(runtime).has('agent')
   const error = cell.run?.status === 'error' ? cell.run.error : undefined
   if (!error) return null
   return (
@@ -79,9 +81,11 @@ export function RunError({ runtime, cell }: { runtime: Runtime; cell: CodeBoardO
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}>
           <strong>{error.ename}</strong>: {error.evalue}
         </button>
-        <button type="button" onClick={() => askAgent(runtime.actor, `Fix the error in the code "${cell.title}" and run it again.`, [cell.id])}>
-          Ask agent to fix
-        </button>
+        {agentOn && (
+          <button type="button" onClick={() => askAgent(runtime.actor, `Fix the error in the code "${cell.title}" and run it again.`, [cell.id])}>
+            Ask agent to fix
+          </button>
+        )}
       </div>
       {open && <pre>{[...error.traceback, ...(cell.run?.stdout ? ['', cell.run.stdout] : [])].join('\n')}</pre>}
     </div>

@@ -8,6 +8,7 @@ import { Hint } from '@/components/Hint'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { NameButton } from '../board/NameButton'
+import { usePluginsOff } from '../board/plugins'
 import type { ConnectionStatus } from '../board/connect'
 import { usePersonName } from '../board/person'
 import type { Awareness } from '../board/presence'
@@ -40,10 +41,11 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
   const { zoom, focused } = useViewState()
   const view = (opId: string) => runtime.dispatch(opId, { kind: 'canvas' }, {})
   const [settings, setSettings] = useState(false)
+  const pluginsOff = usePluginsOff(runtime)
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
     <div className="ttx-ui ttx-shell fixed top-2 right-2 z-[1000002] flex items-center gap-2 rounded-xl border bg-card p-3 font-sans shadow-sm">
-      {bridge !== 'off' && (
+      {bridge !== 'off' && !pluginsOff.has('mcp') && (
         <span
           className={bridge === 'connected' ? 'text-teal-700' : 'text-muted-foreground'}
           title={BRIDGE_LABEL[bridge]}
