@@ -31,11 +31,7 @@ import { ScenarioOnMap, useScenario } from '../routing/ScenarioOnMap'
 // labels (Arabic, Hebrew) itself, so no RTL plugin is needed.
 setWorkerUrl(workerUrl)
 
-/** Where a map starts for a person who has no view of it and nobody else has one either. */
-/**
- * Still where a new map starts. The map saves its first view about a second after it appears (a resize ends a
- * move), so "no view yet" does not last; the zoom does.
- */
+/** Still where a new map starts: nobody has a view of it, or nobody has moved it from the whole world. */
 const atStart = (view: { zoom: number } | undefined) => !view || view.zoom <= WORLD.zoom + 0.01
 
 /** A view is saved this long after the map stops moving, so a series of pans is one write. */
@@ -299,7 +295,7 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     if (!map) return
     const me = runtime.actor.id
     /** `at` of my view as this map last wrote or showed it: a change with another `at` came from elsewhere. */
-    let shownAt = views.get(me, o.id)?.at
+    let shownAt = (views.get(me, o.id) ?? views.latest(o.id)?.view)?.at
     /** The map is moving to a view from elsewhere: do not save that move back. */
     let moving = false
     let pending: SavedView | undefined
@@ -320,15 +316,19 @@ export function MapObject({ runtime, object: o, editing, focused, onFocus }: Obj
     const saved = views.get(me, o.id)
     if (saved && !sameView(shown(map), saved)) map.jumpTo({ center: saved.center, zoom: saved.zoom, bearing: saved.bearing })
     const onMoveStart = () => clearTimeout(timer)
-    const onMoveEnd = () => {
+    const onMoveEnd = (e: { originalEvent?: Event }) => {
       if (moving) return void (moving = false)
+      // Only the person's own gestures are their view. A resize (the first one comes about a second after the map
+      // appears) would otherwise save where the map started as their view, and they would stop following the latest.
+      if (!e.originalEvent) return
       pending = { ...shown(map), at: Date.now() }
       timer = setTimeout(save, SAVE_AFTER_MS)
     }
     map.on('movestart', onMoveStart)
     map.on('moveend', onMoveEnd)
     const unsubscribe = views.subscribe(() => {
-      const view = views.get(me, o.id)
+      // Until this person moves the map themselves, it follows the latest view anyone saved.
+      const view = views.get(me, o.id) ?? views.latest(o.id)?.view
       if (!view || view.at === shownAt) return
       shownAt = view.at
       clearTimeout(timer)
