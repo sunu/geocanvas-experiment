@@ -18,7 +18,7 @@ import { ObjectView } from './ObjectView'
 import { ExitDialog, OptionsPanel } from './OptionsPanel'
 import { useAgentTouched } from '../board/agentActivity'
 import { Links } from './Links'
-import { AgentCursorLayer, Peers } from './Peers'
+import { AgentCursorLayer, FocusCursor, Peers } from './Peers'
 import { useAgentCursors, type Point } from './agentCursor'
 import { isFocusable, objectUI } from './registry'
 import { placeFiles } from '../uploads/drop'
@@ -897,6 +897,8 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
       <div className="ttx-chrome">
         {/* Others' cursors and outlines are at stored positions and sizes, which the focused layout does not match. */}
         {!focus && <Peers peers={peers} camera={camera} byId={byId} agentTouched={agentMarked} />}
+        {/* In focus, only the presenter's cursor, on this person's layout of the object (presentation mode). */}
+        {focus?.rect && presenter && <FocusCursor peer={presenter} objectId={focus.id} box={toScreen(camera, focus.rect)} rootRef={rootRef} />}
         {!focus && <AgentCursorLayer {...agentCursors} activities={agentActivities} camera={camera} rootRef={rootRef} onGoTo={goToPoint} />}
         {/* Not around objects dragged over a report: they are drawn smaller there (ObjectView `dropping`). */}
         {!focus && [...selected].filter((id) => !dropOn?.dragged.has(id)).map((id) => {

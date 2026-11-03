@@ -3,9 +3,10 @@ import { ArrowUpIcon, SparkleIcon } from '@phosphor-icons/react'
 import type { BoardObject } from '../board/board'
 import { isAgent, onColor } from '../board/collaborators'
 import type { Peer } from '../board/presence'
+import { liveMap } from '../map/live'
 import { THINKING } from '@ttx/plugins'
 import { hoverOffset, type AgentCursors, type Point } from './agentCursor'
-import { toScreen, type Camera } from './camera'
+import { toScreen, type Camera, type Rect } from './camera'
 
 /** An outline in someone's color. No handles: only your own selection has them, as only yours can be resized. */
 function Outline({ r, color, dashed }: { r: { x: number; y: number; w: number; h: number }; color: string; dashed?: boolean }) {
@@ -38,6 +39,34 @@ export function Peers({ peers, camera, byId, agentTouched }: { peers: Peer[]; ca
       })}
     </>
   )
+}
+
+/**
+ * A peer's cursor on this person's layout of the object in focus, from its anchor (board/presence.ts `PeerCursor`):
+ * on a map, at the place it points to, kept there while this map moves; elsewhere, at the same share of the box.
+ * Nothing when they are not on this object, or the place is out of this person's view of it.
+ */
+export function FocusCursor({ peer, objectId, box, rootRef }: { peer: Peer; objectId: string; box: Rect; rootRef: RefObject<HTMLElement | null> }) {
+  const anchor = peer.cursor?.in?.id === objectId ? peer.cursor.in : undefined
+  const map = anchor?.lngLat ? liveMap(objectId) : undefined
+  const [, setMoved] = useState(0)
+  useEffect(() => {
+    if (!map) return
+    const onMove = () => setMoved((n) => n + 1)
+    map.on('move', onMove)
+    return () => void map.off('move', onMove)
+  }, [map])
+  if (!anchor) return null
+  let at = { x: box.x + anchor.u * box.w, y: box.y + anchor.v * box.h }
+  const root = rootRef.current
+  if (map && anchor.lngLat && root) {
+    const r = map.getCanvas().getBoundingClientRect()
+    const origin = root.getBoundingClientRect()
+    const p = map.project(anchor.lngLat)
+    at = { x: r.left - origin.left + p.x, y: r.top - origin.top + p.y }
+  }
+  if (at.x < box.x || at.x > box.x + box.w || at.y < box.y || at.y > box.y + box.h) return null
+  return <Cursor at={at} name={peer.user.name} color={peer.user.color} agent={false} />
 }
 
 /** A pointer and name tag at screen point `at`. The agent's has a sparkle and what it does, and floats over the page. */
