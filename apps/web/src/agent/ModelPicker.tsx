@@ -8,13 +8,28 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { DEFAULT_MODEL, keyIsUsable, listModels, LOCAL_SERVERS, SUGGESTED_MODELS, type AgentMode, type KeyConfig, type LocalServer, type ModelInfo } from './keys'
+import {
+  BROWSER_MODELS,
+  browserModel,
+  CONTEXTS,
+  DEFAULT_CONTEXT,
+  DEFAULT_MODEL,
+  keyIsUsable,
+  listModels,
+  LOCAL_SERVERS,
+  SUGGESTED_MODELS,
+  type AgentMode,
+  type KeyConfig,
+  type LocalServer,
+  type ModelInfo,
+} from './keys'
+import { describeLoadError, isCached, isLoading, loadModel, removeModel, storageShort, unloadModel, webGpuMissing } from './webllm'
 
 /**
  * Which model answers the agent: the flow of the Figma file's model screens (Model Menu, then Model Setup).
  * The room's model, the person's own key (OpenRouter or any OpenAI-compatible API) and a local server are saved
- * in this browser (keys.ts) and used by the chat. The small model in the browser is still a stand-in: its download
- * only moves through its states, so that its screens can be seen.
+ * in this browser (keys.ts) and used by the chat. The small model in the browser is downloaded once and runs in
+ * this tab (webllm.ts).
  */
 
 type ModelId = 'backend' | 'key' | 'local' | 'browser'
@@ -31,13 +46,12 @@ const PROVIDERS = [
   { value: 'openai-compatible', label: 'OpenAI-compatible' },
 ]
 const SERVERS = Object.entries(LOCAL_SERVERS).map(([value, { label }]) => ({ value, label }))
-/** The download's size, for the progress; the figures are the Figma file's. */
-const DOWNLOAD_MB = 900
 
 /** What the footer says: where the model runs, and which. */
 function describe(model: ModelId, config: KeyConfig | null): string {
   if (model === 'key' && config) return `${config.provider === 'openrouter' ? 'OpenRouter' : 'Own key'} · ${config.model}`
   if (model === 'local' && config) return `${LOCAL_SERVERS[config.server ?? 'custom'].label} · ${config.model}`
+  if (model === 'browser' && config) return `In browser · ${browserModel(config.model)?.short ?? config.model}`
   return OPTIONS.find((o) => o.id === model)!.title
 }
 
@@ -59,7 +73,7 @@ export function ModelPicker({
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   /** The model in use. */
-  const model: ModelId = mode === 'room' ? 'backend' : config?.provider === 'local' ? 'local' : 'key'
+  const model: ModelId = mode === 'room' ? 'backend' : config?.provider === 'local' ? 'local' : config?.provider === 'browser' ? 'browser' : 'key'
   /** The model whose setup is open beside the menu. */
   const [setup, setSetup] = useState<ModelId | null>(null)
   const current = OPTIONS.find((o) => o.id === model)!
@@ -151,7 +165,7 @@ export function ModelPicker({
           </Card>
           {setup === 'key' && (
             <KeySetup
-              saved={config?.provider === 'local' ? null : config}
+              saved={config?.provider === 'local' || config?.provider === 'browser' ? null : config}
               onCancel={() => setSetup(null)}
               onSave={use}
               onForget={() => {
@@ -161,7 +175,7 @@ export function ModelPicker({
             />
           )}
           {setup === 'local' && <LocalSetup saved={config?.provider === 'local' ? config : null} onCancel={() => setSetup(null)} onUse={use} />}
-          {setup === 'browser' && <BrowserSetup onUse={close} />}
+          {setup === 'browser' && <BrowserSetup saved={config?.provider === 'browser' ? config : null} onUse={use} />}
         </div>
       )}
     </div>
@@ -492,56 +506,109 @@ function LocalSetup({ saved, onCancel, onUse }: { saved: KeyConfig | null; onCan
   )
 }
 
-type DownloadState = 'idle' | 'downloading' | 'ready'
+type DownloadState = 'checking' | 'unsupported' | 'idle' | 'downloading' | 'ready' | 'error'
 
-function BrowserSetup({ onUse }: { onUse: () => void }) {
-  const [state, setState] = useState<DownloadState>('idle')
-  const [mb, setMb] = useState(0)
-  const timer = useRef<ReturnType<typeof setInterval>>(undefined)
-  // A stand-in for the download: counts up, so that the progress and the ready screen can be seen.
-  useEffect(() => () => clearInterval(timer.current), [])
-  function download() {
+const gb = (mb: number) => `${(mb / 1000).toFixed(1)} GB`
+
+/** A model that runs in this tab on WebGPU (webllm.ts): download it once, then use it. */
+function BrowserSetup({ saved, onUse }: { saved: KeyConfig | null; onUse: (config: KeyConfig) => void }) {
+  // A model saved before it left the list (the 2B) gives way to the one there is.
+  const modelId = saved && browserModel(saved.model) ? saved.model : BROWSER_MODELS[0]!.id
+  const [context, setContext] = useState(saved?.context ?? DEFAULT_CONTEXT)
+  const [state, setState] = useState<DownloadState>('checking')
+  const [progress, setProgress] = useState<{ value: number; text: string }>({ value: 0, text: '' })
+  const [error, setError] = useState('')
+  const model = browserModel(modelId)!
+  // Each download or check; an answer for an older one (another model, or cancelled) is dropped.
+  const attempt = useRef(0)
+
+  async function download() {
+    const n = ++attempt.current
     setState('downloading')
-    setMb(0)
-    timer.current = setInterval(() => {
-      setMb((m) => {
-        if (m + 30 < DOWNLOAD_MB) return m + 30
-        clearInterval(timer.current)
-        setState('ready')
-        return DOWNLOAD_MB
+    setProgress({ value: 0, text: '' })
+    const fail = (message: string) => {
+      if (n !== attempt.current) return
+      setError(message)
+      setState('error')
+    }
+    // A model loaded before is read from the cache, so it needs no more room.
+    const short = (await isCached(modelId)) ? null : await storageShort(model.mb)
+    if (short) return fail(short)
+    if (n !== attempt.current) return
+    loadModel(modelId, context, (r) => n === attempt.current && setProgress({ value: r.progress, text: r.text })).then(
+      () => n === attempt.current && setState('ready'),
+      (err) => fail(describeLoadError(err)),
+    )
+  }
+  // WebGPU first, then whether the model is here already, or downloading since the menu was last open.
+  useEffect(() => {
+    const n = ++attempt.current
+    setState('checking')
+    webGpuMissing()
+      .then(async (missing) => {
+        if (n !== attempt.current) return
+        if (missing) {
+          setError(missing)
+          return setState('unsupported')
+        }
+        if (isLoading(modelId, context)) return download()
+        const cached = await isCached(modelId)
+        if (n === attempt.current) setState(cached ? 'ready' : 'idle')
       })
-    }, 200)
+      .catch(() => n === attempt.current && setState('idle'))
+  }, [modelId, context])
+
+  function cancel() {
+    attempt.current++
+    unloadModel()
+    setState('idle')
   }
-  function stop(next: DownloadState) {
-    clearInterval(timer.current)
-    setState(next)
+  async function remove() {
+    attempt.current++
+    await removeModel(modelId)
+    setState('idle')
   }
+  const busy = state === 'checking' || state === 'downloading'
   return (
     <Setup
       Icon={GlobeIcon}
       title="Small model in browser"
-      description="Runs offline on your device with WebGPU."
+      description="Runs on your device with WebGPU. Nothing you ask leaves this browser for the model."
       footer={
-        state === 'idle' ? (
-          <Button onClick={download}>Download model</Button>
-        ) : state === 'downloading' ? (
-          <Button variant="ghost" size="sm" onClick={() => stop('idle')}>
+        state === 'downloading' ? (
+          <Button variant="ghost" size="sm" onClick={cancel}>
             Cancel
           </Button>
-        ) : (
+        ) : state === 'ready' ? (
           <>
-            <Button variant="ghost" size="sm" onClick={() => stop('idle')}>
+            <Button variant="ghost" size="sm" onClick={remove}>
               Remove
             </Button>
-            <Button onClick={onUse}>Use this model</Button>
+            <Button onClick={() => onUse({ provider: 'browser', model: modelId, context, url: '', apiKey: '' })}>Use this model</Button>
           </>
+        ) : state === 'error' ? (
+          <Button variant="outline" onClick={download}>
+            Retry
+          </Button>
+        ) : (
+          <Button disabled={state !== 'idle'} onClick={download}>
+            Download model
+          </Button>
         )
       }
     >
+      <Field label="Context">
+        <Choice
+          value={String(context)}
+          options={CONTEXTS.map((c) => ({ value: String(c), label: `${c / 1024}K tokens · ${gb((c * model.kvKb) / 1024)} more memory` }))}
+          onChange={busy ? () => {} : (c) => setContext(Number(c))}
+        />
+      </Field>
       <dl className="flex flex-col gap-1.5 text-xs/4">
         {[
-          ['Model', 'Qwen 2.5 1.5B (q4)'],
-          ['Size', `About ${DOWNLOAD_MB} MB`],
+          ['Model', model.label],
+          ['Download', `About ${gb(model.mb)}`],
+          ['GPU memory', `About ${gb(model.vramMb + (context * model.kvKb) / 1024)}`],
           ['Runs on', 'WebGPU'],
         ].map(([k, v]) => (
           <div key={k} className="flex items-center justify-between">
@@ -550,15 +617,20 @@ function BrowserSetup({ onUse }: { onUse: () => void }) {
           </div>
         ))}
       </dl>
+      {state === 'checking' && <Status tone="busy">Checking this browser…</Status>}
       {state === 'downloading' && (
         <>
-          <Progress value={(mb / DOWNLOAD_MB) * 100} className="h-1.5" />
-          <p className="text-xs/4 text-muted-foreground">
-            Downloading… {mb} MB of {DOWNLOAD_MB} MB
-          </p>
+          <Progress value={progress.value * 100} className="h-1.5" />
+          <p className="text-xs/4 break-words text-muted-foreground">{progress.text || 'Starting…'}</p>
         </>
       )}
       {state === 'ready' && <Status tone="ok">Ready · cached on this device</Status>}
+      {(state === 'unsupported' || state === 'error') && (
+        <>
+          <Status tone="bad">{state === 'unsupported' ? 'Cannot run here' : 'Could not load the model'}</Status>
+          <p className="text-xs/4 break-words text-muted-foreground">{error}</p>
+        </>
+      )}
     </Setup>
   )
 }
