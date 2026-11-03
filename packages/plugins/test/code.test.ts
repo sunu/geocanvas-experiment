@@ -61,7 +61,7 @@ describe('code cells', () => {
     const r = await rt.invoke('code.add', canvas, { title: 'Kathmandu 10 km buffer', source: 'buffer', showOn: map })
     expect(r.status, r.error).toBe('applied')
     const id = r.created![0]!
-    expect(cell(rt, id)).toMatchObject({ source: 'buffer', run: { status: 'ok', by: 'Ada' }, output: { kind: 'geo.features', uploadId: F1, sourceHash: hashSource('buffer') } })
+    expect(cell(rt, id)).toMatchObject({ source: 'buffer', run: { status: 'ok', by: 'Ada', byId: 'ada' }, output: { kind: 'geo.features', uploadId: F1, sourceHash: hashSource('buffer') } })
     expect((rt.board.get(map) as MapBoardObject).layers).toEqual([expect.objectContaining({ tool: 'data.uploadFeatures', input: { fileId: F1 }, title: 'Kathmandu 10 km buffer', from: id })])
     expect(r.summary).toContain('1 feature(s)')
   })
@@ -106,6 +106,13 @@ describe('code cells', () => {
     expect(r.error).toContain("NameError: name 'gpd' is not defined")
     expect(r.error).not.toContain('\u001b')
     expect(rt.board.list()).toHaveLength(before)
+  })
+
+  it("keep an agent's run as the agent's, with no person id", async () => {
+    const { rt } = setup({ buffer: features(F1) })
+    const r = await rt.invoke('code.add', canvas, { title: 'Buffer', source: 'buffer' }, { actor: agent })
+    expect(cell(rt, r.created![0]!).run).toMatchObject({ status: 'ok', by: 'Agent' })
+    expect(cell(rt, r.created![0]!).run).not.toHaveProperty('byId')
   })
 
   it('refuse to show on a follower an output of a kind it cannot show', async () => {
