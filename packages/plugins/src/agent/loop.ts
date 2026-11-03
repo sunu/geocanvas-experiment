@@ -75,6 +75,13 @@ export function coreToolNames(runtime: Runtime): Set<string> {
   return new Set(ids.map(toolNameOf))
 }
 
+/**
+ * A smaller start for a small model with a short context (the model in the browser, apps/web/src/agent/webllm.ts):
+ * board.get and the ops most requests need. It finds the others with tools__search or a skill.
+ */
+export const leanToolNames = (): Set<string> =>
+  new Set(['board.get', 'sticky.add', 'text.add', 'core.object.move', 'core.object.rename', 'core.object.delete'].map(toolNameOf))
+
 /** The skills whose required tools are all among these tool names. */
 export const availableSkills = (names: Set<string>): Skill[] => SKILLS.filter((s) => s.requires.every((id) => names.has(toolNameOf(id))))
 
@@ -164,12 +171,14 @@ export async function runTurn(
   history: ChatEntry[] = [],
   /** Called with what the agent does next, so people see it (its cursor's tag): THINKING before each model call, a tool's title before each call. */
   onActivity: (title: string) => void = () => {},
+  /** The tools loaded at the start of the turn. */
+  startTools: (runtime: Runtime) => Set<string> = coreToolNames,
 ): Promise<Omit<AgentReply, 'kind' | 'id' | 'at'>> {
   const tools = agentTools(runtime, readTools)
   const all = new Set(tools.map((t) => t.function.name))
   const skills = availableSkills(all)
   // The tools sent with the next model call; skills__read and tools__search add to it.
-  const loaded = coreToolNames(runtime)
+  const loaded = startTools(runtime)
   const meta = [
     fn(TOOLS_SEARCH, 'Search tools. Finds tools that are not loaded yet by a few words for what they do, and loads them.', {
       type: 'object',

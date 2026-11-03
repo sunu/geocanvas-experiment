@@ -10,6 +10,7 @@ import {
   geocodeTools,
   HISTORY_ENTRIES,
   HISTORY_MS,
+  leanToolNames,
   MAX_STEPS,
   plugins,
   runTurn,
@@ -595,6 +596,16 @@ describe('skills and deferred tools', () => {
     expect(found.length).toBeLessThanOrEqual(SEARCH_RESULTS)
     expect(m.sent[1]).toEqual(expect.arrayContaining(found))
     expect(m.sent[0]).not.toContain('map__addClosure')
+  })
+
+  it('starts a small model with the lean tools, and loads the rest by search', async () => {
+    const { doc, chat } = board()
+    const m = recording(tools(call('tools__search', { query: 'road closure' })))
+    const runtime = new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } })
+    const message = chat.send({ actor: ada, text: 'close the bridge', selection: [] })
+    await runTurn(runtime, message, m.complete, new ToolRunner([boardGet(runtime)]), [], () => {}, leanToolNames)
+    expect(m.sent[0]!.sort()).toEqual(['board__get', 'core__object__delete', 'core__object__move', 'core__object__rename', 'skills__read', 'sticky__add', 'text__add', 'tools__search'])
+    expect(m.sent[1]).toContain('map__addClosure')
   })
 
   it('runs a tool that is not loaded when the model names it', async () => {
