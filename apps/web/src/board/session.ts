@@ -13,7 +13,7 @@ import { roomFromHash } from './room'
  */
 export const room = roomFromHash(location.hash)!
 
-export const { board, runtime, provider, chat, uploads } = connect(room)
+export const { board, runtime, provider, chat, uploads, people } = connect(room)
 // Widgets ask the agent through the board's chat (agent/ask.ts).
 setAgentChat(chat)
 // Answers only the messages this tab sends on the person's own key; idle otherwise.
