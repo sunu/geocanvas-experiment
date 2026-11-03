@@ -6,9 +6,9 @@ import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
 import { templatesOn, typeOn, usePluginsOff } from '../board/plugins'
 import { objectFromHash, withoutObject } from '../board/room'
-import { cursorSender, publishSelection, useAgentActivities, usePeers, type Awareness } from '../board/presence'
+import { cursorSender, fieldSender, presenterOf, publishSelection, useAgentActivities, usePeers, type Awareness, type Presenting } from '../board/presence'
 import { Palette } from '../palette/Palette'
-import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
+import { bounds, fitRect, fitView, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
 import { requestFit } from './coreUI'
 import { animateCamera, fillCamera, focusArea, focusedLayout } from './focus'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -29,6 +29,7 @@ import { DropOverlay, PendingUploads } from '../uploads/PendingUploads'
 import { StylePanel } from './StylePanel'
 import { publishViewState } from './viewState'
 import { publishViewport } from './viewport'
+import { presentation, unfollow, usePresentation } from './presentation'
 import { tools, Toolbar, type Tool } from './Toolbar'
 
 const MIN_SIZE = 16
@@ -209,13 +210,16 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
   useEffect(() => {
     const show = (r: Rect | undefined) => {
       const el = rootRef.current
-      if (r && el) setCamera(fitRect(r, el.clientWidth, el.clientHeight))
+      if (!r || !el) return
+      unfollow()
+      setCamera(fitRect(r, el.clientWidth, el.clientHeight))
     }
     runtime.view = {
       fitAll: () => show(bounds(board.list())),
       zoomTo: (ids) => show(bounds(ids.map((id) => board.get(id)).filter((o) => !!o))),
       resetZoom: () => {
         const el = rootRef.current
+        unfollow()
         if (el) setCamera((c) => zoomAt(c, 1 / c.z, el.clientWidth / 2, el.clientHeight / 2))
       },
       focus: (id) => enterFocusRef.current(id),
@@ -249,6 +253,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
     if (e.button === 1 || spaceHeld || tool === 'hand') {
       const start = cameraRef.current
       following.current = false
+      unfollow()
       trackDrag(e, (dx, dy) => setCamera({ ...start, x: start.x + dx, y: start.y + dy }))
       return
     }
@@ -433,6 +438,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
       if (focusRef.current) return
       e.preventDefault()
       following.current = false
+      unfollow()
       const r = root.getBoundingClientRect()
       if (e.ctrlKey || e.metaKey) {
         setCamera((c) => zoomAt(c, Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top))
@@ -475,6 +481,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
       if (e.key === 'Escape') {
         if (editingId) setEditing(null)
         else {
+          unfollow()
           setSelection(new Set())
           setTool('select')
         }
@@ -535,7 +542,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
   useEffect(() => {
     const r = agentCursors.target
     const el = rootRef.current
-    if (!r || !el || !following.current || focusRef.current) return
+    if (!r || !el || !following.current || focusRef.current || presentation().following !== null) return
     const s = toScreen(cameraRef.current, r)
     const m = FOLLOW_MARGIN
     if (s.x >= m && s.y >= m && s.x + s.w <= el.clientWidth - m && s.y + s.h <= el.clientHeight - m) return
@@ -545,11 +552,50 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
 
   /** Move the camera so world point `p` is in the middle, at the same zoom (an off-screen agent's marker). */
   function goToPoint(p: Point) {
+    unfollow()
     const el = rootRef.current!
     const from = cameraRef.current
     stopAnimation.current?.()
     stopAnimation.current = animateCamera(from, { x: el.clientWidth / 2 - p.x * from.z, y: el.clientHeight / 2 - p.y * from.z, z: from.z }, setCamera)
   }
+
+  // Presentation mode (canvas/presentation.ts). The presenter shares the world rectangle they see; in focus, the
+  // focused object's rectangle on the board, since followers cannot see the presenter's draft.
+  const { presenting, following: followingId } = usePresentation()
+  const sendPresenting = useMemo(() => fieldSender<Presenting>(awareness, 'presenting'), [awareness])
+  const wasPresenting = useRef(false)
+  const focusedRect = focus ? byId.get(focus.id) : undefined
+  useEffect(() => {
+    if (presenting === null) {
+      if (wasPresenting.current) sendPresenting(null)
+      wasPresenting.current = false
+      return
+    }
+    if (!size.w || !size.h) return
+    const tl = toWorld(camera, 0, 0)
+    const view = focusedRect
+      ? { x: focusedRect.x, y: focusedRect.y, w: focusedRect.w, h: focusedRect.h }
+      : { x: tl.x, y: tl.y, w: size.w / camera.z, h: size.h / camera.z }
+    sendPresenting({ view, since: presenting })
+    wasPresenting.current = true
+  }, [presenting, camera, size, focusedRect, sendPresenting])
+
+  // A follower's camera shows all of the presenter's view. Following ends when the presenter stops or leaves, and
+  // when this person moves the view themselves (unfollow above).
+  const presenter = presenterOf(peers)
+  const followed = followingId !== null && presenter?.clientId === followingId ? presenter : undefined
+  const followedView = followed?.presenting.view
+  const followedKey = followedView && `${followedView.x},${followedView.y},${followedView.w},${followedView.h}`
+  useEffect(() => {
+    if (followingId !== null && !followed) unfollow()
+  }, [followingId, followed])
+  useEffect(() => {
+    const el = rootRef.current
+    if (!followedView || !el || focusRef.current) return
+    stopAnimation.current?.()
+    stopAnimation.current = animateCamera(cameraRef.current, fitView(followedView, el.clientWidth, el.clientHeight), setCamera)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followedKey, size])
 
   /** Open an object in focus mode: zoom until it fills the screen, then lay it out at that size, on a draft unless its type is live. */
   function enterFocus(id: string) {
@@ -562,6 +608,7 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
     const fullScreen = !!ui.fullScreen
     const area = focusArea(el.clientWidth, el.clientHeight, { full: fullScreen })
     const saved = cameraRef.current
+    unfollow()
     setEditing(null)
     setPaletteOpen(false)
     setSelection(new Set([id]))
@@ -753,10 +800,10 @@ export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
     <div
       ref={rootRef}
       onContextMenuCapture={onContextMenuCapture}
-      className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''} ${focus?.keepChat ? 'keeps-chat' : ''}`}
+      className={`ttx-canvas ${followed ? 'is-following' : ''} ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''} ${focus?.keepChat ? 'keeps-chat' : ''}`}
       // The type in focus, for its own look of the whole view (canvas/focus.css: report mode has no dotted canvas).
       data-focus={focused?.type}
-      style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius } as CSSProperties}
+      style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius, '--ttx-presenter': followed?.user.color } as CSSProperties}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
       onPointerMove={(e) => {
