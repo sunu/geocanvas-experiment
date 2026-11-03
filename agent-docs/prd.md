@@ -104,7 +104,7 @@ A multiplayer infinite canvas for humanitarian tabletop activities and data expl
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Room agent in the Durable Object | Built | OpenRouter tool loop, 12 model calls per turn, 20 turns per room per hour. Undo per turn. Its adds are kept off what is already there. |
+| Room agent in the Durable Object | Built | OpenRouter tool loop, 30 model calls per turn, 20 turns per room per hour. Undo per turn. Its adds are kept off what is already there. |
 | Skills and deferred tools | Built | Domain rules load as skills when a request needs them; most tool schemas load on demand (plan-017). |
 | Skills in Settings, and board skills | Built | The Skills tab of Settings shows the built-in skills, read only. People write skills for one board there, for everyone on it; agents and MCP clients cannot write them (plan-026). |
 | The agent at work: its cursor, current step and busy widgets | Built | Drawn by each browser from the op log, at no model cost. |

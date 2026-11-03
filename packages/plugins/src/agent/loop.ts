@@ -27,7 +27,7 @@ import type { Complete, FunctionTool, Message } from './complete.js'
 export const THINKING = 'Thinking'
 
 /** Model calls in one turn, so a model that keeps calling tools cannot run up the bill. */
-export const MAX_STEPS = 12
+export const MAX_STEPS = 30
 
 /** The request shows at most this many earlier chat entries, from at most this long before it, so the model knows what "the copy" is. */
 export const HISTORY_ENTRIES = 10

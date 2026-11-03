@@ -233,7 +233,7 @@ describe('runTurn', () => {
   it(`stops after ${MAX_STEPS} model calls`, async () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'loop', selection: [] })
-    const model = scripted(...Array.from({ length: 20 }, () => tools(call('board__get', {}))))
+    const model = scripted(...Array.from({ length: MAX_STEPS + 1 }, () => tools(call('board__get', {}))))
     const reply = await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete)
     expect(model.seen).toHaveLength(MAX_STEPS)
     expect(reply.text).toMatch(/stopped after/)
