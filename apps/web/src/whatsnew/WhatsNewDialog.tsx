@@ -11,8 +11,8 @@ const day = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString('
 
 /**
  * What changed on the board, by date, and the build this tab runs (src/build.ts) with a button to copy it for a bug
- * report; no build row without a commit (the dev server). Showing it marks the news seen (seen.ts). It is the What's
- * new tab of Settings and the body of the megaphone's dialog.
+ * report; no build row without a commit (the dev server). Showing it marks the news seen (seen.ts). It is the body of
+ * the megaphone's dialog.
  */
 export function WhatsNewPanel() {
   const [copied, setCopied] = useState(false)
