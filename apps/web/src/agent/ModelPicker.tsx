@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { CaretDownIcon, CheckIcon, CircleNotchIcon, EyeIcon, EyeSlashIcon, GlobeIcon, HardDriveIcon, HardDrivesIcon, KeyIcon, TerminalWindowIcon, type Icon } from '@phosphor-icons/react'
+import { CaretDownIcon, CaretUpDownIcon, CheckIcon, CircleNotchIcon, EyeIcon, EyeSlashIcon, GlobeIcon, HardDriveIcon, HardDrivesIcon, KeyIcon, TerminalWindowIcon, type Icon } from '@phosphor-icons/react'
 import { OPENROUTER_URL } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { DEFAULT_MODEL, keyIsUsable, listModels, LOCAL_SERVERS, type AgentMode, type KeyConfig, type LocalServer } from './keys'
+import { DEFAULT_MODEL, keyIsUsable, listModels, LOCAL_SERVERS, SUGGESTED_MODELS, type AgentMode, type KeyConfig, type LocalServer, type ModelInfo } from './keys'
 
 /**
  * Which model answers the agent: the flow of the Figma file's model screens (Model Menu, then Model Setup).
@@ -66,14 +68,15 @@ export function ModelPicker({
     setOpen(false)
     setSetup(null)
   }
-  // Closes on a press outside or Escape. A Select's list is drawn outside this element, so it counts as inside.
+  // Closes on a press outside or Escape. A Select's list and the model list are drawn outside this element, so they
+  // count as inside; Escape in the model list closes only the list.
   useEffect(() => {
     if (!open) return
     const outside = (e: PointerEvent) => {
       const t = e.target as Element
-      if (!root.current?.contains(t) && !t.closest('[data-slot=select-content]')) close()
+      if (!root.current?.contains(t) && !t.closest('[data-slot=select-content], [data-slot=popover-content]')) close()
     }
-    const escape = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    const escape = (e: KeyboardEvent) => e.key === 'Escape' && !(e.target as Element).closest?.('[data-slot=popover-content]') && close()
     document.addEventListener('pointerdown', outside)
     document.addEventListener('keydown', escape)
     return () => {
@@ -256,6 +259,8 @@ function KeySetup({ saved, onCancel, onSave, onForget }: { saved: KeyConfig | nu
   const set = (fields: Partial<KeyConfig>) => setConfig((c) => ({ ...c, ...fields }))
   const openRouter = config.provider === 'openrouter'
   const valid = keyIsUsable(config)
+  // OpenRouter lists its models without a key; another provider may need it.
+  const list = useModels(openRouter ? OPENROUTER_URL : config.url, openRouter ? '' : config.apiKey)
   return (
     <Setup
       Icon={KeyIcon}
@@ -290,7 +295,7 @@ function KeySetup({ saved, onCancel, onSave, onForget }: { saved: KeyConfig | nu
         </Field>
       )}
       <Field label="Model">
-        <Input value={config.model} onChange={(e) => set({ model: e.target.value })} placeholder={openRouter ? DEFAULT_MODEL : 'gpt-4.1'} className={TEXT} />
+        <ModelCombobox value={config.model} onChange={(model) => set({ model })} models={list.models} loading={list.status === 'checking'} suggested={openRouter ? SUGGESTED_MODELS : []} />
       </Field>
       <Field label="API key">
         <KeyInput value={config.apiKey} onChange={(apiKey) => set({ apiKey })} placeholder={openRouter ? 'sk-or-…' : 'sk-…'} />
@@ -300,32 +305,103 @@ function KeySetup({ saved, onCancel, onSave, onForget }: { saved: KeyConfig | nu
   )
 }
 
-type LocalStatus = 'idle' | 'checking' | 'unreachable' | 'connected'
+/** "1M ctx · $0.50/M in": what OpenRouter says of a model, if anything. */
+function modelFacts({ context, price }: ModelInfo): string {
+  const facts: string[] = []
+  if (context) facts.push(`${context >= 1e6 ? `${+(context / 1e6).toFixed(1)}M` : `${Math.round(context / 1e3)}K`} ctx`)
+  if (price !== undefined) facts.push(price === 0 ? 'free' : `$${price < 0.1 ? +price.toFixed(3) : price.toFixed(2)}/M in`)
+  return facts.join(' · ')
+}
 
-/** A server on this machine: picks its default URL, checks that it answers, and lists its models. */
-function LocalSetup({ saved, onCancel, onUse }: { saved: KeyConfig | null; onCancel: () => void; onUse: (config: KeyConfig) => void }) {
-  const [server, setServer] = useState<LocalServer>(saved?.server ?? 'ollama')
-  const [url, setUrl] = useState(saved?.url ?? LOCAL_SERVERS.ollama.url)
-  const [apiKey, setApiKey] = useState(saved?.apiKey ?? '')
-  const [model, setModel] = useState(saved?.model ?? '')
-  const [models, setModels] = useState<string[]>([])
-  const [status, setStatus] = useState<LocalStatus>('idle')
+function ModelItem({ model, selected, onSelect }: { model: ModelInfo; selected: boolean; onSelect: () => void }) {
+  const facts = modelFacts(model)
+  return (
+    <CommandItem value={model.id} keywords={model.name ? [model.name] : undefined} onSelect={onSelect}>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate">{model.name ?? model.id}</span>
+        <span className="truncate text-xs text-muted-foreground">
+          {model.name ? model.id : null}
+          {model.name && facts ? ' · ' : null}
+          {facts}
+        </span>
+      </span>
+      {selected && <CheckIcon className="size-3.5" />}
+    </CommandItem>
+  )
+}
+
+/**
+ * A model from the server's list, searched by id or name, or any id typed in: a model the list does not have, or a
+ * server that gives none. `suggested` ids come first, those in the list only once it has loaded.
+ */
+function ModelCombobox({ value, onChange, models, loading, suggested }: { value: string; onChange: (id: string) => void; models: ModelInfo[]; loading: boolean; suggested: string[] }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const byId = new Map(models.map((m) => [m.id, m]))
+  const top = suggested.flatMap((id) => (models.length ? (byId.has(id) ? [byId.get(id)!] : []) : [{ id }]))
+  const rest = models.filter((m) => !suggested.includes(m.id))
+  const typed = search.trim()
+  function pick(id: string) {
+    onChange(id)
+    setOpen(false)
+    setSearch('')
+  }
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className={cn(TEXT, 'w-full justify-between px-3 font-medium')}>
+          <span className={cn('truncate', !value && 'text-muted-foreground')}>{(value && byId.get(value)?.name) || value || 'Choose a model'}</span>
+          <CaretUpDownIcon className="size-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-(--radix-popover-trigger-width) min-w-[280px] p-0">
+        <Command>
+          <CommandInput value={search} onValueChange={setSearch} placeholder="Search or type a model id…" />
+          <CommandList>
+            <CommandEmpty>{loading ? 'Loading models…' : 'No model found.'}</CommandEmpty>
+            {typed && !byId.has(typed) && (
+              <CommandGroup forceMount>
+                <CommandItem forceMount value={`use:${typed}`} onSelect={() => pick(typed)}>
+                  Use “{typed}”
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {top.length > 0 && (
+              <CommandGroup heading="Suggested">
+                {top.map((m) => (
+                  <ModelItem key={m.id} model={m} selected={m.id === value} onSelect={() => pick(m.id)} />
+                ))}
+              </CommandGroup>
+            )}
+            {rest.length > 0 && (
+              <CommandGroup heading={top.length ? 'All models' : undefined}>
+                {rest.map((m) => (
+                  <ModelItem key={m.id} model={m} selected={m.id === value} onSelect={() => pick(m.id)} />
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+type ListStatus = 'idle' | 'checking' | 'unreachable' | 'connected'
+
+/** A server's models (listModels), asked again a moment after the URL or key stops changing; `retry` asks again now. */
+function useModels(url: string, apiKey: string) {
+  const [state, setState] = useState<{ status: ListStatus; models: ModelInfo[] }>({ status: 'idle', models: [] })
   const [attempt, setAttempt] = useState(0)
-  const { label, hint } = LOCAL_SERVERS[server]
-
-  // The check: the server's model list, a moment after the URL or key stops changing.
   useEffect(() => {
-    if (!/^https?:\/\/\S/.test(url.trim())) return setStatus('idle')
-    setStatus('checking')
+    const base = url.trim()
+    if (!/^https?:\/\/\S/.test(base)) return setState({ status: 'idle', models: [] })
+    setState((s) => ({ ...s, status: 'checking' }))
     const abort = new AbortController()
     const t = setTimeout(() => {
-      listModels(url.trim(), apiKey, abort.signal).then(
-        (ids) => {
-          setModels(ids)
-          setModel((m) => (ids.length && !ids.includes(m) ? ids[0]! : m))
-          setStatus('connected')
-        },
-        () => !abort.signal.aborted && setStatus('unreachable'),
+      listModels(base, apiKey, abort.signal).then(
+        (models) => setState({ status: 'connected', models }),
+        () => !abort.signal.aborted && setState({ status: 'unreachable', models: [] }),
       )
     }, 400)
     return () => {
@@ -333,6 +409,21 @@ function LocalSetup({ saved, onCancel, onUse }: { saved: KeyConfig | null; onCan
       abort.abort()
     }
   }, [url, apiKey, attempt])
+  return { ...state, retry: () => setAttempt((a) => a + 1) }
+}
+
+/** A server on this machine: picks its default URL, checks that it answers, and lists its models. */
+function LocalSetup({ saved, onCancel, onUse }: { saved: KeyConfig | null; onCancel: () => void; onUse: (config: KeyConfig) => void }) {
+  const [server, setServer] = useState<LocalServer>(saved?.server ?? 'ollama')
+  const [url, setUrl] = useState(saved?.url ?? LOCAL_SERVERS.ollama.url)
+  const [apiKey, setApiKey] = useState(saved?.apiKey ?? '')
+  const [model, setModel] = useState(saved?.model ?? '')
+  const { status, models, retry } = useModels(url, apiKey)
+  const { label, hint } = LOCAL_SERVERS[server]
+  // Once connected, a model the server does not have gives way to its first one.
+  useEffect(() => {
+    if (models.length && !models.some((m) => m.id === model)) setModel(models[0]!.id)
+  }, [models, model])
 
   const config: KeyConfig = { provider: 'local', server, url: url.trim(), model: model.trim(), apiKey: apiKey.trim() }
   return (
@@ -346,7 +437,7 @@ function LocalSetup({ saved, onCancel, onUse }: { saved: KeyConfig | null; onCan
             Cancel
           </Button>
           {status === 'unreachable' ? (
-            <Button variant="outline" onClick={() => setAttempt((a) => a + 1)}>
+            <Button variant="outline" onClick={retry}>
               Retry
             </Button>
           ) : (
@@ -390,7 +481,7 @@ function LocalSetup({ saved, onCancel, onUse }: { saved: KeyConfig | null; onCan
           </Status>
           <Field label="Model">
             {models.length ? (
-              <Choice value={model} options={models.map((m) => ({ value: m, label: m }))} onChange={setModel} />
+              <Choice value={model} options={models.map((m) => ({ value: m.id, label: m.id }))} onChange={setModel} />
             ) : (
               <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model name" className={TEXT} />
             )}
