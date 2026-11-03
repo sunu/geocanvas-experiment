@@ -3,7 +3,7 @@ import { OPENROUTER_URL } from '@ttx/plugins'
 /**
  * The person's own LLM key, for the agent that runs in this browser (browserAgent.ts). It is kept in this
  * browser's localStorage only. It is sent only to `url`, never to our Worker, the board doc or presence.
- * The chat panel's mode and whether it is collapsed are kept here too.
+ * The chat panel's mode, whether it is collapsed and whether it shows only the person's own exchanges are kept here too.
  */
 export interface KeyConfig {
   /** `browser`: a model that runs in this tab (webllm.ts), with no URL or key. */
@@ -140,3 +140,8 @@ export const saveMode = (mode: AgentMode) => write(MODE, mode)
 
 export const loadCollapsed = (): boolean => read<boolean>(COLLAPSED) === true
 export const saveCollapsed = (collapsed: boolean) => write(COLLAPSED, collapsed)
+
+/** Whether the chat panel shows only this person's own exchanges. */
+const ONLY_MINE = 'ttx-agent-only-mine'
+export const loadOnlyMine = (): boolean => read<boolean>(ONLY_MINE) === true
+export const saveOnlyMine = (onlyMine: boolean) => write(ONLY_MINE, onlyMine)

@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import type { Runtime } from '@ttx/core'
 import { hashSource, type CodeBoardObject } from '@ttx/plugins'
 import { askAgent } from '../agent/ask'
+import { usePeopleNames } from '../board/people'
 import { usePluginsOff } from '../board/plugins'
 import { useHub } from './hub'
 
@@ -58,13 +59,14 @@ const ago = (at: number) => {
 }
 
 /** "Ran 2 min ago by Ada · 1.2 s", and whether the code changed since. */
-export function RunStatus({ cell }: { cell: CodeBoardObject }) {
+export function RunStatus({ runtime, cell }: { runtime: Runtime; cell: CodeBoardObject }) {
+  const nameOf = usePeopleNames(runtime.board.doc)
   const run = cell.run
   if (!run) return <span>Not run yet</span>
   const edited = run.sourceHash !== hashSource(cell.source)
   return (
     <span>
-      {run.status === 'error' ? 'Failed' : 'Ran'} {ago(run.at)} by {run.by} · {(run.ms / 1000).toFixed(1)} s{edited && <strong> · edited, not run</strong>}
+      {run.status === 'error' ? 'Failed' : 'Ran'} {ago(run.at)} by {nameOf({ id: run.byId ?? '', name: run.by })} · {(run.ms / 1000).toFixed(1)} s{edited && <strong> · edited, not run</strong>}
     </span>
   )
 }

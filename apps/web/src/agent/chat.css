@@ -70,6 +70,86 @@
   color: var(--agent);
 }
 
+/* A message and its reply, together: the reply under it, set in by the agent's line. */
+.ttx-chat__exchange {
+  margin-bottom: 14px;
+}
+
+.ttx-chat__exchange > .ttx-chat__entry {
+  margin-bottom: 6px;
+}
+
+.ttx-chat__exchange > .ttx-chat__entry--agent {
+  padding-left: 10px;
+  border-left: 2px solid var(--agent);
+}
+
+.ttx-chat__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+.ttx-chat__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--agent);
+}
+
+.ttx-chat__to {
+  font-weight: 500;
+}
+
+.ttx-chat__earlier {
+  display: block;
+  margin: 0 auto 12px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ttx-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ttx-chat__earlier:hover {
+  background: rgb(0 0 0 / 0.04);
+}
+
+/* Where the chat was compacted: a rule across the list, with the summary to open. */
+.ttx-chat__compaction {
+  margin-bottom: 14px;
+  color: var(--ttx-muted);
+  font-size: 12px;
+}
+
+.ttx-chat__compaction-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ttx-chat__compaction-line::before,
+.ttx-chat__compaction-line::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--ttx-border);
+}
+
+.ttx-chat__compaction summary {
+  cursor: pointer;
+}
+
+.ttx-chat__compaction .ttx-chat__text {
+  margin-top: 4px;
+  color: var(--ttx-ink);
+}
+
 .ttx-chat__chip {
   padding: 0 6px;
   border-radius: 999px;

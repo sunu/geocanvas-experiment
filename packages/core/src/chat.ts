@@ -22,6 +22,8 @@ export interface UserMessage {
    * sender's own key (apps/web/src/agent/browserAgent.ts). The message never holds the key.
    */
   browserTab?: string
+  /** A request to compact the chat: the agent answers with a summary of the chat before it (AgentReply.compacted). */
+  compact?: true
   at: number
 }
 
@@ -65,10 +67,53 @@ export interface AgentReply {
   text: string
   calls: ToolCallRecord[]
   undo?: TurnUndo
+  /**
+   * The reply to a `compact` message: the chat before it is hidden and no longer given to the model. `summary` is
+   * the agent's summary of it, absent when there was no model or it failed.
+   */
+  compacted?: { summary?: string }
   at: number
 }
 
 export type ChatEntry = UserMessage | AgentReply
+
+/** The last reply that compacted the chat, and its index in `entries`; index -1 when there is none. */
+export function lastCompaction(entries: ChatEntry[]): { reply?: AgentReply; index: number } {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i]!
+    if (e.kind === 'agent' && e.compacted) return { reply: e, index: i }
+  }
+  return { index: -1 }
+}
+
+/** One request and its reply. A reply whose message is not in the list stands alone. */
+export type Exchange = { message: UserMessage; reply?: AgentReply } | { message?: undefined; reply: AgentReply }
+
+/**
+ * The entries as exchanges, each reply with the message it answers, in the order of the messages: when several people
+ * ask at once, their messages come before the replies, and each reply should show under its own question.
+ */
+export function exchanges(entries: ChatEntry[]): Exchange[] {
+  const replies = new Map<string, AgentReply>()
+  for (const e of entries) if (e.kind === 'agent') replies.set(e.replyTo, e)
+  const asked = new Set(entries.flatMap((e) => (e.kind === 'user' ? [e.id] : [])))
+  return entries.flatMap((e): Exchange[] => {
+    if (e.kind === 'user') {
+      const reply = replies.get(e.id)
+      return [reply ? { message: e, reply } : { message: e }]
+    }
+    return asked.has(e.replyTo) ? [] : [{ reply: e }]
+  })
+}
+
+/**
+ * How many messages its agent answers before `message`: the room's agent answers the messages with no `browserTab`,
+ * a tab's agent those with its id, each in order. 0: it is answered now. -1: it is not pending.
+ */
+export function queuePosition(pending: UserMessage[], message: UserMessage): number {
+  if (!pending.some((m) => m.id === message.id)) return -1
+  return pending.filter((m) => m.browserTab === message.browserTab).findIndex((m) => m.id === message.id)
+}
 
 export class Chat {
   readonly entries: Y.Array<ChatEntry>

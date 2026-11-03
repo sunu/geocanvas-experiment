@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, Runtime, ToolRunner, Views, type Actor, type AgentReply, type AnyObject, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
+import { Chat, People, Runtime, ToolRunner, Views, type Actor, type AgentReply, type AnyObject, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
 import {
   Agent,
   boardGet,
@@ -8,6 +8,7 @@ import {
   eventsSearch,
   GAP,
   geocodeTools,
+  ASKER_EXCHANGES,
   HISTORY_ENTRIES,
   HISTORY_MS,
   leanToolNames,
@@ -230,6 +231,50 @@ describe('runTurn', () => {
     expect(request).toContain(`- Ben: message ${HISTORY_ENTRIES}\n\nAda (person id ada) asks: now`)
   })
 
+  it(`keeps the asker's last ${ASKER_EXCHANGES} exchanges when other people asked since, and says whose each line is`, async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const at = message.at - 100_000
+    const mine = (i: number): ChatEntry[] => [
+      { kind: 'user', id: `a${i}`, actor: ada, text: `ada ${i}`, selection: [], at: at + i },
+      { kind: 'agent', id: `ra${i}`, replyTo: `a${i}`, text: `done ${i}`, calls: [], at: at + i },
+    ]
+    const others = Array.from({ length: HISTORY_ENTRIES }, (_, i): ChatEntry => ({ kind: 'user', id: `b${i}`, actor: ben, text: `ben ${i}`, selection: [], at: at + 100 + i }))
+    const model = scripted()
+    const history = [...[0, 1, 2, 3].flatMap(mine), ...others]
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], history)
+    const request = model.seen[0]![1]!.content as string
+    expect(request).not.toContain('ada 0')
+    expect(request).toContain(`- Ada (asker): ada 1\n- Agent to Ada (asker): done 1\n- Ada (asker): ada 2`)
+    expect(request).toContain(`- Agent to Ada (asker): done 3\n- Ben: ben 0\n`)
+  })
+
+  it("names people by their current name, also in messages sent before they renamed themselves", async () => {
+    const { doc, chat } = board()
+    const otter: Actor = { kind: 'user', id: 'ada', name: 'Otter' }
+    const before: ChatEntry = { kind: 'user', id: 'old', actor: otter, text: 'add a map', selection: [], at: Date.now() - 1000 }
+    new People(doc).set({ ...ada, name: 'Ada' })
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const model = scripted()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], [before])
+    const request = model.seen[0]![1]!.content as string
+    expect(request).toContain('- Ada (asker): add a map\n\nAda (person id ada) asks: now')
+    expect(request).not.toContain('Otter')
+  })
+
+  it('starts with the summary of the last compaction', async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const history: ChatEntry[] = [
+      { kind: 'user', id: 'c', actor: ben, text: 'Compact the chat', selection: [], compact: true, at: message.at - 10 },
+      { kind: 'agent', id: 'rc', replyTo: 'c', text: 'Chat compacted.', calls: [], compacted: { summary: 'Ada added a map of Beira.' }, at: message.at - 5 },
+    ]
+    const model = scripted()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], history)
+    const request = model.seen[0]![1]!.content as string
+    expect(request).toMatch(/^Summary of the earlier chat:\nAda added a map of Beira\.\n\nRecent chat, oldest first:\n- Ben: Compact the chat\n\nAda/)
+  })
+
   it(`stops after ${MAX_STEPS} model calls`, async () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'loop', selection: [] })
@@ -392,7 +437,7 @@ describe('Agent', () => {
     for (let i = 0; i < 10; i++) await settle()
     const copy = replies(chat)[0]!.undo!.created[0]!
     const request = model.seen.at(-1)![1]!.content as string
-    expect(request).toContain(`- Ada: duplicate this [selected: box ${a}]\n- Agent: Duplicated it. [core.object.duplicate on ${a}; added box ${copy}]`)
+    expect(request).toContain(`- Ada (asker): duplicate this [selected: box ${a}]\n- Agent to Ada (asker): Duplicated it. [core.object.duplicate on ${a}; added box ${copy}]`)
   })
 
   it('answers messages a lost turn left, without running them again', () => {
@@ -400,6 +445,34 @@ describe('Agent', () => {
     const lost = chat.send({ actor: ada, text: 'delete everything', selection: [] })
     new Agent({ doc, complete: async () => ({ role: 'assistant', content: 'should not run' }) })
     expect(replies(chat)).toMatchObject([{ replyTo: lost.id, text: 'Interrupted. Please ask again.' }])
+  })
+
+  it('compacts the chat with a summary, and gives later turns only the summary and what came after', async () => {
+    const { doc, chat } = board()
+    const model = scripted({ role: 'assistant', content: 'Did one.' }, { role: 'assistant', content: 'Ada asked for one.' }, { role: 'assistant', content: 'Did two.' })
+    new Agent({ doc, complete: model.complete })
+    chat.send({ actor: ada, text: 'one', selection: [] })
+    for (let i = 0; i < 10; i++) await settle()
+    const compact = chat.send({ actor: ben, text: 'Compact the chat', selection: [], compact: true })
+    for (let i = 0; i < 10; i++) await settle()
+    chat.send({ actor: ada, text: 'two', selection: [] })
+    for (let i = 0; i < 10; i++) await settle()
+    expect(replies(chat)[1]).toMatchObject({ replyTo: compact.id, compacted: { summary: 'Ada asked for one.' } })
+    expect(model.seen[1]).toHaveLength(2)
+    expect(model.seen[1]![1]!.content).toContain('- Ada: one\n- Agent to Ada: Did one.')
+    const request = model.seen[2]![1]!.content as string
+    expect(request).toContain('Summary of the earlier chat:\nAda asked for one.')
+    expect(request).not.toContain('- Ada (asker): one')
+  })
+
+  it('compacts with no summary when there is no model or it fails', async () => {
+    for (const complete of [undefined, async () => Promise.reject(new Error('down'))]) {
+      const { doc, chat } = board()
+      new Agent({ doc, complete })
+      chat.send({ actor: ada, text: 'Compact the chat', selection: [], compact: true })
+      for (let i = 0; i < 10; i++) await settle()
+      expect(replies(chat)[0]).toMatchObject({ compacted: {}, text: 'Chat cleared, with no summary.' })
+    }
   })
 
   it('says it is not configured without an API key', async () => {
