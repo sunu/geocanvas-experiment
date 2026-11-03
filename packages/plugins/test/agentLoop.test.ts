@@ -8,6 +8,7 @@ import {
   eventsSearch,
   GAP,
   geocodeTools,
+  ASKER_EXCHANGES,
   HISTORY_ENTRIES,
   HISTORY_MS,
   leanToolNames,
@@ -230,6 +231,37 @@ describe('runTurn', () => {
     expect(request).toContain(`- Ben: message ${HISTORY_ENTRIES}\n\nAda (person id ada) asks: now`)
   })
 
+  it(`keeps the asker's last ${ASKER_EXCHANGES} exchanges when other people asked since, and says whose each line is`, async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const at = message.at - 100_000
+    const mine = (i: number): ChatEntry[] => [
+      { kind: 'user', id: `a${i}`, actor: ada, text: `ada ${i}`, selection: [], at: at + i },
+      { kind: 'agent', id: `ra${i}`, replyTo: `a${i}`, text: `done ${i}`, calls: [], at: at + i },
+    ]
+    const others = Array.from({ length: HISTORY_ENTRIES }, (_, i): ChatEntry => ({ kind: 'user', id: `b${i}`, actor: ben, text: `ben ${i}`, selection: [], at: at + 100 + i }))
+    const model = scripted()
+    const history = [...[0, 1, 2, 3].flatMap(mine), ...others]
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], history)
+    const request = model.seen[0]![1]!.content as string
+    expect(request).not.toContain('ada 0')
+    expect(request).toContain(`- Ada (asker): ada 1\n- Agent to Ada (asker): done 1\n- Ada (asker): ada 2`)
+    expect(request).toContain(`- Agent to Ada (asker): done 3\n- Ben: ben 0\n`)
+  })
+
+  it('starts with the summary of the last compaction', async () => {
+    const { doc, chat } = board()
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const history: ChatEntry[] = [
+      { kind: 'user', id: 'c', actor: ben, text: 'Compact the chat', selection: [], compact: true, at: message.at - 10 },
+      { kind: 'agent', id: 'rc', replyTo: 'c', text: 'Chat compacted.', calls: [], compacted: { summary: 'Ada added a map of Beira.' }, at: message.at - 5 },
+    ]
+    const model = scripted()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], history)
+    const request = model.seen[0]![1]!.content as string
+    expect(request).toMatch(/^Summary of the earlier chat:\nAda added a map of Beira\.\n\nRecent chat, oldest first:\n- Ben: Compact the chat\n\nAda/)
+  })
+
   it(`stops after ${MAX_STEPS} model calls`, async () => {
     const { doc, chat } = board()
     const message = chat.send({ actor: ada, text: 'loop', selection: [] })
@@ -392,7 +424,7 @@ describe('Agent', () => {
     for (let i = 0; i < 10; i++) await settle()
     const copy = replies(chat)[0]!.undo!.created[0]!
     const request = model.seen.at(-1)![1]!.content as string
-    expect(request).toContain(`- Ada: duplicate this [selected: box ${a}]\n- Agent: Duplicated it. [core.object.duplicate on ${a}; added box ${copy}]`)
+    expect(request).toContain(`- Ada (asker): duplicate this [selected: box ${a}]\n- Agent to Ada (asker): Duplicated it. [core.object.duplicate on ${a}; added box ${copy}]`)
   })
 
   it('answers messages a lost turn left, without running them again', () => {

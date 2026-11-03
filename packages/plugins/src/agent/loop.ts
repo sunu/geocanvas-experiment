@@ -39,11 +39,12 @@ Rules:
 - If the message asks for no change to the board (a greeting, a question about you or the board), answer it in words and call no tools.
 - "This", "these", "it" and "the selected ..." mean the objects under "Selected" in the request.
 - A name for a given object ("the duplicate", "the copy", "the new map", "the one you added") means the object that the recent chat names, also when it is not selected. Find its id in the recent chat.
+- Several people share this chat; lines marked "(asker)" are the asker's. A name for an object means one from the asker's own recent exchanges first; use one from another person's only when the asker refers to it.
 - If the request needs objects and nothing is selected or named, or you are not sure which objects the person means, do not guess: ask.
 - When you add an object, leave out x, y, w and h: it goes in the middle of the person's view, at its type's default size, and each further object you add goes to the right of the last one. An object that would cover others is moved to the nearest free spot. Give x and y only to put it at a given place (e.g. next to an object), and w and h only when the person asks for a size.
 - Coordinates are canvas units; x grows to the right and y grows down; x and y are an object's top-left corner.
 - Only some tools are loaded. To do something none of them does, read the skill for it, or call tools__search with a few words for what you need: it loads the tools it finds.
-- When you are done, reply in one or two short sentences: say what you did, or why you could not.`
+- When you are done, reply to the asker in one or two short sentences: say what you did, or why you could not. Do not report on other people's requests.`
 
 /** The read-only tools an agent may call on this board: not those of a plugin turned off there. */
 export function readToolsOn(runtime: Runtime, tools: ToolRunner): ToolDef[] {
@@ -128,23 +129,42 @@ function named(runtime: Runtime, id: string): string {
   return o ? `${o.type} ${id}` : `${id} (deleted)`
 }
 
-/** The earlier chat, one line per entry, with the ids each message selected and each reply changed and added. */
+/** The asker's own exchanges the request always shows, even when other people's entries are more recent. */
+export const ASKER_EXCHANGES = 3
+
+/**
+ * The earlier chat, one line per entry, with the ids each message selected and each reply changed and added: the last
+ * HISTORY_ENTRIES entries, and the asker's own last ASKER_EXCHANGES exchanges, so other people's requests do not push
+ * them out. Each line says whose it is, so the model can tell the asker's turns from other people's. A compaction's
+ * summary comes first.
+ */
 function recentChat(runtime: Runtime, history: ChatEntry[], message: UserMessage): string {
-  const lines = history
-    .filter((e) => message.at - e.at < HISTORY_MS)
-    .slice(-HISTORY_ENTRIES)
+  const summary = history.flatMap((e) => (e.kind === 'agent' && e.compacted?.summary ? [e.compacted.summary] : [])).at(-1)
+  const askers = new Map(history.flatMap((e) => (e.kind === 'user' ? [[e.id, e.actor] as const] : [])))
+  const name = (actor: { name?: string; id: string }) => `${actor.name ?? actor.id}${actor.id === message.actor.id ? ' (asker)' : ''}`
+  const recent = history.filter((e) => message.at - e.at < HISTORY_MS && !(e.kind === 'agent' && e.compacted))
+  const own = new Set(
+    recent
+      .filter((e) => e.kind === 'user' && e.actor.id === message.actor.id)
+      .slice(-ASKER_EXCHANGES)
+      .map((e) => e.id),
+  )
+  const shown = new Set(recent.slice(-HISTORY_ENTRIES))
+  const lines = recent
+    .filter((e) => shown.has(e) || own.has(e.kind === 'user' ? e.id : e.replyTo))
     .map((e) => {
       if (e.kind === 'user') {
         const selected = e.selection.length ? ` [selected: ${e.selection.map((id) => named(runtime, id)).join(', ')}]` : ''
-        return `- ${e.actor.name ?? e.actor.id}: ${e.text}${selected}`
+        return `- ${name(e.actor)}: ${e.text}${selected}`
       }
       const did = [
         ...e.calls.filter((c) => c.status === 'applied' && c.ids?.length).map((c) => `${c.tool} on ${c.ids!.join(', ')}`),
         ...(e.undo?.created ?? []).map((id) => `added ${named(runtime, id)}`),
       ]
-      return `- Agent: ${e.text}${did.length ? ` [${did.join('; ')}]` : ''}`
+      const to = askers.get(e.replyTo)
+      return `- Agent${to ? ` to ${name(to)}` : ''}: ${e.text}${did.length ? ` [${did.join('; ')}]` : ''}`
     })
-  return lines.length ? `Recent chat, oldest first:\n${lines.join('\n')}\n\n` : ''
+  return `${summary ? `Summary of the earlier chat:\n${summary}\n\n` : ''}${lines.length ? `Recent chat, oldest first:\n${lines.join('\n')}\n\n` : ''}`
 }
 
 function request(runtime: Runtime, message: UserMessage, history: ChatEntry[]): string {
