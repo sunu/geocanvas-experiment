@@ -11,6 +11,7 @@ import { isFocusable, objectUI } from '../canvas/registry'
 import { publishViewport } from '../canvas/viewport'
 import { BoardTitle } from '../chrome/TitleBar'
 import { switchLayout } from '../layout'
+import { WhatsNewButton } from '../whatsnew/WhatsNewButton'
 import { Palette } from '../palette/Palette'
 import { AskPage } from './AskPage'
 import { BoardCanvas } from './BoardCanvas'
@@ -175,6 +176,7 @@ export function MobileApp() {
         <Button variant="ghost" size="icon" title="Redo" aria-label="Redo" onClick={() => runtime.redo()}>
           <ArrowArcRightIcon className="size-5" />
         </Button>
+        <WhatsNewButton phone />
         <Button variant="ghost" size="icon" title="Open the full board" aria-label="Open the full board" onClick={() => switchLayout('desktop')}>
           <DesktopIcon className="size-5" />
         </Button>

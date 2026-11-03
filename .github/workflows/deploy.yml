@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Two weeks of commits for What's new.
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -27,6 +30,12 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # A model writes What's new from the last two weeks of commit subjects (apps/web/scripts/generate-news.ts). It
+      # never fails the deploy: without the key or an answer, the committed news.json is built.
+      - name: Generate What's new
+        run: npm run news -w apps/web
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       - name: Build web app
         run: npm run build -w apps/web
       - name: Deploy Worker
