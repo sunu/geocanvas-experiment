@@ -26,16 +26,25 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
   const selection = useOwnSelection(awareness)
   const [text, setText] = useState('')
   const [mode, setMode] = useState<AgentMode>(loadMode)
-  const [hasKey, setHasKey] = useState(() => keyIsUsable(loadKey()))
+  const [key, setKey] = useState(loadKey)
+  const hasKey = keyIsUsable(key)
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Collapsed: only the header. The draft, mode and key settings stay in this state.
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const ownWithoutKey = mode === 'own' && !hasKey
 
-  function chooseMode(next: AgentMode) {
+  function pickModel(next: AgentMode, config?: KeyConfig) {
+    if (config) {
+      saveKey(config)
+      setKey(loadKey())
+    }
     setMode(next)
     saveMode(next)
-    if (next === 'own' && !hasKey) setSettingsOpen(true)
+  }
+  function forget() {
+    forgetKey()
+    setKey(null)
+    pickModel('room')
   }
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -89,14 +98,10 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
           {settingsOpen && (
             <KeySettings
               onSave={(config) => {
-                saveKey(config)
-                setHasKey(keyIsUsable(config))
+                pickModel(mode, config)
                 setSettingsOpen(false)
               }}
-              onForget={() => {
-                forgetKey()
-                setHasKey(false)
-              }}
+              onForget={forget}
             />
           )}
           {(entries.length > 0 || thinking) && (
@@ -128,7 +133,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
           </div>
           <Separator />
           <footer className="shrink-0 rounded-b-xl bg-panel-footer px-3 py-1">
-            <ModelPicker />
+            <ModelPicker mode={mode} config={key} onUse={pickModel} onForget={forget} />
           </footer>
         </>
       )}

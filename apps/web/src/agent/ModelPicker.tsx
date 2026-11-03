@@ -1,42 +1,65 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CaretDownIcon, CheckIcon, CircleNotchIcon, EyeIcon, EyeSlashIcon, GlobeIcon, HardDriveIcon, HardDrivesIcon, KeyIcon, TerminalWindowIcon, type Icon } from '@phosphor-icons/react'
+import { OPENROUTER_URL } from '@ttx/plugins'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { DEFAULT_MODEL, keyIsUsable, listModels, LOCAL_SERVERS, type AgentMode, type KeyConfig, type LocalServer } from './keys'
 
 /**
  * Which model answers the agent: the flow of the Figma file's model screens (Model Menu, then Model Setup).
- * Only the interface is built. Nothing is saved, checked or downloaded yet: the Ollama check and the model
- * download are stand-ins that move through their states so that every screen can be seen, and the choice is
- * not yet what the chat's agent uses.
+ * The room's model, the person's own key (OpenRouter or any OpenAI-compatible API) and a local server are saved
+ * in this browser (keys.ts) and used by the chat. The small model in the browser is still a stand-in: its download
+ * only moves through its states, so that its screens can be seen.
  */
 
-type ModelId = 'backend' | 'key' | 'ollama' | 'browser'
+type ModelId = 'backend' | 'key' | 'local' | 'browser'
 
 const OPTIONS: { id: ModelId; title: string; hint: string; Icon: Icon }[] = [
   { id: 'backend', title: 'Model on backend', hint: 'Managed for you, no setup needed', Icon: HardDrivesIcon },
-  { id: 'key', title: 'Bring your own key', hint: 'Use your Claude, Gemini or OpenAI key', Icon: KeyIcon },
-  { id: 'ollama', title: 'Ollama (local)', hint: 'Runs on your machine at localhost', Icon: HardDriveIcon },
+  { id: 'key', title: 'Bring your own key', hint: 'OpenRouter or any OpenAI-compatible API', Icon: KeyIcon },
+  { id: 'local', title: 'Local model', hint: 'Ollama, LM Studio, llama.cpp or your own server', Icon: HardDriveIcon },
   { id: 'browser', title: 'Small model in browser', hint: 'Runs offline in your browser, private', Icon: GlobeIcon },
 ]
 
-const PROVIDERS = ['Claude', 'Gemini', 'OpenAI']
-const OLLAMA_MODELS = ['llama3.2:3b', 'qwen2.5:7b', 'mistral:7b']
+const PROVIDERS = [
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'openai-compatible', label: 'OpenAI-compatible' },
+]
+const SERVERS = Object.entries(LOCAL_SERVERS).map(([value, { label }]) => ({ value, label }))
 /** The download's size, for the progress; the figures are the Figma file's. */
 const DOWNLOAD_MB = 900
 
-/** The menu opens beside the Ask panel, to its right, so it never covers the panel or the title bar. */
-export function ModelPicker() {
+/** What the footer says: where the model runs, and which. */
+function describe(model: ModelId, config: KeyConfig | null): string {
+  if (model === 'key' && config) return `${config.provider === 'openrouter' ? 'OpenRouter' : 'Own key'} · ${config.model}`
+  if (model === 'local' && config) return `${LOCAL_SERVERS[config.server ?? 'custom'].label} · ${config.model}`
+  return OPTIONS.find((o) => o.id === model)!.title
+}
+
+/**
+ * The menu opens beside the Ask panel, to its right, so it never covers the panel or the title bar.
+ * `onUse` switches the agent (and saves `config`, when given); `onForget` removes the saved key.
+ */
+export function ModelPicker({
+  mode,
+  config,
+  onUse,
+  onForget,
+}: {
+  mode: AgentMode
+  config: KeyConfig | null
+  onUse(mode: AgentMode, config?: KeyConfig): void
+  onForget(): void
+}) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   /** The model in use. */
-  const [model, setModel] = useState<ModelId>('backend')
+  const model: ModelId = mode === 'room' ? 'backend' : config?.provider === 'local' ? 'local' : 'key'
   /** The model whose setup is open beside the menu. */
   const [setup, setSetup] = useState<ModelId | null>(null)
-  const [provider, setProvider] = useState(PROVIDERS[0]!)
-  const [ollamaModel, setOllamaModel] = useState(OLLAMA_MODELS[0]!)
   const current = OPTIONS.find((o) => o.id === model)!
 
   function close() {
@@ -61,29 +84,27 @@ export function ModelPicker() {
 
   function choose(id: ModelId) {
     if (id === 'backend') {
-      setModel(id)
+      onUse('room')
       close()
     } else setSetup(id)
   }
-  function use(id: ModelId) {
-    setModel(id)
+  function use(config: KeyConfig) {
+    onUse('own', config)
     close()
   }
-
-  const label = model === 'key' ? `Own key · ${provider}` : model === 'ollama' ? `Ollama · ${ollamaModel}` : current.title
 
   return (
     <div ref={root}>
       <Button
         variant="ghost"
-        className="h-auto gap-1 px-1.5 py-1 text-[11px] font-normal text-muted-foreground"
+        className="h-auto max-w-full gap-1 px-1.5 py-1 text-[11px] font-normal text-muted-foreground"
         title="Which model answers"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => (open ? close() : setOpen(true))}
       >
         <current.Icon className="size-3.5" />
-        <span className="mr-0.5">{label}</span>
+        <span className="mr-0.5 truncate">{describe(model, config)}</span>
         <CaretDownIcon className="size-2.5" />
       </Button>
       {/* Placed with CSS against the panel (the nearest positioned ancestor): beside it, bottom edges level. */}
@@ -125,9 +146,19 @@ export function ModelPicker() {
               </span>
             </div>
           </Card>
-          {setup === 'key' && <KeySetup provider={provider} onProvider={setProvider} onCancel={() => setSetup(null)} onSave={() => use('key')} />}
-          {setup === 'ollama' && <OllamaSetup model={ollamaModel} onModel={setOllamaModel} onCancel={() => setSetup(null)} onUse={() => use('ollama')} />}
-          {setup === 'browser' && <BrowserSetup onUse={() => use('browser')} />}
+          {setup === 'key' && (
+            <KeySetup
+              saved={config?.provider === 'local' ? null : config}
+              onCancel={() => setSetup(null)}
+              onSave={use}
+              onForget={() => {
+                onForget()
+                close()
+              }}
+            />
+          )}
+          {setup === 'local' && <LocalSetup saved={config?.provider === 'local' ? config : null} onCancel={() => setSetup(null)} onUse={use} />}
+          {setup === 'browser' && <BrowserSetup onUse={close} />}
         </div>
       )}
     </div>
@@ -166,7 +197,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** A Select styled as the Figma inputs: 8px radius, 14px medium text, a caret on the right. */
-function Choice({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
+function Choice({ value, options, onChange }: { value: string; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="h-auto w-full rounded-md py-1.5 text-sm font-medium">
@@ -174,14 +205,16 @@ function Choice({ value, options, onChange }: { value: string; options: string[]
       </SelectTrigger>
       <SelectContent>
         {options.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o}
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
           </SelectItem>
         ))}
       </SelectContent>
     </Select>
   )
 }
+
+const TEXT = 'h-auto rounded-md py-1.5 text-sm font-medium'
 
 /** The pill under a setup's fields: a dot or spinner, and what is happening. */
 function Status({ tone, children }: { tone: 'busy' | 'ok' | 'bad'; children: ReactNode }) {
@@ -197,9 +230,32 @@ function Status({ tone, children }: { tone: 'busy' | 'ok' | 'bad'; children: Rea
   )
 }
 
-function KeySetup({ provider, onProvider, onCancel, onSave }: { provider: string; onProvider: (p: string) => void; onCancel: () => void; onSave: () => void }) {
+/** An API key, hidden until shown. */
+function KeyInput({ value, onChange, placeholder }: { value: string; onChange: (key: string) => void; placeholder: string }) {
   const [shown, setShown] = useState(false)
-  const [apiKey, setApiKey] = useState('')
+  return (
+    <div className="relative">
+      <Input type={shown ? 'text' : 'password'} autoComplete="off" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={cn(TEXT, 'pr-9')} />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
+        aria-label={shown ? 'Hide key' : 'Show key'}
+        onClick={() => setShown((s) => !s)}
+      >
+        {shown ? <EyeSlashIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
+      </Button>
+    </div>
+  )
+}
+
+/** OpenRouter, or any OpenAI-compatible API at a base URL. `saved` is the key saved for either, if any. */
+function KeySetup({ saved, onCancel, onSave, onForget }: { saved: KeyConfig | null; onCancel: () => void; onSave: (config: KeyConfig) => void; onForget: () => void }) {
+  const [config, setConfig] = useState<KeyConfig>(() => saved ?? { provider: 'openrouter', url: OPENROUTER_URL, model: DEFAULT_MODEL, apiKey: '' })
+  const set = (fields: Partial<KeyConfig>) => setConfig((c) => ({ ...c, ...fields }))
+  const openRouter = config.provider === 'openrouter'
+  const valid = keyIsUsable(config)
   return (
     <Setup
       Icon={KeyIcon}
@@ -207,103 +263,137 @@ function KeySetup({ provider, onProvider, onCancel, onSave }: { provider: string
       description="Requests go straight from your browser to the provider."
       footer={
         <>
+          {saved ? (
+            <Button variant="ghost" size="sm" className="mr-auto" onClick={onForget}>
+              Forget key
+            </Button>
+          ) : null}
           <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={onSave}>Save key</Button>
+          <Button disabled={!valid} onClick={() => onSave({ ...config, url: config.url.trim(), model: config.model.trim(), apiKey: config.apiKey.trim() })}>
+            Save key
+          </Button>
         </>
       }
     >
       <Field label="Provider">
-        <Choice value={provider} options={PROVIDERS} onChange={onProvider} />
+        <Choice
+          value={config.provider}
+          options={PROVIDERS}
+          onChange={(p) => set(p === 'openrouter' ? { provider: 'openrouter', url: OPENROUTER_URL } : { provider: 'openai-compatible', url: config.url === OPENROUTER_URL ? '' : config.url })}
+        />
+      </Field>
+      {!openRouter && (
+        <Field label="Base URL">
+          <Input value={config.url} onChange={(e) => set({ url: e.target.value })} placeholder="https://api.openai.com/v1" className={TEXT} />
+        </Field>
+      )}
+      <Field label="Model">
+        <Input value={config.model} onChange={(e) => set({ model: e.target.value })} placeholder={openRouter ? DEFAULT_MODEL : 'gpt-4.1'} className={TEXT} />
       </Field>
       <Field label="API key">
-        <div className="relative">
-          <Input
-            type={shown ? 'text' : 'password'}
-            autoComplete="off"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-…"
-            className="h-auto rounded-md py-1.5 pr-9 text-sm font-medium"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
-            aria-label={shown ? 'Hide key' : 'Show key'}
-            onClick={() => setShown((s) => !s)}
-          >
-            {shown ? <EyeSlashIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
-          </Button>
-        </div>
+        <KeyInput value={config.apiKey} onChange={(apiKey) => set({ apiKey })} placeholder={openRouter ? 'sk-or-…' : 'sk-…'} />
       </Field>
-      <p className="text-xs/4 text-muted-foreground">Stored only in this browser. It is never sent to our servers.</p>
+      <p className="text-xs/4 text-muted-foreground">Stored only in this browser. It is sent only to {openRouter ? 'OpenRouter' : config.url.trim() || 'the URL above'}, never to our servers.</p>
     </Setup>
   )
 }
 
-type OllamaStatus = 'checking' | 'unreachable' | 'connected'
+type LocalStatus = 'idle' | 'checking' | 'unreachable' | 'connected'
 
-function OllamaSetup({ model, onModel, onCancel, onUse }: { model: string; onModel: (m: string) => void; onCancel: () => void; onUse: () => void }) {
-  const [url, setUrl] = useState('http://localhost:11434')
-  const [status, setStatus] = useState<OllamaStatus>('checking')
+/** A server on this machine: picks its default URL, checks that it answers, and lists its models. */
+function LocalSetup({ saved, onCancel, onUse }: { saved: KeyConfig | null; onCancel: () => void; onUse: (config: KeyConfig) => void }) {
+  const [server, setServer] = useState<LocalServer>(saved?.server ?? 'ollama')
+  const [url, setUrl] = useState(saved?.url ?? LOCAL_SERVERS.ollama.url)
+  const [apiKey, setApiKey] = useState(saved?.apiKey ?? '')
+  const [model, setModel] = useState(saved?.model ?? '')
+  const [models, setModels] = useState<string[]>([])
+  const [status, setStatus] = useState<LocalStatus>('idle')
   const [attempt, setAttempt] = useState(0)
-  // A stand-in for the check: the first try fails and the second works, to show both screens.
+  const { label, hint } = LOCAL_SERVERS[server]
+
+  // The check: the server's model list, a moment after the URL or key stops changing.
   useEffect(() => {
-    if (status !== 'checking') return
-    const t = setTimeout(() => setStatus(attempt === 0 ? 'unreachable' : 'connected'), 1200)
-    return () => clearTimeout(t)
-  }, [status, attempt])
+    if (!/^https?:\/\/\S/.test(url.trim())) return setStatus('idle')
+    setStatus('checking')
+    const abort = new AbortController()
+    const t = setTimeout(() => {
+      listModels(url.trim(), apiKey, abort.signal).then(
+        (ids) => {
+          setModels(ids)
+          setModel((m) => (ids.length && !ids.includes(m) ? ids[0]! : m))
+          setStatus('connected')
+        },
+        () => !abort.signal.aborted && setStatus('unreachable'),
+      )
+    }, 400)
+    return () => {
+      clearTimeout(t)
+      abort.abort()
+    }
+  }, [url, apiKey, attempt])
+
+  const config: KeyConfig = { provider: 'local', server, url: url.trim(), model: model.trim(), apiKey: apiKey.trim() }
   return (
     <Setup
       Icon={HardDriveIcon}
-      title="Ollama (local)"
+      title="Local model"
       description="Connect to a model running on your machine."
       footer={
-        status === 'checking' ? (
+        <>
           <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
           </Button>
-        ) : status === 'unreachable' ? (
-          <Button
-            variant="outline"
-            onClick={() => {
-              setAttempt((a) => a + 1)
-              setStatus('checking')
-            }}
-          >
-            Retry
-          </Button>
-        ) : (
-          <Button onClick={onUse}>Use this model</Button>
-        )
+          {status === 'unreachable' ? (
+            <Button variant="outline" onClick={() => setAttempt((a) => a + 1)}>
+              Retry
+            </Button>
+          ) : (
+            <Button disabled={status !== 'connected' || !keyIsUsable(config)} onClick={() => onUse(config)}>
+              Use this model
+            </Button>
+          )}
+        </>
       }
     >
-      <Field label="Server URL">
-        <Input
-          value={url}
-          onChange={(e) => {
-            setUrl(e.target.value)
-            setAttempt(0)
-            setStatus('checking')
+      <Field label="Server">
+        <Choice
+          value={server}
+          options={SERVERS}
+          onChange={(s) => {
+            const next = s as LocalServer
+            setServer(next)
+            if (next !== 'custom') setUrl(LOCAL_SERVERS[next].url)
           }}
-          className="h-auto rounded-md py-1.5 text-sm font-medium"
         />
       </Field>
+      <Field label="Server URL">
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://localhost:8000/v1" className={TEXT} />
+      </Field>
+      {server === 'custom' && (
+        <Field label="API key (optional)">
+          <KeyInput value={apiKey} onChange={setApiKey} placeholder="Not needed for most local servers" />
+        </Field>
+      )}
       {status === 'checking' && <Status tone="busy">Checking connection…</Status>}
       {status === 'unreachable' && (
         <>
-          <Status tone="bad">Can't reach Ollama</Status>
-          <p className="text-xs/4 text-muted-foreground">Start it with “ollama serve”, then allow this site with OLLAMA_ORIGINS.</p>
+          <Status tone="bad">Can't reach {label}</Status>
+          <p className="text-xs/4 text-muted-foreground">{hint}</p>
         </>
       )}
       {status === 'connected' && (
         <>
-          <Status tone="ok">Connected · Ollama 0.5.1</Status>
+          <Status tone="ok">
+            Connected · {models.length ? `${models.length} model${models.length === 1 ? '' : 's'}` : 'no models listed'}
+          </Status>
           <Field label="Model">
-            <Choice value={model} options={OLLAMA_MODELS} onChange={onModel} />
+            {models.length ? (
+              <Choice value={model} options={models.map((m) => ({ value: m, label: m }))} onChange={setModel} />
+            ) : (
+              <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model name" className={TEXT} />
+            )}
           </Field>
         </>
       )}
