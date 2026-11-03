@@ -45,7 +45,10 @@ export const conflict = defineTemplate({
 export const templatesPlugin = definePlugin({
   id: 'templates',
   title: 'Templates',
-  dependsOn: ['core', 'map', 'events', 'reliefweb', 'hapi', 'inputs', 'links'],
+  description: 'Ready-made sets of widgets, such as a situation report.',
+  optional: true,
+  // Each template needs the plugins of its own nodes (OpDef.adds), so turning off one of them leaves the others.
+  dependsOn: ['core', 'map', 'links'],
   ops: [sitrep, conflict],
 })
 

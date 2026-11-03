@@ -82,6 +82,8 @@ export function defineTemplate(def: TemplateDef): OpDef<any, Plan> {
       "Its objects follow the seed's root object: change the root later and they update. " +
       'Leave a seed out only when asked to: its root and the objects that follow it are then added empty, to fill in on the board.',
     target: { kind: 'canvas' },
+    // Not offered while a plugin of one of its nodes is turned off on the board.
+    adds: [...new Set(def.nodes.map((n) => ('root' in n ? def.seeds[n.root]!.kind.root({}).type : n.type)))],
     args: z.object({
       ...seeds,
       x: z.number().optional().meta({ advanced: true }).describe('Middle of the set, in canvas units. Default: right of everything on the board'),
