@@ -17,7 +17,10 @@ export function LocationPicker({ runtime, mapId }: { runtime: Runtime; mapId: st
   const [point, setPoint] = useState('')
   const [words, setWords] = useState('')
   const [asked, setAsked] = useState(false)
-  const canAsk = useAgentCanGeocode() && !usePluginsOff(runtime).has('agent')
+  // Both hooks run on every render: `&&` would skip the second while the first is still false.
+  const canGeocode = useAgentCanGeocode()
+  const agentOff = usePluginsOff(runtime).has('agent')
+  const canAsk = canGeocode && !agentOff
 
   // Leaving focus, or this map going away, ends a drawing in progress.
   useEffect(() => () => drawing?.(), [drawing])
