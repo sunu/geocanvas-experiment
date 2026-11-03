@@ -55,11 +55,21 @@ Decisions:
   built-in skills (read-only) and the board skills. A skill whose tools are not on this board says so. Select a skill
   to read it. Select a board skill to change or delete it in a form. "New skill" adds one.
 
+### My skills
+
+- A person can use a board skill on other boards. When a person saves a board skill, the browser also keeps it in
+  localStorage (`ttx/skills`, `apps/web/src/agent/mySkills.ts`), by name, at most 50. "Keep in my skills" keeps a
+  board skill that another person wrote.
+- The Skills tab shows My skills. "Add to board" saves a kept skill on the board with `agent.setSkill`. If the board
+  has a skill with the same name and other content, the button updates that skill. "Forget" removes a skill from
+  this browser only.
+- My skills stay in the browser. They go to a board only when a person adds them.
+
 ## Not in scope
 
 - Changes to built-in skills: edit, turn off, or replace by name.
 - Agents or MCP clients that write skills.
-- Skills for one person or for one deployment; import or export of `.md` files.
+- Skills for one deployment; import or export of `.md` files.
 - Skills for MCP clients. They have their own instructions.
 
 ## Verification
