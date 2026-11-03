@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Y from 'yjs'
 import { z } from 'zod'
-import { BoardTx, corePlugin, defineOp, definePlugin, exportTools, Registry, Runtime, summarizeBoard, type Actor, type OplogEntry, type ViewController } from '../src/index'
+import { BoardTx, corePlugin, Nav, defineOp, definePlugin, exportTools, Registry, Runtime, summarizeBoard, type Actor, type OplogEntry, type ViewController } from '../src/index'
 
 /** A plugin as an app would write one: its own object type and ops, through the same API as core. */
 const pinPlugin = definePlugin({
@@ -340,6 +340,18 @@ describe('tools', () => {
       properties: { ids: { type: 'array', minItems: 1 }, args: { properties: { color: { enum: expect.arrayContaining(['red']), widget: 'color' } } } },
     })
     for (const t of tools) expect(JSON.parse(JSON.stringify(t))).toEqual(t)
+  })
+
+  it("shows an object to the person an agent acts for, with no camera of its own", async () => {
+    const rt = runtime()
+    const pin = (await rt.callTool('pin__add', { args: { label: 'Clinic' } })).created![0]!
+    const nav = new Nav(rt.board.doc)
+    const asker: Actor = { kind: 'agent', id: 'helper', onBehalfOf: 'p1' }
+    expect(rt.availableOps({ kind: 'objects', ids: [pin] }).map((op) => op.id)).toContain('core.view.show')
+    expect(await rt.callTool('core__view__show', { ids: [pin], args: {} }, asker)).toMatchObject({ status: 'applied' })
+    expect(nav.get('p1')?.id).toBe(pin)
+    expect(nav.get('helper')).toBeUndefined()
+    expect(await rt.callTool('core__view__show', { ids: [pin], args: {} }, { kind: 'agent', id: 'helper' })).toMatchObject({ status: 'failed' })
   })
 
   it('lets an agent name the board, and gives the name first in the summary', async () => {

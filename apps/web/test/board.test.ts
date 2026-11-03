@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import { corePlugin, Runtime } from '@ttx/core'
 import { eventsPlugin, mapPlugin } from '@ttx/plugins'
-import { newRoomId, roomFromHash, roomHash } from '../src/board/room'
+import { newRoomId, objectFromHash, objectLink, roomFromHash, roomHash, withoutObject } from '../src/board/room'
 
 // The headless plugins of plugins.ts (that file also loads the React views).
 const runtime = (doc = new Y.Doc()) => new Runtime({ doc, plugins: [corePlugin, mapPlugin, eventsPlugin], actor: { kind: 'user', id: 'a' } })
@@ -65,5 +65,19 @@ describe('rooms', () => {
     const ids = new Set(Array.from({ length: 1000 }, newRoomId))
     expect(ids.size).toBe(1000)
     for (const id of ids) expect(roomFromHash(roomHash(id))).toBe(id)
+  })
+
+  it('links to one object of a board', () => {
+    const id = '0b6f1d2e-3c4a-4b5c-8d9e-0f1a2b3c4d5e'
+    const link = objectLink('abc', id, 'https://ttx.example/')
+    expect(link).toBe(`https://ttx.example/#room=abc&obj=${id}`)
+    const hash = new URL(link).hash
+    expect(roomFromHash(hash)).toBe('abc')
+    expect(objectFromHash(hash)).toBe(id)
+    expect(withoutObject(hash)).toBe('#room=abc')
+    expect(withoutObject('#room=abc&obj=x&mcp=8790:t')).toBe('#room=abc&mcp=8790:t')
+    expect(objectFromHash('#room=abc')).toBeUndefined()
+    expect(objectFromHash('#room=abc&obj=')).toBeUndefined()
+    expect(objectFromHash('#room=abc&nobj=x')).toBeUndefined()
   })
 })
