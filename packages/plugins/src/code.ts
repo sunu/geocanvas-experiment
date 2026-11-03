@@ -39,6 +39,7 @@ export const CODE_EXECUTE_TOOL = 'code.execute'
  */
 export const codeExecuteSpec = {
   id: CODE_EXECUTE_TOOL,
+  plugin: 'code',
   title: 'Run Python code',
   description:
     "Run Python code on the person's JupyterHub and get its output (features, a table, an image, text, a number) or its error, without changing the board. " +
@@ -189,6 +190,8 @@ const addArgs = z.object({
 export const codePlugin = definePlugin({
   id: 'code',
   title: 'Code',
+  description: "Python code cells, run on the person's own JupyterHub.",
+  optional: true,
   dependsOn: ['map', 'links'],
   objectTypes: [
     {

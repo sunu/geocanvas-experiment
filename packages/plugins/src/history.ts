@@ -46,6 +46,8 @@ const hazard = z
 export const historyPlugin = definePlugin({
   id: 'history',
   title: 'Disaster history',
+  description: "A country's disaster history from EM-DAT.",
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

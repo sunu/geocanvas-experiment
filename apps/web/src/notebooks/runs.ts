@@ -9,6 +9,7 @@ import type { NotebookFactory } from './api'
 export function notebookRunsTool(nbf: Pick<NotebookFactory, 'listRuns'>) {
   return defineTool({
     id: 'notebooks.runs',
+    plugin: 'notebooks',
     title: 'Search notebook runs',
     description:
       'Published Notebook Factory runs (e.g. risk exposure or impact estimation for an area), newest first, at most 20. ' +
