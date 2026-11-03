@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, WarningIcon } from '@phosphor-icons/react'
+import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, UserIcon, WarningIcon } from '@phosphor-icons/react'
 import { exchanges, failedCalls, lastCompaction, queuePosition, type Actor, type AgentReply, type Chat, type ChatEntry, type OplogEntry, type Runtime, type TurnUndo, type UserMessage } from '@ttx/core'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
@@ -10,7 +10,7 @@ import { AGENT } from '@ttx/plugins'
 import { agentKey, useAgentActivities, useOwnSelection, usePeers, type Awareness } from '../board/presence'
 import { objectName } from '../canvas/registry'
 import { TAB_ID } from './browserAgent'
-import { forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, saveCollapsed, saveKey, saveMode, type AgentMode, type KeyConfig } from './keys'
+import { forgetKey, keyIsUsable, loadCollapsed, loadKey, loadMode, loadOnlyMine, saveCollapsed, saveKey, saveMode, saveOnlyMine, type AgentMode, type KeyConfig } from './keys'
 
 /** A message for a browser agent with no reply after this long, and nobody thinking: its tab has closed. */
 const LOST_AFTER_MS = 120_000
@@ -71,6 +71,11 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
     }
   }
   const indicator = collapsed && (forMe.length > 0 || !!working[0])
+  const [onlyMine, setOnlyMine] = useState(loadOnlyMine)
+  function toggleMine() {
+    setOnlyMine(!onlyMine)
+    saveOnlyMine(!onlyMine)
+  }
 
   function send() {
     if (ownWithoutKey || !sendMessage(runtime, chat, text, selection, mode)) return
@@ -102,10 +107,23 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
             </span>
           </span>
         )}
+        {!collapsed && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={cn('ml-auto', onlyMine && 'bg-accent')}
+            title={onlyMine ? 'Show everyone’s requests' : 'Show only my requests'}
+            aria-label="Show only my requests"
+            aria-pressed={onlyMine}
+            onClick={toggleMine}
+          >
+            <UserIcon className="size-4" weight={onlyMine ? 'fill' : 'regular'} />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"
-          className={cn(!indicator && 'ml-auto')}
+          className={cn(collapsed && !indicator && 'ml-auto')}
           title={collapsed ? 'Open chat' : 'Collapse chat'}
           aria-label={collapsed ? 'Open chat' : 'Collapse chat'}
           aria-expanded={!collapsed}
@@ -118,7 +136,7 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
         <>
           {(entries.length > 0 || thinking) && (
             <div className="ttx-chat__list" ref={listRef}>
-              <ChatEntries runtime={runtime} thread={thread} />
+              <ChatEntries runtime={runtime} thread={thread} onlyOf={onlyMine ? runtime.actor.id : undefined} />
             </div>
           )}
           <div className="flex shrink-0 flex-col gap-3 px-4 pt-0 pb-4">
@@ -187,13 +205,17 @@ export function sendMessage(runtime: Runtime, chat: Chat, text: string, selectio
 
 /**
  * The thread's exchanges, each reply under the message it answers, and each unanswered message's place in its queue. The exchanges before
- * the last compaction are hidden until "Show earlier". With `onOpen`, each reply also lists the objects it added and
+ * the last compaction are hidden until "Show earlier". With `onlyOf`, only that person's. With `onOpen`, each reply also lists the objects it added and
  * changed, to open them: where the canvas is not there to show them (the phone's layout).
  */
-export function ChatEntries({ runtime, thread, onOpen }: { runtime: Runtime; thread: ChatThread; onOpen?(id: string): void }) {
+export function ChatEntries({ runtime, thread, onOpen, onlyOf }: { runtime: Runtime; thread: ChatThread; onOpen?(id: string): void; onlyOf?: string }) {
   const { entries, thinking, undone, pending, status } = thread
   const [showEarlier, setShowEarlier] = useState(false)
-  const all = useMemo(() => exchanges(entries), [entries])
+  // With `onlyOf`, that person's exchanges and the compactions.
+  const all = useMemo(
+    () => exchanges(entries).filter((x) => !onlyOf || x.reply?.compacted || x.message?.actor.id === onlyOf),
+    [entries, onlyOf],
+  )
   const compaction = lastCompaction(entries).reply
   const start = compaction ? all.findIndex((x) => x.reply === compaction) : 0
   const shown = showEarlier ? all : all.slice(start)
