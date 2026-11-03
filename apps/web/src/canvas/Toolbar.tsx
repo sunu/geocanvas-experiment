@@ -16,6 +16,7 @@ import {
   NoteIcon,
   SquareIcon,
   SquaresFourIcon,
+  TerminalWindowIcon,
   TextTIcon,
   UploadSimpleIcon,
   WarningIcon,
@@ -28,7 +29,7 @@ import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Hint } from '@/components/Hint'
 import { toolTypes } from './registry'
-import { CONFLICT_FACE, COUNTRY_FACE, IFRCGO_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
+import { CONFLICT_FACE, COUNTRY_FACE, HISTORY_FACE, IFRCGO_FACE, PRESENCE_FACE, RELIEFWEB_FACE } from './widgetFaces'
 
 /** 'select', or the object type to draw. */
 export type Tool = string
@@ -62,12 +63,14 @@ const EVENT_CONTEXT: Item[] = [
   { ...COUNTRY_FACE, tool: 'country' },
   { ...PRESENCE_FACE, tool: 'presence' },
   { ...CONFLICT_FACE, tool: 'conflict' },
+  { ...HISTORY_FACE, tool: 'history' },
   { ...RELIEFWEB_FACE, tool: 'reliefweb' },
   { ...IFRCGO_FACE, tool: 'ifrcgo' },
 ]
 const MAP_AND_REPORT: Item[] = [
   { label: 'Add map', text: 'Map', Icon: MapTrifoldIcon, tool: 'map', key: 'M' },
   { label: 'Add Jupyter notebook', text: 'Notebook', Icon: CodeIcon, tool: 'notebook', key: 'N' },
+  { label: 'Add Python code, run on your JupyterHub', text: 'Code', Icon: TerminalWindowIcon, tool: 'code', key: 'C' },
   { label: 'Add report', text: 'Report', Icon: FileTextIcon, tool: 'report', key: 'P' },
   { label: 'Add GitHub issue or pull request', text: 'GitHub', Icon: GithubLogoIcon, tool: 'github', key: 'G' },
 ]
@@ -95,6 +98,10 @@ interface Props {
   onUploads(): void
   /** The Templates button: the palette with templates only. */
   onTemplates(): void
+  /** False for a tool whose plugin is turned off on the board (board/plugins.ts). */
+  on(tool: Tool): boolean
+  /** False when every template needs a plugin that is off. */
+  templates: boolean
 }
 
 /** A category of the toolbar, named for screen readers: its buttons in a row. */
@@ -107,7 +114,7 @@ function Section({ name, children }: { name: string; children: ReactNode }) {
 }
 
 /** A tool's icon with its one-word name under it: a name you can read beats a tooltip you have to find. */
-function Face({ Icon, text }: { Icon: Icon; text: string }) {
+export function Face({ Icon, text }: { Icon: Icon; text: string }) {
   return (
     <>
       <Icon className="size-5" />
@@ -117,9 +124,9 @@ function Face({ Icon, text }: { Icon: Icon; text: string }) {
 }
 
 /** The look of the toolbar: rounded, bordered, a small shadow. */
-const PANEL = 'rounded-lg border bg-card p-1.5 shadow-[0_2px_2px_rgb(0_0_0/0.1),0_4px_3px_rgb(0_0_0/0.1)]'
+export const PANEL = 'rounded-lg border bg-card p-1.5 shadow-[0_2px_2px_rgb(0_0_0/0.1),0_4px_3px_rgb(0_0_0/0.1)]'
 
-const BTN = 'h-12 min-w-12 flex-col gap-0.5 rounded-md px-1.5 has-[>svg]:px-1.5'
+export const BTN = 'h-12 min-w-12 flex-col gap-0.5 rounded-md px-1.5 has-[>svg]:px-1.5'
 
 interface GroupProps {
   /** The tooltip of the arrow that opens the list. */
@@ -181,7 +188,7 @@ function ToolGroup({ name, items, tool, onTool }: GroupProps) {
  * weight and a one-word name under each, the selected tool filled, each with a tooltip for its key. Arrange, delete and the command palette have no
  * button here: they are on the keys (], [, Delete, ⌘K).
  */
-export function Toolbar({ tool, onTool, onFiles, onUploads, onTemplates }: Props) {
+export function Toolbar({ tool, onTool, onFiles, onUploads, onTemplates, on, templates }: Props) {
   const pdfInput = useRef<HTMLInputElement>(null)
   const separator = <Separator orientation="vertical" className="data-[orientation=vertical]:h-8" />
   const button = ({ label, text, Icon, tool: type, key }: Item) => (
@@ -204,14 +211,14 @@ export function Toolbar({ tool, onTool, onFiles, onUploads, onTemplates }: Props
         {separator}
         <Section name="Explore">
           {/* An action, not a tool: it opens the palette's list of templates. */}
-          <Hint label="Insert a template, e.g. a situation report">
-            <Button variant="ghost" size="sm" className={BTN} aria-label="Insert a template" onClick={onTemplates}>
-              <Face Icon={SquaresFourIcon} text="Templates" />
-            </Button>
-          </Hint>
-          {button(EVENT)}
-          {EVENT_CONTEXT.map(button)}
-          {MAP_AND_REPORT.map(button)}
+          {templates && (
+            <Hint label="Insert a template, e.g. a situation report">
+              <Button variant="ghost" size="sm" className={BTN} aria-label="Insert a template" onClick={onTemplates}>
+                <Face Icon={SquaresFourIcon} text="Templates" />
+              </Button>
+            </Hint>
+          )}
+          {[EVENT, ...EVENT_CONTEXT, ...MAP_AND_REPORT].filter((i) => on(i.tool)).map(button)}
         </Section>
         {separator}
         <Section name="Board">
@@ -229,16 +236,20 @@ export function Toolbar({ tool, onTool, onFiles, onUploads, onTemplates }: Props
               </DropdownMenuTrigger>
             </Hint>
             <DropdownMenuContent align="center" side="top" sideOffset={8}>
-              <DropdownMenuItem onSelect={() => onTool(IMAGE.tool)}>
-                <IMAGE.Icon />
-                Image
-                <DropdownMenuShortcut>{IMAGE.key}</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => pdfInput.current?.click()}>
-                <FilePdfIcon />
-                PDF
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {on(IMAGE.tool) && (
+                <DropdownMenuItem onSelect={() => onTool(IMAGE.tool)}>
+                  <IMAGE.Icon />
+                  Image
+                  <DropdownMenuShortcut>{IMAGE.key}</DropdownMenuShortcut>
+                </DropdownMenuItem>
+              )}
+              {on('pdf') && (
+                <DropdownMenuItem onSelect={() => pdfInput.current?.click()}>
+                  <FilePdfIcon />
+                  PDF
+                </DropdownMenuItem>
+              )}
+              {(on(IMAGE.tool) || on('pdf')) && <DropdownMenuSeparator />}
               <DropdownMenuItem title="Files uploaded to this board, to put back or share" onSelect={onUploads}>
                 <FolderOpenIcon />
                 See previous uploads

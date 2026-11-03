@@ -7,6 +7,7 @@ import {
   CopyIcon,
   FileTextIcon,
   LinkBreakIcon,
+  LinkSimpleIcon,
   TrashIcon,
 } from '@phosphor-icons/react'
 import type { Runtime, TargetRef } from '@ttx/core'
@@ -21,6 +22,9 @@ import {
   ContextMenuSubTrigger,
 } from '@/components/ui/context-menu'
 import type { Board } from '../board/board'
+import { CodeMenu } from '../code/CodeMenu'
+import { usePluginsOff } from '../board/plugins'
+import { objectLink, roomFromHash } from '../board/room'
 import { addToReport, boardReports } from '../reports/reports'
 
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
@@ -48,9 +52,9 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
   const available = new Set(runtime.availableOps(target).map((op) => op.id))
   const unlink = available.has('link.remove')
   const refresh = available.has('link.refresh')
-  // Reports (agent-docs/tasks/reports.md §4): not for a selection of reports only.
+  // Reports (agent-docs/tasks/reports.md §4): not for a selection of reports only, nor when reports are turned off.
   const board = runtime.board as Board
-  const canReport = ids.some((id) => board.get(id)?.type !== 'report')
+  const canReport = !usePluginsOff(runtime).has('reports') && ids.some((id) => board.get(id)?.type !== 'report')
   const reports = canReport ? boardReports(board, ids) : []
   const report = async (reportId?: string) => {
     const r = await addToReport(runtime, ids, reportId)
@@ -58,6 +62,15 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
     // A new report: select it, so it is easy to find.
     if (!reportId && r.created?.length) onSelect(r.created)
   }
+  // A link that opens the board on this one object, in the middle of the view.
+  const room = ids.length === 1 ? roomFromHash(location.hash) : undefined
+  const copyLink = (room: string) =>
+    navigator.clipboard.writeText(objectLink(room, ids[0]!)).then(
+      () => notify('Link copied: it opens the board on this object'),
+      () => notify('Could not copy the link'),
+    )
+  // A code cell's own entries (plan-022): Run, and Show output on.
+  const cell = ids.length === 1 && board.get(ids[0]!)?.type === 'code' ? board.get(ids[0]!) : undefined
   const layer = (label: string, Icon: typeof ArrowUpIcon, opId: string, keys: string) => (
     <ContextMenuItem onSelect={() => run(opId)}>
       <Icon />
@@ -67,6 +80,12 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
   )
   return (
     <ContextMenuContent className="w-52">
+      {cell?.type === 'code' && (
+        <>
+          <CodeMenu runtime={runtime} cell={cell} notify={notify} onSelect={onSelect} />
+          <ContextMenuSeparator />
+        </>
+      )}
       <ContextMenuItem
         onSelect={() => {
           const created = run('core.object.duplicate').created
@@ -76,6 +95,12 @@ export function ObjectMenu({ runtime, ids, onSelect, notify }: Props) {
         <CopyIcon />
         Duplicate
       </ContextMenuItem>
+      {room && (
+        <ContextMenuItem onSelect={() => void copyLink(room)}>
+          <LinkSimpleIcon />
+          Copy link
+        </ContextMenuItem>
+      )}
       {canReport &&
         (reports.length ? (
           <ContextMenuSub>

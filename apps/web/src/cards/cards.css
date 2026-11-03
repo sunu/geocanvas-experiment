@@ -1,0 +1,70 @@
+/* --- Cards made from a pasted link (GitHub, IFRC GO): the frame, text, form and notes they share ---------- */
+
+.ttx-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--ttx-panel);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
+  font-size: 12px;
+}
+
+.ttx-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.ttx-card__note {
+  color: var(--ttx-muted);
+}
+
+.ttx-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ttx-card__form input {
+  padding: 6px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.ttx-card__error {
+  color: var(--ttx-bad);
+}
+
+.ttx-card__title {
+  color: var(--ttx-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ttx-card__title:hover {
+  color: var(--ttx-accent);
+  text-decoration: underline;
+}
+
+.ttx-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-card__summary {
+  color: var(--ttx-ink);
+  opacity: 0.85;
+}

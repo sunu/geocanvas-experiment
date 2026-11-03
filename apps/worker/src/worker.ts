@@ -11,9 +11,30 @@ import { floodmapsProxy } from './floodmaps'
 import { notebooksProxy } from './notebooks'
 import { reliefwebUpdates } from './reliefweb'
 import { json, serveUpload, storeUpload } from './uploads'
+import { passwordGate } from './password'
 import { uploadUrl, Uploads } from '@ttx/core'
-import type { Runtime } from '@ttx/core'
-import { Agent, AGENT, eventsGet, eventsSearch, forRoom, geocodeTools, OpenCageGeocoder, OPENCAGE_URL, openeoCollections, openeoCoverage, openeoPreview, openRouter, TURNS_PER_HOUR } from '@ttx/plugins'
+import type { Runtime, UserMessage } from '@ttx/core'
+import {
+  Agent,
+  AGENT,
+  codeExecuteSpec,
+  decodeRelay,
+  eventsGet,
+  eventsSearch,
+  forRoom,
+  geocodeTools,
+  OpenCageGeocoder,
+  OPENCAGE_URL,
+  openeoCollections,
+  openeoCoverage,
+  openeoPreview,
+  openRouter,
+  RELAY_MESSAGE,
+  RelayCalls,
+  relayedTool,
+  TURNS_PER_HOUR,
+  type RelayReply,
+} from '@ttx/plugins'
 import { MontyClient } from '@ttx/plugins/monty/client'
 import { UpdateLog } from './updateLog'
 import { OpenEOServiceManager } from './openeo'
@@ -21,7 +42,8 @@ import { OpenEOClient, type OpenEOCredentials } from './openeoClient'
 import { previewOpenEOAnalysis } from './openeoPreview'
 
 /**
- * Multiplayer on Cloudflare. The Worker serves the web app (static assets) and routes
+ * Multiplayer on Cloudflare. Every request first passes the deployment's shared password, when
+ * SITE_PASSWORD is set (password.ts: POST /__login sets its cookie). The Worker serves the web app (static assets) and routes
  * /connect/<room> to that room's Durable Object, which speaks the standard y-websocket
  * protocol (sync + awareness), so the browser uses y-websocket's WebsocketProvider.
  * /monty/search proxies Montandon STAC searches with the token added (monty.ts),
@@ -62,6 +84,8 @@ export class Room extends DurableObject<Env> {
   private runtime?: Runtime
   private openeo?: OpenEOClient
   private previewRunning = false
+  /** Tool calls the room's agent sent to a tab and waits for (plans/plan-023.md). */
+  private relay = new RelayCalls()
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -107,6 +131,9 @@ export class Room extends DurableObject<Env> {
       complete: env.OPENROUTER_API_KEY ? openRouter(env.OPENROUTER_API_KEY, env.AGENT_MODEL) : undefined,
       accepts: forRoom,
       turnsPerHour: TURNS_PER_HOUR,
+      // Running code needs the asker's own JupyterHub login, which only their tab has: the turn gets code.execute
+      // when the asker has a tab that can run it, and each call goes to that tab.
+      toolsFor: (message) => this.tabTools(message),
       tools: [
         ...(env.OPENCAGE_API_KEY ? geocodeTools(new OpenCageGeocoder({ url: OPENCAGE_URL, key: env.OPENCAGE_API_KEY })) : []),
         ...(env.MONTANDON_TOKEN ? montyTools(new MontyClient(stacSearch({ baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN }))) : []),
@@ -126,6 +153,29 @@ export class Room extends DurableObject<Env> {
     })
     this.runtime = agent.runtime
     new OpenEOServiceManager(agent.runtime, openeo, (work) => ctx.waitUntil(work)).start()
+  }
+
+  /** The asker's tab's tools for one turn: code.execute, relayed, when one of their tabs has a hub login. */
+  private tabTools(message: UserMessage) {
+    const socket = this.hubSocket(message.actor.id)
+    if (!socket) return []
+    const send = (bytes: Uint8Array) => {
+      if (socket.readyState !== WebSocket.OPEN) throw new Error('closed')
+      socket.send(bytes)
+    }
+    return [relayedTool(codeExecuteSpec, (input, signal) => this.relay.call(send, { messageId: message.id, tool: codeExecuteSpec.id, input }, signal))]
+  }
+
+  /** A socket of this person whose tab says it can run code (presence `hub`), the latest one when several. */
+  private hubSocket(person: string): WebSocket | undefined {
+    const states = this.awareness.getStates()
+    return this.ctx
+      .getWebSockets()
+      .filter((socket) => presenceIds(socket).some((id) => {
+        const state = states.get(id) as { user?: { id?: string }; hub?: boolean } | undefined
+        return state?.user?.id === person && state.hub === true
+      }))
+      .at(-1)
   }
 
   private compact() {
@@ -199,6 +249,10 @@ export class Room extends DurableObject<Env> {
       if (encoding.length(encoder) > 1) socket.send(encoding.toUint8Array(encoder))
     } else if (type === MESSAGE_AWARENESS) {
       awarenessProtocol.applyAwarenessUpdate(this.awareness, decoding.readVarUint8Array(decoder), socket)
+    } else if (type === RELAY_MESSAGE) {
+      // A tab's answer to a tool call of the room's agent.
+      const reply = decodeRelay<RelayReply>(data.subarray(decoder.pos))
+      if (typeof reply?.id === 'string') this.relay.settle(reply)
     }
   }
 
@@ -246,6 +300,8 @@ function awarenessMessage(update: Uint8Array): Uint8Array {
 
 export default {
   async fetch(request, env) {
+    const denied = await passwordGate(request, (env as Env & { SITE_PASSWORD?: string }).SITE_PASSWORD)
+    if (denied) return denied
     const path = new URL(request.url).pathname
     if (path === '/monty/search') return montySearch(request, { baseUrl: env.MONTANDON_BASE_URL, token: env.MONTANDON_TOKEN })
     if (path === '/tools/geocode') return geocode(request, env.OPENCAGE_API_KEY)
@@ -269,7 +325,8 @@ export default {
     }
     if (path.startsWith('/uploads/')) return serveUpload(request, env.UPLOADS)
     const roomId = /^\/connect\/([\w-]{1,64})$/.exec(path)?.[1]
-    if (!roomId) return new Response('Not found', { status: 404 })
+    // The Worker runs first for every path (wrangler.jsonc), so it serves the web app itself.
+    if (!roomId) return env.ASSETS.fetch(request)
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a websocket', { status: 426 })
     return env.ROOMS.get(env.ROOMS.idFromName(roomId)).fetch(request)
   },

@@ -3,7 +3,7 @@ import { contains, defineOp, definePlugin, framedBy, readingOrder, UPLOAD_ID, ty
 
 /**
  * Reports (agent-docs/tasks/reports.md): a document made from the board. A report is an object on the canvas
- * with a page size and an ordered list of blocks: headings, rich text, images, dividers, and items that show an
+ * with a page size and an ordered list of blocks: headings, rich text, images, dividers, page breaks, and items that show an
  * object of the board, live or frozen. No React here: the widget and report mode are in apps/web/src/reports/.
  *
  * An item keeps its source's id (`sourceId`) and only reads the source; adding it never changes the source, and
@@ -47,6 +47,7 @@ const content = [
   z.object({ kind: z.literal('text'), doc: richDoc }),
   z.object({ kind: z.literal('image'), imageId }),
   z.object({ kind: z.literal('divider') }),
+  z.object({ kind: z.literal('pageBreak') }),
   z.object({
     kind: z.literal('item'),
     sourceId: z.string().min(1).describe('The object of the board it shows'),
@@ -69,6 +70,8 @@ export type Block =
   | { id: string; span: 1 | 2; kind: 'text'; doc: RichDoc }
   | { id: string; span: 1 | 2; kind: 'image'; imageId: string }
   | { id: string; span: 1 | 2; kind: 'divider' }
+  /** What follows starts a new page. */
+  | { id: string; span: 1 | 2; kind: 'pageBreak' }
   | { id: string; span: 1 | 2; kind: 'item'; sourceId: string; mode: 'live' | 'frozen'; frozen?: Frozen }
 export type RichDoc = z.infer<typeof richDoc>
 export type ReportBoardObject = AnyObject & { type: 'report'; paper: Paper; orientation: Orientation; blocks: Block[]; titleFrom?: string }
@@ -93,15 +96,18 @@ export function docText(doc: RichDoc): string {
   const walk = (n: unknown): string => {
     if (!n || typeof n !== 'object') return ''
     const node = n as { text?: unknown; content?: unknown[] }
-    return typeof node.text === 'string' ? node.text : (node.content ?? []).map(walk).join(node.content?.length ? ' ' : '')
+    if (typeof node.text === 'string') return node.text
+    // Marked text is several text nodes in one line ("a **b** c"): joined as they are; blocks are apart.
+    const inline = (node.content ?? []).every((c) => typeof (c as { text?: unknown })?.text === 'string')
+    return (node.content ?? []).map(walk).join(inline ? '' : ' ')
   }
   return walk(doc).replace(/\s+/g, ' ').trim()
 }
 
-/** Headings, dividers, frames (they show as a heading) and maps take the full width; the rest one column. */
+/** Headings, dividers, page breaks, frames (they show as a heading) and maps take the full width; the rest one column. */
 const FULL_WIDTH_SOURCES = new Set(['frame', 'map'])
 const spanFor = (kind: Block['kind'], sourceType?: string): 1 | 2 =>
-  kind === 'heading' || kind === 'divider' || (kind === 'item' && FULL_WIDTH_SOURCES.has(sourceType ?? '')) ? 2 : 1
+  kind === 'heading' || kind === 'divider' || kind === 'pageBreak' || (kind === 'item' && FULL_WIDTH_SOURCES.has(sourceType ?? '')) ? 2 : 1
 
 const newId = () => crypto.randomUUID().slice(0, 8)
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
@@ -174,6 +180,8 @@ function describeBlock(b: Block): string {
       return `${b.id} image ${b.imageId}${width}`
     case 'divider':
       return `${b.id} divider`
+    case 'pageBreak':
+      return `${b.id} page break`
     case 'item':
       return `${b.id} item: object ${b.sourceId}, ${b.mode}${b.mode === 'frozen' && !b.frozen ? ' (no copy yet)' : ''}${width}`
   }
@@ -185,11 +193,14 @@ const newBlock = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('text'), text: z.string().optional().describe('Plain text; blank lines separate paragraphs'), doc: richDoc.optional() }),
   z.object({ kind: z.literal('image'), imageId }),
   z.object({ kind: z.literal('divider') }),
+  z.object({ kind: z.literal('pageBreak').describe('What follows starts a new page') }),
 ])
 
 export const reportsPlugin = definePlugin({
   id: 'reports',
   title: 'Reports',
+  description: 'Reports to write, print and save as PDF.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {
@@ -239,13 +250,15 @@ export const reportsPlugin = definePlugin({
       target: { kind: 'objects', min: 1 },
       args: z.object({
         reportId: z.string().min(1).optional().meta({ widget: 'report' }).describe('The report to add them to. Leave it out for a new report'),
+        // Report mode's toolbar adds after the selected block; forms do not ask (`advanced`).
+        index: z.number().int().optional().meta({ advanced: true }).describe('Where in the report. Default: at the end'),
       }),
       // With one report on the board, that one; otherwise a new report unless someone picks one.
       defaults: (ctx) => {
         const reports = ctx.board.list().filter((o) => o.type === 'report')
         return reports.length === 1 ? { reportId: reports[0]!.id } : {}
       },
-      prepare(ctx, { reportId }) {
+      prepare(ctx, { reportId, index }) {
         const report = reportId ? reportOf(ctx, reportId) : undefined
         const blocks = report?.blocks ?? []
         const already = new Set(blocks.flatMap((b) => (b.kind === 'item' ? [b.sourceId] : [])))
@@ -267,7 +280,7 @@ export const reportsPlugin = definePlugin({
                 y: Math.round(Math.min(...selected.map((o) => o.y))),
                 ...ctx.registry.objectType('report')!.defaultSize,
               },
-          blocks: [...blocks, ...added],
+          blocks: insertAt(blocks, added, index),
           ...(whole && { titleFrom: first!.id }),
           count: added.length,
           name: report ? report.name || 'the report' : 'a new report',
@@ -282,7 +295,7 @@ export const reportsPlugin = definePlugin({
     defineOp({
       id: 'report.addBlock',
       title: 'Add to report page',
-      description: 'Add a heading, text, an image or a divider to the selected report.',
+      description: 'Add a heading, text, an image, a divider or a page break to the selected report.',
       target: oneReport,
       args: z.object({ block: newBlock.describe('What to add'), index: z.number().int().optional().describe('Where. Default: at the end') }),
       prepare(ctx, { block: b, index }) {

@@ -44,8 +44,9 @@ export function Peers({ peers, camera, byId, agentTouched }: { peers: Peer[]; ca
 function Cursor({ at, name, color, agent, opacity, doing }: { at: Point; name: string; color: string; agent: boolean; opacity?: number; doing?: string }) {
   return (
     <div className={`ttx-cursor ${agent ? 'ttx-cursor--agent' : ''}`} style={{ transform: `translate(${at.x}px, ${at.y}px)`, opacity }}>
-      <svg width="16" height="20" viewBox="0 0 16 20" aria-hidden>
-        <path d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z" fill={color} stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
+      {/* The Figma file's pointer (Collaborator Cursor), cropped to its shape and filled with the owner's color. */}
+      <svg width="22" height="23" viewBox="14.5 4.5 22 23" aria-hidden>
+        <path d="M15.75 5.75002L35.75 14.0227L25.6855 16.8227L22.3307 26.75L15.75 5.75002Z" fill={color} stroke="#fafafa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       <span className="ttx-cursor__name" style={{ background: color, color: agent ? '#fafafa' : onColor(color), fontWeight: agent ? 500 : 600 }}>
         {agent && <SparkleIcon size={10} weight="fill" />}

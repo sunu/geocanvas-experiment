@@ -1,6 +1,6 @@
 # Plan 010 — Bring your own agent to the local canvas through MCP
 
-Date: 2026-10-28. Status: delivery steps 1–3 implemented on `feat/local-mcp` (section 11); steps 4–5 not started.
+Date: 2026-10-28. Status: delivery steps 1–3 built, in `main` (PR #42, section 11); steps 4–5 (runner handoff, inactivity batches) not started.
 
 ## 1. Outcome
 

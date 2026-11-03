@@ -14,7 +14,7 @@ import {
   type TurnUndo,
   type ViewController,
 } from '@ttx/core'
-import { areaOfView, callOp, MAP_HEADER_PX, TurnLog } from '@ttx/plugins'
+import { areaOfView, callOp, MAP_HEADER_PX, readToolsOn, TurnLog } from '@ttx/plugins'
 
 /**
  * What an external agent (Claude, Codex) does on this tab's board, through the local MCP companion (apps/mcp,
@@ -78,16 +78,21 @@ export class Executor {
     opts.doc.on('update', () => this.revision++)
   }
 
-  /** Every op an agent may run (not hidden, not only for people) and every read-only tool. */
+  /** Every op an agent may run (not hidden, not only for people, with the tools it needs, not of a plugin turned off) and every read-only tool. */
   manifest(): Manifest {
-    const ops = this.runtime.registry.ops().filter((op) => !op.hidden && op.risk !== 'high')
-    const reads = exportToolDefs(this.tools.list()).map((t) => ({ ...t, annotations: { readOnlyHint: true as const } }))
+    const disabled = this.runtime.disabledPlugins()
+    if (disabled.has('mcp')) return { fingerprint: hash(stableJson([])), tools: [] }
+    const ops = this.runtime.registry
+      .ops()
+      .filter((op) => !op.hidden && op.risk !== 'high' && (op.tools ?? []).every((id) => this.tools.tool(id)) && this.runtime.registry.opEnabled(op, disabled))
+    const reads = exportToolDefs(readToolsOn(this.runtime, this.tools)).map((t) => ({ ...t, annotations: { readOnlyHint: true as const } }))
     const tools = [...exportTools(ops), ...reads]
     return { fingerprint: hash(stableJson(tools)), tools }
   }
 
   /** The board as data: objects with all their stored fields, the person's selection, view and map views. */
   snapshot({ ids, limit = SNAPSHOT_LIMIT }: { ids?: string[]; limit?: number } = {}) {
+    this.checkOn()
     const all = this.runtime.board.list()
     const wanted = ids ? all.filter((o) => ids.includes(o.id)) : all
     const objects = wanted.slice(0, limit)
@@ -116,7 +121,8 @@ export class Executor {
 
   /** Run one tool of the manifest by name: a read-only tool, or an op as the agent for this tab's person. */
   async call(name: string, input: unknown, client?: string) {
-    const read = this.tools.list().find((t) => toolNameOf(t.id) === name)
+    this.checkOn()
+    const read = readToolsOn(this.runtime, this.tools).find((t) => toolNameOf(t.id) === name)
     if (read) return bounded(await this.tools.run(read.id, input))
     this.runtime.view = this.opts.view()
     const recent = this.lastAdd && Date.now() - this.lastAdd.at < NEXT_TO_MS ? this.runtime.board.get(this.lastAdd.id) : undefined
@@ -136,11 +142,20 @@ export class Executor {
 
   /** Undo the agent's last change in this tab. Refused, and kept, when someone has changed its objects since. */
   async undo(client?: string) {
+    this.checkOn()
     const undo = this.undos.at(-1)
     if (!undo) return { status: 'failed', error: 'Nothing to undo: no change by an external agent since this tab loaded.' }
     const record = await this.runtime.invoke('agent.revert', { kind: 'canvas' }, undo, { actor: this.actor(client) })
     if (record.status === 'applied') this.undos.pop()
     return { status: record.status, ...(record.error && { error: record.error }), revision: this.revision }
+  }
+
+  /**
+   * Throws while external agents are turned off on the board (the mcp plugin, in Settings). The companion has the
+   * manifest from when it connected, so each request checks again.
+   */
+  private checkOn() {
+    if (this.runtime.disabledPlugins().has('mcp')) throw new Error(MCP_OFF)
   }
 
   private actor(client: string | undefined): Actor {
@@ -167,6 +182,8 @@ export function bounded(out: unknown): unknown {
   }
   return { truncated: true, chars: json.length, preview: json.slice(0, MAX_RESULT_CHARS) }
 }
+
+export const MCP_OFF = 'External agents are turned off on this board (Settings).'
 
 /** FNV-1a, as hex: tells manifests apart, not a secret. */
 function hash(s: string): string {

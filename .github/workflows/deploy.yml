@@ -40,6 +40,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENCAGE_API_KEY: ${{ secrets.OPENCAGE_API_KEY }}
           HAPI_APP_IDENTIFIER: ${{ secrets.HAPI_APP_IDENTIFIER }}
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
         # An explicit bash runs with pipefail (the default shell does not), so a failed deploy fails this
         # step even though its output goes through tee.
         shell: bash
@@ -48,9 +49,9 @@ jobs:
           # Secrets belong to one Worker, and each branch is its own Worker, so upload the API keys with
           # every deploy. A key the repository does not have is left out: without MONTANDON_TOKEN,
           # OPENCAGE_API_KEY or HAPI_APP_IDENTIFIER its route answers with a 503; without OPENROUTER_API_KEY the board agent
-          # answers that it is not configured.
+          # answers that it is not configured; without SITE_PASSWORD the deployment needs no password.
           secrets=()
-          (umask 077 && jq -n '{MONTANDON_TOKEN: env.MONTANDON_TOKEN, OPENROUTER_API_KEY: env.OPENROUTER_API_KEY, OPENCAGE_API_KEY: env.OPENCAGE_API_KEY, HAPI_APP_IDENTIFIER: env.HAPI_APP_IDENTIFIER}
+          (umask 077 && jq -n '{MONTANDON_TOKEN: env.MONTANDON_TOKEN, OPENROUTER_API_KEY: env.OPENROUTER_API_KEY, OPENCAGE_API_KEY: env.OPENCAGE_API_KEY, HAPI_APP_IDENTIFIER: env.HAPI_APP_IDENTIFIER, SITE_PASSWORD: env.SITE_PASSWORD}
             | with_entries(select(.value != null and .value != ""))' > "$RUNNER_TEMP/secrets.json")
           if [ "$(jq length "$RUNNER_TEMP/secrets.json")" -gt 0 ]; then
             secrets=(--secrets-file "$RUNNER_TEMP/secrets.json")

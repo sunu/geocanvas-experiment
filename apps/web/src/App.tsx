@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useConnectionStatus } from './board/connect'
+import { useConnectionStatus, whenSynced } from './board/connect'
+import { usePluginsOff } from './board/plugins'
 import { chat, provider, room, runtime, uploads } from './board/session'
 import { Canvas } from './canvas/Canvas'
 import { ChatPanel } from './agent/ChatPanel'
@@ -25,15 +26,19 @@ void startBridge(
   { room, person: runtime.actor },
 )
 
+const synced = new Promise<void>((resolve) => whenSynced(provider, resolve))
+
 export function App() {
   const status = useConnectionStatus(provider)
   const bridge = useBridgeStatus()
   const [uploadsOpen, setUploadsOpen] = useState(false)
+  // The chat is the agent's: none while the agent is turned off on the board.
+  const agentOn = !usePluginsOff(runtime).has('agent')
   return (
     <>
-      <Canvas runtime={runtime} chat={chat} awareness={provider.awareness} onUploads={() => setUploadsOpen(true)} />
+      <Canvas runtime={runtime} chat={chat} awareness={provider.awareness} synced={synced} onUploads={() => setUploadsOpen(true)} />
       <TitleBar runtime={runtime} />
-      <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} />
+      {agentOn && <ChatPanel runtime={runtime} chat={chat} awareness={provider.awareness} />}
       {/* The open gallery takes the user menu's corner and has its own close button. */}
       {uploadsOpen ? (
         <UploadsPanel runtime={runtime} uploads={uploads} onClose={() => setUploadsOpen(false)} />

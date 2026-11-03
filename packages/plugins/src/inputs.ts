@@ -26,6 +26,8 @@ export type InputBoardObject = AnyObject & { type: 'input'; kind: (typeof INPUT_
 export const inputsPlugin = definePlugin({
   id: 'inputs',
   title: 'Inputs',
+  description: 'Areas of interest that other widgets follow.',
+  optional: true,
   dependsOn: ['core'],
   objectTypes: [
     {

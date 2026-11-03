@@ -6,7 +6,7 @@ affected areas that are ticked and the closed areas), the same buildings (Overtu
 same OpenStreetMap health facilities and schools, now with a depth and a damage estimate each. Fully in the browser,
 apart from a Worker proxy for the depth maps.
 
-Status: built on `feat/inundation`, on top of `feat/flood-exposure`.
+Status: built, in `main` (PR #79). Not done: applying GloFAS's `Spurious_Depths` mask.
 
 ## Depth: GloFAS return-period maps, not the event
 

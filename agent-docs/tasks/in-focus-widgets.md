@@ -1,6 +1,6 @@
 # Task: in-focus mode widgets
 
-Date: 2026-10-28. Status: planned, not started. Scope from `agent-docs/features.md` and `agent-docs/architect.md`.
+Date: 2026-10-28. Status: milestones 1 and 2 built (focus mode on the Map, Notebook, PDF and Report; the Map's steps 3–7), and uploads for map layers from step 12; milestone 3 (Table) and steps 11 and 13–16 not started. Scope from `agent-docs/features.md` and `agent-docs/architect.md`.
 
 ## 1. Requirements
 
@@ -166,13 +166,13 @@ Milestone 1 adds no dependencies and no new object type. It is also where the ha
 
 ### Milestone 1: Map with in-focus mode
 
-1. **Draft doc** in `packages/core`: fork, forward, merge, `hasUnshared`, `applyDraft`. No UI. Node tests:
+1. **Draft doc** (built) in `packages/core`: fork, forward, merge, `hasUnshared`, `applyDraft`. No UI. Node tests:
    - edits in the draft do not reach main; main edits reach the draft
    - each merge is one undo step; a second share sends only the newer changes
    - the draft's op log entries arrive, and map views written in the draft arrive with the share
    - `hasUnshared` is false after a share and after only remote changes
    - deleting the object during a draft
-2. **Focus mode, with the Map as the first `FocusableObjectUI`:**
+2. **Focus mode, with the Map as the first `FocusableObjectUI`** (built):
    - Everything in §5.
    - Split `MapObject`'s effect (§5.4).
    - The Map's `Options` takes today's header controls: place search and pin, layers and "Add layer", basemap. The compact header keeps the title and the ⤢ button.
@@ -191,14 +191,14 @@ Milestone 1 adds no dependencies and no new object type. It is also where the ha
 
 Each of these is an Options panel tool, written through map ops, so the agent can use them too. New map fields are optional (AGENTS.md).
 
-3. **Location selection when a map is added:**
+3. **Location selection when a map is added** (built; a typed bbox was dropped in PR #70 in favor of drawing one):
    - Draw an area on a minimap, type lat/lon, or type a bbox. Each moves everyone's view through `map.showArea`.
    - "Describe it in words" goes to the agent when it is configured (it geocodes, then runs `map.showArea`), and is hidden otherwise.
-4. **Data from a URL, and a legend:**
+4. **Data from a URL, and a legend** (built: the legend is in the layer list; a legend on the map itself is a PRD to-do):
    - A layer from a URL: GeoJSON, GeoParquet (hyparquet, already used), COG (the existing raster path), XYZ raster tiles, shapefile (`shpjs`).
    - Each is a tool recipe like today's layers, e.g. `{ tool: 'data.fromUrl', input: { url, format } }`.
    - The layer list shows a legend for each layer: color for features, the color ramp and range for rasters.
-5. **Attributes, filters and legend formatting:**
+5. **Attributes, filters and legend formatting** (built):
    - The attribute panel lists a layer's properties.
    - Each layer gets an optional `filter` (property, operator, value) and `style` (color, by-property coloring, opacity).
    - Ops `map.setLayerFilter`, `map.setLayerStyle`.
@@ -210,7 +210,7 @@ Each of these is an Options panel tool, written through map ops, so the agent ca
    - Shapes are a deck.gl layer above the data layers, so they are in snapshots too; arrowheads are triangles on the map, a quarter of the arrow long. Sticky notes are DOM markers on a live map, and are not in snapshots.
    - Removing: the Options panel's "Notes and drawings" lists every note and shape, each with ×; ⌘Z undoes one in focus; Discard on leaving focus drops the unshared ones.
    - Not built: a label on a shape, selecting a shape on the map to move or delete it, and stroke widths.
-7. **Snapshots and the live-map cap:**
+7. **Snapshots and the live-map cap** (built: 4 live maps):
    - A map that is zoomed out on the canvas, too small, off screen, or beyond the cap shows a snapshot image; a focused map is always live.
    - One shared hidden renderer makes the snapshots (`plans/plan-005.md` §2.4 on `experiment`).
    - Check: 12 maps on a board use at most (cap × 2) + 1 WebGL contexts, and canvas FPS stays at 30 or more.
@@ -235,10 +235,10 @@ Each of these is an Options panel tool, written through map ops, so the agent ca
 ### Then
 
 11. **Dark mode:** `--ttx-*` tokens for `prefers-color-scheme`, plus an app setting. Until then, new CSS uses only the `--ttx-*` tokens, so this step changes the tokens and nothing else.
-12. **Uploads** for Map layers and Tables, once R2 is decided (§8). Local development is described in §8.
+12. **Uploads** for Map layers (built: GeoJSON, GeoParquet and zipped shapefiles on R2) and Tables (with the Table).
 13. **Table, more sources:** STAC, and xlsx (SheetJS only if DuckDB-wasm cannot read it).
 14. **Chart.**
-15. **Notebook.**
+15. **Notebook:** any `.ipynb` from an upload or URL, rendered with its outputs, never executed (the published Notebook Factory run is built).
 16. *(Stretch)* **Input** widget.
 
 Each step: `npm test`, `npm run typecheck`, and a browser check from two browsers.
@@ -258,27 +258,21 @@ Made (2026-10-28):
 
    Their size and loading belong in each step's PR.
 5. **Map first** (2026-10-28): the Map is the first in-focus widget and is finished before the Table.
+6. **A type can be live in focus** (2026-10-29): focus stays private by default, but a type may set `live` (`FocusableObjectUI`) to edit the board directly, with no draft, Share or exit dialog, and `keepChat` to keep the agent chat open on the left. Reports are both, so the agent and people work on the same report (`agent-docs/tasks/reports.md` §5).
 
 Open:
-6. **Upload storage: R2** (in progress), not the room's Durable Object storage.
+7. **Upload storage: R2** (built: `apps/worker/src/uploads.ts`, binding `UPLOADS`, a bucket per Worker), not the room's Durable Object storage.
    - Durable Object SQLite caps a row at 2 MB, so files would be split across rows.
    - It has no range reads; DuckDB-wasm and GeoParquet reads rely on them.
    - Every read would wake the room and bill Durable Object time.
    - R2 stores files whole, answers `Range` requests, and does not wake the room.
 
-   Still to decide: the bucket names, and limits on file size and on the number of files per room.
+   Decided: a bucket per Worker (`<worker>-uploads`), and size limits by kind (`MAX_UPLOAD_BYTES`). Still to decide: a limit on the number of files per room.
 
 **Local development of uploads, with no R2 account needed:**
 - `npm run sync` runs `wrangler dev`, which stands in for an R2 binding with a local bucket (Miniflare). It supports `put`, `get` with `range`, `head` and `delete`.
 - Files are kept in `apps/worker/.wrangler/state/v3/r2/`, beside the rooms' state. Delete the folder to start clean.
 - Nothing reaches Cloudflare unless the binding sets `"remote": true` or `wrangler dev --remote` is used; do neither.
-- Wiring the upload step needs:
-  - `"r2_buckets": [{ "binding": "FILES", "bucket_name": "<name>" }]` in `wrangler.jsonc`; the real bucket has to exist only for deploys
-  - `/files/*` in `run_worker_first`, and in the Vite dev proxy beside `/connect`, `/monty` and `/tools`
-- Tests:
-  - Key checks, size limits and `Range` parsing are pure functions, tested with vitest.
-  - The route itself is checked against `wrangler dev`.
-  - `@cloudflare/vitest-pool-workers` is not needed.
-- **Branch previews share one bucket**, but deleting a branch deletes only its Worker and rooms (`delete-branch-worker.yml`). Choose one of these, so files from deleted branches do not stay:
-  - prefix keys with the Worker's name and have that workflow delete the prefix, or
-  - use a separate preview bucket with an expiry rule.
+- As built: the `UPLOADS` binding has no `bucket_name`, so `wrangler deploy` makes a bucket per Worker; `/uploads` goes through the room's Durable Object, and `GET /uploads/<id>` is served by the Worker (AGENTS.md, Uploads).
+- Tests: type sniffing and size limits are pure functions, tested with vitest; the route is checked against `wrangler dev`.
+- **Not done: cleanup of deleted branches' buckets.** Deleting a branch deletes its Worker and rooms (`delete-branch-worker.yml`) but not its bucket. Either have that workflow delete the bucket too, or give preview buckets an expiry rule.

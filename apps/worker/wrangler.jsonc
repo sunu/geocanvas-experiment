@@ -5,11 +5,13 @@
   "compatibility_date": "2026-10-20",
   // The agent's skills are Markdown files, imported as text (packages/plugins/src/skills/).
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
-  // The built web app. API paths and /connect/* run the Worker; other requests are served from these assets.
+  // The built web app. The Worker runs first for every request, so the password (SITE_PASSWORD, src/password.ts)
+  // covers the pages too; paths it does not handle are served from these assets through the binding.
   "assets": {
     "directory": "../web/dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/connect/*", "/agent/*", "/monty/*", "/tools/*", "/notebooks/*", "/reliefweb/*", "/floodmaps/*", "/hapi/*", "/openeo/*", "/uploads", "/uploads/*"]
+    "run_worker_first": true
   },
   // Montandon STAC API, the database agent-docs/features.md scopes us to, and Notebook Factory (published
   // notebook runs; read anonymously). API keys are secrets: apps/worker/.dev.vars locally, `wrangler secret`
@@ -28,6 +30,9 @@
   },
   // OPENROUTER_API_KEY: without it, the agent answers that it is not configured. HAPI_APP_IDENTIFIER is
   // base64("app name:email") for HDX HAPI; not a key, but it carries the email (apps/worker/src/hapi.ts).
+  // SITE_PASSWORD (src/password.ts) is an optional secret, listed in neither place: without it, nothing is checked.
+  // A var of the same name would make every deploy after the first warn that it replaces the secret. Locally,
+  // pass it with `npm run dev -w apps/worker -- --var SITE_PASSWORD:<password>`, since .dev.vars entries not listed here are dropped.
   "secrets": { "required": ["MONTANDON_TOKEN", "OPENROUTER_API_KEY", "OPENCAGE_API_KEY", "HAPI_APP_IDENTIFIER"] },
   // One Durable Object per board (room), with its own SQLite storage.
   "durable_objects": {

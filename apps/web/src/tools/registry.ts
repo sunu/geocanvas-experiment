@@ -1,3 +1,4 @@
+import { codeExecuteTool } from '../code/execute'
 import { adminBoundariesTool, WorldBankBoundaries } from '../data/boundaries'
 import { OvertureParquet, overtureTool } from '../data/buildings'
 import { uploadFeaturesTool, UrlFeatures, urlFeaturesTool, urlRasterTool, urlTilesTool } from '../data/fromUrl'
@@ -6,7 +7,8 @@ import { healthFacilitiesTool, LayercakeHealth } from '../data/health'
 import { populationTool, SourceCoopPopulation } from '../data/population'
 import { eventFootprintTool } from '../events/footprint'
 import { ExposureWorker, exposureTool } from '../exposure/exposure'
-import { monty } from '../events/monty'
+import { monty, postSearch } from '../events/monty'
+import { desinventarTool } from '../history/desinventar'
 import { choroplethTool } from '../hapi/choropleth'
 import { boundariesTool } from '../map/adminAreas'
 import { notebookFactory } from '../notebooks/api'
@@ -34,6 +36,7 @@ export const tools = new ToolRunner([
   notebookArtifactTool(notebookFactory),
   notebookRunsTool(notebookFactory),
   eventFootprintTool(monty),
+  desinventarTool(postSearch),
   forecastTool(gfs),
   eventsSearch(monty),
   eventsGet(monty),
@@ -44,4 +47,5 @@ export const tools = new ToolRunner([
   openeoCoverage(),
   routeTool(routing),
   exposureTool(new ExposureWorker(), layercake),
+  codeExecuteTool,
 ])

@@ -1,0 +1,95 @@
+/* --- GitHub issue or pull request card: state, labels, checks, linked pull requests ---------------------- */
+
+.ttx-github__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ttx-github__state {
+  padding: 1px 6px;
+  border-radius: 0;
+  background: var(--ttx-neutral);
+  color: var(--ttx-on-status);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ttx-github__state.is-open {
+  background: var(--ttx-ok);
+}
+
+.ttx-github__state.is-merged {
+  background: var(--ttx-merged);
+}
+
+.ttx-github__state.is-closed {
+  background: var(--ttx-bad);
+}
+
+.ttx-github__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ttx-github__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--ttx-border);
+  font-size: 11px;
+}
+
+.ttx-github__label i {
+  width: 8px;
+  height: 8px;
+}
+
+.ttx-github__pull {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ttx-muted);
+  font-size: 11px;
+}
+
+.ttx-github__checks {
+  font-weight: 600;
+}
+
+.ttx-github__checks.is-passing {
+  color: var(--ttx-ok);
+}
+
+.ttx-github__checks.is-failing {
+  color: var(--ttx-bad);
+}
+
+.ttx-github__linked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ttx-border);
+}
+
+.ttx-github__linked a {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--ttx-ink);
+  text-decoration: none;
+}
+
+.ttx-github__linked a:hover .ttx-github__linkedtitle {
+  color: var(--ttx-accent);
+  text-decoration: underline;
+}
+
+.ttx-github__linkedtitle em {
+  color: var(--ttx-muted);
+  font-style: normal;
+}

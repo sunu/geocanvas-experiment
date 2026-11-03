@@ -1,0 +1,26 @@
+/*
+ * Shared values for the app's own CSS (styles/index.css). New rules use these, not literal colors, so dark mode (PRD
+ * step 11) can be a change of tokens only. shadcn's tokens for the chrome are in shadcn.css.
+ */
+:root {
+  --ttx-bg: #f7f7f8;
+  --ttx-grid: #d4d4d8;
+  --ttx-ink: #18181b;
+  --ttx-muted: #71717a;
+  --ttx-panel: #ffffff;
+  --ttx-border: rgb(0 0 0 / 0.12);
+  --ttx-accent: #2563eb;
+  /* A frame's fill: light, so what it holds stands out. */
+  --ttx-frame-fill: rgb(255 255 255 / 0.6);
+  /* Status chips (cards made from a pasted link): the state is always written out; the color only adds to it. */
+  --ttx-ok: #1a7f37;
+  --ttx-bad: #cf222e;
+  --ttx-merged: #8250df;
+  --ttx-neutral: #6e7781;
+  --ttx-warn: #9a6700;
+  --ttx-alert: #bc4c00;
+  --ttx-on-status: #fff;
+  --ttx-font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--ttx-font);
+  color: var(--ttx-ink);
+}

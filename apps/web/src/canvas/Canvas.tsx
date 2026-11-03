@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type * as Y from 'yjs'
-import { Draft, type Chat, type ChatEntry, type Runtime, type TargetRef } from '@ttx/core'
+import { Draft, Nav, type Chat, type ChatEntry, type Runtime, type TargetRef } from '@ttx/core'
 import type { ReportBoardObject } from '@ttx/plugins'
 import type { Board, BoardObject } from '../board/board'
 import { useObjects } from '../board/connect'
+import { templatesOn, typeOn, usePluginsOff } from '../board/plugins'
+import { objectFromHash, withoutObject } from '../board/room'
 import { cursorSender, publishSelection, useAgentActivities, usePeers, type Awareness } from '../board/presence'
 import { Palette } from '../palette/Palette'
 import { bounds, fitRect, intersects, rectFrom, toScreen, toWorld, zoomAt, withFramed, type Camera, type Rect } from './camera'
@@ -71,7 +73,12 @@ interface Focus {
   id: string
   /** The camera to go back to. */
   saved: Camera
-  draft: Draft
+  /** This person's private copy of the board; none for a live type (a report), which edits the board itself. */
+  draft: Draft | null
+  /** The type keeps the agent chat open on the left (canvas/registry.ts FocusableObjectUI). */
+  keepChat: boolean
+  /** The type fills the screen to its edges (canvas/registry.ts FocusableObjectUI). */
+  fullScreen: boolean
   /** The screen area the object fills. */
   area: Rect
   /** The object's local rectangle once the zoom-in ends; null while it animates. */
@@ -109,9 +116,17 @@ function trackDrag(
  * The canvas. It reads the board and writes only by dispatching ops on the runtime: one gesture
  * (a press, a key, a button) is one runtime.beginGesture(), so one undo step.
  */
-export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runtime; chat: Chat; awareness: Awareness; onUploads(): void }) {
+export function Canvas({ runtime, chat, awareness, synced, onUploads }: {
+  runtime: Runtime
+  chat: Chat
+  awareness: Awareness
+  /** Resolves once the room's doc has synced, so a linked object is on the board. */
+  synced: Promise<void>
+  onUploads(): void
+}) {
   const board = runtime.board as Board
   const objects = useObjects(board)
+  const pluginsOff = usePluginsOff(runtime)
   const peers = usePeers(awareness)
   const agentTouched = useAgentTouched(runtime)
   const me = (awareness.getLocalState() as { user?: { id?: string } } | null)?.user?.id
@@ -146,9 +161,11 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   const stopAnimation = useRef<() => void>(undefined)
 
   // The focused object as the draft has it: this person's changes, and everyone else's as they arrive.
-  const draftBoard = focus?.draft.runtime.board as Board | undefined
+  const draftBoard = focus?.draft?.runtime.board as Board | undefined
   const draftObjects = useSyncExternalStore(draftBoard?.subscribe ?? noSubscribe, draftBoard?.snapshot ?? noObjects)
-  const focused = focus ? draftObjects.find((o) => o.id === focus.id) : undefined
+  const focused = focus ? (focus.draft ? draftObjects : objects).find((o) => o.id === focus.id) : undefined
+  /** What focus edits: the draft, or the board itself for a live type. */
+  const focusRuntime = focus?.draft?.runtime ?? runtime
   const focusedUI = focused && objectUI(focused.type)
 
   // Someone else may delete what we have selected or are editing.
@@ -431,15 +448,17 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     const onKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
       if (focus) {
-        // In focus only Esc (leave) and undo, on the draft. The exit dialog handles its own Esc. An Esc that closed
-        // something else first (a select or menu in the Options panel: Radix prevents its default) does not leave.
+        // In focus only Esc (leave) and undo, on what focus edits. The exit dialog handles its own Esc. An Esc that
+        // closed something else first (a select or menu in the Options panel: Radix prevents its default), or that was
+        // typed in a field (the chat a report keeps open, a name in the Options), does not leave.
+        const typing = !!(e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')
         if (e.key === 'Escape') {
-          if (!e.defaultPrevented) requestExit()
+          if (!e.defaultPrevented && !typing) requestExit()
         }
-        else if (mod && e.key.toLowerCase() === 'z' && !(e.target as HTMLElement).closest?.('textarea, input, select, [contenteditable="true"]')) {
+        else if (mod && e.key.toLowerCase() === 'z' && !typing) {
           e.preventDefault()
-          if (e.shiftKey) focus.draft.runtime.redo()
-          else focus.draft.runtime.undo()
+          if (e.shiftKey) focusRuntime.redo()
+          else focusRuntime.undo()
         }
         return
       }
@@ -487,7 +506,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
         // ⇧ with a key picks the tool listed as '⇧<key>' (the arrow is ⇧L), else the plain one.
         const k = e.key.toUpperCase()
         const t = (e.shiftKey && tools().find((t) => t.key === `⇧${k}`)) || tools().find((t) => t.key.toUpperCase() === k)
-        if (t) setTool(t.tool)
+        if (t && typeOn(runtime, runtime.disabledPlugins(), t.tool)) setTool(t.tool)
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
@@ -532,18 +551,21 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     stopAnimation.current = animateCamera(from, { x: el.clientWidth / 2 - p.x * from.z, y: el.clientHeight / 2 - p.y * from.z, z: from.z }, setCamera)
   }
 
-  /** Open an object in focus mode: zoom until it fills the screen, then lay it out at that size, on a draft. */
+  /** Open an object in focus mode: zoom until it fills the screen, then lay it out at that size, on a draft unless its type is live. */
   function enterFocus(id: string) {
     if (focusRef.current) return
     const o = board.get(id)
-    if (!o || !isFocusable(objectUI(o.type))) throw new Error(`${o ? runtime.registry.objectType(o.type)?.title : 'This object'} has no focus mode`)
+    const ui = o && objectUI(o.type)
+    if (!o || !isFocusable(ui)) throw new Error(`${o ? runtime.registry.objectType(o.type)?.title : 'This object'} has no focus mode`)
     const el = rootRef.current!
-    const area = focusArea(el.clientWidth, el.clientHeight)
+    const keepChat = !!ui.keepChat
+    const fullScreen = !!ui.fullScreen
+    const area = focusArea(el.clientWidth, el.clientHeight, { full: fullScreen })
     const saved = cameraRef.current
     setEditing(null)
     setPaletteOpen(false)
     setSelection(new Set([id]))
-    setFocus({ id, saved, draft: new Draft(runtime), area, rect: null })
+    setFocus({ id, saved, draft: ui.live ? null : new Draft(runtime), keepChat, fullScreen, area, rect: null })
     stopAnimation.current?.()
     stopAnimation.current = animateCamera(saved, fillCamera(o, area), setCamera, () => {
       const layout = focusedLayout(o, area)
@@ -568,6 +590,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
 
   /** Send the draft's changes to everyone; the type may add its own first (a map shares its view). */
   function share(f: Focus) {
+    if (!f.draft) return
     const o = f.draft.runtime.board.get(f.id) as BoardObject | undefined
     const ui = o && objectUI(o.type)
     if (o && isFocusable(ui)) ui.beforeShare?.(f.draft.runtime, o)
@@ -578,12 +601,12 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
   function requestExit() {
     const f = focusRef.current
     if (!f) return
-    if (f.draft.hasUnshared()) setAsking(true)
+    if (f.draft?.hasUnshared()) setAsking(true)
     else leaveFocus(false)
   }
 
-  /** Leave focus, sharing the draft's changes or dropping them, and zoom back out to where this person was. */
-  function leaveFocus(shareChanges: boolean) {
+  /** Leave focus, sharing the draft's changes or dropping them, and zoom back out to where this person was; then `then`. */
+  function leaveFocus(shareChanges: boolean, then?: () => void) {
     const f = focusRef.current
     if (!f) return
     if (shareChanges) share(f)
@@ -591,16 +614,72 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     setAsking(false)
     setFocus(null)
     const o = board.get(f.id)
-    if (!o) return setCamera(f.saved)
+    if (!o) {
+      setCamera(f.saved)
+      return then?.()
+    }
     const from = fillCamera(o, f.area)
     setCamera(from)
-    stopAnimation.current = animateCamera(from, f.saved, setCamera)
+    stopAnimation.current = animateCamera(from, f.saved, setCamera, then)
   }
+
+  /** From focus, show another object on the canvas: leave focus, select it, and zoom to it (a report item's source). */
+  function goTo(id: string) {
+    leaveFocus(false, () => {
+      if (!board.get(id)) return
+      setSelection(new Set([id]))
+      runtime.view?.zoomTo([id])
+    })
+  }
+
+  /** Show one object in the middle of the view, selected (a board link's object). */
+  function show(id: string) {
+    const f = focusRef.current
+    if (f?.draft?.hasUnshared()) return setNotice('Share or discard your changes in focus to see the linked object.')
+    if (!board.get(id)) return setNotice('The linked object is no longer on the board.')
+    if (f) return goTo(id)
+    setSelection(new Set([id]))
+    runtime.view?.zoomTo([id])
+  }
+  const showRef = useRef(show)
+  showRef.current = show
+
+  // A link to an object (#room=<id>&obj=<object id>): show it once the board has synced, and again for each link
+  // pasted into this tab. The object is then taken out of the URL, so the same link pasted again shows it again.
+  useEffect(() => {
+    let live = true
+    const onHash = () => {
+      const id = objectFromHash(location.hash)
+      if (!id || !live) return
+      history.replaceState(null, '', withoutObject(location.hash))
+      showRef.current(id)
+    }
+    void synced.then(onHash)
+    window.addEventListener('hashchange', onHash)
+    return () => {
+      live = false
+      window.removeEventListener('hashchange', onHash)
+    }
+  }, [synced])
+
+  // An agent asked to show this person an object (core.view.show). Listened to from the sync on, so the request
+  // the doc already had is not shown again on load. Not by time: the Worker's clock and this browser's differ.
+  useEffect(() => {
+    let stop: (() => void) | undefined
+    let live = true
+    void synced.then(() => {
+      if (live) stop = new Nav(board.doc).subscribe(runtime.actor.id, (r) => showRef.current(r.id))
+    })
+    return () => {
+      live = false
+      stop?.()
+    }
+  }, [board, runtime, synced])
 
   // The draft lives as long as its focus. Closed after the object's view has let go of it.
   useEffect(() => {
-    if (!focus) return
-    const draft = focus.draft
+    const draft = focus?.draft
+    if (!draft) return
     return () => draft.close()
   }, [focus?.draft])
 
@@ -624,7 +703,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
       const el = rootRef.current
       const f = focusRef.current
       if (!el || !f?.rect) return
-      const area = focusArea(el.clientWidth, el.clientHeight)
+      const area = focusArea(el.clientWidth, el.clientHeight, { full: f.fullScreen })
       const layout = focusedLayout(f.rect, area)
       setFocus({ ...f, area, rect: layout.rect })
       setCamera(layout.camera)
@@ -674,7 +753,9 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
     <div
       ref={rootRef}
       onContextMenuCapture={onContextMenuCapture}
-      className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''}`}
+      className={`ttx-canvas ${spaceHeld || tool === 'hand' ? 'is-panning' : ''} ${tool !== 'select' && tool !== 'hand' ? 'is-drawing' : ''} ${focus ? 'is-focus' : ''} ${focus?.keepChat ? 'keeps-chat' : ''}`}
+      // The type in focus, for its own look of the whole view (canvas/focus.css: report mode has no dotted canvas).
+      data-focus={focused?.type}
       style={{ backgroundSize: `${grid}px ${grid}px`, backgroundPosition: `${camera.x}px ${camera.y}px`, '--ttx-dots': dots, '--ttx-dot-r': dotRadius } as CSSProperties}
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
@@ -690,7 +771,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
             // Same key and place as when not focused, so the view is not remounted (a map keeps its WebGL contexts).
             <ObjectView
               key={o.id}
-              runtime={focus.draft.runtime}
+              runtime={focusRuntime}
               object={focused ?? o}
               layer={objects.length}
               editing
@@ -751,12 +832,15 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
 
       {focus && focused && isFocusable(focusedUI) && (
         <OptionsPanel
-          draft={focus.draft}
+          runtime={focusRuntime}
+          draft={focus.draft ?? undefined}
           object={focused}
           ui={focusedUI}
-          title={runtime.registry.objectType(focused.type)?.title ?? focused.type}
+          // The object's own title: its name, else what its type's panel calls it (a report's frame title), else its type.
+          title={focused.name || focusedUI.panel?.(focused, board).title || (runtime.registry.objectType(focused.type)?.title ?? focused.type)}
           onShare={() => share(focus)}
           onExit={requestExit}
+          onGoTo={goTo}
         />
       )}
       {asking && <ExitDialog onShare={() => leaveFocus(true)} onDiscard={() => leaveFocus(false)} onStay={() => setAsking(false)} />}
@@ -772,7 +856,7 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
           runtime={runtime}
           chat={chat}
           object={single}
-          info={objectUI(single.type)!.panel!(single)}
+          info={objectUI(single.type)!.panel!(single, board)}
           onOpen={isFocusable(objectUI(single.type)) ? () => enterFocus(single.id) : undefined}
           onSelect={(ids) => setSelection(new Set(ids))}
           notify={setNotice}
@@ -787,6 +871,8 @@ export function Canvas({ runtime, chat, awareness, onUploads }: { runtime: Runti
         onFiles={(files) => placeFiles(runtime, files, viewCenter())}
         onUploads={onUploads}
         onTemplates={() => setPaletteOpen('templates')}
+        on={(t) => typeOn(runtime, pluginsOff, t)}
+        templates={templatesOn(runtime, pluginsOff)}
       />}
 
       {paletteOpen && (

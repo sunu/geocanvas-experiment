@@ -4,6 +4,7 @@ import { Draft, type InvocationRecord, type TargetRef } from '@ttx/core'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useConnectionStatus, useObjects } from '../board/connect'
+import { usePluginsOff } from '../board/plugins'
 import { publishSelection, useOwnSelection } from '../board/presence'
 import { board, chat, provider, runtime } from '../board/session'
 import { isFocusable, objectUI } from '../canvas/registry'
@@ -52,7 +53,10 @@ export function MobileApp() {
   const objects = useObjects(board)
   const selection = useOwnSelection(awareness)
   const status = useConnectionStatus(provider)
-  const [tab, setTab] = useState<Tab>('ask')
+  const [chosenTab, setTab] = useState<Tab>('ask')
+  // Ask is the agent's chat: none while the agent is turned off on the board, so the board shows instead.
+  const agentOn = !usePluginsOff(runtime).has('agent')
+  const tab = chosenTab === 'ask' && !agentOn ? 'board' : chosenTab
   const [sheet, setSheet] = useState<{ id: string; editing: boolean; draft?: Draft } | null>(null)
   const [palette, setPalette] = useState(false)
   /** Shows an object on the Board tab: the list scrolls to it, the canvas fits it. None: the whole board. */
@@ -200,7 +204,7 @@ export function MobileApp() {
       </main>
 
       <nav className="ttx-m__tabs flex border-t bg-card" aria-label="Views">
-        <TabButton active={tab === 'ask'} onClick={() => setTab('ask')} icon={<SparkleIcon className="size-5" />} label="Ask" />
+        {agentOn && <TabButton active={tab === 'ask'} onClick={() => setTab('ask')} icon={<SparkleIcon className="size-5" />} label="Ask" />}
         <TabButton active={tab === 'board'} onClick={() => setTab('board')} icon={<SquaresFourIcon className="size-5" />} label={`Board · ${objects.length}`} />
         <TabButton active={tab === 'reports'} onClick={() => setTab('reports')} icon={<FileTextIcon className="size-5" />} label="Reports" />
       </nav>
@@ -214,10 +218,14 @@ export function MobileApp() {
           onEditing={(editing) => setSheet({ ...sheet, editing })}
           back={back}
           onClose={closeSheet}
-          onAsk={() => {
-            closeSheet()
-            setTab('ask')
-          }}
+          onAsk={
+            agentOn
+              ? () => {
+                  closeSheet()
+                  setTab('ask')
+                }
+              : undefined
+          }
           onMore={() => setPalette(true)}
         />
       )}

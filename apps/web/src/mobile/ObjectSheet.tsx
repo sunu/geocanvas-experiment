@@ -24,8 +24,8 @@ interface Props {
   /** Set here: what the browser's back does, after it took away the full screen's history entry. */
   back: MutableRefObject<(() => void) | undefined>
   onClose(): void
-  /** Ask the agent about it: it is the selection already. */
-  onAsk(): void
+  /** Ask the agent about it: it is the selection already. None while the agent is turned off on the board. */
+  onAsk?: () => void
   /** The palette, on it. */
   onMore(): void
 }
@@ -86,9 +86,11 @@ export function ObjectSheet({ runtime, id, draft, editing, onEditing, back, onCl
             <SlidersHorizontalIcon className="size-5" />
           </Button>
         )}
-        <Button variant="ghost" size="icon" title="Ask the agent about this" aria-label="Ask the agent about this" onClick={() => leave(onAsk)}>
-          <SparkleIcon className="size-5" />
-        </Button>
+        {onAsk && (
+          <Button variant="ghost" size="icon" title="Ask the agent about this" aria-label="Ask the agent about this" onClick={() => leave(onAsk)}>
+            <SparkleIcon className="size-5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" title="Commands" aria-label="Commands" onClick={onMore}>
           <DotsThreeIcon className="size-5" weight="bold" />
         </Button>

@@ -11,6 +11,14 @@ describe('focus geometry', () => {
     expect(area.h).toBeLessThan(900)
   })
 
+  it('fills the screen to its edges for a full-screen type (a report), still left of the Options panel', () => {
+    const full = focusArea(1600, 900, { full: true })
+    expect(full).toMatchObject({ x: 0, y: 0, h: 900 })
+    // Both stop one gap short of the Options panel.
+    expect(full.x + full.w).toBe(area.x + area.w)
+    expect(full.x + full.w).toBeLessThan(1600 - PANEL_W)
+  })
+
   it('zooms an object until it fills the area, centered', () => {
     const r = toScreen(fillCamera(map, area), map)
     // One side fills the area, the other fits inside it; centered either way.

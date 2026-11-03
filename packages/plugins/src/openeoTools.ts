@@ -26,6 +26,7 @@ const sceneDay = (scene: Scene) => {
 export function openeoCollections(baseUrl: string = OPENEO_BASE_URL) {
   return defineTool({
     id: 'openeo.collections',
+    plugin: 'openeo',
     title: 'List openEO collections',
     description: 'The data collections on EOPF openEO (Sentinel-1, -2, -3), each with its id, its first date and its band names. Use the ids and band names in a process graph\'s load_collection.',
     input: z.object({}),
@@ -54,6 +55,7 @@ export function openeoCoverage(baseUrl: string = OPENEO_BASE_URL) {
   }
   return defineTool({
     id: 'openeo.coverage',
+    plugin: 'openeo',
     title: 'Check openEO data coverage',
     description:
       'How many scenes a collection has over the CENTRE of an area in some dates, with each day\'s lowest cloud cover. Call it before openeo__proposeGraph: EOPF\'s collections are sparse (some have no scenes for months, or outside parts of Europe), ' +
@@ -102,6 +104,7 @@ const PREVIEW_TIMEOUT_MS = 100_000
 export function openeoPreview(render: (graph: ProcessGraph, signal: AbortSignal) => Promise<Response>) {
   return defineTool({
     id: 'openeo.preview',
+    plugin: 'openeo',
     title: 'Preview an openEO graph',
     description:
       'Dry run: EOPF renders your process graph once, on a box of about 1 km at the centre of the area, and says whether it works. ' +

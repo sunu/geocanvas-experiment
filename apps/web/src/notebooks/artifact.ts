@@ -12,6 +12,7 @@ const LON_LAT = /CRS84$|EPSG::?4326$/i
 export function notebookArtifactTool(nbf: Pick<NotebookFactory, 'getRun'>) {
   return defineTool({
     id: 'notebooks.artifact',
+    plugin: 'notebooks',
     title: 'Notebook result',
     description:
       'A GeoJSON file published by a Notebook Factory run (e.g. exposure by subdivision), as features with the ' +

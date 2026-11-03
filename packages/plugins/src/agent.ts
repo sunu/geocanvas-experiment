@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { Chat, defineOp, definePlugin, stableJson, type Board, type BoardTx, type TurnUndo } from '@ttx/core'
+import { BoardSkills, Chat, defineOp, definePlugin, MAX_BOARD_SKILLS, skillSchema, stableJson, type Board, type BoardSkill, type BoardTx, type TurnUndo } from '@ttx/core'
+import { SKILLS } from './skills/index.js'
 
 /**
  * Ops for the board's agent. The agent itself (src/agent/) runs in the room Durable Object, or in a browser on a person's own key.
@@ -62,9 +63,53 @@ function revert(tx: BoardTx, { created, before }: TurnUndo) {
   for (const [id, { id: _id, type, ...fields }] of Object.entries(before)) tx.restore(id, type, fields)
 }
 
+/**
+ * The board's own skills (plans/plan-026.md), written in Settings. Hidden, and refused for any actor but a person: a
+ * skill goes into every later turn for everyone, so an agent that wrote one from text it read (a feed item, a PDF)
+ * would leave a prompt injection on the board.
+ */
+const onlyPeople = (kind: string) => {
+  if (kind !== 'user') throw new Error('Only people can change board skills')
+}
+
+const setSkill = defineOp<{ id?: string; skill: z.infer<typeof skillSchema> }, { id: string; skill: Omit<BoardSkill, 'id'> }>({
+  id: 'agent.setSkill',
+  title: 'Save board skill',
+  description: 'Add a skill for the agent on this board, or replace one, for everyone. Undo does not cover it.',
+  target: { kind: 'canvas' },
+  hidden: true,
+  args: z.object({ id: z.string().optional(), skill: skillSchema }),
+  prepare(ctx, { id, skill }) {
+    onlyPeople(ctx.actor.kind)
+    const others = new BoardSkills(ctx.board.doc).list().filter((s) => s.id !== id)
+    if (SKILLS.some((s) => s.name === skill.name)) throw new Error(`${skill.name} is the name of a built-in skill`)
+    if (others.some((s) => s.name === skill.name)) throw new Error(`This board has a skill named ${skill.name}`)
+    if (!id && others.length >= MAX_BOARD_SKILLS) throw new Error(`A board has at most ${MAX_BOARD_SKILLS} skills`)
+    const by = ctx.actor.onBehalfOf ?? ctx.actor.id
+    return { id: id ?? crypto.randomUUID(), skill: { ...skill, ...(by && { by }), at: Date.now() } }
+  },
+  apply: (tx, { id, skill }) => tx.setSkill(id, skill),
+})
+
+const removeSkill = defineOp<{ id: string }>({
+  id: 'agent.removeSkill',
+  title: 'Delete board skill',
+  description: 'Delete one of the skills of this board, for everyone. Undo does not cover it.',
+  target: { kind: 'canvas' },
+  hidden: true,
+  args: z.object({ id: z.string() }),
+  prepare(ctx, args) {
+    onlyPeople(ctx.actor.kind)
+    return args
+  },
+  apply: (tx, { id }) => tx.removeSkill(id),
+})
+
 export const agentPlugin = definePlugin({
   id: 'agent',
   title: 'Agent',
+  description: 'The board\'s agent in the chat, on the server or on your own key.',
+  optional: true,
   dependsOn: ['core'],
-  ops: [undoTurn, revertOp],
+  ops: [undoTurn, revertOp, setSkill, removeSkill],
 })

@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from 'react'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
-import { Chat, Runtime, Uploads } from '@ttx/core'
+import { Chat, People, Runtime, Uploads } from '@ttx/core'
 import { plugins } from '../plugins'
 import type { Board, BoardObject } from './board'
-import { personActor } from './person'
+import { claimColor } from './collaborators'
+import { personActor, savePerson } from './person'
 import { tools } from '../tools/registry'
 
 /** Join a room: the Worker routes /connect/<room> to that room's Durable Object. */
@@ -14,9 +15,21 @@ export function connect(room: string) {
   const provider = new WebsocketProvider(url, room, doc)
   const runtime = new Runtime({ doc, plugins, actor: personActor(), tools })
   provider.awareness.setLocalStateField('user', runtime.actor)
+  // Everyone on the board has a color of their own (collaborators.ts).
+  claimColor(runtime.actor, provider.awareness, () => savePerson(runtime.actor))
+  // This person's current name on the board, for what shows records they wrote (chat, code runs): a rename or a new
+  // color changes their presence. After the sync, so it is written only when it differs from the board's.
+  const people = new People(doc)
+  whenSynced(provider, () => {
+    const keep = () => people.set(runtime.actor)
+    keep()
+    provider.awareness.on('change', ({ updated }: { updated: number[] }) => {
+      if (updated.includes(provider.awareness.clientID)) keep()
+    })
+  })
   // Merged gesture entries wait for the gesture to end; write them before the tab goes.
   addEventListener('pagehide', () => runtime.flush())
-  return { board: runtime.board as Board, runtime, provider, chat: new Chat(doc), uploads: new Uploads(doc) }
+  return { board: runtime.board as Board, runtime, provider, chat: new Chat(doc), uploads: new Uploads(doc), people }
 }
 
 /** The board's objects, bottom to top; re-renders on any change, local or remote. */

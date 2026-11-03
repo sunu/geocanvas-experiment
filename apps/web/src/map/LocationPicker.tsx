@@ -3,6 +3,7 @@ import { SelectionPlusIcon } from '@phosphor-icons/react'
 import type { MapArea } from '@ttx/plugins'
 import type { Runtime } from '@ttx/core'
 import { askAgent, useAgentCanGeocode } from '../agent/ask'
+import { usePluginsOff } from '../board/plugins'
 import { drawBox } from './draw'
 import { liveMap } from './live'
 import { areaAround, parseLatLon } from './location'
@@ -16,7 +17,7 @@ export function LocationPicker({ runtime, mapId }: { runtime: Runtime; mapId: st
   const [point, setPoint] = useState('')
   const [words, setWords] = useState('')
   const [asked, setAsked] = useState(false)
-  const canAsk = useAgentCanGeocode()
+  const canAsk = useAgentCanGeocode() && !usePluginsOff(runtime).has('agent')
 
   // Leaving focus, or this map going away, ends a drawing in progress.
   useEffect(() => () => drawing?.(), [drawing])

@@ -1,6 +1,6 @@
 # Task: forecast context on the map (issue #43)
 
-Date: 2026-10-28. Status: implemented on `feat/weather-forecast`.
+Date: 2026-10-28. Status: built, in `main` (PR #44). Not built: a point forecast or time series (waits for the Chart widget), a hover value, other variables or models, refreshing a layer to a newer run.
 
 ## Goal
 

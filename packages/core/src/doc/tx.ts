@@ -1,5 +1,7 @@
 import * as Y from 'yjs'
 import type { Registry } from '../plugins/registry.js'
+import { Nav } from '../nav.js'
+import { BoardSkills, type BoardSkill } from '../skills.js'
 import { Views, type SavedView } from '../views.js'
 import type { AnyObject, Board } from './board.js'
 
@@ -101,10 +103,31 @@ export class BoardTx {
     else this.board.meta.delete('title')
   }
 
+  /** Turn optional plugins off on this board, for everyone. Ids not listed are on. */
+  setDisabledPlugins(ids: string[]) {
+    if (ids.length) this.board.meta.set('disabledPlugins', ids)
+    else this.board.meta.delete('disabledPlugins')
+  }
+
+  /** Add or replace one of the board's own skills, for everyone. Checked by the op (agent.setSkill). */
+  setSkill(id: string, skill: Omit<BoardSkill, 'id'>) {
+    new BoardSkills(this.board.doc).entries.set(id, skill)
+  }
+
+  removeSkill(id: string) {
+    new BoardSkills(this.board.doc).entries.delete(id)
+  }
+
   /** Change a person's view of an object, e.g. the agent moves the map of the person who asked. */
   setView(person: string, objectId: string, view: Omit<SavedView, 'at'>) {
     if (!this.board.objects.has(objectId)) throw new Error(`Object ${objectId} does not exist`)
     new Views(this.board.doc).set(person, objectId, view)
+  }
+
+  /** Ask a person's browser to show an object: their canvas moves to it (nav.ts). */
+  showTo(person: string, objectId: string) {
+    if (!this.board.objects.has(objectId)) throw new Error(`Object ${objectId} does not exist`)
+    new Nav(this.board.doc).show(person, objectId)
   }
 
   // --- Layer order ---------------------------------------------------------

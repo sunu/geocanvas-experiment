@@ -1,5 +1,7 @@
 # Plan 017: agent skills and deferred tools
 
+Status: built, in `main` (PR #85).
+
 The board agent (`packages/plugins/src/agent/loop.ts`) sent every op and read-only tool with each model call: 81 tools,
 about 76,000 characters (about 22,000 tokens), up to 12 calls per turn. Its system prompt had every domain rule, also
 when the request was "add a sticky note". This plan makes two changes. Skills keep the domain rules out of the prompt

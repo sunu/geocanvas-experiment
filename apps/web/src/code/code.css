@@ -1,0 +1,315 @@
+/* --- Code cell (plans/plan-021.md) ---------------------------------------- */
+
+.ttx-code {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--ttx-panel);
+  outline: 1px solid var(--ttx-border);
+  outline-offset: -1px;
+  font-size: 12px;
+}
+
+.ttx-code__source,
+.ttx-code__editing {
+  flex: 0 1 auto;
+  max-height: 55%;
+  min-height: 48px;
+  margin: 0;
+  overflow: auto;
+  border-bottom: 1px solid var(--ttx-border);
+  background: #fafafa;
+}
+
+.ttx-code__source {
+  padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, monospace;
+  white-space: pre;
+}
+
+.ttx-code__editing .cm-editor {
+  height: 100%;
+  font-size: 12px;
+}
+
+.ttx-code__editing .cm-editor.cm-focused {
+  outline: none;
+}
+
+.ttx-code__placeholder {
+  color: var(--ttx-muted);
+  font-family: inherit;
+}
+
+.ttx-code__status {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+  color: var(--ttx-muted);
+  border-bottom: 1px solid var(--ttx-border);
+}
+
+.ttx-code__hint {
+  text-align: right;
+}
+
+.ttx-code__run {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ttx-code__run:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ttx-code__problem,
+.ttx-code__error {
+  padding: 6px 10px;
+  border-bottom: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.ttx-code__error-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ttx-code__error-head button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ttx-code__error-head button + button {
+  flex: none;
+  text-decoration: underline;
+}
+
+.ttx-code__error pre {
+  max-height: 140px;
+  margin: 6px 0 0;
+  overflow: auto;
+  font: 11px/1.4 ui-monospace, monospace;
+  white-space: pre-wrap;
+}
+
+.ttx-code__output {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+}
+
+.ttx-code__text {
+  margin: 0;
+  padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, monospace;
+  white-space: pre-wrap;
+}
+
+.ttx-code__number {
+  margin: auto;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.ttx-code__image {
+  width: 100%;
+  object-fit: contain;
+}
+
+.ttx-code__table {
+  flex: 1;
+  overflow: auto;
+}
+
+.ttx-code__table table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.ttx-code__table th,
+.ttx-code__table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--ttx-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ttx-code__table th {
+  position: sticky;
+  top: 0;
+  background: var(--ttx-panel);
+}
+
+.ttx-code__geo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  color: var(--ttx-muted);
+}
+
+.ttx-code__geo svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.ttx-code__geo path {
+  fill: rgb(14 116 144 / 0.15);
+  stroke: #0e7490;
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.ttx-code__geo circle {
+  fill: #0e7490;
+}
+
+/* A code cell's footnote under what shows its output (code/Footnote.tsx): counter-scaled like the label, so it
+   reads the same at any zoom. */
+.ttx-codenote {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max(calc(100% * var(--ttx-zoom, 1)), 360px);
+  padding-top: 4px;
+  transform: scale(calc(1 / var(--ttx-zoom, 1)));
+  transform-origin: 0 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.ttx-codenote__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttx-codenote__flag {
+  padding: 0 4px;
+  white-space: nowrap;
+  border: 1px solid #f59e0b;
+  color: #b45309;
+}
+
+.ttx-codenote__head.is-behind {
+  color: #b45309;
+}
+
+.ttx-codenote__head:hover,
+.ttx-codenote__row:hover {
+  color: var(--ttx-ink);
+}
+
+/* The elements of one object, one row each: hover points them out, click opens their details. */
+.ttx-codenote__rows {
+  width: 420px;
+  max-width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+}
+
+.ttx-codenote__rows .ttx-codenote__body {
+  width: auto;
+  margin: 0;
+  border-width: 1px 0;
+}
+
+.ttx-codenote__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  background: none;
+  color: var(--ttx-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ttx-codenote__row.is-hovered,
+.ttx-codenote__row.is-open {
+  background: color-mix(in srgb, var(--canvas-accent) 10%, transparent);
+}
+
+.ttx-codenote__cell {
+  flex: 1;
+  color: var(--ttx-muted);
+}
+
+.ttx-codenote__body {
+  width: 420px;
+  max-width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--ttx-border);
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+}
+
+.ttx-codenote__state {
+  margin: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ttx-border);
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.ttx-codenote__code .ttx-code__source,
+.ttx-codenote__code .ttx-code__editing {
+  max-height: 220px;
+}
+
+.ttx-codenote__actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.ttx-codenote__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--ttx-border);
+  border-radius: 6px;
+  background: var(--ttx-panel);
+  color: var(--ttx-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttx-codenote__actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

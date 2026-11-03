@@ -1,57 +1,58 @@
-# Plan 020: IFRC GO emergencies on the board, and what HDX links would take
+# Plan 020: a place's disaster history from Montandon
 
-Status: IFRC GO card built. HDX card not built (feasibility below).
+What has happened here before: a country's disasters since 1900, and the local losses of past disasters in an area,
+from Montandon's EM-DAT and DesInventar collections. Two parts: a widget for a country, and a map layer for an area.
 
-Builds on plan-019 (a card from a pasted link; the board stores the link, each browser reads the item). Both
-sources were checked on 2026-10-30 with real requests, not from documentation.
+Status: built, in `main` (PR #92).
 
-## IFRC GO: built
+## Spike (2026-10-30, Montandon staging)
 
-**Feasible, and cheap.** `goadmin.ifrc.org/api/v2` answers anonymous GETs with `access-control-allow-origin: *`
-and a preflight that allows GET, so a browser reads it directly: no Worker route, no key. No rate limit is stated
-and none showed in the headers; a card costs 2 requests.
+| Source | Query | Nepal | Time | Notes |
+| --- | --- | --- | --- | --- |
+| EM-DAT events | by `monty:country_codes`, without geometry | 212 events, 1954–2026 | 0.8 s, 333 KB | with geometry 5.5 s and 5 MB (country outlines) |
+| EM-DAT events | by shape (a district's bbox) | 1,382 events | 122 s | catches every event whose region touches the box: unusable |
+| EM-DAT impacts | by country, without geometry | 551 items | 1.4 s | deaths, affected, injured, cost, displaced |
+| DesInventar impacts | by country | over 12,000 items, still going | over 22 s | too many to read whole |
+| DesInventar impacts | by shape (Chitwan, 0.4 deg²) | 1,775 items, 1971–2013 | 5 s | 553 flood, 413 fire, 272 landslide items; 1,465 deaths |
+| GDACS, IFRC, USGS, IDMC events | by shape | 10, 72, 3, 4 | under 4 s | points, or country and province outlines |
 
-- **Links.** `https://go.ifrc.org/emergencies/<id>` (the web app's routes also have `/overview`, `/details`,
-  `/reports`…, read as the emergency). Not read: `emergencies/slug/<slug>` (needs a lookup), `emergencies/all`,
-  countries, appeals (an appeal has no page of its own, only `appeals/all`), field reports.
-- **One emergency.** `GET /api/v2/event/<id>/` has everything the card shows: severity, `key_figures`,
-  `appeals` (type, code, status, `amount_requested`, `amount_funded`, `num_beneficiaries`, in Swiss francs) and
-  `field_reports`. Its `dtype` is a bare id, while the list endpoint (`/event/?id=<id>`) has the hazard's name but
-  no key figures, so the hazard's name is a second request (`/disaster_type/<id>/`, kept per page for all cards).
-  A missing or non-public emergency answers 404.
-- **Contacts are in the answer** (names, job titles, emails of IFRC staff). The card never copies them, and a test
-  checks that.
-- **Not tied to Montandon.** Montandon's IFRC events and GO's emergencies are different ids; linking one to the
-  other is not built.
-- **Shared with the GitHub card** (`apps/web/src/cards/`, extracted when this second card made them the same
-  concept): the link field, `useCardItem` (load, refresh, loading state) and `perPage` (the cache). What each
-  source shows is its own, so there is no common card model yet.
+- **EM-DAT items join by the id in their item id.** `emdat-event-2015-0114-NPL` and
+  `emdat-impact-2015-0114-NPL-total_deaths`: most items have no `monty:src_event_id` (only recent ones do), so a join
+  on it gave losses to 2026's events only.
+- **Hazards group by EM-DAT's classification code**, which every EM-DAT and DesInventar item carries in
+  `monty:hazard_codes` (`nat-hyd-flo-riv`, `nat-geo-ear-gro`): its first three parts. EM-DAT also records transport and
+  other technological accidents (`tec-…`; 78 of Nepal's 212 events), kept apart.
+- **DesInventar is one item per record, place and loss**: `desinventar-impact-<record>-<type>`, the place a simplified
+  polygon (a ward, a municipality) and named only in the title ("FLOOD in Ward no. 8 on 2013-12-30 …"), inconsistently
+  ("Ward No. 2", "Ward no 8", "None" for 835 of Chitwan's 1,775). No P-codes. So records are shown where they are, not
+  grouped by place name.
+- **DesInventar coverage**: 31 of 50 countries probed (Nepal, India, Mozambique, Kenya, Uganda, Ethiopia, Madagascar,
+  Malawi, Zambia, Senegal, Nigeria, Tunisia, Myanmar, Timor-Leste, Jamaica and most of Latin America); not Pakistan,
+  Bangladesh, Sri Lanka, Indonesia or the Philippines. Mostly up to about 2013.
+- Paging works through the Worker's proxy: Montandon's next link is a POST body with a token.
 
-## HDX: feasible, not built
+## Built
 
-A dataset page is `https://data.humdata.org/dataset/<name>` (and `…/resource/<id>`); the CKAN API gives it as
-JSON.
+- **Disaster history widget** (`history` type, `packages/plugins/src/history.ts`; view in `apps/web/src/history/`):
+  for a country (the HDX widgets' frame and country picker; op `history.setCountry`), EM-DAT's natural hazard
+  disasters since its first record: totals, disasters per decade stacked by hazard family, the five deadliest, and
+  events and deaths by family; a hazard filter shared on the board (`hazard`, op `history.setHazard`, `''` for every
+  natural hazard). Technological events are left out and counted. In the toolbar's event menu, the palette
+  (`history.add`) and for the agent.
+- **Past disasters (DesInventar)** map layer (`DATA_LAYERS.desinventar`, browser tool `history.desinventar`): for an
+  area up to 1 deg², one point per record at the center of its place's polygon, with its hazard family, DesInventar's
+  event type, place, date and losses (deaths, missing, injured, affected, relocated, evacuated, houses destroyed and
+  damaged), colored by hazard family. At most 10,000 impact items, then truncated. Where DesInventar has nothing,
+  the layer says so.
 
-- **Reads work from a browser.** `GET /api/3/action/package_show?id=<name>` is anonymous for public datasets and
-  sends `access-control-allow-origin: *` (also on the error answer and on a preflight, which allows GET and the
-  `Content-Type` header). One request per card. No rate limit is stated and none showed in the headers; HDX HAPI's
-  60 a minute, which the Worker already handles, is a different service.
-- **What a card could show** (from a real dataset, `cod-ab-npl`): `title`, `organization.title`, `notes`
-  (Markdown), `dataset_date` (the period the data covers, as `[start TO end]`), `data_update_frequency` (days),
-  `last_modified`, `license_title`, `caveats`, `methodology`, `dataset_source`, the countries (`groups`), and
-  `resources` (name, format, size, download link). Useful for a situation report: who published it, how fresh it
-  is, its license.
-- **Files are not readable from a browser.** A resource's download link redirects (302) to a signed Amazon S3
-  address, and the first answer allows only `https://data.humdata.org` as origin, so a browser on another origin
-  cannot follow it. A "show this file on a map" button therefore needs a Worker proxy (with its size limit,
-  allow-list of hosts and abuse risk: anyone with a board link could use it), which is a separate decision. A card
-  can link to the files without it.
-- **HAPI already links to HDX datasets** (`metadata/resource`, shown by the country widgets), so those datasets
-  can be named on the board today; a card would let a person paste any dataset.
-- **Open questions:** dataset names can change (the id in the CKAN answer does not; the card could store the
-  name from the link and show the title it reads); datasets with `is_requestdata_type` (files on request) or
-  `private` answer differently, which was not tried; `dataset_date` needs parsing for display.
+Measured in headless Chrome: Nepal's widget in 1.1 s (134 natural hazard disasters 1954–2026, 29.6K deaths, 43.5M
+people affected; deadliest the 2015 earthquake, 8.8K); Chitwan's DesInventar layer in 3 s (894 records). Many records
+share a ward's polygon, so they share a point: 894 records draw as about 100 dots.
 
-Estimate if wanted: about a day, on the shape of the IFRC GO card (parse, canonical link, `package_show`, a summary
-of the metadata, a link per resource). The open parts are datasets that need a request or are private, and showing
-`notes` (Markdown) as text.
+## Later
+
+- The layer's span and totals in the layer list ("1971–2013 · 553 floods · 1,465 deaths"), and records spread or sized
+  by deaths where they share a place.
+- Past events near an event (GDACS, IFRC, USGS points), and a link from an event on the board to its country's
+  history filtered to its hazard.
+- DesInventar by province: its places carry no P-codes, so they would be joined to COD-AB by location.

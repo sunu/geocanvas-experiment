@@ -39,6 +39,8 @@ export const mapLayer = z.object({
   style: layerStyle.optional(),
   /** Its features close the roads they cover, for the map's routes (mapRoutes.ts): e.g. a flood extent. */
   blocks: z.boolean().optional(),
+  /** The code cell that made this layer (code.ts): a run of the cell gives the layer its new features. */
+  from: z.string().optional(),
 })
 export type MapLayer = z.infer<typeof mapLayer>
 
@@ -76,7 +78,15 @@ export const DATA_LAYERS = {
     tool: 'data.healthFacilities',
     input: {},
   },
-} as const satisfies Record<string, { label: string; title: string; tool: string; input: Record<string, unknown> }>
+  desinventar: {
+    label: 'Past disasters (DesInventar), zoomed in',
+    title: 'Past disasters (DesInventar)',
+    tool: 'history.desinventar',
+    input: {},
+    // Each record's hazard as a category: floods, landslides, fires… in their own colors.
+    style: { byProperty: 'hazard' },
+  },
+} as const satisfies Record<string, { label: string; title: string; tool: string; input: Record<string, unknown>; style?: LayerStyle }>
 
 export type DataLayerKey = keyof typeof DATA_LAYERS
 
