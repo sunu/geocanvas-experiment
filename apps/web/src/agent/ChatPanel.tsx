@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowCounterClockwiseIcon, ArrowUpIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, UserIcon, WarningIcon } from '@phosphor-icons/react'
+import { ArrowCounterClockwiseIcon, ArrowUpIcon, BroomIcon, CaretDownIcon, CaretUpIcon, CursorIcon, MicrophoneIcon, SparkleIcon, UserIcon, WarningIcon } from '@phosphor-icons/react'
 import { exchanges, failedCalls, lastCompaction, queuePosition, type Actor, type AgentReply, type Chat, type ChatEntry, type OplogEntry, type Runtime, type TurnUndo, type UserMessage } from '@ttx/core'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
@@ -71,6 +71,9 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
     }
   }
   const indicator = collapsed && (forMe.length > 0 || !!working[0])
+  // Something to compact (a message since the last compaction), and no compaction on its way.
+  const since = entries.slice(lastCompaction(entries).index + 1)
+  const canCompact = since.some((e) => e.kind === 'user' && !e.compact) && !since.some((e) => e.kind === 'user' && e.compact && thread.pending.has(e.id))
   const [onlyMine, setOnlyMine] = useState(loadOnlyMine)
   function toggleMine() {
     setOnlyMine(!onlyMine)
@@ -107,11 +110,23 @@ export function ChatPanel({ runtime, chat, awareness }: { runtime: Runtime; chat
             </span>
           </span>
         )}
+        {!collapsed && canCompact && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="ml-auto"
+            title="Compact chat: the agent summarizes it, and the earlier messages are hidden for everyone"
+            aria-label="Compact chat"
+            onClick={() => compactChat(runtime, chat, ownWithoutKey ? 'room' : mode)}
+          >
+            <BroomIcon className="size-4" />
+          </Button>
+        )}
         {!collapsed && (
           <Button
             variant="ghost"
             size="icon-sm"
-            className={cn('ml-auto', onlyMine && 'bg-accent')}
+            className={cn(!canCompact && 'ml-auto', onlyMine && 'bg-accent')}
             title={onlyMine ? 'Show everyone’s requests' : 'Show only my requests'}
             aria-label="Show only my requests"
             aria-pressed={onlyMine}
@@ -201,6 +216,14 @@ export function sendMessage(runtime: Runtime, chat: Chat, text: string, selectio
   const center = runtime.view?.center()
   chat.send({ actor: runtime.actor, text: message, selection: [...selection], center, ...(mode === 'own' && { browserTab: TAB_ID }) })
   return true
+}
+
+/**
+ * Ask the agent to compact the chat: it summarizes the chat for its later requests, and the exchanges before are hidden
+ * for everyone (they stay in the doc, with their Undo buttons, behind "Show earlier").
+ */
+function compactChat(runtime: Runtime, chat: Chat, mode: AgentMode) {
+  chat.send({ actor: runtime.actor, text: 'Compact the chat', selection: [], compact: true, ...(mode === 'own' && { browserTab: TAB_ID }) })
 }
 
 /**
