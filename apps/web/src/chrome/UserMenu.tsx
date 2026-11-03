@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon, CaretDownIcon, GearIcon, PlugsConnectedIcon, PlugsIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArrowCounterClockwiseIcon, CaretDownIcon, GearIcon, PlugsConnectedIcon, PlugsIcon, PresentationIcon } from '@phosphor-icons/react'
 import type { Actor, Runtime } from '@ttx/core'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import type { Awareness } from '../board/presence'
 import { PresenceAvatars } from './PresenceAvatars'
 import { SettingsDialog } from './SettingsDialog'
 import { useViewState } from '../canvas/viewState'
+import { startPresenting, stopPresenting, usePresentation } from '../canvas/presentation'
 import { HubStatusDot } from '../code/HubSettings'
 import type { useBridgeStatus } from '../mcp/bridge'
 
@@ -42,6 +43,7 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
   const view = (opId: string) => runtime.dispatch(opId, { kind: 'canvas' }, {})
   const [settings, setSettings] = useState(false)
   const pluginsOff = usePluginsOff(runtime)
+  const presenting = usePresentation().presenting !== null
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
     <div className="ttx-ui ttx-shell fixed top-2 right-2 z-[1000002] flex items-center gap-2 rounded-xl border bg-card p-3 font-sans shadow-sm">
@@ -83,6 +85,17 @@ export function UserMenu({ runtime, status, actor, awareness, bridge }: Props) {
           <DropdownMenuItem onSelect={() => view('core.view.resetZoom')}>Reset zoom (100%)</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <Hint label={presenting ? 'Stop presenting' : 'Present: others on the board can follow your view'}>
+        <Button
+          variant={presenting ? 'secondary' : 'ghost'}
+          size="icon-sm"
+          aria-label={presenting ? 'Stop presenting' : 'Present'}
+          aria-pressed={presenting}
+          onClick={presenting ? stopPresenting : startPresenting}
+        >
+          <PresentationIcon className="size-4" />
+        </Button>
+      </Hint>
       <PresenceAvatars awareness={awareness} />
       <Avatar>
         <AvatarFallback className="bg-muted text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</AvatarFallback>
