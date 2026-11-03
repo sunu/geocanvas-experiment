@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { Chat, Runtime, ToolRunner, Views, type Actor, type AgentReply, type AnyObject, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
+import { Chat, People, Runtime, ToolRunner, Views, type Actor, type AgentReply, type AnyObject, type ChatEntry, type ToolDef, type UserMessage } from '@ttx/core'
 import {
   Agent,
   boardGet,
@@ -247,6 +247,19 @@ describe('runTurn', () => {
     expect(request).not.toContain('ada 0')
     expect(request).toContain(`- Ada (asker): ada 1\n- Agent to Ada (asker): done 1\n- Ada (asker): ada 2`)
     expect(request).toContain(`- Agent to Ada (asker): done 3\n- Ben: ben 0\n`)
+  })
+
+  it("names people by their current name, also in messages sent before they renamed themselves", async () => {
+    const { doc, chat } = board()
+    const otter: Actor = { kind: 'user', id: 'ada', name: 'Otter' }
+    const before: ChatEntry = { kind: 'user', id: 'old', actor: otter, text: 'add a map', selection: [], at: Date.now() - 1000 }
+    new People(doc).set({ ...ada, name: 'Ada' })
+    const message = chat.send({ actor: ada, text: 'now', selection: [] })
+    const model = scripted()
+    await turn(new Runtime({ doc, plugins, actor: { kind: 'agent', id: 'agent' } }), message, model.complete, [], [before])
+    const request = model.seen[0]![1]!.content as string
+    expect(request).toContain('- Ada (asker): add a map\n\nAda (person id ada) asks: now')
+    expect(request).not.toContain('Otter')
   })
 
   it('starts with the summary of the last compaction', async () => {

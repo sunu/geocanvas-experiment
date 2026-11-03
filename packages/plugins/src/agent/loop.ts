@@ -1,6 +1,7 @@
 import {
   BoardSkills,
   exportToolDefs,
+  People,
   exportTools,
   opIdOf,
   summarizeBoard,
@@ -163,7 +164,9 @@ function recentChat(runtime: Runtime, history: ChatEntry[], message: UserMessage
  */
 function chatLines(runtime: Runtime, entries: ChatEntry[], all: ChatEntry[], asker?: string): string[] {
   const askers = new Map(all.flatMap((e) => (e.kind === 'user' ? [[e.id, e.actor] as const] : [])))
-  const name = (actor: { name?: string; id: string }) => `${actor.name ?? actor.id}${actor.id === asker ? ' (asker)' : ''}`
+  // People's current names: a message keeps the name its sender had then.
+  const people = new People(runtime.board.doc)
+  const name = (actor: { name?: string; id: string }) => `${people.nameOf(actor.id, actor.name) ?? actor.id}${actor.id === asker ? ' (asker)' : ''}`
   return entries.map((e) => {
     if (e.kind === 'user') {
       const selected = e.selection.length ? ` [selected: ${e.selection.map((id) => named(runtime, id)).join(', ')}]` : ''
@@ -203,7 +206,8 @@ function request(runtime: Runtime, message: UserMessage, history: ChatEntry[]): 
     const o = runtime.board.get(id)
     return o ? [describe(runtime, o)] : []
   })
-  const who = `${message.actor.name ?? 'Someone'} (person id ${message.actor.id})`
+  const asker = new People(runtime.board.doc).nameOf(message.actor.id, message.actor.name)
+  const who = `${asker ?? 'Someone'} (person id ${message.actor.id})`
   const views = new Views(runtime.board.doc)
   const maps = runtime.board.list().flatMap((o) => {
     const view = o.type === 'map' && views.get(message.actor.id, o.id)
@@ -211,7 +215,7 @@ function request(runtime: Runtime, message: UserMessage, history: ChatEntry[]): 
     const a = areaOfView(view, o.w, o.h - MAP_HEADER_PX)
     return [`- map ${o.id}: west ${a.west.toFixed(2)} south ${a.south.toFixed(2)} east ${a.east.toFixed(2)} north ${a.north.toFixed(2)}`]
   })
-  const mapViews = maps.length ? `\n\nWhat ${message.actor.name ?? 'they'} see on each map:\n${maps.join('\n')}` : ''
+  const mapViews = maps.length ? `\n\nWhat ${asker ?? 'they'} see on each map:\n${maps.join('\n')}` : ''
   const center = message.center ? `\n\nView center: (${Math.round(message.center.x)}, ${Math.round(message.center.y)})` : ''
   return `${recentChat(runtime, history, message)}${who} asks: ${message.text}\n\nSelected (${selected.length}):\n${selected.join('\n') || '(nothing)'}${mapViews}${center}`
 }
